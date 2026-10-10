@@ -42,7 +42,7 @@ function openApp(id, { push }) {
   const app = catalog.apps.find(a => a.id === id);
   if (!app) return;
   if (push) {
-    history.pushState({ app: id }, '', `/?app=${encodeURIComponent(id)}`);
+    history.pushState({ app: id }, '', `/app/${encodeURIComponent(id)}`);
     pushedHistory = true;
   }
   loading.hidden = false;
@@ -103,10 +103,15 @@ async function init() {
   appsOrigin = resolveAppsOrigin(catalog.appsOrigin);
   renderGrid();
 
-  const deepLink = new URLSearchParams(location.search).get('app');
-  if (deepLink) {
-    history.replaceState({ app: deepLink }, '', location.href);
+  // /app/<id> deep links; ?app=<id> is the older form, still accepted.
+  // Paths (not query strings) let analytics count each app separately.
+  const deepLink = location.pathname.match(/^\/app\/([\w-]+)\/?$/)?.[1]
+    ?? new URLSearchParams(location.search).get('app');
+  if (deepLink && catalog.apps.some(a => a.id === deepLink)) {
+    history.replaceState({ app: deepLink }, '', `/app/${deepLink}`);
     openApp(deepLink, { push: false });
+  } else if (deepLink) {
+    history.replaceState(null, '', '/');
   }
 }
 

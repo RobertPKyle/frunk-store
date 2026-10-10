@@ -56,7 +56,7 @@ await check('fractal renders with worker threads', async () => {
 await check('home button closes app', async () => {
   await page.click('#home');
   await page.waitForSelector('#runner', { state: 'hidden' });
-  if (new URL(page.url()).search) throw new Error(`URL still has query: ${page.url()}`);
+  if (new URL(page.url()).pathname !== '/') throw new Error(`URL not reset: ${page.url()}`);
 });
 
 await check('breakout runs and launches', async () => {
@@ -71,8 +71,13 @@ await check('breakout runs and launches', async () => {
   await page.screenshot({ path: shots + 'breakout.png' });
 });
 
+await check('old ?app= link redirects to /app/ path', async () => {
+  await page.goto(base + '/?app=breakout');
+  await page.waitForFunction(() => location.pathname === '/app/breakout');
+});
+
 await check('probe deep link + isolation inside frame', async () => {
-  await page.goto(base + '/?app=probe');
+  await page.goto(base + '/app/probe');
   const frame = await (async () => {
     for (let i = 0; i < 50; i++) {
       const f = page.frames().find(f => f.url().includes('/probe/'));

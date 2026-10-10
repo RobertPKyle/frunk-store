@@ -75,6 +75,15 @@ h1 { font-size: 30px; line-height: 1.15; margin: 8px 0 4px; letter-spacing: -0.0
 .req code { font-size: 13px; background: #22262e; padding: 1px 5px; border-radius: 5px; }
 .contact .req-note { margin-top: 10px; font-size: 14px; }
 
+.foot p { margin: 0; }
+.foot .support { font-size: 15px; color: #c3cad6; }
+.coffee {
+  display: inline-flex; align-items: center; gap: 10px; margin: 12px 0 20px;
+  min-height: 48px; padding: 10px 22px; border-radius: 12px;
+  background: var(--accent); color: #111418; font-weight: 700; font-size: 16px; text-decoration: none;
+}
+.coffee:active { transform: scale(.98); }
+
 .foot { color: var(--muted); font-size: 13px; text-align: center; padding: 16px 24px 24px; }
 
 /* Full-viewport app runner */

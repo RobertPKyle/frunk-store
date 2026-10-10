@@ -21,6 +21,13 @@ async function serve(dir, port, host) {
     for (const { key, value } of headers) res.setHeader(key, value);
     let path = normalize(decodeURIComponent(new URL(req.url, 'http://x').pathname));
     if (path.includes('..')) { res.writeHead(400).end(); return; }
+    // Vercel injects the analytics script in production; stub it locally
+    if (path.startsWith('/_vercel/insights/')) {
+      res.writeHead(200, { 'Content-Type': 'text/javascript' }).end('');
+      return;
+    }
+    // mirror the hub's vercel.json rewrite of /app/:id to the shell
+    if (dir === 'hub' && /^\/app\/[\w-]+\/?$/.test(path)) path = '/index.html';
     let file = join(root, dir, path);
     try {
       if ((await stat(file)).isDirectory()) file = join(file, 'index.html');
