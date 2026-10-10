@@ -1,0 +1,14 @@
+{
+  "name": "frunk-store",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:wasm": "node tools/build-wasm.mjs",
+    "dev": "node tools/dev.mjs",
+    "test:e2e": "node tools/e2e.mjs"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.64.0",
+    "wabt": "^1.0.39"
+  }
+}

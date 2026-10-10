@@ -1,0 +1,29 @@
+{
+  "appsOrigin": "https://frunk-apps.vercel.app",
+  "apps": [
+    {
+      "id": "breakout",
+      "name": "Brick Breaker",
+      "tagline": "Classic paddle game. Drag to move, tap to launch.",
+      "path": "/breakout/",
+      "icon": "/breakout/icon.svg",
+      "tags": ["Game", "Controller", "WebGL"]
+    },
+    {
+      "id": "fractal",
+      "name": "Fractal Explorer",
+      "tagline": "Multi-threaded WebAssembly Mandelbrot. Pinch to zoom.",
+      "path": "/fractal/",
+      "icon": "/fractal/icon.svg",
+      "tags": ["WASM threads", "SIMD", "Controller"]
+    },
+    {
+      "id": "probe",
+      "name": "Car Benchmark",
+      "tagline": "See what this car's browser can do.",
+      "path": "/probe/",
+      "icon": "/probe/icon.svg",
+      "tags": ["Tool"]
+    }
+  ]
+}

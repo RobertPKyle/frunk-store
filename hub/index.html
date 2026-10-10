@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0b0d10">
+<title>frunk.store</title>
+<meta name="description" content="Apps made for the Tesla in-car browser.">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/hub.css">
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="/"><span class="mark">frunk</span><span class="tld">.store</span></a>
+  <button id="fullscreen" class="ghost" hidden>Full screen</button>
+</header>
+
+<main>
+  <h1>Apps for your car's browser</h1>
+  <p class="lede">Games and tools built to run on the center screen while you're parked.</p>
+  <div id="grid" class="grid" aria-live="polite"></div>
+  <p id="catalogError" class="error" hidden></p>
+</main>
+
+<footer class="foot">
+  Unofficial. Not affiliated with Tesla, Inc. Use apps only while parked.
+</footer>
+
+<div id="runner" class="runner" hidden>
+  <iframe id="frame" title="App"
+    allow="fullscreen; gamepad; autoplay; encrypted-media; cross-origin-isolated"
+    sandbox="allow-scripts allow-same-origin allow-pointer-lock allow-forms"></iframe>
+  <div id="loading" class="loading"><span class="spinner"></span></div>
+  <button id="home" class="home" aria-label="Back to apps">‹ Apps</button>
+</div>
+
+<script type="module" src="/hub.js"></script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+{
+  "redirects": [
+    { "source": "/", "destination": "https://frunk.store/", "permanent": false }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "Cross-Origin-Opener-Policy", "value": "same-origin" },
+        { "key": "Cross-Origin-Embedder-Policy", "value": "require-corp" },
+        { "key": "Cross-Origin-Resource-Policy", "value": "cross-origin" },
+        { "key": "Content-Security-Policy", "value": "frame-ancestors 'self' https://frunk.store https://www.frunk.store https://frunk-store.vercel.app" },
+        { "key": "X-Content-Type-Options", "value": "nosniff" }
+      ]
+    }
+  ]
+}
