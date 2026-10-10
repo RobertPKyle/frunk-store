@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 const root = fileURLToPath(new URL('..', import.meta.url));
 const TYPES = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css',
-  '.json': 'application/json', '.svg': 'image/svg+xml', '.wasm': 'application/wasm', '.png': 'image/png',
+  '.json': 'application/json', '.svg': 'image/svg+xml', '.wasm': 'application/wasm', '.png': 'image/png', '.woff2': 'font/woff2',
 };
 
 async function serve(dir, port, host) {

@@ -1,7 +1,7 @@
 // Network-first cache for the hub shell and catalog, so the hub still opens
 // when the car has a weak or no connection.
-const CACHE = 'frunk-hub-v1';
-const SHELL = ['/', '/hub.css', '/hub.js', '/catalog.json', '/icon.svg'];
+const CACHE = 'frunk-hub-v4';
+const SHELL = ['/', '/hub.css', '/hub.js', '/catalog.json', '/icon.svg', '/brand/frunk-mark-on-dark.svg', '/fonts/unbounded-latin.woff2'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));

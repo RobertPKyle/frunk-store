@@ -1,4 +1,13 @@
 /* Sized for the Model 3 browser viewport: about 773x601 CSS px. */
+
+/* Unbounded (SIL OFL 1.1, see /fonts/OFL.txt), variable weight, latin subset */
+@font-face {
+  font-family: "Unbounded";
+  src: url("/fonts/unbounded-latin.woff2") format("woff2");
+  font-weight: 200 900;
+  font-display: swap;
+}
+
 :root {
   --bg: #0b0d10;
   --card: #15181d;
@@ -16,9 +25,9 @@ body { font: 17px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; min-hei
 button { font: inherit; color: inherit; cursor: pointer; }
 
 .top { display: flex; align-items: center; justify-content: space-between; padding: 16px 24px; }
-.brand { text-decoration: none; color: var(--text); font-size: 26px; letter-spacing: -0.02em; }
-.brand .mark { font-weight: 800; }
-.brand .tld { color: var(--accent); font-weight: 600; }
+.brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--text); font: 700 24px/1 "Unbounded", system-ui, sans-serif; letter-spacing: -0.02em; }
+.brand img { display: block; }
+.brand .tld { color: var(--accent); font-weight: 500; }
 
 .ghost { background: transparent; border: 1px solid var(--line); border-radius: 12px; padding: 10px 18px; min-height: 48px; }
 .ghost:active { background: var(--card); }
@@ -43,6 +52,28 @@ h1 { font-size: 30px; line-height: 1.15; margin: 8px 0 4px; letter-spacing: -0.0
 
 .skeleton { background: var(--card); border-radius: var(--radius); min-height: 190px; opacity: .5; }
 .error { color: #ff8a80; }
+
+.contact { margin-top: 28px; padding: 20px; border: 1px solid var(--line); border-radius: var(--radius); }
+.contact h2 { font-size: 19px; margin: 0 0 6px; }
+.contact p { margin: 0; color: var(--muted); }
+.contact a { color: var(--accent); font-weight: 600; word-break: break-all; }
+
+.reqs { margin-top: 16px; border-top: 1px solid var(--line); padding-top: 4px; }
+.reqs summary {
+  cursor: pointer; list-style: none; display: flex; align-items: center; justify-content: space-between;
+  min-height: 52px; font-weight: 600; font-size: 17px;
+}
+.reqs summary::-webkit-details-marker { display: none; }
+.reqs summary::after { content: "+"; font-size: 26px; font-weight: 400; color: var(--accent); }
+.reqs[open] summary::after { content: "−"; }
+.req-grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); padding: 6px 0 4px; }
+.req { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; }
+.req-wide { grid-column: 1 / -1; }
+.req h3 { margin: 0 0 8px; font-size: 16px; color: var(--accent); }
+.req ul { margin: 0; padding-left: 18px; color: #c3cad6; font-size: 15px; }
+.req li + li { margin-top: 6px; }
+.req code { font-size: 13px; background: #22262e; padding: 1px 5px; border-radius: 5px; }
+.contact .req-note { margin-top: 10px; font-size: 14px; }
 
 .foot { color: var(--muted); font-size: 13px; text-align: center; padding: 16px 24px 24px; }
 

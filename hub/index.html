@@ -7,11 +7,15 @@
 <title>frunk.store</title>
 <meta name="description" content="Apps made for the Tesla in-car browser.">
 <link rel="icon" href="/icon.svg" type="image/svg+xml">
+<link rel="preload" href="/fonts/unbounded-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/hub.css">
 </head>
 <body>
 <header class="top">
-  <a class="brand" href="/"><span class="mark">frunk</span><span class="tld">.store</span></a>
+  <a class="brand" href="/" aria-label="frunk.store home">
+    <img src="/brand/frunk-mark-on-dark.svg" alt="" width="42" height="42">
+    <span><span class="mark">frunk</span><span class="tld">.store</span></span>
+  </a>
   <button id="fullscreen" class="ghost" hidden>Full screen</button>
 </header>
 
@@ -20,6 +24,68 @@
   <p class="lede">Games and tools built to run on the center screen while you're parked.</p>
   <div id="grid" class="grid" aria-live="polite"></div>
   <p id="catalogError" class="error" hidden></p>
+
+  <section class="contact" id="submit" aria-labelledby="submit-title">
+    <h2 id="submit-title">Built something for the car's browser?</h2>
+    <p>Send your app, an idea, or a question to
+      <a href="mailto:frunkstore@protonmail.com">frunkstore@protonmail.com</a></p>
+
+    <details class="reqs">
+      <summary>App submission requirements</summary>
+      <div class="req-grid">
+        <div class="req">
+          <h3>Languages &amp; tech</h3>
+          <ul>
+            <li>HTML, CSS and JavaScript. TypeScript is fine once compiled to JS.</li>
+            <li>WebAssembly from C, C++, Rust, Go, Zig or AssemblyScript (Emscripten, wasm-pack, etc.). SIMD and threads work.</li>
+            <li>Graphics: WebGL 2 or Canvas. WebGPU is not available.</li>
+            <li>Any framework or engine (React, Svelte, Phaser, PixiJS, three.js, Godot web export) if it stays within the size limit.</li>
+            <li>Static files only, with an <code>index.html</code> entry. No server code.</li>
+            <li>Not accepted: native binaries, Android/iOS apps, browser extensions.</li>
+          </ul>
+        </div>
+        <div class="req">
+          <h3>Fits the car</h3>
+          <ul>
+            <li>Landscape layout that works at 773×601 CSS pixels with no sideways scrolling, and scales up for full screen.</li>
+            <li>Touch first: tap targets at least 44 px, no hover-only controls, no keyboard required. Gamepad support is a bonus.</li>
+            <li>Runs smoothly on the slowest cars (Intel Atom, 4 cores): aim for 30 fps or better.</li>
+            <li>Under 25 MB total; under 5 MB is recommended. Should load in about 10 seconds on LTE.</li>
+            <li>Sound starts only after the user taps.</li>
+            <li>Works offline after the first load (recommended).</li>
+          </ul>
+        </div>
+        <div class="req">
+          <h3>How apps run</h3>
+          <ul>
+            <li>Apps open in a sandboxed frame. Pop-ups and leaving frunk.store are blocked.</li>
+            <li>localStorage and IndexedDB work. Prefix keys with your app id.</li>
+            <li>The page is cross-origin isolated: anything loaded from another domain must be HTTPS and send CORS or <code>Cross-Origin-Resource-Policy</code> headers. Bundling assets is easier.</li>
+          </ul>
+        </div>
+        <div class="req">
+          <h3>Rules</h3>
+          <ul>
+            <li>Made for parked use. Nothing meant for use while driving and nothing that gets around the car's driving limits.</li>
+            <li>You own or have the rights to all code, art and audio. Open-source licenses are fine; include them. No copyrighted ROMs or pirated games.</li>
+            <li>No malware, crypto mining, hidden tracking, or collecting passwords.</li>
+            <li>Don't use Tesla's or anyone else's branding as your own.</li>
+            <li>No adult content.</li>
+          </ul>
+        </div>
+        <div class="req req-wide">
+          <h3>What to send</h3>
+          <ul>
+            <li>App name, a one-line description, and a category (game, tool, media, other).</li>
+            <li>A link to the source repo, or a zip of the built files.</li>
+            <li>A square icon (SVG, or PNG at 512×512) and a screenshot at 773×601.</li>
+            <li>The license, and which controls it supports: touch, gamepad, keyboard.</li>
+          </ul>
+          <p class="req-note">Every app is tested in a real car before it's listed.</p>
+        </div>
+      </div>
+    </details>
+  </section>
 </main>
 
 <footer class="foot">
