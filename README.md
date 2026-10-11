@@ -28,6 +28,12 @@ the apps are served from.
   (`fractal.wat`, f64x2 SIMD). It renders on a pool of workers that share one
   memory, and falls back to the main thread when the page is not isolated.
 - `apps/probe`: browser capability probe and benchmark.
+- `apps/sleep`, `apps/fireplace`, `apps/stars`: Camp Mode apps (Sleep Sounds,
+  Campfire, Star Map). Sounds come from `apps/_shared/ambient.js`, which
+  generates everything with Web Audio. Star data is built by
+  `node tools/build-stars.mjs` from d3-celestial (BSD-3-Clause), and the
+  planet and Moon math in `apps/stars/astro.js` was checked against JPL
+  Horizons to within about 0.1°.
 
 ## Commands
 

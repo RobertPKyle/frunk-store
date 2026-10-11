@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Sleep Sounds</title>
+<style>
+  :root { --bg: #050608; --tile: #101318; --tile-on: #1d1a12; --line: #20242c; --text: #c9ced8; --muted: #737b89; --amber: #e0a24a; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 16px/1.4 system-ui, sans-serif; user-select: none; -webkit-tap-highlight-color: transparent; }
+  body { display: flex; flex-direction: column; padding: 14px 20px 16px; gap: 14px; overflow: hidden; }
+  button { font: inherit; color: inherit; cursor: pointer; }
+
+  .clock { text-align: center; padding-top: 4px; background: none; border: 0; }
+  .time { font-size: 76px; font-weight: 200; letter-spacing: 0.02em; line-height: 1; color: var(--amber); opacity: .85; font-variant-numeric: tabular-nums; }
+  .date { color: var(--muted); font-size: 15px; margin-top: 4px; }
+
+  .presets { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+  .chip { min-height: 44px; padding: 8px 16px; border-radius: 999px; background: var(--tile); border: 1px solid var(--line); font-size: 15px; }
+  .chip[aria-pressed="true"] { border-color: var(--amber); color: var(--amber); }
+
+  .grid { flex: 1; display: grid; gap: 10px; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-auto-rows: minmax(0, 1fr); min-height: 0; }
+  .tile { display: flex; flex-direction: column; justify-content: center; gap: 4px; padding: 10px 12px; border-radius: 16px; background: var(--tile); border: 1px solid var(--line); min-height: 0; }
+  .tile.on { background: var(--tile-on); border-color: #5a4422; }
+  .tile button { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; background: none; border: 0; padding: 0; min-height: 44px; font-size: 16px; }
+  .tile svg { flex: none; color: var(--muted); }
+  .tile.on svg { color: var(--amber); }
+  .tile input { width: 100%; accent-color: var(--amber); height: 32px; display: none; }
+  .tile.on input { display: block; }
+
+  .bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: center; }
+  .bar .label { color: var(--muted); font-size: 14px; margin-right: 2px; }
+  .bar .spacer { flex: 1; }
+  .countdown { color: var(--amber); font-variant-numeric: tabular-nums; min-width: 52px; font-size: 15px; }
+  .action { min-height: 44px; padding: 8px 18px; border-radius: 12px; background: var(--tile); border: 1px solid var(--line); }
+
+  /* Dim mode: almost black, only a deep red clock */
+  #dim { position: fixed; inset: 0; background: #000; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; z-index: 5; border: 0; }
+  #dim[hidden] { display: none; }
+  #dim .time { color: #6b1d12; opacity: 1; font-size: 96px; }
+  #dim .hint { color: #2b0d08; font-size: 14px; }
+
+  @media (max-width: 600px) {
+    .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: auto; overflow: auto; }
+    .time { font-size: 56px; }
+  }
+</style>
+</head>
+<body>
+<button class="clock" id="clockBtn" aria-label="Switch 12 or 24 hour clock">
+  <div class="time" id="time">--:--</div>
+  <div class="date" id="date"></div>
+</button>
+
+<div class="presets" id="presets" role="group" aria-label="Presets">
+  <button class="chip" id="resume" type="button" hidden>Resume last mix</button>
+</div>
+
+<div class="grid" id="grid"></div>
+
+<div class="bar">
+  <span class="label">Sleep timer</span>
+  <span id="timers" role="group" aria-label="Sleep timer" style="display:flex;gap:6px;flex-wrap:wrap"></span>
+  <span class="countdown" id="countdown"></span>
+  <span class="spacer"></span>
+  <button class="action" id="stop">Stop all</button>
+  <button class="action" id="dimBtn">Dim screen</button>
+</div>
+
+<button id="dim" hidden aria-label="Wake screen">
+  <div class="time" id="dimTime">--:--</div>
+  <div class="hint">Tap to wake</div>
+</button>
+
+<script type="module" src="sleep.js"></script>
+<script src="/sw-register.js"></script>
+</body>
+</html>

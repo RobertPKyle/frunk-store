@@ -7,7 +7,11 @@
       "tagline": "Classic paddle game. Drag to move, tap to launch.",
       "path": "/breakout/",
       "icon": "/breakout/icon.svg",
-      "tags": ["Game", "Controller", "WebGL"]
+      "tags": [
+        "Game",
+        "Controller",
+        "WebGL"
+      ]
     },
     {
       "id": "fractal",
@@ -15,7 +19,44 @@
       "tagline": "Multi-threaded WebAssembly Mandelbrot. Pinch to zoom.",
       "path": "/fractal/",
       "icon": "/fractal/icon.svg",
-      "tags": ["WASM threads", "SIMD", "Controller"]
+      "tags": [
+        "WASM threads",
+        "SIMD",
+        "Controller"
+      ]
+    },
+    {
+      "id": "sleep",
+      "name": "Sleep Sounds",
+      "tagline": "Rain, ocean, campfire and more for Camp Mode, with a dim clock and sleep timer.",
+      "path": "/sleep/",
+      "icon": "/sleep/icon.svg",
+      "tags": [
+        "Camp Mode",
+        "Offline"
+      ]
+    },
+    {
+      "id": "fireplace",
+      "name": "Campfire",
+      "tagline": "A crackling fire with sparks and crickets. Cozy screen for the campsite.",
+      "path": "/fireplace/",
+      "icon": "/fireplace/icon.svg",
+      "tags": [
+        "Camp Mode",
+        "WebGL"
+      ]
+    },
+    {
+      "id": "stars",
+      "name": "Star Map",
+      "tagline": "What's in the sky tonight: stars, planets and the Moon over your campsite.",
+      "path": "/stars/",
+      "icon": "/stars/icon.svg",
+      "tags": [
+        "Camp Mode",
+        "Offline"
+      ]
     },
     {
       "id": "probe",
@@ -23,7 +64,9 @@
       "tagline": "See what this car's browser can do.",
       "path": "/probe/",
       "icon": "/probe/icon.svg",
-      "tags": ["Tool"]
+      "tags": [
+        "Tool"
+      ]
     }
   ]
 }

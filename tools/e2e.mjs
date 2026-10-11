@@ -32,11 +32,12 @@ async function openFromHub(name) {
   await page.waitForSelector('#loading', { state: 'hidden' });
 }
 
-await check('hub lists 3 apps', async () => {
+await check('hub lists every catalog app', async () => {
   await page.goto(base + '/');
   await page.waitForSelector('.card');
+  const expected = (await (await fetch(base + '/catalog.json')).json()).apps.length;
   const n = await page.locator('.card').count();
-  if (n !== 3) throw new Error(`expected 3 cards, got ${n}`);
+  if (n !== expected) throw new Error(`expected ${expected} cards, got ${n}`);
   if (!(await page.evaluate(() => crossOriginIsolated))) throw new Error('hub not cross-origin isolated');
   await page.screenshot({ path: shots + 'hub.png' });
 });
@@ -90,6 +91,32 @@ await check('probe deep link + isolation inside frame', async () => {
   const json = JSON.parse(await frame.locator('#json').textContent());
   if (json.Compute.crossOriginIsolated !== true) throw new Error('probe reports crossOriginIsolated false');
   await page.screenshot({ path: shots + 'probe.png' });
+});
+
+await check('sleep sounds preset starts audio', async () => {
+  await openFromHub(/Sleep Sounds/);
+  await appFrame().getByRole('button', { name: 'Rainy night' }).click();
+  await appFrame().locator('.tile.on').nth(1).waitFor({ timeout: 5000 });
+  const frame = page.frames().find(f => f.url().includes('/sleep/'));
+  const running = await frame.evaluate(() => new Promise(r => setTimeout(() => r(document.querySelectorAll('.tile.on').length), 300)));
+  if (running !== 2) throw new Error(`expected 2 active sounds, got ${running}`);
+  await appFrame().getByRole('button', { name: 'Stop all' }).click();
+  await page.screenshot({ path: shots + 'sleep.png' });
+});
+
+await check('campfire renders', async () => {
+  await openFromHub(/Campfire/);
+  await appFrame().locator('#fps').filter({ hasText: /fps/ }).waitFor({ timeout: 8000 });
+  console.log(`     ${await appFrame().locator('#fps').textContent()}`);
+  await page.screenshot({ path: shots + 'campfire.png' });
+});
+
+await check('star map draws after picking a place', async () => {
+  await openFromHub(/Star Map/);
+  const picker = appFrame().locator('#picker');
+  if (await picker.isVisible()) await appFrame().getByRole('button', { name: 'Moab' }).click();
+  await appFrame().locator('#when').filter({ hasText: /Now ·/ }).waitFor({ timeout: 8000 });
+  await page.screenshot({ path: shots + 'stars.png' });
 });
 
 await check('no console or page errors', async () => {
