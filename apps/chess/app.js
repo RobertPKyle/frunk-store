@@ -179,7 +179,7 @@ async function load() {
     statusEl.textContent = "Couldn't load today's puzzle";
     setSub('Check the connection and reload.');
     resetBtn.hidden = true;
-    giveupBtn.hidden = true;
+    hintBtn.hidden = true;
     return;
   }
   puzzle = p;
