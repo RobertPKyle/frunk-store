@@ -1,24 +1,8 @@
 // Star Map: the sky overhead for a place and time, drawn as a planisphere
 // (zenith in the center, horizon on the rim, north up, east left). Stars and
 // constellations come from sky.json; the Sun, Moon and planets are computed.
-import { julianDay, localSiderealTime, toHorizon, sun, moon, planet, PLANETS } from './astro.js';
-
-const CITIES = [
-  ['Seattle', 47.61, -122.33], ['Portland', 45.52, -122.68], ['San Francisco', 37.77, -122.42],
-  ['Los Angeles', 34.05, -118.24], ['San Diego', 32.72, -117.16], ['Las Vegas', 36.17, -115.14],
-  ['Phoenix', 33.45, -112.07], ['Salt Lake City', 40.76, -111.89], ['Denver', 39.74, -104.99],
-  ['Austin', 30.27, -97.74], ['Dallas', 32.78, -96.8], ['Houston', 29.76, -95.37],
-  ['Minneapolis', 44.98, -93.27], ['Chicago', 41.88, -87.63], ['Nashville', 36.16, -86.78],
-  ['Atlanta', 33.75, -84.39], ['Orlando', 28.54, -81.38], ['Miami', 25.76, -80.19],
-  ['Washington DC', 38.91, -77.04], ['New York', 40.71, -74.01], ['Boston', 42.36, -71.06],
-  ['Yosemite', 37.87, -119.54], ['Grand Canyon', 36.06, -112.14], ['Zion', 37.3, -113.03],
-  ['Moab', 38.57, -109.55], ['Yellowstone', 44.43, -110.59],
-  ['Vancouver', 49.28, -123.12], ['Calgary', 51.05, -114.07], ['Toronto', 43.65, -79.38], ['Montreal', 45.5, -73.57],
-  ['London', 51.51, -0.13], ['Paris', 48.86, 2.35], ['Amsterdam', 52.37, 4.9], ['Berlin', 52.52, 13.4],
-  ['Oslo', 59.91, 10.75], ['Stockholm', 59.33, 18.07], ['Madrid', 40.42, -3.7], ['Rome', 41.9, 12.5],
-  ['Tokyo', 35.68, 139.69], ['Shanghai', 31.23, 121.47], ['Sydney', -33.87, 151.21],
-  ['Melbourne', -37.81, 144.96], ['Auckland', -36.85, 174.76],
-];
+import { julianDay, localSiderealTime, toHorizon, sun, moon, planet, PLANETS } from '../_shared/astro.js';
+import { getPlace, pickPlace } from '../_shared/place.js';
 
 const STORE_KEY = 'stars.settings';
 const BAR = 72; // height reserved for the bottom bar, CSS px
@@ -27,12 +11,15 @@ const canvas = $('sky');
 const ctx = canvas.getContext('2d');
 
 const state = (() => {
-  const fallback = { lat: null, lon: null, place: '', rot: 0, red: false };
-  try { return { ...fallback, ...JSON.parse(localStorage.getItem(STORE_KEY)) }; } catch { return fallback; }
+  const fallback = { rot: 0, red: false };
+  let saved = {};
+  try { saved = JSON.parse(localStorage.getItem(STORE_KEY)) || {}; } catch {}
+  const place = getPlace();
+  return { rot: saved.rot ?? fallback.rot, red: saved.red ?? fallback.red, lat: place?.lat ?? null, lon: place?.lon ?? null, place: place?.name ?? '' };
 })();
 const save = () => {
-  const { lat, lon, place, rot, red } = state;
-  try { localStorage.setItem(STORE_KEY, JSON.stringify({ lat, lon, place, rot, red })); } catch {}
+  const { rot, red } = state;
+  try { localStorage.setItem(STORE_KEY, JSON.stringify({ rot, red })); } catch {}
 };
 
 let sky = null;            // sky.json
@@ -360,37 +347,13 @@ $('redBtn').onclick = () => setRed(!state.red);
 
 // ---------- location ----------
 
-function setPlace(lat, lon, place) {
-  Object.assign(state, { lat, lon, place });
-  $('placeBtn').textContent = place;
-  save();
-  $('picker').hidden = true;
+function setPlace(place) {
+  if (!place) return;
+  Object.assign(state, { lat: place.lat, lon: place.lon, place: place.name });
+  $('placeBtn').textContent = place.name;
   redraw();
 }
-
-for (const [name, lat, lon] of CITIES) {
-  const b = document.createElement('button');
-  b.type = 'button';
-  b.textContent = name;
-  b.onclick = () => setPlace(lat, lon, name);
-  $('cities').appendChild(b);
-}
-$('placeBtn').onclick = () => { $('picker').hidden = false; };
-$('closePicker').onclick = () => { if (state.lat != null) $('picker').hidden = true; };
-$('geoBtn').onclick = () => {
-  const status = $('geoStatus');
-  if (!navigator.geolocation) { status.textContent = 'Location is not available. Pick the nearest place below.'; return; }
-  status.textContent = 'Finding location…';
-  navigator.geolocation.getCurrentPosition(
-    pos => {
-      status.textContent = '';
-      const { latitude, longitude } = pos.coords;
-      setPlace(latitude, longitude, `Here (${latitude.toFixed(1)}°, ${longitude.toFixed(1)}°)`);
-    },
-    err => { status.textContent = `Couldn't get location (${err.message || 'denied'}). Pick the nearest place below.`; },
-    { timeout: 12000, maximumAge: 600_000 },
-  );
-};
+$('placeBtn').onclick = () => pickPlace().then(setPlace);
 
 // ---------- start ----------
 
@@ -399,7 +362,7 @@ setInterval(() => { if (!offsetMin && !pointers.size) redraw(); }, 30_000);
 
 layout();
 setRed(state.red);
-if (state.lat == null) $('picker').hidden = false;
+if (state.lat == null) pickPlace({ required: true }).then(setPlace);
 else $('placeBtn').textContent = state.place;
 
 fetch('sky.json')

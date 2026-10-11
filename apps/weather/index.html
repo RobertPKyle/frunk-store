@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Weather</title>
+<style>
+  :root { --bg: #0b1120; --card: #121a2e; --line: rgba(140, 170, 230, .16); --text: #e1e7f3; --muted: #8b96ad; --accent: #8fb4ff; --rain: #4f8dff; --warm: #ffc56b; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--text); font: 16px/1.35 system-ui, sans-serif; -webkit-tap-highlight-color: transparent; }
+  body { padding: 10px 12px 14px; }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  .btn { min-height: 44px; padding: 8px 14px; border-radius: 12px; background: var(--card); border: 1px solid var(--line); white-space: nowrap; }
+
+  /* left padding keeps clear of the hub's Apps button */
+  header { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; padding-left: 100px; }
+  #placeBtn { max-width: 46%; overflow: hidden; text-overflow: ellipsis; font-weight: 600; }
+  #status { flex: 1; color: var(--muted); font-size: 14px; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .cards { display: grid; grid-template-columns: 1fr 1.25fr; gap: 10px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 12px 14px; }
+  .card h2 { margin: 0 0 6px; font-size: 13px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+
+  .now { display: flex; align-items: center; gap: 12px; }
+  .now svg { width: 72px; height: 72px; flex: none; }
+  #temp { font-size: 54px; font-weight: 300; line-height: 1; }
+  #desc { font-size: 17px; margin-top: 4px; }
+  .facts { margin-top: 10px; color: var(--muted); font-size: 14px; display: grid; gap: 3px; }
+  .facts b { color: var(--text); font-weight: 500; }
+
+  .sky { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-size: 14px; align-items: baseline; }
+  .sky dt { color: var(--muted); }
+  .sky dd { margin: 0; }
+  .rating { font-weight: 700; }
+  .rating.great { color: #7ee2a8; } .rating.good { color: #b8e07e; } .rating.fair { color: var(--warm); } .rating.poor { color: #ff8f7a; }
+
+  .strip { margin-top: 10px; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: thin; }
+  #hours { display: flex; width: max-content; }
+  .hr { position: relative; width: 50px; flex: none; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 0 6px; font-size: 14px; }
+  .hr .t { color: var(--muted); font-size: 12px; }
+  .hr svg { width: 28px; height: 28px; }
+  .hr .p { color: var(--rain); font-size: 12px; min-height: 16px; }
+  .hr .bar { position: absolute; left: 6px; right: 6px; bottom: 0; background: var(--rain); opacity: .22; border-radius: 4px 4px 0 0; }
+  .hr.day0 { border-left: 1px solid var(--line); }
+
+  #days { margin-top: 10px; display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+  .day { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 8px 4px; display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 14px; min-width: 0; }
+  .day .d { font-weight: 600; }
+  .day svg { width: 34px; height: 34px; }
+  .day .lo { color: var(--muted); }
+  .day .p { color: var(--rain); font-size: 12px; min-height: 16px; }
+
+  #error { margin: 40px auto; max-width: 420px; text-align: center; color: var(--muted); }
+  #error[hidden], main[hidden] { display: none; }
+  footer { margin-top: 12px; color: var(--muted); font-size: 12px; text-align: center; }
+</style>
+</head>
+<body>
+<header>
+  <span id="status"></span>
+  <button class="btn" id="placeBtn" type="button">Set location</button>
+  <button class="btn" id="unitBtn" type="button" aria-label="Switch units">°F</button>
+  <button class="btn" id="refreshBtn" type="button" aria-label="Refresh">↻</button>
+</header>
+
+<p id="error" hidden></p>
+
+<main hidden>
+  <div class="cards">
+    <section class="card">
+      <h2>Now</h2>
+      <div class="now">
+        <span id="nowIcon"></span>
+        <div>
+          <div id="temp"></div>
+          <div id="desc"></div>
+        </div>
+      </div>
+      <div class="facts" id="facts"></div>
+    </section>
+    <section class="card">
+      <h2 id="skyTitle">Tonight's sky</h2>
+      <dl class="sky" id="sky"></dl>
+    </section>
+  </div>
+
+  <div class="strip card" style="padding:0 4px"><div id="hours"></div></div>
+  <div id="days"></div>
+</main>
+
+<footer>Weather data by Open-Meteo.com (CC BY 4.0) · Aurora forecast from NOAA SWPC · Sun and Moon times computed on this screen</footer>
+
+<script type="module" src="weather.js"></script>
+<script src="/sw-register.js"></script>
+</body>
+</html>

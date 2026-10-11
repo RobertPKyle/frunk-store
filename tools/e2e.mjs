@@ -4,7 +4,7 @@
 //   node tools/e2e.mjs                       # against `npm run dev`
 //   node tools/e2e.mjs https://frunk.store   # against production
 import { chromium } from 'playwright-core';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 
 const base = process.argv[2] || 'http://localhost:5173';
 const shots = new URL('../.e2e/', import.meta.url).pathname;
@@ -15,6 +15,21 @@ const browser = await chromium.launch({
   args: ['--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'],
 });
 const page = await browser.newPage({ viewport: { width: 773, height: 601 }, deviceScaleFactor: 1.53, hasTouch: true });
+
+// Serve CelesTrak orbit data from a local copy refreshed at most once a day:
+// CelesTrak blocks clients that download the same data too often.
+async function celestrak(group) {
+  const file = `${shots}celestrak-${group}.json`;
+  try { if (Date.now() - statSync(file).mtimeMs < 86400_000) return readFileSync(file, 'utf8'); } catch {}
+  const body = await (await fetch(`https://celestrak.org/NORAD/elements/gp.php?GROUP=${group}&FORMAT=json`)).text();
+  JSON.parse(body); // throws on CelesTrak's plain-text rate-limit note
+  writeFileSync(file, body);
+  return body;
+}
+await page.route('https://celestrak.org/**', async route => {
+  const group = new URL(route.request().url()).searchParams.get('GROUP');
+  route.fulfill({ status: 200, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: await celestrak(group) });
+});
 
 const errors = [];
 page.on('pageerror', e => errors.push(`pageerror: ${e.message}`));
@@ -113,10 +128,37 @@ await check('campfire renders', async () => {
 
 await check('star map draws after picking a place', async () => {
   await openFromHub(/Star Map/);
-  const picker = appFrame().locator('#picker');
+  const picker = appFrame().locator('.fp-picker');
   if (await picker.isVisible()) await appFrame().getByRole('button', { name: 'Moab' }).click();
   await appFrame().locator('#when').filter({ hasText: /Now ·/ }).waitFor({ timeout: 8000 });
   await page.screenshot({ path: shots + 'stars.png' });
+});
+
+await check('weather loads a forecast and tonight\'s sky', async () => {
+  await openFromHub(/Weather/);
+  // Change place through the shared picker's search
+  await appFrame().locator('#placeBtn').click();
+  await appFrame().locator('.fp-search').fill('Moab');
+  await appFrame().getByRole('button', { name: /Moab.*Utah/ }).click();
+  await appFrame().locator('#temp').filter({ hasText: /°/ }).waitFor({ timeout: 15000 });
+  const sky = await appFrame().locator('#sky').textContent();
+  if (!/Moon/.test(sky)) throw new Error(`sky card missing Moon: "${sky}"`);
+  const hours = await appFrame().locator('.hr').count(), days = await appFrame().locator('.day').count();
+  if (hours < 24 || days !== 7) throw new Error(`expected 24+ hours and 7 days, got ${hours} and ${days}`);
+  console.log(`     ${(await appFrame().locator('#temp').textContent())} ${await appFrame().locator('#desc').textContent()}`);
+  await page.screenshot({ path: shots + 'weather.png' });
+});
+
+await check('satellite tracker predicts passes', async () => {
+  await openFromHub(/Satellite Tracker/);
+  const frame = page.frames().find(f => f.url().includes('/satellites/'));
+  await frame.waitForFunction(() => !document.getElementById('hero').textContent.includes('Loading')
+    && !document.getElementById('hero').textContent.includes('Working'), null, { timeout: 30000 });
+  await appFrame().getByRole('button', { name: 'All bright' }).click();
+  await appFrame().locator('.pass').first().waitFor({ timeout: 30000 });
+  console.log(`     ${(await appFrame().locator('#hero').innerText()).replace(/\s+/g, ' ')} · ${await appFrame().locator('.pass').count()} passes listed`);
+  await appFrame().getByRole('button', { name: 'Highlights' }).click();
+  await page.screenshot({ path: shots + 'satellites.png' });
 });
 
 await check('no console or page errors', async () => {

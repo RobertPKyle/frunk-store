@@ -59,6 +59,28 @@
       ]
     },
     {
+      "id": "weather",
+      "name": "Weather",
+      "tagline": "Forecast, sunset, true darkness, Moon and a stargazing rating for tonight.",
+      "path": "/weather/",
+      "icon": "/weather/icon.svg",
+      "tags": [
+        "Camp Mode",
+        "Tool"
+      ]
+    },
+    {
+      "id": "satellites",
+      "name": "Satellite Tracker",
+      "tagline": "When to see the ISS, Hubble and new Starlink trains pass over you.",
+      "path": "/satellites/",
+      "icon": "/satellites/icon.svg",
+      "tags": [
+        "Camp Mode",
+        "Offline"
+      ]
+    },
+    {
       "id": "probe",
       "name": "Car Benchmark",
       "tagline": "See what this car's browser can do.",

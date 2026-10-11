@@ -32,8 +32,19 @@ the apps are served from.
   Campfire, Star Map). Sounds come from `apps/_shared/ambient.js`, which
   generates everything with Web Audio. Star data is built by
   `node tools/build-stars.mjs` from d3-celestial (BSD-3-Clause), and the
-  planet and Moon math in `apps/stars/astro.js` was checked against JPL
+  planet and Moon math in `apps/_shared/astro.js` was checked against JPL
   Horizons to within about 0.1°.
+- `apps/weather`: Open-Meteo forecast plus a "Tonight's sky" card (sunset,
+  darkness, Moon, stargazing rating, aurora chance from the NOAA Kp
+  forecast). Needs a connection; the last forecast is cached.
+- `apps/satellites`: visible passes of the ISS, Tiangong, Hubble, new
+  Starlink trains and about 150 bright satellites, from CelesTrak orbit data
+  (cached, refreshed at most every 8 hours). SGP4 comes from satellite.js
+  (MIT), bundled into `apps/satellites/satellite.js` by
+  `node tools/build-satellite.mjs`. Pass times matched Skyfield to within
+  about 10 seconds.
+- `apps/_shared/place.js`: the location picker. Star Map, Weather and
+  Satellites share one saved place (`frunk.place` in localStorage).
 
 ## Commands
 

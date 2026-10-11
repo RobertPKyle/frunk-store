@@ -22,13 +22,6 @@
   #tip { position: fixed; padding: 6px 10px; border-radius: 10px; background: var(--panel); border: 1px solid var(--line); font-size: 14px; pointer-events: none; transform: translate(-50%, calc(-100% - 12px)); white-space: nowrap; }
   #tip[hidden] { display: none; }
 
-  #picker { position: fixed; inset: 0; background: rgba(2, 4, 10, .92); display: flex; flex-direction: column; padding: 60px 20px 20px; gap: 12px; z-index: 5; }
-  #picker[hidden] { display: none; }
-  #picker h2 { margin: 0; font-size: 20px; }
-  #picker .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-  #geoStatus { color: var(--muted); font-size: 14px; }
-  #cities { flex: 1; overflow: auto; display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); align-content: start; }
-  #cities button { min-height: 48px; padding: 8px 12px; border-radius: 12px; background: #0d1322; border: 1px solid var(--line); text-align: left; }
 
   /* Night vision: keep only the red channel of everything on screen */
   #red { position: fixed; inset: 0; background: #ff2a10; mix-blend-mode: multiply; pointer-events: none; z-index: 10; }
@@ -52,19 +45,6 @@
 </div>
 
 <div id="tip" hidden></div>
-
-<div id="picker" hidden>
-  <div class="row">
-    <h2>Where are you?</h2>
-    <span style="flex:1"></span>
-    <button class="btn" id="closePicker" type="button">Done</button>
-  </div>
-  <div class="row">
-    <button class="btn" id="geoBtn" type="button">Use this car's location</button>
-    <span id="geoStatus"></span>
-  </div>
-  <div id="cities"></div>
-</div>
 
 <div id="red" hidden></div>
 <script type="module" src="stars.js"></script>
