@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>What's Around Me</title>
+<style>
+  :root { --bg: #0a0f19; --panel: #0f1624; --card: #151e30; --line: rgba(150, 175, 220, .16); --text: #e2e7f0; --muted: #8b95a8; --accent: #7fd1b9; --pick: #ffd36e; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 16px/1.4 system-ui, sans-serif; overflow: hidden; -webkit-tap-highlight-color: transparent; }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  .btn { min-height: 44px; padding: 8px 14px; border-radius: 12px; background: var(--card); border: 1px solid var(--line); white-space: nowrap; }
+
+  .app { display: grid; grid-template-columns: 1fr 360px; height: 100%; }
+  .main { position: relative; min-width: 0; }
+  canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  #mapNote { position: absolute; left: 12px; bottom: 10px; font-size: 13px; color: var(--muted); pointer-events: none; }
+
+  /* The article covers the map. Top padding keeps clear of the hub's Apps button. */
+  #article { position: absolute; inset: 0; overflow-y: auto; overscroll-behavior: contain; background: var(--bg); padding: 64px 28px 24px; user-select: text; }
+  #article[hidden] { display: none; }
+  .tools { position: absolute; top: 8px; right: 8px; display: flex; gap: 6px; z-index: 2; }
+  .tools[hidden] { display: none; }
+  #article h1 { margin: 0; font-size: 28px; line-height: 1.2; }
+  #article .sub { color: var(--muted); margin: 4px 0 14px; }
+  #article .sub b { color: var(--accent); font-weight: 600; }
+  #article figure { margin: 0 0 16px; }
+  #article figure img { display: block; max-width: 100%; max-height: 300px; border-radius: 14px; background: var(--card); }
+  #article h2 { font-size: 21px; margin: 24px 0 8px; }
+  #article h3 { font-size: 18px; margin: 18px 0 6px; }
+  #article p { margin: 0 0 12px; font-size: 18px; line-height: 1.55; max-width: 46em; }
+  #article .credit { margin-top: 24px; padding-top: 12px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; }
+
+  aside { display: flex; flex-direction: column; min-height: 0; background: var(--panel); border-left: 1px solid var(--line); }
+  .head { display: flex; gap: 6px; padding: 8px; }
+  #placeBtn { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; text-align: left; }
+  .chips { display: flex; gap: 6px; padding: 0 8px 8px; }
+  .chip { flex: 1; min-height: 40px; padding: 0 6px; border-radius: 999px; background: var(--card); border: 1px solid var(--line); font-size: 14px; white-space: nowrap; }
+  .chip[aria-pressed="true"] { background: #1d4a43; border-color: var(--accent); }
+  #summary { padding: 2px 12px 6px; font-size: 14px; color: var(--muted); }
+  #list { flex: 1; overflow-y: auto; padding: 0 8px 8px; overscroll-behavior: contain; }
+  .item { display: grid; grid-template-columns: 64px 1fr; gap: 0 10px; align-items: center; width: 100%; text-align: left; padding: 6px; margin-bottom: 6px; border-radius: 12px; background: var(--card); border: 1px solid var(--line); }
+  .item[aria-pressed="true"] { border-color: var(--pick); background: #232a38; }
+  .item .thumb { width: 64px; height: 64px; border-radius: 8px; background: #1c2538 center / cover no-repeat; overflow: hidden; }
+  .item .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .item .name, .item .desc, .item .dist { display: block; }
+  .item .name { font-weight: 600; line-height: 1.25; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .item .desc { font-size: 13px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .item .dist { font-size: 13px; color: var(--accent); font-variant-numeric: tabular-nums; }
+  #msg { padding: 14px; color: var(--muted); font-size: 14px; }
+  #msg:empty { display: none; }
+  footer { padding: 6px 10px 8px; font-size: 11px; color: var(--muted); border-top: 1px solid var(--line); }
+
+  @media (max-width: 640px) {
+    .app { grid-template-columns: 1fr; grid-template-rows: 46% 54%; }
+    aside { border-left: 0; border-top: 1px solid var(--line); }
+    #article { padding: 60px 16px 16px; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="main">
+    <canvas id="map"></canvas>
+    <div id="mapNote"></div>
+    <article id="article" hidden></article>
+    <div class="tools" id="articleTools" hidden>
+      <button class="btn" id="speakBtn" type="button" hidden>Read aloud</button>
+      <button class="btn" id="mapBtn" type="button">Show map</button>
+    </div>
+  </div>
+  <aside>
+    <div class="head">
+      <button class="btn" id="placeBtn" type="button">Set location</button>
+      <button class="btn" id="hereBtn" type="button">Here</button>
+      <button class="btn" id="refreshBtn" type="button" aria-label="Refresh">↻</button>
+    </div>
+    <div class="chips" role="group" aria-label="How far" id="radii"></div>
+    <div class="chips" role="group" aria-label="Order">
+      <button class="chip" type="button" data-sort="near" aria-pressed="true">Closest</button>
+      <button class="chip" type="button" data-sort="known" aria-pressed="false">Best known</button>
+    </div>
+    <div id="summary"></div>
+    <div id="msg"></div>
+    <div id="list"></div>
+    <footer>Articles and photos from Wikipedia (CC BY-SA 4.0) · Distances as the crow flies</footer>
+  </aside>
+</div>
+<script type="module" src="nearby.js"></script>
+<script src="/sw-register.js"></script>
+</body>
+</html>

@@ -43,8 +43,13 @@ the apps are served from.
   (MIT), bundled into `apps/satellites/satellite.js` by
   `node tools/build-satellite.mjs`. Pass times matched Skyfield to within
   about 10 seconds.
-- `apps/_shared/place.js`: the location picker. Star Map, Weather and
-  Satellites share one saved place (`frunk.place` in localStorage).
+- `apps/nearby`: What's Around Me. Wikipedia articles near the car (geosearch
+  API, up to 20 km), on a north-up map and a list, with an in-app reader.
+  Article text is shown as plain text only. The last 15 articles read are
+  cached for offline use.
+- `apps/_shared/place.js`: the location picker. Star Map, Weather,
+  Satellites and What's Around Me share one saved place (`frunk.place` in
+  localStorage).
 
 ## Commands
 

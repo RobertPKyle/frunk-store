@@ -81,6 +81,17 @@
       ]
     },
     {
+      "id": "nearby",
+      "name": "What's Around Me",
+      "tagline": "History, landmarks and nature near where you are parked, from Wikipedia. Great while charging.",
+      "path": "/nearby/",
+      "icon": "/nearby/icon.svg",
+      "tags": [
+        "Road Trip",
+        "Tool"
+      ]
+    },
+    {
       "id": "probe",
       "name": "Car Benchmark",
       "tagline": "See what this car's browser can do.",

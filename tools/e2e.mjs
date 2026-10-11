@@ -161,6 +161,23 @@ await check('satellite tracker predicts passes', async () => {
   await page.screenshot({ path: shots + 'satellites.png' });
 });
 
+await check('what\'s around me lists places and opens an article', async () => {
+  await openFromHub(/What's Around Me/);
+  const picker = appFrame().locator('.fp-picker');
+  if (await picker.isVisible()) await appFrame().getByRole('button', { name: 'Moab' }).click();
+  await appFrame().locator('.item').first().waitFor({ timeout: 20000 });
+  console.log(`     ${await appFrame().locator('#summary').textContent()}`);
+  await appFrame().getByRole('button', { name: 'Best known' }).click();
+  await appFrame().locator('.item').first().click();
+  await appFrame().locator('#article .credit').waitFor({ timeout: 15000 });
+  const paras = await appFrame().locator('#article p').count();
+  if (paras < 2) throw new Error(`article has ${paras} paragraphs`);
+  console.log(`     ${await appFrame().locator('#article h1').textContent()}: ${paras} paragraphs`);
+  await page.screenshot({ path: shots + 'nearby.png' });
+  await appFrame().getByRole('button', { name: 'Show map' }).click();
+  await page.screenshot({ path: shots + 'nearby-map.png' });
+});
+
 await check('no console or page errors', async () => {
   // headless Chrome may log a GPU stall warning for readPixels; ignore those
   const real = errors.filter(e => !/GPU stall|swiftshader/i.test(e));
