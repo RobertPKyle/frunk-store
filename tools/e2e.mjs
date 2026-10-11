@@ -198,6 +198,18 @@ await check('what\'s around me lists places and opens an article', async () => {
   await page.screenshot({ path: shots + 'nearby-map.png' });
 });
 
+await check('chess puzzle renders a board', async () => {
+  await openFromHub(/Chess Puzzle/);
+  const frame = page.frames().find(f => f.url().includes('/chess/'));
+  await frame.waitForFunction(() => {
+    const n = document.getElementById('board').children.length;
+    const s = document.getElementById('status').textContent;
+    return n === 64 || s.includes("Couldn't");
+  }, null, { timeout: 15000 });
+  console.log(`     ${await frame.locator('#status').textContent()}`);
+  await page.screenshot({ path: shots + 'chess.png' });
+});
+
 await check('no console or page errors', async () => {
   // headless Chrome may log a GPU stall warning for readPixels; ignore those
   const real = errors.filter(e => !/GPU stall|swiftshader/i.test(e));

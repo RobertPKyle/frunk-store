@@ -111,6 +111,17 @@
       "tags": [
         "Tool"
       ]
+    },
+    {
+      "id": "chess",
+      "name": "Chess Puzzle",
+      "tagline": "Solve the Lichess daily chess puzzle on your screen.",
+      "path": "/chess/",
+      "icon": "/chess/icon.svg",
+      "tags": [
+        "Game",
+        "Puzzle"
+      ]
     }
   ]
 }
