@@ -54,6 +54,11 @@ the apps are served from.
   API, up to 20 km), on a north-up map and a list, with an in-app reader.
   Article text is shown as plain text only. The last 15 articles read are
   cached for offline use.
+- `apps/chess`: the Lichess daily chess puzzle, playable on the board. Tap a
+  piece, then a highlighted square; the opponent's reply is played
+  automatically and only the best move is accepted. The last puzzle is cached
+  for offline use. Rules come from chess.js (BSD-2-Clause); the piece art is
+  the cburnett set (CC BY-SA 3.0).
 - `apps/_shared/place.js`: the location picker. Star Map, Weather,
   Satellites, Sky Events and What's Around Me share one saved place (`frunk.place` in
   localStorage).

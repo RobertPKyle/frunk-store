@@ -1,0 +1,9 @@
+Third-party components
+======================
+
+- chess.js 1.4.0 — BSD-2-Clause — https://github.com/jhlywa/chess.js
+  (chess.min.js; full text in chess-LICENSE.txt)
+
+- cburnett chess pieces — CC BY-SA 3.0, Colin M.L. Burnett
+  (inlined as SVG in pieces.js; the set Lichess serves at
+  lichess.org/assets/piece/cburnett)

@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Chess Puzzle</title>
+<style>
+  :root {
+    --bg: #0b0d10;
+    --card: #15181d;
+    --line: #262b34;
+    --text: #eef1f5;
+    --muted: #8d96a5;
+    --accent: #ffb547;
+    --light: #f0d9b5;
+    --dark: #b58863;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 16px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  body { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 60px 16px 12px; min-height: 100%; }
+  header { display: flex; align-items: baseline; gap: 12px; width: 100%; max-width: 520px; }
+  h1 { font-size: 20px; margin: 0; letter-spacing: -0.01em; }
+  #sub { color: var(--muted); font-size: 14px; margin-left: auto; text-align: right; }
+
+  #board {
+    display: grid; grid-template-columns: repeat(8, 1fr); grid-template-rows: repeat(8, 1fr);
+    width: min(100vw - 32px, calc(100vh - 220px), 520px); aspect-ratio: 1;
+    border: 2px solid var(--line); border-radius: 6px; overflow: hidden;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, .45);
+  }
+  .sq { position: relative; display: flex; align-items: center; justify-content: center; }
+  .sq.l { background: var(--light); }
+  .sq.d { background: var(--dark); }
+  .sq svg { width: 100%; height: 100%; pointer-events: none; }
+  .sq.sel { box-shadow: inset 0 0 0 3px #f5d442; }
+  .sq.hint-src { box-shadow: inset 0 0 0 3px #39c6a0; }
+  .sq.hint-dst { box-shadow: inset 0 0 0 3px #39c6a0; }
+  .sq.tgt::after { content: ''; position: absolute; inset: 32%; border-radius: 50%; background: rgba(0, 0, 0, .25); }
+  .sq.cap::after { content: ''; position: absolute; inset: 5%; border-radius: 50%; border: 4px solid rgba(0, 0, 0, .25); }
+  #board.wrong { animation: shake .3s; }
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-6px); }
+    75% { transform: translateX(6px); }
+  }
+
+  #status { font-size: 16px; color: var(--text); text-align: center; min-height: 1.4em; }
+  .controls { display: flex; gap: 10px; }
+  button {
+    font: inherit; color: inherit; cursor: pointer; min-height: 46px; padding: 9px 20px;
+    background: transparent; border: 1px solid var(--line); border-radius: 12px;
+  }
+  button:active { background: var(--card); }
+  button.primary { background: var(--accent); color: #111418; font-weight: 700; border: none; }
+
+  .credit { margin-top: auto; font-size: 12px; color: var(--muted); }
+  .credit a { color: var(--muted); text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+  .credit a:active { color: var(--text); }
+  .credit svg { display: block; }
+</style>
+</head>
+<body>
+  <header>
+    <h1>Daily chess puzzle</h1>
+    <span id="sub"></span>
+  </header>
+  <div id="board"></div>
+  <div id="status">Loading today's puzzle…</div>
+  <div class="controls">
+    <button id="reset" type="button">Reset</button>
+    <button id="hint" type="button">Hint</button>
+  </div>
+  <footer class="credit">
+    <a href="https://lichess.org/training/daily" target="_blank" rel="noopener">
+      <svg viewBox="0 0 45 45" width="15" height="15" aria-hidden="true"><g fill="currentColor"><path d="M22 10c10.5 1 16.5 8 16 29H15c0-9 10-6.5 8-21"/><path d="M24 18c.38 2.91-5.55 7.37-8 9-3 2-2.82 4.34-5 4-1.042-.94 1.41-3.04 0-3-1 0 .19 1.23-1 2-1 0-4.003 1-4-4 0-2 6-12 6-12s1.89-1.9 2-3.5c-.73-.994-.5-2-.5-3 1-1 3 2.5 3 2.5h2s.78-1.992 2.5-3c1 0 1 3 1 3"/></g></svg>
+      Lichess daily puzzle
+    </a>
+  </footer>
+  <script src="chess.min.js"></script>
+  <script src="pieces.js"></script>
+  <script src="app.js"></script>
+  <script src="/sw-register.js"></script>
+</body>
+</html>
