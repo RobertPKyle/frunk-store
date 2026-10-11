@@ -81,6 +81,17 @@
       ]
     },
     {
+      "id": "skyevents",
+      "name": "Sky Events",
+      "tagline": "Meteor showers, full moons, eclipses and planets for the year ahead, and what is up tonight.",
+      "path": "/skyevents/",
+      "icon": "/skyevents/icon.svg",
+      "tags": [
+        "Camp Mode",
+        "Offline"
+      ]
+    },
+    {
       "id": "nearby",
       "name": "What's Around Me",
       "tagline": "History, landmarks and nature near where you are parked, from Wikipedia. Great while charging.",

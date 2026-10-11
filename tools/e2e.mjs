@@ -161,6 +161,26 @@ await check('satellite tracker predicts passes', async () => {
   await page.screenshot({ path: shots + 'satellites.png' });
 });
 
+await check('sky events lists the year ahead', async () => {
+  await openFromHub(/Sky Events/);
+  const picker = appFrame().locator('.fp-picker');
+  if (await picker.isVisible()) await appFrame().getByRole('button', { name: 'Moab' }).click();
+  await appFrame().locator('.ev').first().waitFor({ timeout: 15000 });
+  const highlights = await appFrame().locator('.ev').count();
+  const titles = (await appFrame().locator('.ev h3').allTextContents()).join(' | ');
+  for (const want of [/Full .*Moon/, /meteor shower/, /solstice|equinox/]) {
+    if (!want.test(titles)) throw new Error(`no ${want} in highlights`);
+  }
+  if (await appFrame().locator('.pl').count() !== 5) throw new Error('tonight panel missing planets');
+  await page.screenshot({ path: shots + 'skyevents.png' });
+  await appFrame().getByRole('button', { name: 'Eclipses' }).click();
+  const eclipses = await appFrame().locator('.ev').count();
+  if (eclipses < 10) throw new Error(`only ${eclipses} eclipses in 5 years`);
+  console.log(`     ${highlights} highlights, ${eclipses} eclipses in 5 years`);
+  await page.screenshot({ path: shots + 'skyevents-eclipses.png' });
+  await appFrame().getByRole('button', { name: 'Highlights' }).click();
+});
+
 await check('what\'s around me lists places and opens an article', async () => {
   await openFromHub(/What's Around Me/);
   const picker = appFrame().locator('.fp-picker');

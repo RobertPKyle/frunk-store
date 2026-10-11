@@ -43,12 +43,19 @@ the apps are served from.
   (MIT), bundled into `apps/satellites/satellite.js` by
   `node tools/build-satellite.mjs`. Pass times matched Skyfield to within
   about 10 seconds.
+- `apps/skyevents`: Sky Events. Moon phases, named and super full moons,
+  lunar eclipses, meteor shower peaks rated for the viewer's latitude and
+  moonlight, planet oppositions, elongations and pairings, equinoxes and
+  solstices, all computed in `apps/skyevents/events.js`. Solar eclipses come
+  from NASA's table (Espenak) through 2035. Checked against Skyfield and
+  NASA: phases within 3 minutes, seasons within 6, lunar eclipse times within
+  about a minute and umbral magnitudes within 0.02.
 - `apps/nearby`: What's Around Me. Wikipedia articles near the car (geosearch
   API, up to 20 km), on a north-up map and a list, with an in-app reader.
   Article text is shown as plain text only. The last 15 articles read are
   cached for offline use.
 - `apps/_shared/place.js`: the location picker. Star Map, Weather,
-  Satellites and What's Around Me share one saved place (`frunk.place` in
+  Satellites, Sky Events and What's Around Me share one saved place (`frunk.place` in
   localStorage).
 
 ## Commands
