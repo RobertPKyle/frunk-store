@@ -22,7 +22,16 @@
   td { padding: 6px 0; border-top: 1px solid var(--line); vertical-align: top; word-break: break-word; }
   td:first-child { color: var(--muted); width: 45%; padding-right: 12px; }
   .ok { color: var(--ok); } .bad { color: var(--bad); } .warn { color: var(--warn); }
-  #pads { min-height: 40px; }
+  #pads { min-height: 40px; margin-top: 12px; white-space: pre-line; }
+  .pad { display: flex; align-items: center; justify-content: center; gap: 36px; padding: 16px; border-radius: 40px; background: #22262d; max-width: 520px; }
+  .pad i { display: block; background: #3a404a; border-radius: 6px; font-style: normal; font-size: 14px; color: var(--muted); text-align: center; }
+  .pad i.on { background: var(--ok); color: #062014; }
+  .dpad { display: grid; grid-template: repeat(3, 34px) / repeat(3, 34px); }
+  .dpad [data-k=up] { grid-area: 1 / 2; } .dpad [data-k=left] { grid-area: 2 / 1; }
+  .dpad [data-k=right] { grid-area: 2 / 3; } .dpad [data-k=down] { grid-area: 3 / 2; }
+  .mid { display: flex; gap: 12px; } .mid i { padding: 6px 12px; border-radius: 999px; }
+  .face { display: flex; gap: 14px; } .face i { width: 52px; height: 52px; line-height: 52px; border-radius: 50%; font-size: 18px; font-weight: 700; }
+  .log { margin-top: 8px; font-size: 14px; color: var(--muted); }
   #qr { background: #fff; padding: 12px; display: inline-block; border-radius: 8px; }
   #status { color: var(--muted); }
   @media (max-width: 480px) { main { grid-template-columns: 1fr; padding: 12px 16px; } }
@@ -38,8 +47,24 @@
 <main id="out"></main>
 <div style="padding:0 24px 48px">
   <section>
-    <h2>Gamepad (press a button on a connected controller)</h2>
-    <div id="pads">No gamepad detected.</div>
+    <h2>Controller (connect it, then press any button)</h2>
+    <div class="pad" aria-hidden="true">
+      <div class="dpad"><i data-k="up"></i><i data-k="left"></i><i data-k="right"></i><i data-k="down"></i></div>
+      <div class="mid"><i data-k="select">Select</i><i data-k="start">Start</i></div>
+      <div class="face"><i data-k="b">B</i><i data-k="a">A</i></div>
+    </div>
+    <div id="pads">No controller seen yet. Press a button after it connects.</div>
+    <div id="padLog" class="log"></div>
+  </section>
+  <section style="margin-top:16px">
+    <h2>Files (plug in a USB drive, then pick a file or a folder)</h2>
+    <div style="display:flex;gap:12px;flex-wrap:wrap">
+      <button id="pickFile" type="button">Pick a file</button>
+      <button id="pickFolder" type="button" class="secondary">Pick a folder</button>
+    </div>
+    <input id="fileInput" type="file" multiple hidden>
+    <input id="folderInput" type="file" webkitdirectory multiple hidden>
+    <div id="files" style="margin-top:12px;color:var(--muted)">Nothing picked yet.</div>
   </section>
   <section style="margin-top:16px">
     <h2>Results JSON (photograph or scan QR)</h2>
@@ -175,12 +200,16 @@ async function probe() {
   set('Network & devices', 'WebTransport', typeof WebTransport !== 'undefined');
   set('Network & devices', 'connection type', navigator.connection ? `${navigator.connection.effectiveType} ~${navigator.connection.downlink}Mbps` : 'n/a');
   set('Network & devices', 'Gamepad API', 'getGamepads' in navigator);
+  set('Controller', 'Gamepad API', 'getGamepads' in navigator);
   set('Network & devices', 'Geolocation API', 'geolocation' in navigator);
   set('Network & devices', 'Web Bluetooth', 'bluetooth' in navigator);
   set('Network & devices', 'WebUSB', 'usb' in navigator);
   set('Network & devices', 'Notifications', 'Notification' in self);
   set('Network & devices', 'Clipboard write', !!navigator.clipboard?.writeText);
   set('Network & devices', 'Vibration', 'vibrate' in navigator);
+  set('Files', 'File input', (() => { const i = document.createElement('input'); i.type = 'file'; return i.type === 'file' && !i.disabled; })());
+  set('Files', 'Folder picking (webkitdirectory)', 'webkitdirectory' in document.createElement('input'));
+  set('Files', 'File System Access API', typeof showOpenFilePicker === 'function');
 
   render();
   document.getElementById('status').textContent = 'Probe done. Tap "Run benchmarks" while parked.';
@@ -261,17 +290,142 @@ function webglFrame() {
   return f;
 }
 
-// Live gamepad readout
+// Controller tester. Shows which NES-style button each press lights up and
+// logs raw button numbers and keys, so we can learn how a controller maps.
+// Covers the Gamepad API (standard mapping or not, with the D-pad on buttons
+// or on axes) and keyboard mode, which some controllers offer instead.
+const padLog = [];
+const buttonsSeen = new Set(), keysSeen = new Set();
+const lit = new Set();
+function logPad(text) {
+  padLog.unshift(text);
+  padLog.length = Math.min(padLog.length, 8);
+  document.getElementById('padLog').textContent = padLog.join(' · ');
+}
+function light(keys) {
+  for (const el of document.querySelectorAll('.pad i')) el.classList.toggle('on', keys.has(el.dataset.k));
+}
+
+// The car adds a "Tesla Virtual Gamepad" (standard layout) for a controller
+// it recognises, next to the controller's own raw device, and both report
+// every press under different numbers: an 8BitDo Zero 2's A is raw button 0
+// but standard button 1. So when any standard pad is present, buttons come
+// only from standard pads; raw pads add only D-pad directions from their
+// axes, which agree with the standard pad. Without a standard pad, raw pads
+// are read with the usual raw layout (A 0, B 1, Select 10, Start 11).
+function padsToPlayers(pads) {
+  const players = [new Set(), new Set()];
+  const standard = pads.filter(p => p.mapping === 'standard');
+  const raw = pads.filter(p => p.mapping !== 'standard');
+  (standard.length ? standard : raw).slice(0, 2).forEach((p, i) => readPad(p, players[i]));
+  if (standard.length) for (const p of raw) padAxes(p, players[0]);
+  return players;
+}
+
+function padAxes(p, out) {
+  const ax = p.axes;
+  if (ax[1] < -0.5) out.add('up');
+  if (ax[1] > 0.5) out.add('down');
+  if (ax[0] < -0.5) out.add('left');
+  if (ax[0] > 0.5) out.add('right');
+}
+
+function readPad(p, out) {
+  const on = i => p.buttons[i] && p.buttons[i].pressed;
+  padAxes(p, out);
+  if (p.mapping === 'standard') {
+    if (on(12)) out.add('up');
+    if (on(13)) out.add('down');
+    if (on(14)) out.add('left');
+    if (on(15)) out.add('right');
+    // Bottom face button is NES B, right face button is NES A
+    if (on(1) || on(3)) out.add('a');
+    if (on(0) || on(2)) out.add('b');
+    if (on(8)) out.add('select');
+    if (on(9)) out.add('start');
+  } else {
+    if (on(0)) out.add('a');
+    if (on(1)) out.add('b');
+    if (on(10)) out.add('select');
+    if (on(11)) out.add('start');
+  }
+}
+
+const prevPressed = new Map();
 function pollPads() {
   const pads = [...(navigator.getGamepads?.() || [])].filter(Boolean);
-  const el = document.getElementById('pads');
-  if (pads.length) {
-    el.innerHTML = pads.map(p => `<div><b>${p.id}</b> — mapping: ${p.mapping || 'none'}, buttons pressed: [${p.buttons.map((b, i) => b.pressed ? i : null).filter(i => i !== null).join(', ')}], axes: [${p.axes.map(a => a.toFixed(2)).join(', ')}]</div>`).join('');
-    set('Network & devices', 'Gamepad seen', pads.map(p => p.id).join(' | '));
+  const keys = new Set(lit);
+  const lines = [];
+  for (const p of pads) {
+    const pressed = p.buttons.map((b, i) => b.pressed ? i : null).filter(i => i !== null);
+    const before = prevPressed.get(p.index) || [];
+    for (const i of pressed) if (!before.includes(i)) { buttonsSeen.add(i); logPad(`pad ${p.index} button ${i}`); }
+    prevPressed.set(p.index, pressed);
+    const ax = p.axes;
+    const role = pads.some(q => q.mapping === 'standard') && p.mapping !== 'standard' ? ' (D-pad only: the car mirrors it as a standard pad)' : '';
+    lines.push(`pad ${p.index}: ${p.id}${role} — mapping: ${p.mapping || 'none'}, ${p.buttons.length} buttons, ${ax.length} axes [${ax.map(a => a.toFixed(2)).join(', ')}]`);
   }
+  for (const b of padsToPlayers(pads)[0]) keys.add(b);
+  if (pads.length) {
+    document.getElementById('pads').textContent = lines.join('\n');
+    set('Controller', 'Gamepad seen', pads.map(p => p.id).join(' | '));
+    set('Controller', 'Mapping', pads.map(p => p.mapping || 'none').join(' | '));
+  }
+  light(keys);
   requestAnimationFrame(pollPads);
 }
-addEventListener('gamepadconnected', render);
+addEventListener('gamepadconnected', e => { logPad(`connected: ${e.gamepad.id}`); set('Controller', 'Gamepad seen', e.gamepad.id); render(); });
+addEventListener('gamepaddisconnected', e => { logPad(`disconnected: ${e.gamepad.id}`); });
+
+// Keyboard mode: arrows for the D-pad; common choices for the buttons
+const KEYMAP = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right', Enter: 'start', ShiftRight: 'select', ShiftLeft: 'select', Space: 'select', KeyX: 'a', KeyK: 'a', KeyZ: 'b', KeyJ: 'b' };
+addEventListener('keydown', e => {
+  if (e.repeat) return;
+  keysSeen.add(e.code || e.key);
+  logPad(`key ${e.key} (${e.code})`);
+  if (KEYMAP[e.code]) { lit.add(KEYMAP[e.code]); e.preventDefault(); }
+  set('Controller', 'Keys seen', [...keysSeen].join(' '));
+  render();
+});
+addEventListener('keyup', e => lit.delete(KEYMAP[e.code]));
+setInterval(() => { if (buttonsSeen.size) { set('Controller', 'Buttons seen', [...buttonsSeen].sort((a, b) => a - b).join(' ')); render(); } }, 1000);
+
+// File picker: does the car's browser open a chooser, can it see a USB
+// drive, and can the page read what was picked? Files are read here only.
+async function describe(file) {
+  const head = new Uint8Array(await file.slice(0, 16).arrayBuffer());
+  const nes = head[0] === 0x4e && head[1] === 0x45 && head[2] === 0x53 && head[3] === 0x1a;
+  return `${file.webkitRelativePath || file.name} · ${(file.size / 1024).toFixed(1)} KB` + (nes ? ' · iNES header OK' : '');
+}
+
+async function picked(input, label) {
+  const files = [...input.files];
+  const el = document.getElementById('files');
+  if (!files.length) { set('Files', label, 'chooser opened, nothing picked'); render(); return; }
+  try {
+    const lines = await Promise.all(files.slice(0, 20).map(describe));
+    set('Files', label, `${files.length} file(s), read OK`);
+    set('Files', 'iNES files seen', lines.filter(l => l.includes('iNES')).length);
+    el.replaceChildren(...lines.map(l => Object.assign(document.createElement('div'), { textContent: l })),
+      ...(files.length > 20 ? [Object.assign(document.createElement('div'), { textContent: `…and ${files.length - 20} more` })] : []));
+  } catch (e) {
+    set('Files', label, 'picked, but reading failed: ' + (e && e.message || e));
+  }
+  render();
+}
+
+function pickWith(id, label) {
+  const input = document.getElementById(id);
+  set('Files', label, 'tapped, waiting for chooser…');
+  render();
+  input.value = '';
+  input.onchange = () => picked(input, label);
+  input.oncancel = () => { set('Files', label, 'chooser opened, then cancelled'); render(); };
+  input.click();
+}
+
+document.getElementById('pickFile').onclick = () => pickWith('fileInput', 'Pick a file');
+document.getElementById('pickFolder').onclick = () => pickWith('folderInput', 'Pick a folder');
 
 // Compact summary for QR: key facts only, so it fits in one code
 function showQr() {
@@ -279,7 +433,8 @@ function showQr() {
   const summary = {
     ua: g('userAgent'), gpu: g('GPU renderer'), cores: g('hardwareConcurrency'), vp: g('viewport'), dpr: g('devicePixelRatio'),
     gl2: g('WebGL 2'), gpu2: g('WebGPU adapter'), simd: g('WASM SIMD'), sab: g('SharedArrayBuffer'), sw: g('Service Worker'),
-    quota: g('quota estimate'), pad: g('Gamepad API'), padSeen: g('Gamepad seen'), wv: g('Widevine'), h264: g('H.264'),
+    quota: g('quota estimate'), pad: g('Gamepad API'), padSeen: g('Gamepad seen'), padMap: g('Mapping'), btns: g('Buttons seen'), keys: g('Keys seen'), wv: g('Widevine'), h264: g('H.264'),
+    file: g('Pick a file'), folder: g('Pick a folder'), nes: g('iNES files seen'),
     js: g('JS loop 2e7 (ms, lower better)'), fps2d: g('Canvas 2D FPS (2000 sprites)'), fpsgl: g('WebGL FPS (50k triangles)'),
   };
   const wrap = document.getElementById('qrWrap');
