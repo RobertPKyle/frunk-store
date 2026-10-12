@@ -224,6 +224,51 @@ await check('speed test measures ping and starts the download', async () => {
   console.log(`     ping ${await appFrame().locator('#tPing b').textContent()} ms, ${live} Mbps live, ${await appFrame().locator('#server').textContent()}`);
 });
 
+await check('retro console adds a local file and plays a game', async () => {
+  await openFromHub(/Retro Console/);
+  // A player's own file: use one of the bundled free games as the stand-in
+  await appFrame().getByRole('button', { name: 'Add game files' }).click();
+  // First time: confirm owning the games; that tap opens the picker
+  const [chooser] = await Promise.all([page.waitForEvent('filechooser'), appFrame().getByRole('button', { name: 'I own my games' }).click()]);
+  await chooser.setFiles(new URL('../apps/retro/games/croom.nes', import.meta.url).pathname);
+  await appFrame().locator('#mine .game').filter({ hasText: 'croom' }).waitFor({ timeout: 5000 });
+  await appFrame().getByRole('button', { name: 'Remove croom' }).click();
+  await appFrame().locator('#mine .game').waitFor({ state: 'detached', timeout: 5000 });
+
+  // Get games from phone: a second page plays the phone, opened from the QR link
+  await appFrame().getByRole('button', { name: 'Get games from phone' }).click();
+  await appFrame().locator('#transferStatus').filter({ hasText: 'Waiting' }).waitFor({ timeout: 10000 });
+  const link = await appFrame().locator('#qr a').getAttribute('href');
+  const phone = await browser.newPage({ viewport: { width: 390, height: 800 }, isMobile: true, hasTouch: true });
+  await phone.goto(link);
+  const [pick] = await Promise.all([phone.waitForEvent('filechooser'), phone.getByRole('button', { name: 'Choose games' }).click()]);
+  await pick.setFiles(new URL('../apps/retro/games/thwaite.nes', import.meta.url).pathname);
+  await phone.locator('#files li.ok').waitFor({ timeout: 10000 });
+  await phone.close();
+  await appFrame().locator('#received li').filter({ hasText: 'thwaite' }).waitFor({ timeout: 10000 });
+  await appFrame().getByRole('button', { name: 'Done' }).click();
+  await appFrame().getByRole('button', { name: 'Remove thwaite' }).click();
+  await appFrame().locator('#mine .game').waitFor({ state: 'detached', timeout: 5000 });
+
+  await appFrame().getByRole('button', { name: /Thwaite/ }).click();
+  await appFrame().locator('#fps').filter({ hasText: /fps/ }).waitFor({ timeout: 10000 });
+  // Start skips the notice, then starts a game; the on-screen button is tapped
+  for (let i = 0; i < 2; i++) { await appFrame().locator('.pill[data-b=start]').click(); await page.waitForTimeout(1500); }
+  const fps = parseInt(await appFrame().locator('#fps').textContent());
+  if (!(fps >= 50)) throw new Error(`running at ${fps} fps`);
+  const lit = await page.frames().find(f => f.url().includes('/retro/')).evaluate(() => {
+    const d = document.getElementById('screen').getContext('2d').getImageData(0, 0, 256, 240).data;
+    let n = 0;
+    for (let i = 0; i < d.length; i += 4) if (d[i] + d[i + 1] + d[i + 2] > 60) n++;
+    return n;
+  });
+  if (lit < 5000) throw new Error(`screen mostly black (${lit} lit pixels)`);
+  console.log(`     ${fps} fps, ${lit} lit pixels`);
+  // Last: after a full-page screenshot, Playwright's clicks stop reaching
+  // the app frame
+  await page.screenshot({ path: shots + 'retro.png' });
+});
+
 await check('no console or page errors', async () => {
   // headless Chrome may log a GPU stall warning for readPixels; ignore those
   const real = errors.filter(e => !/GPU stall|swiftshader/i.test(e));

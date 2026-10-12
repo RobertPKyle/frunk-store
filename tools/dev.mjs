@@ -8,6 +8,7 @@ import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
+process.env.FRUNK_DEV = '1';
 const TYPES = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css',
   '.json': 'application/json', '.svg': 'image/svg+xml', '.wasm': 'application/wasm', '.png': 'image/png', '.woff2': 'font/woff2',
@@ -24,6 +25,28 @@ async function serve(dir, port, host) {
     // Vercel injects the analytics script in production; stub it locally
     if (path.startsWith('/_vercel/insights/')) {
       res.writeHead(200, { 'Content-Type': 'text/javascript' }).end('');
+      return;
+    }
+    // Vercel runs apps/api/*.js as functions; do the same with an in-memory
+    // store in place of Redis
+    if (dir === 'apps' && /^\/api\/[\w-]+$/.test(path)) {
+      try {
+        const mod = await import(join(root, dir, path + '.js'));
+        const handler = mod[req.method];
+        if (!handler) { res.writeHead(405).end(); return; }
+        const chunks = [];
+        for await (const c of req) chunks.push(c);
+        const body = Buffer.concat(chunks);
+        const request = new Request(`http://${host}:${port}${req.url}`, {
+          method: req.method, headers: req.headers, body: body.length ? body : undefined,
+        });
+        const response = await handler(request);
+        res.writeHead(response.status, Object.fromEntries(response.headers));
+        res.end(Buffer.from(await response.arrayBuffer()));
+      } catch (e) {
+        console.error(e);
+        res.writeHead(500).end(String(e));
+      }
       return;
     }
     // mirror the hub's vercel.json rewrite of /app/:id to the shell

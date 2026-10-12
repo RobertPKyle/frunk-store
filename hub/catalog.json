@@ -123,6 +123,17 @@
       ]
     },
     {
+      "id": "retro",
+      "name": "Retro Console",
+      "tagline": "Play 8-bit homebrew games, or NES games you own sent from your phone, with a controller or on screen.",
+      "path": "/retro/",
+      "icon": "/retro/icon.svg",
+      "tags": [
+        "Game",
+        "Controller"
+      ]
+    },
+    {
       "id": "chess",
       "name": "Chess Puzzle",
       "tagline": "Solve the Lichess daily chess puzzle on your screen.",

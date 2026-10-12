@@ -1,0 +1,16 @@
+Third-party components
+======================
+
+- jsnes 2.1.0, Apache License 2.0, https://github.com/bfirsh/jsnes
+  (jsnes.min.js, unmodified from the npm package; full text in jsnes-LICENSE.txt)
+
+- Thwaite 0.03, copyright 2011 Damian Yerrick, GNU GPL version 3 or later
+  (games/thwaite.nes; complete source in games/thwaite-0.03.zip, license
+  text in games/gpl-3.0.txt). From https://pineight.com/nes/
+
+- Concentration Room 0.02, copyright 2010 Damian Yerrick, GNU GPL version 3
+  or later, with an exception allowing exact copies without source
+  (games/croom.nes; source in games/ConcentrationRoom-0.02.zip).
+  From https://pineight.com/croom/
+
+Both games are distributed exactly as published by their author.

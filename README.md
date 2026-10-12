@@ -59,6 +59,22 @@ the apps are served from.
   (speed.cloudflare.com). Each direction runs for a fixed time on several
   connections and reports the average after a 2 second warm-up. Data use is
   capped at about 350 MB per test. The last 30 results are kept on the device.
+- `apps/retro`: Retro Console, an NES-compatible emulator (jsnes 2.1.0,
+  Apache-2.0, vendored unmodified). Ships only homebrew games whose licenses
+  allow redistribution (Thwaite and Concentration Room by Damian Yerrick, GPL,
+  with their source zips next to them; see `apps/retro/NOTICE`). Players add
+  games they own with "Get games from phone" (or from files on a computer);
+  those are stored in the screen's IndexedDB only. A one-time confirmation
+  asks players to load only games they legally own. Never add commercial ROMs
+  to this repo or the site.
+- `apps/send` and `apps/api/transfer.js`: "Get games from phone". The car
+  opens a session and shows a QR code with the session id and an AES-GCM key
+  in the URL fragment, which never reaches the server. The phone page
+  encrypts each game before upload; the function relays ciphertext through
+  Upstash Redis (Vercel Marketplace, free plan, env `KV_REST_API_URL` and
+  `KV_REST_API_TOKEN`) for at most 15 minutes and deletes each file when the
+  car takes it. Limits: 2 MB per file, 50 files and 40 MB per session, rate
+  limits per IP. `npm run dev` serves `/api/*` locally with an in-memory store.
 - `apps/chess`: the Lichess daily chess puzzle, playable on the board. Tap a
   piece, then a highlighted square; the opponent's reply is played
   automatically and only the best move is accepted. The last puzzle is cached

@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Send games to your car</title>
+<style>
+  :root { --bg: #0b0b12; --card: #1b1b28; --line: rgba(190, 180, 255, .15); --text: #ecebf5; --muted: #9592ab; --accent: #ff5d73; --ok: #8fe0a0; --bad: #ff9f8a; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); font: 17px/1.45 system-ui, -apple-system, sans-serif; }
+  main { max-width: 520px; margin: 0 auto; padding: 28px 18px 40px; }
+  h1 { font-size: 24px; margin: 0 0 6px; }
+  .lede { color: var(--muted); margin: 0 0 22px; }
+  #choose { display: block; width: 100%; min-height: 58px; border: 0; border-radius: 16px; background: var(--accent); color: #1a0508; font: inherit; font-size: 19px; font-weight: 700; cursor: pointer; }
+  #choose:disabled { opacity: .5; }
+  #files { list-style: none; margin: 18px 0 0; padding: 0; }
+  #files li { display: flex; justify-content: space-between; gap: 12px; padding: 12px 14px; margin-bottom: 8px; border-radius: 12px; background: var(--card); border: 1px solid var(--line); }
+  #files li span { min-width: 0; overflow-wrap: anywhere; }
+  #files li b { flex: none; font-weight: 600; color: var(--muted); }
+  #files li.ok b { color: var(--ok); }
+  #files li.bad b { color: var(--bad); }
+  #msg { margin: 16px 0 0; color: var(--bad); }
+  #msg:empty { display: none; }
+  .fine { margin-top: 26px; font-size: 14px; color: var(--muted); }
+  .fine p { margin: 0 0 8px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Send games to your car</h1>
+  <p class="lede" id="lede">Pick NES game files (.nes) on this phone. They appear on the car screen in a few seconds.</p>
+  <button id="choose" type="button">Choose games</button>
+  <input id="input" type="file" multiple hidden>
+  <p id="msg" role="alert"></p>
+  <ul id="files" aria-live="polite"></ul>
+  <div class="fine">
+    <p>Files are encrypted on this phone before they're sent. frunk.store can't read them, and deletes each one as soon as your car picks it up, or after 15 minutes.</p>
+    <p><b>Only send games you legally own</b>, such as copies you made from your own cartridges. frunk.store doesn't provide, sell or share commercial games. You're responsible for the files you send.</p>
+  </div>
+</main>
+<script type="module" src="send.js"></script>
+</body>
+</html>

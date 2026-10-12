@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Retro Console</title>
+<style>
+  :root { --bg: #0b0b12; --panel: #13131d; --card: #1b1b28; --line: rgba(190, 180, 255, .15); --text: #ecebf5; --muted: #9592ab;
+          --accent: #ff5d73; --accent2: #ffc65c; --ok: #8fe0a0; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 16px/1.4 system-ui, sans-serif; overflow: hidden;
+               -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; touch-action: none; }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  .btn { min-height: 44px; padding: 8px 16px; border-radius: 12px; background: var(--card); border: 1px solid var(--line); white-space: nowrap; }
+  .btn.primary { background: var(--accent); border-color: transparent; color: #1a0508; font-weight: 700; }
+  [hidden] { display: none !important; }
+
+  /* ---------- library ---------- */
+  #library { display: flex; flex-direction: column; height: 100%; }
+  /* left padding keeps clear of the hub's Apps button */
+  header { display: flex; align-items: center; gap: 10px; min-height: 60px; padding: 8px 12px 8px 110px; border-bottom: 1px solid var(--line); }
+  header h1 { margin: 0; font-size: 18px; font-weight: 600; flex: 1; }
+  .scroll { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 12px 16px 20px; touch-action: pan-y; }
+  h2 { margin: 10px 2px 8px; font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .games { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+  .game { position: relative; display: flex; flex-direction: column; gap: 4px; text-align: left; padding: 12px 14px; border-radius: 14px; background: var(--card); border: 1px solid var(--line); min-height: 96px; }
+  .game b { font-size: 17px; }
+  .game small { color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
+  .game p { margin: 2px 0 0; font-size: 14px; color: #c9c6dc; }
+  .wrap { position: relative; display: grid; }
+  .wrap .game { padding-right: 90px; }
+  .wrap .del { position: absolute; top: 6px; right: 6px; min-height: 36px; min-width: 36px; padding: 0 10px; border-radius: 10px; background: transparent; border: 1px solid var(--line); color: var(--muted); font-size: 13px; }
+  .add { display: flex; gap: 8px; flex-wrap: wrap; margin: 4px 0 6px; }
+  .note { font-size: 13px; color: var(--muted); margin: 6px 2px; max-width: 60em; }
+  #addMsg:empty { display: none; }
+  #mine:empty::before { content: 'None yet.'; color: var(--muted); font-size: 14px; padding: 2px; }
+  .legal { margin-top: 18px; font-size: 12px; color: var(--muted); user-select: text; -webkit-user-select: text; }
+  .legal p { margin: 4px 0; }
+
+  /* ---------- get games from phone ---------- */
+  .owned { padding: 10px 12px; border-radius: 12px; background: #24182a; border: 1px solid rgba(255, 93, 115, .35); color: #d9d4e6; }
+  .owned b { color: var(--text); }
+  .sheet.terms { flex-direction: column; align-items: stretch; gap: 0; max-width: 560px; }
+  .terms h2 { margin: 0 0 8px; font-size: 19px; color: var(--text); letter-spacing: 0; text-transform: none; }
+  .terms p { margin: 0 0 10px; font-size: 15px; color: #c9c6dc; }
+  .overlay { position: fixed; inset: 0; z-index: 5; display: grid; place-items: center; padding: 64px 16px 16px; background: rgba(5, 5, 10, .88); }
+  .sheet { display: flex; gap: 22px; align-items: center; max-width: 680px; padding: 18px; border-radius: 18px; background: var(--panel); border: 1px solid var(--line); }
+  .qr { flex: none; display: grid; place-items: center; width: 236px; height: 236px; border-radius: 12px; background: #fff; }
+  .qr a { display: block; }
+  .qr img, .qr canvas { display: block; width: 216px; height: 216px; image-rendering: pixelated; }
+  .steps h2 { margin: 0 0 6px; font-size: 19px; color: var(--text); letter-spacing: 0; text-transform: none; }
+  .steps ol { margin: 0 0 10px; padding-left: 20px; font-size: 15px; color: #c9c6dc; }
+  #transferStatus { margin: 0 0 6px; font-size: 14px; color: var(--muted); }
+  #received { list-style: none; margin: 0 0 10px; padding: 0; max-height: 110px; overflow-y: auto; font-size: 14px; }
+  #received li::before { content: '✓ '; color: var(--ok); }
+  #received li.bad::before { content: '✕ '; color: var(--accent); }
+  @media (max-width: 640px) { .sheet { flex-direction: column; } }
+
+  /* ---------- player ---------- */
+  #player { position: fixed; inset: 0; display: grid; grid-template-columns: minmax(128px, 1fr) auto minmax(128px, 1fr); grid-template-rows: 60px 1fr; background: #000; }
+  .bar { grid-column: 1 / 4; display: flex; align-items: center; gap: 8px; padding: 8px 10px 8px 110px; background: var(--panel); border-bottom: 1px solid var(--line); }
+  .bar b { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #fps { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .screen { grid-column: 2; display: flex; align-items: center; justify-content: center; min-height: 0; position: relative; }
+  canvas { display: block; image-rendering: pixelated; image-rendering: crisp-edges; background: #000; }
+  #paused { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(0, 0, 0, .6); font-size: 22px; font-weight: 700; }
+  .side { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px; padding: 4px; }
+  .side.left { grid-column: 1; grid-row: 2; }
+  .side.right { grid-column: 3; grid-row: 2; }
+  .dpad { position: relative; width: 120px; height: 120px; border-radius: 50%; background: #1d1d29; border: 1px solid var(--line); }
+  .dpad i { position: absolute; background: #3a3a4c; border-radius: 6px; }
+  .dpad .h { left: 14px; right: 14px; top: 50%; height: 40px; margin-top: -20px; }
+  .dpad .v { top: 14px; bottom: 14px; left: 50%; width: 40px; margin-left: -20px; }
+  .dpad.up .v { box-shadow: inset 0 40px 0 -8px rgba(255, 93, 115, .7); }
+  .dpad.down .v { box-shadow: inset 0 -40px 0 -8px rgba(255, 93, 115, .7); }
+  .dpad.left .h { box-shadow: inset 40px 0 0 -8px rgba(255, 93, 115, .7); }
+  .dpad.right .h { box-shadow: inset -40px 0 0 -8px rgba(255, 93, 115, .7); }
+  .ab { position: relative; width: 120px; height: 120px; }
+  .ab button { position: absolute; width: 56px; height: 56px; border-radius: 50%; border: 0; background: var(--accent); color: #1a0508; font-size: 20px; font-weight: 800; }
+  .ab [data-b=b] { left: 0; bottom: 6px; }
+  .ab [data-b=a] { right: 0; top: 6px; }
+  .ab button.on, .pill.on { filter: brightness(1.4); transform: scale(.94); }
+  .pills { display: flex; gap: 8px; }
+  .pill { min-height: 40px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--line); background: #1d1d29; font-size: 13px; color: var(--muted); }
+  #player.pad .side .dpad, #player.pad .side .ab { opacity: .25; }
+
+  @media (max-width: 640px) {
+    html, body { overflow: auto; }
+    #player { grid-template-columns: 1fr 1fr; grid-template-rows: 60px auto 1fr; }
+    .bar { grid-column: 1 / 3; }
+    .screen { grid-column: 1 / 3; grid-row: 2; }
+    .side.left { grid-column: 1; grid-row: 3; }
+    .side.right { grid-column: 2; grid-row: 3; }
+  }
+</style>
+</head>
+<body>
+<section id="library">
+  <header>
+    <h1>Retro Console</h1>
+  </header>
+  <div class="scroll">
+    <h2>Free games</h2>
+    <div class="games" id="free"></div>
+
+    <h2 style="margin-top:20px">Your games</h2>
+    <div class="add">
+      <button class="btn primary" id="fromPhone" type="button">Get games from phone</button>
+      <button class="btn" id="addFiles" type="button">Add game files</button>
+      <button class="btn" id="addFolder" type="button">Add a folder</button>
+    </div>
+    <input id="fileInput" type="file" accept=".nes" multiple hidden>
+    <input id="folderInput" type="file" webkitdirectory multiple hidden>
+    <p class="note" id="addMsg" aria-live="polite"></p>
+    <div class="games" id="mine"></div>
+    <p class="note owned"><b>Only load games you legally own</b>, such as copies you made from your own cartridges. frunk.store doesn't provide, sell or share commercial games, and never keeps yours: they're stored only on this screen. You're responsible for the files you load.</p>
+
+    <div class="legal">
+      <p>Controls: a USB or Bluetooth controller, the on-screen buttons, or a keyboard (arrows, Z = B, X = A, Enter = Start, Shift = Select).</p>
+      <p>Emulator: jsnes (Apache License 2.0). The free games are by their authors, under the licenses shown on each card; source code is kept next to each game.</p>
+      <p>Not affiliated with or endorsed by Nintendo. Play only while parked.</p>
+    </div>
+  </div>
+</section>
+
+<section id="terms" class="overlay" hidden aria-labelledby="termsTitle">
+  <div class="sheet terms">
+    <h2 id="termsTitle">Your own games</h2>
+    <p>Only load NES games you legally own, such as copies you made from cartridges you own. Downloading or sharing games you don't own can break copyright law.</p>
+    <p>frunk.store doesn't provide, sell or share commercial games. Games you load stay on this screen; when you send them from your phone they're encrypted and deleted from our server as soon as the car picks them up.</p>
+    <p>You're responsible for the files you load.</p>
+    <div class="add">
+      <button class="btn primary" id="termsOk" type="button">I own my games</button>
+      <button class="btn" id="termsCancel" type="button">Cancel</button>
+    </div>
+  </div>
+</section>
+
+<section id="transfer" class="overlay" hidden aria-labelledby="transferTitle">
+  <div class="sheet">
+    <div class="qr" id="qr" aria-hidden="true"></div>
+    <div class="steps">
+      <h2 id="transferTitle">Get games from phone</h2>
+      <ol>
+        <li>Scan this code with your phone's camera.</li>
+        <li>On the page that opens, choose your .nes files.</li>
+        <li>They show up here in a few seconds.</li>
+      </ol>
+      <p id="transferStatus" aria-live="polite">Getting a code…</p>
+      <ul id="received"></ul>
+      <button class="btn primary" id="transferDone" type="button">Done</button>
+    </div>
+  </div>
+</section>
+
+<section id="player" hidden>
+  <div class="bar">
+    <b id="title"></b>
+    <span id="fps"></span>
+    <button class="btn" id="pauseBtn" type="button">Pause</button>
+    <button class="btn" id="resetBtn" type="button">Reset</button>
+    <button class="btn" id="soundBtn" type="button">Sound on</button>
+    <button class="btn" id="quitBtn" type="button">Games</button>
+  </div>
+  <div class="side left">
+    <div class="dpad" id="dpad"><i class="h"></i><i class="v"></i></div>
+    <div class="pills"><button class="pill" type="button" data-b="select">Select</button></div>
+  </div>
+  <div class="screen">
+    <canvas id="screen" width="256" height="240"></canvas>
+    <div id="paused" hidden>Paused</div>
+  </div>
+  <div class="side right">
+    <div class="ab"><button type="button" data-b="b">B</button><button type="button" data-b="a">A</button></div>
+    <div class="pills"><button class="pill" type="button" data-b="start">Start</button></div>
+  </div>
+</section>
+
+<script src="jsnes.min.js"></script>
+<script src="/probe/qrcode.min.js"></script>
+<script type="module" src="retro.js"></script>
+<script src="/sw-register.js"></script>
+</body>
+</html>
