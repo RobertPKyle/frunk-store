@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Speed Test</title>
+<style>
+  :root { --bg: #080c14; --panel: #0e1420; --card: #141c2c; --line: rgba(150, 175, 220, .16); --text: #e4e9f2; --muted: #8b95a8;
+          --down: #4fd1e8; --up: #b48cff; --ping: #ffd36e; --good: #8fe0a0; --meh: #ffd36e; --bad: #ff8f7a; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 16px/1.4 system-ui, sans-serif; overflow: hidden; -webkit-tap-highlight-color: transparent; }
+  button { font: inherit; color: inherit; cursor: pointer; }
+
+  .app { display: grid; grid-template-columns: 1fr 330px; grid-template-rows: auto 1fr; height: 100%; }
+  /* left padding keeps clear of the hub's Apps button */
+  header { grid-column: 1 / 3; display: flex; align-items: center; gap: 10px; min-height: 60px; padding: 8px 12px 8px 110px; border-bottom: 1px solid var(--line); }
+  header h1 { margin: 0; font-size: 18px; font-weight: 600; flex: 1; }
+  #server { font-size: 14px; color: var(--muted); }
+
+  .main { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; min-height: 0; padding: 8px; }
+  .gauge { position: relative; width: min(100%, 330px); }
+  .gauge svg { display: block; width: 100%; height: auto; }
+  .gauge .track { fill: none; stroke: #1c2638; stroke-width: 16; stroke-linecap: round; }
+  .gauge .value { fill: none; stroke: var(--down); stroke-width: 16; stroke-linecap: round; transition: stroke .3s; }
+  .gauge .value.up { stroke: var(--up); }
+  .gauge .value.ping { stroke: var(--ping); }
+  .gauge text { fill: var(--muted); font-size: 12px; text-anchor: middle; }
+  .readout { position: absolute; left: 0; right: 0; top: 40%; text-align: center; pointer-events: none; }
+  #big { display: block; font-size: 56px; font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums; }
+  #unit { display: block; font-size: 15px; color: var(--muted); margin-top: 4px; }
+  #phase { min-height: 1.4em; color: var(--muted); text-align: center; }
+  #go { min-width: 200px; min-height: 56px; padding: 10px 28px; border: 0; border-radius: 999px; background: var(--down); color: #062028; font-size: 19px; font-weight: 700; }
+  #go.stop { background: var(--card); color: var(--text); border: 1px solid var(--line); }
+
+  aside { display: flex; flex-direction: column; min-height: 0; background: var(--panel); border-left: 1px solid var(--line); overflow-y: auto; overscroll-behavior: contain; padding: 10px; }
+  h2 { margin: 6px 2px 8px; font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 10px; }
+  .tile { padding: 8px 10px; border-radius: 12px; background: var(--card); border: 1px solid var(--line); }
+  .tile.wide { grid-column: 1 / 3; }
+  .tile small { display: block; font-size: 13px; color: var(--muted); }
+  .tile b { font-size: 24px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .tile b.na { color: var(--muted); }
+  .tile span { font-size: 13px; color: var(--muted); margin-left: 3px; }
+  #tDown b { color: var(--down); }
+  #tUp b { color: var(--up); }
+  #tPing b { color: var(--ping); }
+  #verdict { margin-bottom: 10px; }
+  #verdict:empty { display: none; }
+  .v { display: grid; grid-template-columns: 22px 1fr; gap: 2px 6px; padding: 7px 10px; margin-bottom: 4px; border-radius: 10px; background: var(--card); font-size: 14px; }
+  .v i { font-style: normal; font-weight: 700; text-align: center; }
+  .v.good i { color: var(--good); }
+  .v.meh i { color: var(--meh); }
+  .v.bad i { color: var(--bad); }
+  .histhead { display: flex; align-items: center; justify-content: space-between; }
+  #clear { min-height: 36px; padding: 4px 12px; border-radius: 10px; background: transparent; border: 1px solid var(--line); font-size: 13px; color: var(--muted); }
+  #clear[hidden] { display: none; }
+  .h { padding: 6px 10px; margin-bottom: 4px; border-radius: 10px; background: var(--card); font-size: 14px; font-variant-numeric: tabular-nums; }
+  .h small { display: block; color: var(--muted); font-size: 12px; }
+  .h .d { color: var(--down); }
+  .h .u { color: var(--up); }
+  #history:empty::before { content: 'Past tests show up here.'; display: block; padding: 4px 2px; font-size: 14px; color: var(--muted); }
+  footer { margin-top: auto; padding: 10px 2px 0; font-size: 11px; color: var(--muted); }
+
+  @media (max-width: 640px) {
+    html, body { overflow: auto; }
+    .app { grid-template-columns: 1fr; grid-template-rows: auto auto auto; height: auto; }
+    header { grid-column: 1; }
+    aside { border-left: 0; border-top: 1px solid var(--line); overflow: visible; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>Speed Test</h1>
+    <span id="server"></span>
+  </header>
+  <div class="main">
+    <div class="gauge">
+      <svg id="gauge" viewBox="0 0 300 250" aria-hidden="true"></svg>
+      <div class="readout"><b id="big">–</b><span id="unit">Mbps</span></div>
+    </div>
+    <div id="phase" aria-live="polite">Tests the connection this screen is using, Wi-Fi or LTE.</div>
+    <button id="go" type="button">Start test</button>
+  </div>
+  <aside>
+    <h2>Result</h2>
+    <div class="tiles">
+      <div class="tile" id="tDown"><small>Download</small><b class="na">–</b><span>Mbps</span></div>
+      <div class="tile" id="tUp"><small>Upload</small><b class="na">–</b><span>Mbps</span></div>
+      <div class="tile" id="tPing"><small>Ping</small><b class="na">–</b><span>ms</span></div>
+      <div class="tile" id="tJitter"><small>Jitter</small><b class="na">–</b><span>ms</span></div>
+      <div class="tile wide" id="tBusy"><small>Ping while busy (download / upload)</small><b class="na">–</b><span>ms</span></div>
+    </div>
+    <div id="verdict"></div>
+    <div class="histhead"><h2>Past tests</h2><button id="clear" type="button" hidden>Clear</button></div>
+    <div id="history"></div>
+    <footer>Measured against Cloudflare's speed test servers. A test uses up to about 350 MB of data on a fast connection, much less on LTE. Results stay on this screen.</footer>
+  </aside>
+</div>
+<script type="module" src="speedtest.js"></script>
+<script src="/sw-register.js"></script>
+</body>
+</html>

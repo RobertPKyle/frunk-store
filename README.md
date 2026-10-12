@@ -54,6 +54,11 @@ the apps are served from.
   API, up to 20 km), on a north-up map and a list, with an in-app reader.
   Article text is shown as plain text only. The last 15 articles read are
   cached for offline use.
+- `apps/speedtest`: Speed Test. Download, upload, ping, jitter and ping under
+  load, measured against Cloudflare's public speed test servers
+  (speed.cloudflare.com). Each direction runs for a fixed time on several
+  connections and reports the average after a 2 second warm-up. Data use is
+  capped at about 350 MB per test. The last 30 results are kept on the device.
 - `apps/chess`: the Lichess daily chess puzzle, playable on the board. Tap a
   piece, then a highlighted square; the opponent's reply is played
   automatically and only the best move is accepted. The last puzzle is cached

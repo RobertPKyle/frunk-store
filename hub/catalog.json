@@ -103,6 +103,16 @@
       ]
     },
     {
+      "id": "speedtest",
+      "name": "Speed Test",
+      "tagline": "How fast is the car's internet right now? Download, upload and ping, on Wi-Fi or LTE.",
+      "path": "/speedtest/",
+      "icon": "/speedtest/icon.svg",
+      "tags": [
+        "Tool"
+      ]
+    },
+    {
       "id": "probe",
       "name": "Car Benchmark",
       "tagline": "See what this car's browser can do.",

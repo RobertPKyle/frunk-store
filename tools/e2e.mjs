@@ -210,6 +210,20 @@ await check('chess puzzle renders a board', async () => {
   await page.screenshot({ path: shots + 'chess.png' });
 });
 
+await check('speed test measures ping and starts the download', async () => {
+  await openFromHub(/Speed Test/);
+  await appFrame().getByRole('button', { name: 'Start test' }).click();
+  await appFrame().locator('#tPing b:not(.na)').waitFor({ timeout: 20000 });
+  await appFrame().locator('#phase').filter({ hasText: 'download' }).waitFor({ timeout: 5000 });
+  await page.waitForTimeout(3000);
+  const live = await appFrame().locator('#big').textContent();
+  if (!(parseFloat(live) > 0)) throw new Error(`no live download rate: "${live}"`);
+  // Stop early to keep the test's data use small
+  await appFrame().getByRole('button', { name: 'Stop' }).click();
+  await appFrame().locator('#phase').filter({ hasText: 'Stopped' }).waitFor({ timeout: 5000 });
+  console.log(`     ping ${await appFrame().locator('#tPing b').textContent()} ms, ${live} Mbps live, ${await appFrame().locator('#server').textContent()}`);
+});
+
 await check('no console or page errors', async () => {
   // headless Chrome may log a GPU stall warning for readPixels; ignore those
   const real = errors.filter(e => !/GPU stall|swiftshader/i.test(e));
