@@ -216,16 +216,22 @@ itersBtn.onclick = () => {
 };
 
 // --- Gamepad: left stick pans, A / right trigger zoom in, B / left trigger zoom out ---
+// The car lists each controller twice: the raw device (A 0, B 1) and a "Tesla
+// Virtual Gamepad" copy with the standard layout (A 1, B 0). Read only the
+// standard one when there is one; triggers exist only there.
 
 let padLoop = false;
 function pollPad(prev) {
-  const pad = [...(navigator.getGamepads?.() || [])].find(Boolean);
+  const pads = [...(navigator.getGamepads?.() || [])].filter(Boolean);
+  const pad = pads.find(p => p.mapping === 'standard') || pads[0];
   if (!pad) { padLoop = false; return; }
   const now = performance.now(), dt = Math.min(0.05, (now - prev) / 1000);
   const dead = v => (Math.abs(v) < 0.15 ? 0 : v);
   const sx = dead(pad.axes[0] || 0), sy = dead(pad.axes[1] || 0);
-  const zin = pad.buttons[0]?.pressed || (pad.buttons[7]?.value || 0) > 0.2;
-  const zout = pad.buttons[1]?.pressed || (pad.buttons[6]?.value || 0) > 0.2;
+  const standard = pad.mapping === 'standard';
+  const [a, b] = standard ? [1, 0] : [0, 1];
+  const zin = pad.buttons[a]?.pressed || (standard && (pad.buttons[7]?.value || 0) > 0.2);
+  const zout = pad.buttons[b]?.pressed || (standard && (pad.buttons[6]?.value || 0) > 0.2);
   if (sx || sy || zin || zout) {
     const speed = canvas.clientWidth * 0.8 * dt;
     view.cx += sx * speed * view.scale;

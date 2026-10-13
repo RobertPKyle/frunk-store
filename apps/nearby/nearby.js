@@ -33,6 +33,7 @@ let place = getPlace();
 let pages = [];      // [{ id, title, desc, lat, lon, thumb, length, dist, bearing }]
 let selected = null; // page id
 let loading = false;
+let reload = false;  // place or distance changed during a search: run it again
 
 function el(tag, props = {}, ...children) {
   const node = Object.assign(document.createElement(tag), props);
@@ -296,6 +297,7 @@ async function open(id) {
   selected = id;
   markSelected();
   stopSpeaking();
+  current = null;   // Read aloud waits for this article's text
   const mine = ++openSeq;
   const pane = $('article');
   pane.hidden = false;
@@ -388,8 +390,14 @@ function measure() {
 }
 
 async function load(force = false) {
-  if (!place || loading) return;
+  if (!place) return;
+  if (loading) { reload = true; return; }
   loading = true;
+  try { await findAndShow(force); } finally { loading = false; }
+  if (reload) { reload = false; load(); }
+}
+
+async function findAndShow(force) {
   const radius = RADII[settings.radius][1];
   const key = `${place.lat.toFixed(3)},${place.lon.toFixed(3)}`;
   const cached = store.get(CACHE_KEY);
@@ -404,11 +412,14 @@ async function load(force = false) {
     $('list').replaceChildren();
     $('summary').textContent = '';
     try {
-      pages = await search(place.lat, place.lon, radius);
-      store.set(CACHE_KEY, { key, radius, fetched: Date.now(), pages });
+      const found = await search(place.lat, place.lon, radius);
+      store.set(CACHE_KEY, { key, radius, fetched: Date.now(), pages: found });
+      if (reload) return;   // these results are for the old place or distance
+      pages = found;
     } catch {
+      if (reload) return;
       if (usable) pages = cached.pages;
-      else { pages = []; setMsg('Couldn\'t reach Wikipedia. Check the connection and tap ↻.'); loading = false; draw(); return; }
+      else { pages = []; setMsg('Couldn\'t reach Wikipedia. Check the connection and tap ↻.'); draw(); return; }
     }
   }
   measure();
@@ -417,7 +428,6 @@ async function load(force = false) {
   showPlace();
   renderList();
   draw();
-  loading = false;
 }
 
 function setPlace(p) {

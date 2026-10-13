@@ -179,7 +179,7 @@ function renderList() {
     out.push(card(e));
   }
   $('list').replaceChildren(...out);
-  $('msg').textContent = list.length ? '' : 'Nothing in this list for the next year.';
+  $('msg').textContent = list.length ? '' : `Nothing in this list for the next ${filter === 'eclipse' ? '5 years' : 'year'}.`;
   $('range').textContent = filter === 'eclipse' ? '· next 5 years' : '· next 12 months';
 }
 

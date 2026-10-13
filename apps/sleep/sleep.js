@@ -147,14 +147,18 @@ for (const minutes of TIMER_CHOICES) {
   $('timers').appendChild(chip);
 }
 
+// The timer runs only while sound plays: it starts with the first sound, and
+// starts over each time sound begins again after stopping
 function startTimer() {
-  timerEnd = state.timer ? Date.now() + state.timer * 60_000 : 0;
+  timerEnd = state.timer && amb.playing ? Date.now() + state.timer * 60_000 : 0;
   [...$('timers').children].forEach((c, i) => c.setAttribute('aria-pressed', String(TIMER_CHOICES[i] === state.timer)));
   tickTimer();
 }
 
 async function tickTimer() {
-  if (!timerEnd || !amb.playing) { $('countdown').textContent = ''; return; }
+  if (!amb.playing) timerEnd = 0;
+  else if (!timerEnd && state.timer) timerEnd = Date.now() + state.timer * 60_000;
+  if (!timerEnd) { $('countdown').textContent = ''; return; }
   const left = Math.max(0, timerEnd - Date.now());
   const m = Math.floor(left / 60_000), s = Math.floor(left / 1000) % 60;
   $('countdown').textContent = `${m}:${String(s).padStart(2, '0')}`;

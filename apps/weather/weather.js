@@ -25,7 +25,8 @@ let place = getPlace();
 let units = store.get(UNITS_KEY) || (/-US$/.test(navigator.language) ? 'us' : 'metric');
 let forecast = null;  // { key, fetched, data }
 let kp = store.get(KP_KEY); // { fetched, data }
-let loading = false;
+let loading = null;    // place key of the forecast being fetched
+let reload = false;    // the place changed during that fetch
 
 // ---------- units and formatting ----------
 
@@ -289,8 +290,9 @@ async function loadKp() {
 }
 
 async function load(force = false) {
-  if (!place || loading) return;
+  if (!place) return;
   const key = placeKey();
+  if (loading) { reload ||= key !== loading; return; }
   if (!forecast || forecast.key !== key) {
     const cached = store.get(CACHE_KEY);
     forecast = cached?.key === key ? cached : null;
@@ -298,7 +300,7 @@ async function load(force = false) {
   render();
   if (!force && forecast && Date.now() - forecast.fetched < STALE) { await loadKp(); render(); return; }
 
-  loading = true;
+  loading = key;
   setStatus('Updating…');
   try {
     const [res] = await Promise.all([fetch(forecastUrl()), loadKp()]);
@@ -312,7 +314,8 @@ async function load(force = false) {
     if (forecast) setStatus(`Offline · updated ${ago(forecast.fetched)}`);
     else showError(`Couldn't load the forecast (${e.message}). Weather needs a connection the first time.`);
   } finally {
-    loading = false;
+    loading = null;
+    if (reload) { reload = false; load(true); }
   }
 }
 

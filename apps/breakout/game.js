@@ -298,19 +298,25 @@ function primaryAction() {
   else if (state === 'over') newGame();
 }
 
-let padPrev = [];
+// The car lists each controller twice: the raw device, and a "Tesla Virtual
+// Gamepad" copy with the standard layout and its own button numbers. Read one
+// pad only, the standard one when there is one. Either face button launches.
+let padPrev = { fire: false, pause: false };
 function readGamepad(dt) {
-  const pad = [...(navigator.getGamepads?.() || [])].find(Boolean);
+  const pads = [...(navigator.getGamepads?.() || [])].filter(Boolean);
+  const pad = pads.find(p => p.mapping === 'standard') || pads[0];
   if (!pad) return;
   const pressed = i => !!pad.buttons[i]?.pressed;
+  const standard = pad.mapping === 'standard';
   let dx = Math.abs(pad.axes[0]) > 0.15 ? pad.axes[0] : 0;
-  if (pressed(14)) dx = -1;
-  if (pressed(15)) dx = 1;
+  if (standard && pressed(14)) dx = -1;
+  if (standard && pressed(15)) dx = 1;
   if (dx) paddle.target = paddle.x + dx * 950 * dt;
   // edge-triggered buttons
-  if (pressed(0) && !padPrev[0]) { unlockAudio(); primaryAction(); }
-  if (pressed(9) && !padPrev[9] && state === 'play') setState('paused');
-  padPrev = pad.buttons.map(b => b.pressed);
+  const now = { fire: pressed(0) || pressed(1), pause: pressed(standard ? 9 : 11) };
+  if (now.fire && !padPrev.fire) { unlockAudio(); primaryAction(); }
+  if (now.pause && !padPrev.pause && state === 'play') setState('paused');
+  padPrev = now;
 }
 
 document.addEventListener('visibilitychange', () => {

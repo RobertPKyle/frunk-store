@@ -101,7 +101,8 @@ function ownGames(then) {
 // session id and a fresh AES key in the #fragment. The phone uploads games
 // encrypted with that key; this screen polls, downloads, decrypts and saves.
 
-const transfer = { session: null, key: null, taken: 0, timer: 0, busy: false };
+// gen changes when the panel closes, so a code still being fetched is dropped
+const transfer = { session: null, key: null, taken: 0, timer: 0, busy: false, gen: 0 };
 
 async function api(op, params = {}, method = 'GET') {
   const q = new URLSearchParams({ op, ...params });
@@ -113,12 +114,19 @@ async function openTransfer() {
   const status = $('transferStatus');
   $('qr').replaceChildren();
   status.textContent = 'Getting a code…';
+  const gen = transfer.gen;
   try {
+    const raw = crypto.getRandomValues(new Uint8Array(32));
+    const key = await crypto.subtle.importKey('raw', raw, 'AES-GCM', false, ['decrypt']);
     const res = await api('open', {}, 'POST');
     if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || res.status);
-    transfer.session = await res.json();
-    const raw = crypto.getRandomValues(new Uint8Array(32));
-    transfer.key = await crypto.subtle.importKey('raw', raw, 'AES-GCM', false, ['decrypt']);
+    const session = await res.json();
+    if (gen !== transfer.gen) {   // closed while waiting
+      api('close', { sid: session.sid, token: session.token }, 'POST').catch(() => {});
+      return;
+    }
+    transfer.session = session;
+    transfer.key = key;
     transfer.taken = 0;
     const link = `${location.origin}/send/#${transfer.session.sid}.${toBase64Url(raw)}`;
     // The code is also a link, so the phone page can be tried on a computer;
@@ -130,6 +138,7 @@ async function openTransfer() {
     clearInterval(transfer.timer);
     transfer.timer = setInterval(pollTransfer, 2500);
   } catch (e) {
+    if (gen !== transfer.gen) return;
     status.textContent = /\d{3}|unavailable/.test(String(e.message)) || e instanceof TypeError
       ? 'Sending from a phone isn\'t available right now. Check the connection and try again.'
       : String(e.message);
@@ -142,10 +151,11 @@ async function pollTransfer() {
   const { sid, token } = transfer.session;
   try {
     const res = await api('poll', { sid });
+    if (sid !== transfer.session?.sid) return;                 // closed while waiting
     if (res.status === 410) { await openTransfer(); return; }   // expired: show a fresh code
     if (!res.ok) return;
     const { n } = await res.json();
-    while (transfer.taken < n) {
+    while (transfer.taken < n && sid === transfer.session?.sid) {
       const i = transfer.taken + 1;
       const file = await api('take', { sid, token, i });
       // A missing file was rejected or already taken; other errors retry
@@ -180,6 +190,7 @@ function showTransfer() {
 }
 
 function closeTransfer() {
+  transfer.gen++;
   clearInterval(transfer.timer);
   const s = transfer.session;
   transfer.session = transfer.key = null;
@@ -490,7 +501,11 @@ function setPaused(p) {
   if (audio.ctx && settings.get('sound', true)) (p ? audio.ctx.suspend() : audio.ctx.resume()).catch(() => {});
 }
 
+let starting = false;   // a game is loading; ignore more taps until it runs
+
 async function play(title, bytes) {
+  cancelAnimationFrame(raf);
+  stopAudio();
   await startAudio();
   try {
     nes = new NES({
@@ -523,19 +538,29 @@ async function play(title, bytes) {
 }
 
 async function playUrl(game) {
+  if (starting) return;
+  starting = true;
   try {
     const res = await fetch(game.file);
     if (!res.ok) throw new Error(res.status);
     await play(game.title, new Uint8Array(await res.arrayBuffer()));
   } catch {
     $('addMsg').textContent = `Couldn't load ${game.title}. Check the connection and try again.`;
+  } finally {
+    starting = false;
   }
 }
 
 async function playStored(id) {
-  const rom = await getRom(id).catch(() => null);
-  if (rom) await play(rom.title, rom.data);
-  else renderMine();
+  if (starting) return;
+  starting = true;
+  try {
+    const rom = await getRom(id).catch(() => null);
+    if (rom) await play(rom.title, rom.data);
+    else renderMine();
+  } finally {
+    starting = false;
+  }
 }
 
 function quit() {
