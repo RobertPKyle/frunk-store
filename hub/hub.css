@@ -85,6 +85,8 @@ h1 { font-size: 30px; line-height: 1.15; margin: 8px 0 4px; letter-spacing: -0.0
 .coffee:active { transform: scale(.98); }
 .foot .follow { margin: 0 0 14px; font-size: 14px; }
 .follow a { display: inline-block; padding: 10px 4px; color: #c3cad6; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
+.foot .referral { max-width: 34em; margin: 0 auto 14px; font-size: 14px; color: #c3cad6; }
+.referral a { display: inline-block; padding: 8px 4px; color: var(--accent); font-weight: 600; }
 
 .foot { color: var(--muted); font-size: 13px; text-align: center; padding: 16px 24px 24px; }
 
