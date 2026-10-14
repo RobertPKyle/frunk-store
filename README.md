@@ -9,7 +9,6 @@ viewport of about 773x601 CSS px.
 | Folder   | Vercel project | URL                           | What it is                         |
 |----------|----------------|-------------------------------|------------------------------------|
 | `hub/`   | `frunk-store`  | https://frunk.store           | Catalog page that launches apps    |
-| `apps/`  | `frunk-apps`   | https://frunk-apps.vercel.app | App files, one folder per app      |
 | `tools/` | -              | -                             | Dev server, WASM build, e2e checks |
 
 The hub runs each app in a sandboxed iframe on the apps origin, so apps cannot
