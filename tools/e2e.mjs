@@ -33,7 +33,12 @@ await page.route('https://celestrak.org/**', async route => {
 
 const errors = [];
 page.on('pageerror', e => errors.push(`pageerror: ${e.message}`));
-page.on('console', m => { if (m.type() === 'error') errors.push(`console: ${m.text()}`); });
+page.on('console', m => {
+  if (m.type() !== 'error') return;
+  // Pit Stop asks again when OpenStreetMap is busy; the check below fails if it never answers
+  if (m.location().url.includes('/api/places') && m.text().includes('status of 503')) return;
+  errors.push(`console: ${m.text()}`);
+});
 
 let failed = 0;
 async function check(name, fn) {
@@ -196,6 +201,23 @@ await check('what\'s around me lists places and opens an article', async () => {
   await page.screenshot({ path: shots + 'nearby.png' });
   await appFrame().getByRole('button', { name: 'Show map' }).click();
   await page.screenshot({ path: shots + 'nearby-map.png' });
+});
+
+await check('pit stop lists places with hours and directions', async () => {
+  await openFromHub(/Pit Stop/);
+  const picker = appFrame().locator('.fp-picker');
+  if (await picker.isVisible()) await appFrame().getByRole('button', { name: 'Moab' }).click();
+  // A spot the CDN hasn't cached waits on OpenStreetMap's busy servers
+  await appFrame().locator('.item').first().waitFor({ timeout: 130000 });
+  console.log(`     ${await appFrame().locator('#summary').textContent()}`);
+  await appFrame().locator('[data-group="food"]').click();
+  await appFrame().locator('.item').first().click();
+  await appFrame().locator('#detail .qr canvas').waitFor({ state: 'attached', timeout: 5000 });
+  console.log(`     ${await appFrame().locator('#detail h1').textContent()}: ${await appFrame().locator('#detail .sub').textContent()}`);
+  await page.screenshot({ path: shots + 'pitstop.png' });
+  await appFrame().getByRole('button', { name: 'Show map' }).click();
+  await appFrame().locator('[data-group="all"]').click();
+  await page.screenshot({ path: shots + 'pitstop-map.png' });
 });
 
 await check('chess puzzle renders a board', async () => {

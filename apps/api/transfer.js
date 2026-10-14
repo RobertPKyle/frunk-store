@@ -11,12 +11,9 @@
 //   GET  ?op=poll&sid=…                car: files uploaded so far -> { n, ttl }
 //   GET  ?op=take&sid=…&i=…&token=…    car: file i (then deleted)
 //   POST ?op=close&sid=…&token=…       car: end the session early
-//
-// Storage is Upstash Redis over its REST API (env set by the Vercel
-// Marketplace integration). The local dev server sets FRUNK_DEV=1 to use an
-// in-memory store instead.
 
-import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
+import { randomBytes, timingSafeEqual } from 'node:crypto';
+import { fail, hash, json, limited, redis } from './_lib.js';
 
 const TTL = 15 * 60;              // seconds a session stays open
 const MAX_FILE = 2.2e6;           // a 2 MB game plus encryption overhead
@@ -25,68 +22,7 @@ const MAX_BYTES = 40e6;           // per session
 const OPENS_PER_HOUR = 30;        // per IP address
 const PUTS_PER_MINUTE = 60;       // per IP address
 
-// ---------- storage ----------
-
-const url = process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL;
-const auth = process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN;
-
-async function redis(...commands) {
-  commands = commands.map(c => c.map(String));
-  if (process.env.FRUNK_DEV === '1' && !url) return memory(commands);
-  if (!url || !auth) throw new Error('storage not configured');
-  const res = await fetch(`${url}/pipeline`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${auth}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify(commands),
-  });
-  if (!res.ok) throw new Error(`storage HTTP ${res.status}`);
-  return (await res.json()).map(r => { if (r.error) throw new Error(r.error); return r.result; });
-}
-
-// Just enough Redis for local testing
-const mem = globalThis.__frunkMem || (globalThis.__frunkMem = new Map());
-function memory(commands) {
-  const now = Date.now();
-  const live = k => { const e = mem.get(k); if (e && e.exp && e.exp < now) { mem.delete(k); return undefined; } return e; };
-  return commands.map(([cmd, key, ...args]) => {
-    const e = live(key);
-    switch (cmd) {
-      case 'SET': mem.set(key, { v: String(args[0]), exp: args[1] === 'EX' ? now + args[2] * 1000 : 0 }); return 'OK';
-      case 'GET': return e ? e.v : null;
-      case 'GETDEL': mem.delete(key); return e ? e.v : null;
-      case 'DEL': return [key, ...args].filter(k => mem.delete(k)).length;
-      case 'INCRBY': case 'INCR': {
-        const v = (e ? +e.v : 0) + (cmd === 'INCR' ? 1 : +args[0]);
-        mem.set(key, { v: String(v), exp: e ? e.exp : 0 });
-        return v;
-      }
-      case 'EXPIRE': if (e && !e.exp) e.exp = now + args[0] * 1000; return e ? 1 : 0;
-      case 'TTL': return e ? (e.exp ? Math.ceil((e.exp - now) / 1000) : -1) : -2;
-      default: throw new Error(`memory store: ${cmd}`);
-    }
-  });
-}
-
-// ---------- helpers ----------
-
-const json = (body, status = 200) => new Response(JSON.stringify(body), {
-  status, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
-});
-const fail = (status, error) => json({ error }, status);
-const hash = s => createHash('sha256').update(s).digest('hex');
 const SID = /^[A-Za-z0-9_-]{22}$/;
-
-function ip(request) {
-  return (request.headers.get('x-real-ip') || request.headers.get('x-forwarded-for') || 'local').split(',')[0].trim();
-}
-
-// Counts requests per IP in a fixed window; true when over the limit
-async function limited(name, request, max, seconds) {
-  const window = Math.floor(Date.now() / 1000 / seconds);
-  const key = `rl:${name}:${hash(ip(request)).slice(0, 16)}:${window}`;
-  const [n] = await redis(['INCR', key], ['EXPIRE', key, seconds, 'NX']);
-  return n > max;
-}
 
 async function carAllowed(sid, token) {
   if (!SID.test(sid) || !token) return false;

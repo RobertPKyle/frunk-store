@@ -103,6 +103,17 @@
       ]
     },
     {
+      "id": "pitstop",
+      "name": "Pit Stop",
+      "tagline": "Restrooms, coffee, food and shops within walking distance of the charger, with what's open now.",
+      "path": "/pitstop/",
+      "icon": "/pitstop/icon.svg",
+      "tags": [
+        "Road Trip",
+        "Tool"
+      ]
+    },
+    {
       "id": "speedtest",
       "name": "Speed Test",
       "tagline": "How fast is the car's internet right now? Download, upload and ping, on Wi-Fi or LTE.",

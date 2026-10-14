@@ -54,6 +54,18 @@ the apps are served from.
   API, up to 20 km), on a north-up map and a list, with an in-app reader.
   Article text is shown as plain text only. The last 15 articles read are
   cached for offline use.
+- `apps/pitstop` and `apps/api/places.js`: Pit Stop. Restrooms, coffee,
+  food, shops and parks within walking distance (up to 2 km), from
+  OpenStreetMap (ODbL), with open-now status from `opening_hours`
+  (`apps/pitstop/hours.js` reads the common forms and shows anything else as
+  written) and a QR code for walking directions on a phone. The browser can't
+  query Overpass directly (the main server turns away requests without a
+  descriptive User-Agent), so the function asks on its behalf, trying
+  overpass-api.de and then two mirrors with staggered starts. The app snaps
+  the location to a 0.005° grid and the function rejects anything else, so
+  Vercel's CDN caches each spot for a day. Uncached queries are limited to 40
+  per IP per hour and 3000 a day overall. The last 6 spots are kept on the
+  device for offline use.
 - `apps/speedtest`: Speed Test. Download, upload, ping, jitter and ping under
   load, measured against Cloudflare's public speed test servers
   (speed.cloudflare.com). Each direction runs for a fixed time on several
@@ -81,8 +93,8 @@ the apps are served from.
   for offline use. Rules come from chess.js (BSD-2-Clause); the piece art is
   the cburnett set (CC BY-SA 3.0).
 - `apps/_shared/place.js`: the location picker. Star Map, Weather,
-  Satellites, Sky Events and What's Around Me share one saved place (`frunk.place` in
-  localStorage).
+  Satellites, Sky Events, What's Around Me and Pit Stop share one saved place
+  (`frunk.place` in localStorage).
 
 ## Commands
 

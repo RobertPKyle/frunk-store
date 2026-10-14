@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Pit Stop</title>
+<style>
+  :root { --bg: #0b1018; --panel: #101722; --card: #161f2e; --line: rgba(150, 175, 220, .16); --text: #e4e8f0; --muted: #8b95a8; --accent: #ffb454; --open: #6fd08c; --closed: #ff7a7a; --pick: #ffffff; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 16px/1.4 system-ui, sans-serif; overflow: hidden; -webkit-tap-highlight-color: transparent; }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  .btn { min-height: 44px; padding: 8px 14px; border-radius: 12px; background: var(--card); border: 1px solid var(--line); white-space: nowrap; }
+
+  .app { display: grid; grid-template-columns: 1fr 360px; height: 100%; }
+  .main { position: relative; min-width: 0; }
+  canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  #mapNote { position: absolute; left: 12px; bottom: 10px; font-size: 13px; color: var(--muted); pointer-events: none; }
+
+  /* The details cover the map. Top padding keeps clear of the hub's Apps button. */
+  #detail { position: absolute; inset: 0; overflow-y: auto; overscroll-behavior: contain; background: var(--bg); padding: 64px 28px 24px; }
+  #detail[hidden] { display: none; }
+  .tools { position: absolute; top: 8px; right: 8px; display: flex; gap: 6px; z-index: 2; }
+  .tools[hidden] { display: none; }
+  #detail h1 { margin: 0; font-size: 28px; line-height: 1.2; }
+  #detail .sub { color: var(--muted); margin: 4px 0 12px; font-size: 17px; }
+  #detail .sub b { color: var(--accent); font-weight: 600; }
+  .state { font-size: 20px; font-weight: 600; margin: 0 0 14px; }
+  .state.open { color: var(--open); }
+  .state.closed { color: var(--closed); }
+  .state.soon { color: var(--accent); }
+  .cols { display: flex; gap: 28px; flex-wrap: wrap; align-items: flex-start; }
+  .cols > div { min-width: 0; }
+  #detail h2 { font-size: 15px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 6px; font-weight: 600; }
+  table.hours { border-collapse: collapse; font-variant-numeric: tabular-nums; margin-bottom: 16px; }
+  table.hours td { padding: 3px 18px 3px 0; vertical-align: top; }
+  table.hours tr.today { color: var(--accent); font-weight: 600; }
+  .raw { margin: 0 0 16px; max-width: 28em; overflow-wrap: anywhere; }
+  ul.facts { margin: 0 0 16px; padding: 0; list-style: none; }
+  ul.facts li { padding: 3px 0; }
+  .top { display: grid; grid-template-columns: 1fr auto; gap: 16px; align-items: start; margin-bottom: 4px; }
+  .phone { width: 128px; text-align: center; }
+  .phone .qr { display: inline-block; padding: 7px; background: #fff; border-radius: 10px; line-height: 0; }
+  .phone p { margin: 6px 0 0; color: var(--muted); font-size: 12px; line-height: 1.3; }
+  .credit { margin-top: 20px; padding-top: 12px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; }
+
+  aside { display: flex; flex-direction: column; min-height: 0; background: var(--panel); border-left: 1px solid var(--line); }
+  .head { display: flex; gap: 6px; padding: 8px; }
+  #placeBtn { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; text-align: left; }
+  .chips { display: flex; gap: 6px; padding: 0 8px 8px; }
+  .chip { flex: 1; min-height: 40px; padding: 0 6px; border-radius: 999px; background: var(--card); border: 1px solid var(--line); font-size: 14px; white-space: nowrap; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+  .chip[aria-pressed="true"] { background: #4a3417; border-color: var(--accent); }
+  .chip i { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+  #summary { padding: 2px 12px 6px; font-size: 14px; color: var(--muted); }
+  #list { flex: 1; overflow-y: auto; padding: 0 8px 8px; overscroll-behavior: contain; }
+  .item { display: grid; grid-template-columns: 40px 1fr; gap: 0 10px; align-items: center; width: 100%; text-align: left; padding: 8px; margin-bottom: 6px; border-radius: 12px; background: var(--card); border: 1px solid var(--line); }
+  .item[aria-pressed="true"] { border-color: var(--pick); background: #232a38; }
+  .badge { width: 40px; height: 40px; border-radius: 10px; display: grid; place-items: center; }
+  .badge svg { width: 24px; height: 24px; }
+  .item .name, .item .desc, .item .dist { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .item .name { font-weight: 600; }
+  .item .desc { font-size: 13px; color: var(--muted); }
+  .item .dist { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .item .dist b { color: var(--text); font-weight: 600; }
+  .open { color: var(--open); }
+  .closed { color: var(--closed); }
+  .soon { color: var(--accent); }
+  #msg { padding: 14px; color: var(--muted); font-size: 14px; }
+  #msg:empty { display: none; }
+  footer { padding: 6px 10px 8px; font-size: 11px; color: var(--muted); border-top: 1px solid var(--line); }
+
+  @media (max-width: 640px) {
+    .app { grid-template-columns: 1fr; grid-template-rows: 40% 60%; }
+    aside { border-left: 0; border-top: 1px solid var(--line); }
+    #detail { padding: 60px 16px 16px; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="main">
+    <canvas id="map"></canvas>
+    <div id="mapNote"></div>
+    <section id="detail" hidden></section>
+    <div class="tools" id="detailTools" hidden>
+      <button class="btn" id="mapBtn" type="button">Show map</button>
+    </div>
+  </div>
+  <aside>
+    <div class="head">
+      <button class="btn" id="placeBtn" type="button">Set location</button>
+      <button class="btn" id="hereBtn" type="button">Here</button>
+      <button class="btn" id="refreshBtn" type="button" aria-label="Refresh">↻</button>
+    </div>
+    <div class="chips" role="group" aria-label="What" id="groupsA"></div>
+    <div class="chips" role="group" aria-label="What" id="groupsB"></div>
+    <div class="chips" role="group" aria-label="How far" id="radii"></div>
+    <div id="summary"></div>
+    <div id="msg"></div>
+    <div id="list"></div>
+    <footer>Map data © OpenStreetMap contributors (ODbL) · Walk times are estimates</footer>
+  </aside>
+</div>
+<script src="/probe/qrcode.min.js"></script>
+<script type="module" src="pitstop.js"></script>
+<script src="/sw-register.js"></script>
+</body>
+</html>
