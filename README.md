@@ -70,22 +70,33 @@ the apps are served from.
   (speed.cloudflare.com). Each direction runs for a fixed time on several
   connections and reports the average after a 2 second warm-up. Data use is
   capped at about 350 MB per test. The last 30 results are kept on the device.
-- `apps/retro`: Retro Console, an NES-compatible emulator (jsnes 2.1.0,
-  Apache-2.0, vendored unmodified). Ships only homebrew games whose licenses
-  allow redistribution (Thwaite and Concentration Room by Damian Yerrick, GPL,
-  with their source zips next to them; see `apps/retro/NOTICE`). Players add
-  games they own with "Get games from phone" (or from files on a computer);
-  those are stored in the screen's IndexedDB only. A one-time confirmation
-  asks players to load only games they legally own. Never add commercial ROMs
-  to this repo or the site.
+- `apps/retro`: Retro Console. NES games run on jsnes 2.1.0 (Apache-2.0,
+  `nes.js`); Game Boy, Game Boy Color and Game Boy Advance games run on mGBA
+  2.5.1 compiled to WebAssembly (MPL-2.0, `gba.js`, threaded, so it needs the
+  COOP/COEP headers); both are vendored unmodified. SNES games run on
+  LakeSnes (MIT, `snes.js`), built from `tools/lakesnes` (the dinkc64 fork)
+  by `npm run build:snes`, which needs Docker. The console is picked from the
+  file's header (for SNES, the .sfc/.smc name plus a header check), and
+  zipped games are unzipped in the browser (`apps/_shared/roms.js`). Game Boy
+  and SNES games keep battery saves and a resume snapshot in IndexedDB, so
+  they pick up where they left off; Reset starts over. LakeSnes takes about
+  2.5 ms a frame on a Ryzen 5800X, so expect about 11 ms on the car's Atom,
+  inside the 16.7 ms budget but with little room. Ships only homebrew games whose licenses allow redistribution (Attack
+  on Voxelburg by John Tsiombikas, Thwaite and Concentration Room by Damian
+  Yerrick, all GPL, with their source next to them; see `apps/retro/NOTICE`).
+  Players add games they own with "Get games from phone" (or from files on a
+  computer); those are stored in the screen's IndexedDB only. A one-time
+  confirmation asks players to load only games they legally own. Never add
+  commercial ROMs to this repo or the site.
 - `apps/send` and `apps/api/transfer.js`: "Get games from phone". The car
   opens a session and shows a QR code with the session id and an AES-GCM key
   in the URL fragment, which never reaches the server. The phone page
   encrypts each game before upload; the function relays ciphertext through
   Upstash Redis (Vercel Marketplace, free plan, env `KV_REST_API_URL` and
   `KV_REST_API_TOKEN`) for at most 15 minutes and deletes each file when the
-  car takes it. Limits: 2 MB per file, 50 files and 40 MB per session, rate
-  limits per IP. `npm run dev` serves `/api/*` locally with an in-memory store.
+  car takes it. Games over 2 MB are split into 2 MB pieces on the phone and
+  joined on the car. Limits: 2 MB per piece, 200 pieces and 80 MB per
+  session, rate limits per IP. `npm run dev` serves `/api/*` locally with an in-memory store.
 - `apps/chess`: the Lichess daily chess puzzle, playable on the board. Tap a
   piece, then a highlighted square; the opponent's reply is played
   automatically and only the best move is accepted. The last puzzle is cached
@@ -100,6 +111,7 @@ the apps are served from.
 ```sh
 npm install
 npm run build:wasm                      # after editing apps/fractal/fractal.wat
+npm run build:snes                      # after editing tools/lakesnes (needs Docker)
 npm run dev                             # hub on localhost:5173, apps on 127.0.0.1:5174
 npm run test:e2e                        # checks against the dev server
 node tools/e2e.mjs https://frunk.store  # checks against production

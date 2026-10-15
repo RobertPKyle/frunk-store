@@ -54,6 +54,7 @@
   #received { list-style: none; margin: 0 0 10px; padding: 0; max-height: 110px; overflow-y: auto; font-size: 14px; }
   #received li::before { content: '✓ '; color: var(--ok); }
   #received li.bad::before { content: '✕ '; color: var(--accent); }
+  #received li.busy::before { content: '… '; color: var(--muted); }
   @media (max-width: 640px) { .sheet { flex-direction: column; } }
 
   /* ---------- player ---------- */
@@ -82,7 +83,16 @@
   .ab button.on, .pill.on { filter: brightness(1.4); transform: scale(.94); }
   .pills { display: flex; gap: 8px; }
   .pill { min-height: 40px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--line); background: #1d1d29; font-size: 13px; color: var(--muted); }
-  #player.pad .side .dpad, #player.pad .side .ab { opacity: .25; }
+  #player.pad .side .dpad, #player.pad .side .ab, #player.pad .shoulder { opacity: .25; }
+  .shoulder { min-width: 96px; font-size: 15px; font-weight: 700; color: var(--text); }
+  #player:not([data-system=gba]):not([data-system=snes]) .shoulder { display: none; }
+  /* SNES: four face buttons in a diamond, X top, Y left, A right, B bottom */
+  .ab [data-b=x], .ab [data-b=y] { display: none; }
+  #player[data-system=snes] .ab button { width: 48px; height: 48px; font-size: 18px; }
+  #player[data-system=snes] .ab [data-b=x] { display: block; left: 36px; top: 0; }
+  #player[data-system=snes] .ab [data-b=y] { display: block; left: 0; top: 36px; }
+  #player[data-system=snes] .ab [data-b=a] { left: auto; right: 0; top: 36px; }
+  #player[data-system=snes] .ab [data-b=b] { left: 36px; bottom: 0; }
 
   @media (max-width: 640px) {
     html, body { overflow: auto; }
@@ -109,15 +119,16 @@
       <button class="btn" id="addFiles" type="button">Add game files</button>
       <button class="btn" id="addFolder" type="button">Add a folder</button>
     </div>
-    <input id="fileInput" type="file" accept=".nes" multiple hidden>
+    <input id="fileInput" type="file" accept=".nes,.gb,.gbc,.gba,.sfc,.smc,.zip" multiple hidden>
     <input id="folderInput" type="file" webkitdirectory multiple hidden>
     <p class="note" id="addMsg" aria-live="polite"></p>
     <div class="games" id="mine"></div>
     <p class="note owned"><b>Only load games you legally own</b>, such as copies you made from your own cartridges. frunk.store doesn't provide, sell or share commercial games, and never keeps yours: they're stored only on this screen. You're responsible for the files you load.</p>
 
     <div class="legal">
-      <p>Controls: a USB or Bluetooth controller, the on-screen buttons, or a keyboard (arrows, Z = B, X = A, Enter = Start, Shift = Select).</p>
-      <p>Emulator: jsnes (Apache License 2.0). The free games are by their authors, under the licenses shown on each card; source code is kept next to each game.</p>
+      <p>Plays NES, Game Boy, Game Boy Color, Game Boy Advance and SNES games (.nes, .gb, .gbc, .gba, .sfc, .smc, also zipped). Game Boy and SNES games remember your progress: they pick up where you left off, and Reset starts over.</p>
+      <p>Controls: a USB or Bluetooth controller, the on-screen buttons, or a keyboard (arrows, Z = B, X = A, A = Y, S = X, Q = L, W = R, Enter = Start, Shift = Select).</p>
+      <p>Emulators: jsnes (Apache License 2.0) for NES, mGBA (Mozilla Public License 2.0, source at github.com/thenick775/mgba) for Game Boy, and LakeSnes (MIT License, github.com/dinkc64/LakeSnes) for SNES. The free games are by their authors, under the licenses shown on each card; source code is kept next to each game.</p>
       <p>Not affiliated with or endorsed by Nintendo. Play only while parked.</p>
     </div>
   </div>
@@ -126,7 +137,7 @@
 <section id="terms" class="overlay" hidden aria-labelledby="termsTitle">
   <div class="sheet terms">
     <h2 id="termsTitle">Your own games</h2>
-    <p>Only load NES games you legally own, such as copies you made from cartridges you own. Downloading or sharing games you don't own can break copyright law.</p>
+    <p>Only load games you legally own, such as copies you made from cartridges you own. Downloading or sharing games you don't own can break copyright law.</p>
     <p>frunk.store doesn't provide, sell or share commercial games. Games you load stay on this screen; when you send them from your phone they're encrypted and deleted from our server as soon as the car picks them up.</p>
     <p>You're responsible for the files you load.</p>
     <div class="add">
@@ -143,7 +154,7 @@
       <h2 id="transferTitle">Get games from phone</h2>
       <ol>
         <li>Scan this code with your phone's camera.</li>
-        <li>On the page that opens, choose your .nes files.</li>
+        <li>On the page that opens, choose your game files.</li>
         <li>They show up here in a few seconds.</li>
       </ol>
       <p id="transferStatus" aria-live="polite">Getting a code…</p>
@@ -163,15 +174,19 @@
     <button class="btn" id="quitBtn" type="button">Games</button>
   </div>
   <div class="side left">
+    <button class="pill shoulder" type="button" data-b="l">L</button>
     <div class="dpad" id="dpad"><i class="h"></i><i class="v"></i></div>
     <div class="pills"><button class="pill" type="button" data-b="select">Select</button></div>
   </div>
   <div class="screen">
     <canvas id="screen" width="256" height="240"></canvas>
+    <canvas id="gbaScreen" width="240" height="160" hidden></canvas>
+    <canvas id="snesScreen" width="512" height="224" hidden></canvas>
     <div id="paused" hidden>Paused</div>
   </div>
   <div class="side right">
-    <div class="ab"><button type="button" data-b="b">B</button><button type="button" data-b="a">A</button></div>
+    <button class="pill shoulder" type="button" data-b="r">R</button>
+    <div class="ab"><button type="button" data-b="x">X</button><button type="button" data-b="y">Y</button><button type="button" data-b="b">B</button><button type="button" data-b="a">A</button></div>
     <div class="pills"><button class="pill" type="button" data-b="start">Start</button></div>
   </div>
 </section>

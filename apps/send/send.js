@@ -1,10 +1,11 @@
 // Phone side of "Get games from phone". The QR code on the car opens this
 // page with #<session id>.<key>; the fragment never reaches the server. Each
-// game is checked, encrypted here with AES-GCM and uploaded to the session.
-import { sealGame } from '../_shared/transfer.js';
+// game is checked, encrypted here with AES-GCM and uploaded to the session,
+// in pieces when it's big. Zipped games are sent zipped; the car unzips them.
+import { sealPieces } from '../_shared/transfer.js';
+import { MAX_FILE, findGame } from '../_shared/roms.js';
 
 const $ = id => document.getElementById(id);
-const MAX_ROM = 2 * 1024 * 1024;
 
 const [sid, keyText] = location.hash.slice(1).split('.');
 let key = null;
@@ -30,19 +31,23 @@ function row(name) {
 }
 
 async function send(file, set) {
-  if (file.size > MAX_ROM) return set('Too big for an NES game', 'bad');
+  if (file.size > MAX_FILE) return set('Too big', 'bad');
   const bytes = new Uint8Array(await file.arrayBuffer());
-  if (!(bytes[0] === 0x4e && bytes[1] === 0x45 && bytes[2] === 0x53 && bytes[3] === 0x1a)) return set('Not an NES game', 'bad');
-  set('Sending…');
-  const body = await sealGame(key, sid, file.name, bytes);
-  const res = await fetch(`/api/transfer?op=put&sid=${encodeURIComponent(sid)}`, {
-    method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body,
-  });
-  if (res.ok) return set('Sent', 'ok');
-  const { error } = await res.json().catch(() => ({}));
-  set('Not sent', 'bad');
-  $('msg').textContent = error || 'Something went wrong. Try again.';
-  if (res.status === 410) $('choose').disabled = true;
+  if (!(await findGame(file.name, bytes))) return set('Not a game this plays', 'bad');
+  const pieces = await sealPieces(key, sid, file.name, bytes);
+  for (let i = 0; i < pieces.length; i++) {
+    set(pieces.length > 1 ? `Sending ${Math.round(100 * i / pieces.length)}%` : 'Sending…');
+    const res = await fetch(`/api/transfer?op=put&sid=${encodeURIComponent(sid)}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: pieces[i],
+    });
+    if (res.ok) continue;
+    const { error } = await res.json().catch(() => ({}));
+    set('Not sent', 'bad');
+    $('msg').textContent = error || 'Something went wrong. Try again.';
+    if (res.status === 410) $('choose').disabled = true;
+    return;
+  }
+  set('Sent', 'ok');
 }
 
 $('choose').onclick = () => {

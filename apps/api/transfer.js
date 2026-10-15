@@ -7,18 +7,21 @@
 // 15 minutes, and deletes each file as soon as the car takes it.
 //
 //   POST ?op=open                      car: new session -> { sid, token, ttl }
-//   POST ?op=put&sid=…        (body)   phone: one encrypted file -> { n }
-//   GET  ?op=poll&sid=…                car: files uploaded so far -> { n, ttl }
-//   GET  ?op=take&sid=…&i=…&token=…    car: file i (then deleted)
+//   POST ?op=put&sid=…        (body)   phone: one encrypted piece -> { n }
+//   GET  ?op=poll&sid=…                car: pieces uploaded so far -> { n, ttl }
+//   GET  ?op=take&sid=…&i=…&token=…    car: piece i (then deleted)
+//
+// Games bigger than one piece are split by the phone and joined by the car
+// (see apps/_shared/transfer.js); this server only counts pieces.
 //   POST ?op=close&sid=…&token=…       car: end the session early
 
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { fail, hash, json, limited, redis } from './_lib.js';
 
 const TTL = 15 * 60;              // seconds a session stays open
-const MAX_FILE = 2.2e6;           // a 2 MB game plus encryption overhead
-const MAX_FILES = 50;
-const MAX_BYTES = 40e6;           // per session
+const MAX_FILE = 2.2e6;           // a 2 MB piece plus encryption overhead
+const MAX_FILES = 200;            // pieces per session
+const MAX_BYTES = 80e6;           // per session: two of the biggest GBA games
 const OPENS_PER_HOUR = 30;        // per IP address
 const PUTS_PER_MINUTE = 60;       // per IP address
 
@@ -49,14 +52,14 @@ async function open(request) {
 async function put(request, sid) {
   if (!SID.test(sid)) return fail(400, 'Bad session.');
   const length = +request.headers.get('content-length');
-  if (!length || length > MAX_FILE) return fail(413, 'That file is too big for an NES game.');
+  if (!length || length > MAX_FILE) return fail(413, 'That piece is too big.');
   if (await limited('put', request, PUTS_PER_MINUTE, 60)) return fail(429, 'Too many files at once. Wait a minute.');
   const [ttl] = await redis(['TTL', `t:${sid}`]);
   if (ttl <= 0) return fail(410, 'This code has expired. Show a new one on the car screen.');
   const body = Buffer.from(await request.arrayBuffer());
-  if (body.length > MAX_FILE || body.length < 29) return fail(413, 'That file is too big for an NES game.');
+  if (body.length > MAX_FILE || body.length < 29) return fail(413, 'That piece is too big.');
   const [n, bytes] = await redis(['INCR', `t:${sid}:n`], ['INCRBY', `t:${sid}:bytes`, body.length]);
-  if (n > MAX_FILES || bytes > MAX_BYTES) return fail(413, `A session takes up to ${MAX_FILES} games. Show a new code on the car to send more.`);
+  if (n > MAX_FILES || bytes > MAX_BYTES) return fail(413, 'That\'s all this code can take. Show a new code on the car to send more.');
   await redis(['SET', `t:${sid}:f:${n}`, body.toString('base64'), 'EX', ttl]);
   return json({ n });
 }

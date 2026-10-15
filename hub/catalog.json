@@ -136,7 +136,7 @@
     {
       "id": "retro",
       "name": "Retro Console",
-      "tagline": "Play 8-bit homebrew games, or NES games you own sent from your phone, with a controller or on screen.",
+      "tagline": "Play homebrew games, or NES, SNES, Game Boy and GBA games you own sent from your phone, with a controller or on screen.",
       "path": "/retro/",
       "icon": "/retro/icon.svg",
       "tags": [
