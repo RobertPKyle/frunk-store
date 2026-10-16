@@ -97,7 +97,7 @@ the apps are served from.
   keep full speed. Tapping the frame rate shows the refresh rate and whether
   steady mode is on. SNES support (LakeSnes) was removed on 2026-10-15
   because it ran at about 15 fps in the car; it is in git history (commit
-  32a8df1). Ships only homebrew games whose licenses allow redistribution
+  3dfae87). Ships only homebrew games whose licenses allow redistribution
   (Attack on Voxelburg by John Tsiombikas, Thwaite and Concentration Room by
   Damian Yerrick, GPL; Libbet and the Magic Floor by Damian Yerrick, zlib;
   Tobu Tobu Girl Deluxe by Tangram Games, MIT and CC BY 4.0), with their
