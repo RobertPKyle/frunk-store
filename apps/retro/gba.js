@@ -24,14 +24,20 @@ async function runtime(canvas) {
   if (!module) {
     module = (async () => {
       const { default: mGBA } = await import('./mgba/mgba.js');
-      const m = await mGBA({ canvas });
+      // mGBA's sound is resampled on this page's main thread (the busiest
+      // part of it there). Run its output at the consoles' own 32768 Hz
+      // rather than the usual 48000: that's a third less work, and the
+      // browser converts to the speaker's rate on its audio thread.
+      let audioContext;
+      try { audioContext = new AudioContext({ sampleRate: 32768 }); } catch {}
+      const m = await mGBA({ canvas, SDL2: audioContext ? { audioContext } : {} });
       await m.FSInit();
       m.toggleInput(false);   // keyboard and controllers come from retro.js
       countFrames(m.ctx);
-      // A bigger sound buffer (4096 samples, about 85 ms, up from 1024): mGBA
-      // fills it from this page's main thread, which in the car is often too
-      // late for the small one, so sound crackled.
-      m.setCoreSettings({ rewindEnable: false, autoSaveStateTimerIntervalSeconds: 20, audioBufferSize: 4096 });
+      // Sound buffer of 2048 samples (62 ms at 32768 Hz; the default 1024 at
+      // 48000 Hz was 21 ms and crackled in the car): mGBA fills it from this
+      // page's main thread, so a bigger one makes longer pauses there.
+      m.setCoreSettings({ rewindEnable: false, autoSaveStateTimerIntervalSeconds: 20, audioBufferSize: 2048 });
       return m;
     })();
     module.catch(() => { module = null; });
@@ -90,8 +96,6 @@ export function createGba(canvas) {
       }
     },
 
-    tick() {},
-
     // mGBA runs the game on its own timer, so game speed and sound stay right
     // whatever the screen's refresh rate (tying it to the refresh rate would
     // run it at double speed on 120 Hz screens). Steady mode draws on every
@@ -101,6 +105,15 @@ export function createGba(canvas) {
     },
 
     pause(p) { p ? m.pauseGame() : m.resumeGame(); },
+
+    // Saves everything now (the resume snapshot and battery saves), for when
+    // the game is paused or the page may be about to close
+    async save() {
+      if (!m || !game) return;
+      try { m.forceAutoSaveState(); } catch {}
+      clearTimeout(syncTimer);
+      await m.FSSync().catch(() => {});
+    },
 
     sound(on) { m.setVolume(on ? 1 : 0); },
 

@@ -80,6 +80,20 @@ await check('home button closes app', async () => {
   if (new URL(page.url()).pathname !== '/') throw new Error(`URL not reset: ${page.url()}`);
 });
 
+await check('home button closes apps opened one after another', async () => {
+  // Unloading a frame by navigating it used to add history entries, so the
+  // second app's home button only moved its frame back a page
+  const before = await page.evaluate(() => history.length);
+  for (const name of [/Brick Breaker/, /Retro Console/, /Brick Breaker/]) {
+    await page.getByRole('button', { name }).click();
+    await page.waitForSelector('#loading', { state: 'hidden' });
+    await page.click('#home');
+    await page.waitForSelector('#runner', { state: 'hidden', timeout: 3000 });
+  }
+  const after = await page.evaluate(() => history.length);
+  if (after > before + 1) throw new Error(`history grew from ${before} to ${after}`);
+});
+
 await check('breakout runs and launches', async () => {
   await openFromHub(/Brick Breaker/);
   const frame = page.frames().find(f => f.url().includes('/breakout/'));
@@ -254,7 +268,9 @@ await check('retro console adds a local file and plays a game', async () => {
   const [chooser] = await Promise.all([page.waitForEvent('filechooser'), appFrame().getByRole('button', { name: 'I own my games' }).click()]);
   await chooser.setFiles(new URL('../apps/retro/games/croom.nes', import.meta.url).pathname);
   await appFrame().locator('#mine .game').filter({ hasText: 'croom' }).waitFor({ timeout: 5000 });
+  // Remove asks for a second tap
   await appFrame().getByRole('button', { name: 'Remove croom' }).click();
+  await appFrame().getByRole('button', { name: 'Remove croom' }).filter({ hasText: 'Sure?' }).click();
   await appFrame().locator('#mine .game').waitFor({ state: 'detached', timeout: 5000 });
 
   // Get games from phone: a second page plays the phone, opened from the QR link
@@ -270,22 +286,38 @@ await check('retro console adds a local file and plays a game', async () => {
   await appFrame().locator('#received li').filter({ hasText: 'thwaite' }).waitFor({ timeout: 10000 });
   await appFrame().getByRole('button', { name: 'Done' }).click();
   await appFrame().getByRole('button', { name: 'Remove thwaite' }).click();
+  await appFrame().getByRole('button', { name: 'Remove thwaite' }).click();
   await appFrame().locator('#mine .game').waitFor({ state: 'detached', timeout: 5000 });
 
-  await appFrame().getByRole('button', { name: /Thwaite/ }).click();
+  await appFrame().locator('#free .game').filter({ hasText: 'Thwaite' }).click();
   await appFrame().locator('#fps').filter({ hasText: /fps/ }).waitFor({ timeout: 10000 });
   // Start skips the notice, then starts a game; the on-screen button is tapped
   for (let i = 0; i < 2; i++) { await appFrame().locator('.pill[data-b=start]').click(); await page.waitForTimeout(1500); }
   const fps = parseInt(await appFrame().locator('#fps').textContent());
   if (!(fps >= 50)) throw new Error(`running at ${fps} fps`);
-  const lit = await page.frames().find(f => f.url().includes('/retro/')).evaluate(() => {
-    const d = document.getElementById('screen').getContext('2d').getImageData(0, 0, 256, 240).data;
+  // The worker draws the screen, so read it back from a screenshot
+  const shot = await appFrame().locator('#screen').screenshot();
+  const lit = await page.evaluate(async png => {
+    const img = await createImageBitmap(new Blob([new Uint8Array(png)], { type: 'image/png' }));
+    const c = new OffscreenCanvas(img.width, img.height).getContext('2d');
+    c.drawImage(img, 0, 0);
+    const d = c.getImageData(0, 0, img.width, img.height).data;
     let n = 0;
     for (let i = 0; i < d.length; i += 4) if (d[i] + d[i + 1] + d[i + 2] > 60) n++;
-    return n;
-  });
-  if (lit < 5000) throw new Error(`screen mostly black (${lit} lit pixels)`);
-  console.log(`     ${fps} fps, ${lit} lit pixels`);
+    return Math.round(n / (img.width * img.height) * 100);
+  }, [...shot]);
+  if (lit < 10) throw new Error(`screen mostly black (${lit}% lit)`);
+  // Leaving saves a resume snapshot, and Continue brings the game back
+  await appFrame().getByRole('button', { name: 'Games' }).click();
+  await appFrame().getByRole('button', { name: 'Continue Thwaite' }).click();
+  await appFrame().locator('#player').waitFor({ state: 'visible', timeout: 10000 });
+  const saved = await page.frames().find(f => f.url().includes('/retro/')).evaluate(() => new Promise(r => {
+    const q = indexedDB.open('nes', 1);
+    q.onsuccess = () => { const g = q.result.transaction('saves').objectStore('saves').get('free-thwaite.nes'); g.onsuccess = () => r(!!g.result?.state); };
+    q.onerror = () => r(false);
+  }));
+  if (!saved) throw new Error('no resume snapshot saved for Thwaite');
+  console.log(`     ${fps} fps, ${lit}% lit`);
   // Last: after a full-page screenshot, Playwright's clicks stop reaching
   // the app frame
   await page.screenshot({ path: shots + 'retro.png' });
@@ -307,7 +339,7 @@ await check('retro console plays a GBA game with a controller and resumes it', a
       await new Promise(r => setTimeout(r, 600));
     };
   });
-  await appFrame().getByRole('button', { name: /Attack on Voxelburg/ }).click();
+  await appFrame().locator('#free .game').filter({ hasText: 'Attack on Voxelburg' }).click();
   await appFrame().locator('#fps').filter({ hasText: /fps/ }).waitFor({ timeout: 15000 });
   await page.waitForTimeout(7000);   // logo, then the title menu
   const screen = appFrame().locator('#gbaScreen');
@@ -316,12 +348,16 @@ await check('retro console plays a GBA game with a controller and resumes it', a
   if (!(fps >= 50)) throw new Error(`running at ${fps} fps`);
   if (menu.length < 8000) throw new Error(`screen looks empty (${menu.length} byte PNG)`);
   // Down, then A, opens the Controls page
+  const small = await screen.evaluate(c => c.getBoundingClientRect().width);
   await frame().evaluate(async () => { await padTap(1, 13); await padTap(1, 1); });
   const controls = await screen.screenshot();
   if (controls.equals(menu)) throw new Error('controller input did nothing');
+  // With a controller in use, the on-screen buttons hide and the game grows
+  const big = await screen.evaluate(c => c.getBoundingClientRect().width);
+  if (!(big > small) || await appFrame().locator('.side.left').isVisible()) throw new Error(`screen didn't grow for the controller (${small} -> ${big} px)`);
   // Leaving and coming back picks up on the same page
   await appFrame().getByRole('button', { name: 'Games' }).click();
-  await appFrame().getByRole('button', { name: /Attack on Voxelburg/ }).click();
+  await appFrame().locator('#free .game').filter({ hasText: 'Attack on Voxelburg' }).click();
   await page.waitForTimeout(1500);
   if (!(await screen.screenshot()).equals(controls)) throw new Error('did not resume where it left off');
   console.log(`     ${fps} fps`);
@@ -330,7 +366,7 @@ await check('retro console plays a GBA game with a controller and resumes it', a
 
 await check('retro console plays a Game Boy Color game', async () => {
   await openFromHub(/Retro Console/);
-  await appFrame().getByRole('button', { name: /Tobu Tobu Girl Deluxe/ }).click();
+  await appFrame().locator('#free .game').filter({ hasText: 'Tobu Tobu Girl Deluxe' }).click();
   await appFrame().locator('#fps').filter({ hasText: /fps/ }).waitFor({ timeout: 15000 });
   await page.waitForTimeout(3000);
   const size = await appFrame().locator('#gbaScreen').evaluate(c => `${c.width}x${c.height}`);

@@ -4,12 +4,17 @@
 
 const grid = document.getElementById('grid');
 const runner = document.getElementById('runner');
-const frame = document.getElementById('frame');
+let frame = document.getElementById('frame');
 const loading = document.getElementById('loading');
 
 let catalog;
 let appsOrigin;
 let pushedHistory = false; // true when the open app added a history entry
+// An app that keeps progress (Retro Console) posts { frunk: 'save-on-close' }
+// when it loads. Closing it then posts { frunk: 'close' } and waits up to a
+// second for { frunk: 'closed' } before unloading it, so it can save first.
+let saveOnClose = false;
+let opened = 0;            // counts openApp calls, so a late unload can't hit a newer app
 
 // Local dev (tools/dev.mjs) serves apps on the next port. 127.0.0.1 is a
 // different site from localhost, which mirrors production isolation.
@@ -38,6 +43,21 @@ function renderGrid() {
   }));
 }
 
+// Each app gets a fresh, empty frame, and closing one removes its frame.
+// Navigating a single frame from app to app (or to about:blank) adds entries
+// to the browser history, and then the Apps button's history.back() only
+// moved the frame back a page instead of closing the app.
+function freshFrame() {
+  const next = frame.cloneNode(false);
+  next.removeAttribute('src');
+  next.addEventListener('load', () => {
+    try { if (next.contentWindow.location.href === 'about:blank') return; } catch {}   // the app's origin can't be read
+    loading.hidden = true;
+  });
+  frame.replaceWith(next);
+  frame = next;
+}
+
 function openApp(id, { push }) {
   const app = catalog.apps.find(a => a.id === id);
   if (!app) return;
@@ -46,6 +66,9 @@ function openApp(id, { push }) {
     pushedHistory = true;
   }
   loading.hidden = false;
+  opened++;
+  saveOnClose = false;
+  freshFrame();
   frame.src = appsOrigin + app.path;
   runner.hidden = false;
   document.title = `${app.name} · frunk.store`;
@@ -53,11 +76,26 @@ function openApp(id, { push }) {
 
 function closeApp() {
   runner.hidden = true;
-  frame.src = 'about:blank'; // unload the app so it stops using CPU and memory
   document.title = 'frunk.store';
+  // unload the app so it stops using CPU and memory
+  const unload = () => freshFrame();
+  if (!saveOnClose) return unload();
+  saveOnClose = false;
+  const which = opened, app = frame.contentWindow;
+  const done = e => {
+    if (e && (e.source !== app || e.data?.frunk !== 'closed')) return;
+    removeEventListener('message', done);
+    clearTimeout(timer);
+    if (which === opened) unload();
+  };
+  const timer = setTimeout(done, 1000);
+  addEventListener('message', done);
+  app.postMessage({ frunk: 'close' }, appsOrigin);
 }
 
-frame.addEventListener('load', () => { loading.hidden = true; });
+addEventListener('message', e => {
+  if (e.source === frame.contentWindow && e.origin === appsOrigin && e.data?.frunk === 'save-on-close') saveOnClose = true;
+});
 
 document.getElementById('home').addEventListener('click', () => {
   if (pushedHistory) {

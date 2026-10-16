@@ -261,6 +261,26 @@ function pick(inputId) {
 
 // ---------- library ----------
 
+// Shows how starting a game went, at the top of the library
+function status(text) { $('status').textContent = text; }
+
+// Buttons that lose progress or games ask for a second tap within 3 seconds
+function confirmTap(btn, action) {
+  if (btn.dataset.armed) {
+    clearTimeout(+btn.dataset.armed);
+    delete btn.dataset.armed;
+    btn.textContent = btn.dataset.label;
+    action();
+    return;
+  }
+  btn.dataset.label = btn.textContent;
+  btn.textContent = 'Sure?';
+  btn.dataset.armed = setTimeout(() => {
+    delete btn.dataset.armed;
+    btn.textContent = btn.dataset.label;
+  }, 3000);
+}
+
 function card(title, lines, onPlay) {
   const b = document.createElement('button');
   b.type = 'button';
@@ -268,7 +288,7 @@ function card(title, lines, onPlay) {
   const t = document.createElement('b');
   t.textContent = title;
   b.append(t, ...lines.map(([tag, text]) => Object.assign(document.createElement(tag), { textContent: text })));
-  b.onclick = onPlay;
+  b.onclick = () => onPlay(b);
   return b;
 }
 
@@ -277,7 +297,7 @@ function renderFree() {
     ['small', `${SYSTEMS[g.system].name} · ${g.by}`],
     ['p', g.about],
     ['small', `License: ${g.license}. Source: frunk-apps.vercel.app/retro/${g.source}`],
-  ], () => playUrl(g))));
+  ], b => playUrl(g, b))));
 }
 
 async function renderMine() {
@@ -290,16 +310,31 @@ async function renderMine() {
     del.className = 'del';
     del.textContent = 'Remove';
     del.setAttribute('aria-label', `Remove ${r.title}`);
-    del.onclick = async () => {
+    del.onclick = () => confirmTap(del, async () => {
       await deleteRom(r.id);
       renderMine();
-    };
+      renderContinue();
+    });
     // Games for a console this app no longer plays (SNES, for now) can only be removed
     const system = SYSTEMS[r.system || 'nes'];
     const label = system ? system.name : `${r.system.toUpperCase()}, can't be played here for now`;
-    wrap.append(card(r.title, [['small', `${label} · ${Math.round(r.size / 1024)} KB · on this screen only`]], () => system && playStored(r.id)), del);
+    wrap.append(card(r.title, [['small', `${label} · ${Math.round(r.size / 1024)} KB · on this screen only`]], b => system && playStored(r.id, b, r.title)), del);
     return wrap;
   }));
+}
+
+// The last game played, to pick up from the top of the library
+async function renderContinue() {
+  const last = settings.get('last', null);
+  const btn = $('continue');
+  btn.hidden = true;
+  if (!last) return;
+  const free = last.free && GAMES.find(g => g.id === last.free);
+  const mine = last.mine && await getRom(last.mine).catch(() => null);
+  if (!free && !mine) return;
+  btn.textContent = `Continue ${free ? free.title : mine.title}`;
+  btn.onclick = () => free ? playUrl(free, btn) : playStored(mine.id, btn, mine.title);
+  btn.hidden = false;
 }
 
 // ---------- sound ----------
@@ -378,7 +413,22 @@ function readPad(p, out) {
   }
 }
 
-let usingPad = false;
+// While a controller is in use, the on-screen buttons are hidden and the
+// game gets their room; touching the screen brings them back
+let padMode = false;
+function setPadMode(on) {
+  if (on === padMode) return;
+  padMode = on;
+  $('player').classList.toggle('pad', on);
+  fit();
+}
+
+const readPads = () => padsToPlayers([...(navigator.getGamepads ? navigator.getGamepads() : [])].filter(Boolean));
+
+// Start that resumed a paused game stays away from the game until released,
+// so it doesn't also open the game's own pause menu
+let swallowStart = false;
+
 function readInput() {
   const now = [new Set(keyboard), new Set()];
   for (const [b, left] of sticky) {
@@ -386,17 +436,28 @@ function readInput() {
     if (left <= 1) sticky.delete(b); else sticky.set(b, left - 1);
   }
   for (const t of touch.values()) for (const b of t.held || []) now[0].add(b);
-  const pads = [...(navigator.getGamepads ? navigator.getGamepads() : [])].filter(Boolean);
-  padsToPlayers(pads).forEach((set, i) => { for (const b of set) now[i].add(b); });
-  if (pads.length && !usingPad) { usingPad = true; $('player').classList.add('pad'); }
+  const pads = readPads();
+  pads.forEach((set, i) => { for (const b of set) now[i].add(b); });
+  if (pads.some(set => set.size)) setPadMode(true);
+  if (swallowStart) {
+    if (now[0].has('start')) now[0].delete('start');
+    else swallowStart = false;
+  }
   core.input(now);
   showTouch(now[0]);
 }
 
+// Lights the on-screen buttons that are held; touches the page only when
+// that changes, and not at all while they're hidden for a controller
+const touchButtons = [...document.querySelectorAll('#player [data-b]')];
+let shownTouch = '';
 function showTouch(set) {
+  const key = padMode ? '' : [...set].sort().join();
+  if (key === shownTouch) return;
+  shownTouch = key;
   const d = $('dpad');
   for (const dir of ['up', 'down', 'left', 'right']) d.classList.toggle(dir, set.has(dir));
-  for (const el of document.querySelectorAll('#player [data-b]')) el.classList.toggle('on', set.has(el.dataset.b));
+  for (const el of touchButtons) el.classList.toggle('on', set.has(el.dataset.b));
 }
 
 function dpadDirs(e) {
@@ -419,6 +480,7 @@ function buttonAt(e) {
 }
 
 function onPointer(e) {
+  if (e.type === 'pointerdown' && !e.target.closest('.bar')) setPadMode(false);
   if (e.type === 'pointerdown') {
     if (e.target.closest('#dpad')) touch.set(e.pointerId, { dpad: true, held: dpadDirs(e) });
     else if (e.target.closest('#player [data-b]')) touch.set(e.pointerId, { held: buttonAt(e) });
@@ -438,6 +500,11 @@ function onPointer(e) {
 for (const type of ['pointerdown', 'pointermove', 'pointerup', 'pointercancel']) $('player').addEventListener(type, onPointer);
 addEventListener('keydown', e => {
   if ($('player').hidden || !KEYS[e.code]) return;
+  if (paused) {
+    if (KEYS[e.code] === 'start' && !e.repeat) setPaused(false);
+    e.preventDefault();
+    return;
+  }
   if (!e.repeat) press(KEYS[e.code]);
   keyboard.add(KEYS[e.code]);
   e.preventDefault();
@@ -457,7 +524,7 @@ let core = null, raf = 0, paused = false, frames = 0, fpsSince = 0, refreshes = 
 // steady 30 fps; the games still run at full speed. It stays on until the
 // next game starts.
 const SLOW_HZ = 54;
-let steady = false, slowSeconds = 0, odd = false;
+let steady = false, slowSeconds = 0, startedAt = 0;
 
 // Tapping the frame rate shows details for checking speed in the car: how
 // often the screen refreshed (60 when the page keeps up)
@@ -469,20 +536,26 @@ function loop(t) {
   if (paused || document.hidden) {
     // start counting afresh when the game comes back
     frames = core.frames; fpsSince = t; refreshes = 0;
+    // Start on a controller resumes (once it has been let go since pausing)
+    const start = readPads()[0].has('start');
+    if (paused && start && !swallowStart) { swallowStart = true; setPaused(false); }
+    else if (paused) swallowStart = start;
     return;
   }
   refreshes++;
-  odd = !odd;
+  // The cores run on their own threads and pace themselves; this page
+  // passes on input and watches the refresh rate
   readInput();
-  // the NES core catches up two frames on the next refresh
-  if (!steady || !odd) core.tick(t);
   if (t - fpsSince >= 1000) {
-    const hz = Math.round(refreshes * 1000 / (t - fpsSince));
-    slowSeconds = hz < SLOW_HZ ? slowSeconds + 1 : 0;
-    if (!steady && slowSeconds >= 3) {
+    let hz = Math.round(refreshes * 1000 / (t - fpsSince));
+    // the first two seconds don't count: starting a game can stall the page
+    slowSeconds = hz < SLOW_HZ && t - startedAt > 2000 ? slowSeconds + 1 : 0;
+    if (!steady && slowSeconds >= 3 && core.steady) {
       steady = true;
-      if (core.steady) core.steady(true);
+      core.steady(true);
     }
+    // A core with its own refresh rate (NES, in a worker) decides for itself
+    if ('refresh' in core) { hz = core.refresh; steady = core.isSteady; }
     $('fps').textContent = `${Math.round((core.frames - frames) * 1000 / (t - fpsSince))} fps` +
       (details ? ` · ${hz} Hz${steady ? ' · steady' : ''}` : '');
     frames = core.frames;
@@ -494,8 +567,9 @@ function loop(t) {
 function fit() {
   if (!core) return;
   const { width: w, height: h } = core;
-  const sides = innerWidth > 640 ? 2 * 128 : 0;
-  const room = innerHeight - 60 - (innerWidth > 640 ? 8 : 230);
+  const wide = innerWidth > 640;
+  const sides = wide && !padMode ? 2 * 128 : 0;
+  const room = innerHeight - 60 - (wide || padMode ? 8 : 230);
   let s = Math.min((innerWidth - sides) / w, room / h);
   if (s >= 1) s = Math.max(1, Math.floor(s * 4) / 4);   // keep pixels close to even
   core.canvas.style.width = `${Math.round(w * s)}px`;
@@ -503,32 +577,56 @@ function fit() {
 }
 addEventListener('resize', fit);
 
+// Pausing saves the game's progress; returns when it's saved
 function setPaused(p) {
   paused = p;
+  swallowStart = true;   // Start must be let go, then pressed, to resume
   $('paused').hidden = !p;
   $('pauseBtn').textContent = p ? 'Resume' : 'Pause';
-  if (core) core.pause(p || document.hidden);
+  if (!core) return Promise.resolve();
+  core.pause(p || document.hidden);
+  return p ? core.save() : Promise.resolve();
 }
 
-// Stop emulating while the screen is off or another app is showing
+// Stop emulating, and save, while the screen is off or another app is showing
 document.addEventListener('visibilitychange', () => {
-  if (core && !paused) core.pause(document.hidden);
+  if (!core || paused) return;
+  core.pause(document.hidden);
+  if (document.hidden) core.save();
 });
 
+// A controller switched off or out of range pauses the game
+addEventListener('gamepaddisconnected', () => {
+  if (core && padMode && !paused) setPaused(true);
+});
+
+// The hub's Apps button (or the car's back button) unloads this page. The
+// hub asks first, so the game can be saved; it waits up to a second.
+addEventListener('message', async e => {
+  if (e.source !== parent || e.data?.frunk !== 'close') return;
+  if (core && !paused) await setPaused(true);
+  else if (core) await core.save();
+  e.source.postMessage({ frunk: 'closed' }, e.origin);
+});
+if (parent !== window) parent.postMessage({ frunk: 'save-on-close' }, '*');
+
 let starting = false;   // a game is loading; ignore more taps until it runs
+let quitting = null;    // the last game still saving after Games was tapped
 
 // fileName stays the same for a game; mGBA names its saves after it
 async function play(title, system, bytes, fileName) {
   cancelAnimationFrame(raf);
   if (core) await core.quit();
+  await quitting;
   core = cores[CORE[system]];
   try {
     await core.start(bytes, settings.get('sound', true), fileName);
   } catch (e) {
     core = null;
-    $('addMsg').textContent = `Couldn't start "${title}": ${e && e.message && /\.$/.test(e.message) ? e.message : 'the emulator didn\'t load. Check the connection and try again.'}`;
-    return;
+    status(`Couldn't start "${title}": ${e && e.message && /\.$/.test(e.message) ? e.message : 'the emulator didn\'t load. Check the connection and try again.'}`);
+    return false;
   }
+  status('');
   keyboard.clear(); touch.clear(); sticky.clear();
   $('title').textContent = title;
   for (const c of Object.values(cores)) c.canvas.hidden = c !== core;
@@ -538,9 +636,24 @@ async function play(title, system, bytes, fileName) {
   showSound();
   fit();
   setPaused(false);
-  frames = core.frames; fpsSince = performance.now(); refreshes = 0;
+  frames = core.frames; fpsSince = startedAt = performance.now(); refreshes = 0;
   steady = false; slowSeconds = 0;
   raf = requestAnimationFrame(loop);
+  return true;
+}
+
+// Marks the tapped card (or Continue button) while its game loads
+async function startGame(btn, title, run) {
+  if (starting) return;
+  starting = true;
+  btn?.classList.add('busy');
+  status(`Starting ${title}…`);
+  try {
+    await run();
+  } finally {
+    starting = false;
+    btn?.classList.remove('busy');
+  }
 }
 
 // A file name for mGBA's saves: the same for the same game every time
@@ -549,44 +662,51 @@ function saveName(id, system, bytes) {
   return `${id.replace(/[^\w .|-]/g, '').replace('|', '-').slice(0, 80)}.${ext}`;
 }
 
-async function playUrl(game) {
-  if (starting) return;
-  starting = true;
-  try {
-    const res = await fetch(game.file);
-    if (!res.ok) throw new Error(res.status);
-    const bytes = new Uint8Array(await res.arrayBuffer());
-    await play(game.title, game.system, bytes, saveName(`free-${game.id}`, game.system, bytes));
-  } catch {
-    $('addMsg').textContent = `Couldn't load ${game.title}. Check the connection and try again.`;
-  } finally {
-    starting = false;
-  }
+function playUrl(game, btn) {
+  return startGame(btn, game.title, async () => {
+    let bytes;
+    try {
+      const res = await fetch(game.file);
+      if (!res.ok) throw new Error(res.status);
+      bytes = new Uint8Array(await res.arrayBuffer());
+    } catch {
+      status(`Couldn't load ${game.title}. Check the connection and try again.`);
+      return;
+    }
+    if (await play(game.title, game.system, bytes, saveName(`free-${game.id}`, game.system, bytes))) {
+      settings.set('last', { free: game.id });
+    }
+  });
 }
 
-async function playStored(id) {
-  if (starting) return;
-  starting = true;
-  try {
+function playStored(id, btn, title) {
+  return startGame(btn, title, async () => {
     const rom = await getRom(id).catch(() => null);
     const system = rom && (rom.system || 'nes');
-    if (rom) await play(rom.title, system, rom.data, saveName(rom.id, system, rom.data));
-    else renderMine();
-  } finally {
-    starting = false;
-  }
+    if (!rom || !SYSTEMS[system]) {
+      status('');
+      renderMine();
+      renderContinue();
+      return;
+    }
+    if (await play(rom.title, system, rom.data, saveName(rom.id, system, rom.data))) {
+      settings.set('last', { mine: rom.id });
+    }
+  });
 }
 
 function quit() {
   cancelAnimationFrame(raf);
-  if (core) core.quit();
+  if (core) quitting = core.quit().catch(() => {});
   core = null;
   $('player').hidden = true;
   $('library').hidden = false;
+  renderContinue();
 }
 
 $('pauseBtn').onclick = () => setPaused(!paused);
-$('resetBtn').onclick = () => { if (core) { core.reset(); setPaused(false); } };
+$('paused').onclick = () => setPaused(false);
+$('resetBtn').onclick = () => confirmTap($('resetBtn'), () => { if (core) { core.reset(); setPaused(false); } });
 $('quitBtn').onclick = quit;
 $('soundBtn').onclick = () => {
   const on = !settings.get('sound', true);
@@ -598,7 +718,7 @@ $('addFiles').onclick = () => ownGames(() => pick('fileInput'));
 $('fromPhone').onclick = () => ownGames(showTransfer);
 $('transferDone').onclick = closeTransfer;
 $('addFolder').onclick = () => ownGames(() => pick('folderInput'));
-addEventListener('gamepadconnected', () => { if (!$('player').hidden) { usingPad = true; $('player').classList.add('pad'); } });
 
 renderFree();
 renderMine();
+renderContinue();

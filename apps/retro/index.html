@@ -20,6 +20,7 @@
   /* left padding keeps clear of the hub's Apps button */
   header { display: flex; align-items: center; gap: 10px; min-height: 60px; padding: 8px 12px 8px 110px; border-bottom: 1px solid var(--line); }
   header h1 { margin: 0; font-size: 18px; font-weight: 600; flex: 1; }
+  #continue { max-width: 55%; overflow: hidden; text-overflow: ellipsis; }
   .scroll { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 12px 16px 20px; touch-action: pan-y; }
   h2 { margin: 10px 2px 8px; font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
   .games { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
@@ -32,7 +33,10 @@
   .wrap .del { position: absolute; top: 6px; right: 6px; min-height: 36px; min-width: 36px; padding: 0 10px; border-radius: 10px; background: transparent; border: 1px solid var(--line); color: var(--muted); font-size: 13px; }
   .add { display: flex; gap: 8px; flex-wrap: wrap; margin: 4px 0 6px; }
   .note { font-size: 13px; color: var(--muted); margin: 6px 2px; max-width: 60em; }
-  #addMsg:empty { display: none; }
+  #addMsg:empty, #status:empty { display: none; }
+  #status { margin: 0 2px 10px; color: var(--text); }
+  .game.busy, .btn.busy { opacity: .6; }
+  .game.busy b::after { content: ' · starting…'; font-weight: 400; color: var(--muted); }
   #mine:empty::before { content: 'None yet.'; color: var(--muted); font-size: 14px; padding: 2px; }
   .legal { margin-top: 18px; font-size: 12px; color: var(--muted); user-select: text; -webkit-user-select: text; }
   .legal p { margin: 4px 0; }
@@ -64,7 +68,8 @@
   #fps { font: inherit; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; background: none; border: 0; padding: 12px 4px; cursor: pointer; }
   .screen { grid-column: 2; display: flex; align-items: center; justify-content: center; min-height: 0; position: relative; }
   canvas { display: block; image-rendering: pixelated; image-rendering: crisp-edges; background: #000; }
-  #paused { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(0, 0, 0, .6); font-size: 22px; font-weight: 700; }
+  #paused { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; gap: 6px; background: rgba(0, 0, 0, .6); font-size: 22px; font-weight: 700; cursor: pointer; }
+  #paused small { font-size: 14px; font-weight: 400; color: #c9c6dc; }
   .side { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px; padding: 4px; }
   .side.left { grid-column: 1; grid-row: 2; }
   .side.right { grid-column: 3; grid-row: 2; }
@@ -83,7 +88,9 @@
   .ab button.on, .pill.on { filter: brightness(1.4); transform: scale(.94); }
   .pills { display: flex; gap: 8px; }
   .pill { min-height: 40px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--line); background: #1d1d29; font-size: 13px; color: var(--muted); }
-  #player.pad .side .dpad, #player.pad .side .ab, #player.pad .shoulder { opacity: .25; }
+  /* a controller is in use: the game takes the on-screen buttons' room */
+  #player.pad .side { display: none; }
+  #player.pad .screen { grid-column: 1 / -1; }
   .shoulder { min-width: 96px; font-size: 15px; font-weight: 700; color: var(--text); }
   #player:not([data-system=gba]) .shoulder { display: none; }
 
@@ -101,8 +108,10 @@
 <section id="library">
   <header>
     <h1>Retro Console</h1>
+    <button class="btn" id="continue" type="button" hidden></button>
   </header>
   <div class="scroll">
+    <p class="note" id="status" aria-live="polite"></p>
     <h2>Free games</h2>
     <div class="games" id="free"></div>
 
@@ -119,8 +128,8 @@
     <p class="note owned"><b>Only load games you legally own</b>, such as copies you made from your own cartridges. frunk.store doesn't provide, sell or share commercial games, and never keeps yours: they're stored only on this screen. You're responsible for the files you load.</p>
 
     <div class="legal">
-      <p>Plays NES, Game Boy, Game Boy Color and Game Boy Advance games (.nes, .gb, .gbc, .gba, also zipped). Game Boy games remember your progress: they pick up where you left off, and Reset starts over.</p>
-      <p>Controls: a USB or Bluetooth controller, the on-screen buttons, or a keyboard (arrows, Z = B, X = A, Q = L, W = R, Enter = Start, Shift = Select).</p>
+      <p>Plays NES, Game Boy, Game Boy Color and Game Boy Advance games (.nes, .gb, .gbc, .gba, also zipped). Games remember your progress: they pick up where you left off, and Reset starts over (keeping in-game saves).</p>
+      <p>Controls: a USB or Bluetooth controller, the on-screen buttons, or a keyboard (arrows, Z = B, X = A, Q = L, W = R, Enter = Start, Shift = Select). With a controller, the on-screen buttons hide to make the game bigger; touch the screen to bring them back. Switching the controller off pauses the game, and Start resumes it.</p>
       <p>Emulators: jsnes (Apache License 2.0) for NES, mGBA (Mozilla Public License 2.0, source at github.com/thenick775/mgba) for Game Boy. The free games are by their authors, under the licenses shown on each card; source code is kept next to each game.</p>
       <p>Not affiliated with or endorsed by Nintendo. Play only while parked.</p>
     </div>
@@ -174,7 +183,7 @@
   <div class="screen">
     <canvas id="screen" width="256" height="240"></canvas>
     <canvas id="gbaScreen" width="240" height="160" hidden></canvas>
-    <div id="paused" hidden>Paused</div>
+    <div id="paused" hidden>Paused<small>Tap here or press Start to resume</small></div>
   </div>
   <div class="side right">
     <button class="pill shoulder" type="button" data-b="r">R</button>
@@ -183,7 +192,6 @@
   </div>
 </section>
 
-<script src="jsnes.min.js"></script>
 <script src="/probe/qrcode.min.js"></script>
 <script type="module" src="retro.js"></script>
 <script src="/sw-register.js"></script>

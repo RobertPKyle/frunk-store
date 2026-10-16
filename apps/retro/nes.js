@@ -1,25 +1,26 @@
-// NES core: jsnes (loaded by index.html as window.jsnes), drawn to a 2D
-// canvas, with sound through an AudioWorklet. Retro Console calls tick() on
-// every screen refresh; the core runs as many NES frames as are due.
+// NES core: jsnes, run on its own thread by nes-worker.js, which draws to
+// this core's canvas (handed over as an OffscreenCanvas), keeps the game's
+// saves, and sends sound straight to the AudioWorklet made here. This side
+// passes on controller input, pause and reset. On the page's main thread,
+// jsnes took the biggest share of it, and in the car that made the screen's
+// refresh rate drop.
 
-const FRAME_MS = 1000 / 60.0988;   // NTSC frame rate
-
-// Samples go from the emulator to an AudioWorklet through a ring buffer of
-// about 170 ms, posted in batches
+// Samples arrive from the worker in batches on a port, into a ring buffer of
+// about 170 ms
 const WORKLET = `
 class NesOut extends AudioWorkletProcessor {
   constructor() {
     super();
     this.size = 8192; this.l = new Float32Array(this.size); this.r = new Float32Array(this.size);
     this.read = 0; this.write = 0; this.count = 0;
-    this.port.onmessage = e => {
-      const { l, r } = e.data;
-      for (let i = 0; i < l.length; i++) {
-        if (this.count === this.size) { this.read = (this.read + 1) % this.size; this.count--; }
-        this.l[this.write] = l[i]; this.r[this.write] = r[i];
-        this.write = (this.write + 1) % this.size; this.count++;
-      }
-    };
+    this.port.onmessage = e => { e.data.onmessage = m => this.add(m.data); };
+  }
+  add({ l, r }) {
+    for (let i = 0; i < l.length; i++) {
+      if (this.count === this.size) { this.read = (this.read + 1) % this.size; this.count--; }
+      this.l[this.write] = l[i]; this.r[this.write] = r[i];
+      this.write = (this.write + 1) % this.size; this.count++;
+    }
   }
   process(_, outputs) {
     const [L, R] = outputs[0];
@@ -33,29 +34,46 @@ class NesOut extends AudioWorkletProcessor {
 registerProcessor('nes-out', NesOut);
 `;
 
-const BATCH = 512;
+// jsnes button numbers
+const BUTTON = { a: 0, b: 1, select: 2, start: 3, up: 4, down: 5, left: 6, right: 7 };
 
 export function createNes(canvas) {
-  const { NES, Controller } = window.jsnes;
-  const BUTTON = {
-    a: Controller.BUTTON_A, b: Controller.BUTTON_B, select: Controller.BUTTON_SELECT, start: Controller.BUTTON_START,
-    up: Controller.BUTTON_UP, down: Controller.BUTTON_DOWN, left: Controller.BUTTON_LEFT, right: Controller.BUTTON_RIGHT,
-  };
-  const ctx = canvas.getContext('2d');
-  const image = ctx.createImageData(256, 240);
-  const pixels = new Uint32Array(image.data.buffer);
-  const audio = { ctx: null, node: null, l: new Float32Array(BATCH), r: new Float32Array(BATCH), n: 0 };
-  const held = [new Set(), new Set()];
-  let nes = null, last = 0, due = 0, drawn = true, soundOn = true, paused = false, catchUp = 2;
+  const audio = { ctx: null, node: null };
+  const sent = [0, 0];
+  let worker = null, nextId = 1, soundOn = true, paused = false, fromWorker = { n: 0, hz: 0, steady: false };
+  // Frames drawn, the worker's refresh rate and its steady mode: in shared
+  // memory when the page is cross-origin isolated (it is on frunk.store),
+  // otherwise by message
+  const count = self.crossOriginIsolated ? new Int32Array(new SharedArrayBuffer(12)) : null;
+  const waiting = new Map();   // request id -> resolve
 
-  function sample(l, r) {
-    if (!audio.node) return;
-    audio.l[audio.n] = l;
-    audio.r[audio.n] = r;
-    if (++audio.n === BATCH) {
-      audio.node.port.postMessage({ l: audio.l.slice(), r: audio.r.slice() });
-      audio.n = 0;
+  // One worker per page: the canvas can be handed over only once
+  function thread() {
+    if (!worker) {
+      worker = new Worker(new URL('./nes-worker.js', import.meta.url));
+      worker.onmessage = ({ data }) => {
+        if (data.type === 'frames') { fromWorker = data; return; }
+        const done = waiting.get(data.id);
+        waiting.delete(data.id);
+        if (done) done(data);
+      };
+      worker.onerror = () => {
+        for (const done of waiting.values()) done({ error: 'the emulator didn\'t load. Check the connection and try again.' });
+        waiting.clear();
+      };
+      const screen = canvas.transferControlToOffscreen();
+      worker.postMessage({ type: 'canvas', canvas: screen, count }, [screen]);
     }
+    return worker;
+  }
+
+  function ask(msg) {
+    const w = thread();
+    return new Promise(resolve => {
+      const id = nextId++;
+      waiting.set(id, resolve);
+      w.postMessage({ ...msg, id });
+    });
   }
 
   async function startAudio() {
@@ -66,84 +84,61 @@ export function createNes(canvas) {
       URL.revokeObjectURL(url);
       audio.node = new AudioWorkletNode(audio.ctx, 'nes-out', { outputChannelCount: [2] });
       audio.node.connect(audio.ctx.destination);
+      const { port1, port2 } = new MessageChannel();
+      audio.node.port.postMessage(port2, [port2]);
+      thread().postMessage({ type: 'audio', port: port1, rate: audio.ctx.sampleRate }, [port1]);
       if (!soundOn) await audio.ctx.suspend();
     } catch {
-      audio.ctx = audio.node = null;
+      stopAudio();
     }
   }
 
   function stopAudio() {
     if (audio.ctx) audio.ctx.close().catch(() => {});
     audio.ctx = audio.node = null;
-    audio.n = 0;
-  }
-
-  function onFrame(buffer) {
-    // jsnes gives 0xBBGGRR; the canvas wants 0xAABBGGRR on little-endian
-    for (let i = 0; i < 61440; i++) pixels[i] = 0xff000000 | buffer[i];
-    drawn = false;
+    if (worker) worker.postMessage({ type: 'audio', port: null });
   }
 
   const core = {
-    system: 'nes', canvas, width: 256, height: 240, frames: 0,
+    system: 'nes', canvas, width: 256, height: 240,
+    get frames() { return count ? Atomics.load(count, 0) : fromWorker.n; },
+    // The worker paces itself by its own refreshes, which keep going when
+    // this page's main thread is slow, and picks steady mode itself
+    get refresh() { return count ? Atomics.load(count, 1) : fromWorker.hz; },
+    get isSteady() { return count ? Atomics.load(count, 2) === 1 : fromWorker.steady; },
 
-    async start(bytes, soundEnabled) {
+    // fileName names the game's saves, so it must stay the same for a game
+    async start(bytes, soundEnabled, fileName) {
       soundOn = soundEnabled;
       stopAudio();
       await startAudio();
-      try {
-        nes = new NES({
-          onFrame,
-          onAudioSample: sample,
-          emulateSound: !!audio.node,
-          sampleRate: audio.ctx ? audio.ctx.sampleRate : 48000,
-        });
-        // jsnes reads ROMs as a binary string
-        let s = '';
-        for (let i = 0; i < bytes.length; i += 8192) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 8192));
-        nes.loadROM(s);
-      } catch (e) {
+      const { error } = await ask({ type: 'load', bytes, name: fileName });
+      if (error) {
         stopAudio();
-        nes = null;
-        throw new Error(/mapper/i.test(String(e && e.message))
-          ? 'this game uses a cartridge type the emulator doesn\'t support yet.'
-          : 'the file may be damaged.');
+        throw new Error(error);
       }
-      held[0].clear(); held[1].clear();
-      ctx.fillStyle = '#000';
-      ctx.fillRect(0, 0, 256, 240);
-      last = performance.now(); due = 0; paused = false; catchUp = 2;
+      sent[0] = sent[1] = 0;
+      paused = false;
     },
 
     // players: two Sets of button names (up down left right a b x y l r start select)
     input(players) {
+      const now = [0, 0];
       for (let p = 0; p < 2; p++) {
-        // NES has two face buttons; X and Y work as A and B
-        const now = new Set([...players[p]].map(b => ({ x: 'a', y: 'b' })[b] || b).filter(b => b in BUTTON));
-        for (const b of now) if (!held[p].has(b)) nes.buttonDown(p + 1, BUTTON[b]);
-        for (const b of held[p]) if (!now.has(b)) nes.buttonUp(p + 1, BUTTON[b]);
-        held[p] = now;
+        for (const b of players[p]) {
+          // NES has two face buttons; X and Y work as A and B
+          const n = BUTTON[b === 'x' ? 'a' : b === 'y' ? 'b' : b];
+          if (n !== undefined) now[p] |= 1 << n;
+        }
       }
-    },
-
-    tick(t) {
-      if (paused) { last = t; return; }
-      due += Math.min(t - last, 100);
-      last = t;
-      // Catch up at most two frames per screen refresh (four in steady mode,
-      // which ticks every other refresh); drop the rest when the CPU can't
-      // keep up, so the game slows down instead of stuttering
-      if (due > FRAME_MS * catchUp) due = FRAME_MS * catchUp;
-      while (due >= FRAME_MS) {
-        nes.frame();
-        due -= FRAME_MS;
-      }
-      if (!drawn) { ctx.putImageData(image, 0, 0); drawn = true; core.frames++; }
+      if (now[0] === sent[0] && now[1] === sent[1]) return;
+      sent[0] = now[0]; sent[1] = now[1];
+      worker.postMessage({ type: 'input', buttons: now });
     },
 
     pause(p) {
       paused = p;
-      last = performance.now();
+      worker.postMessage({ type: 'pause', on: p });
       if (audio.ctx && soundOn) (p ? audio.ctx.suspend() : audio.ctx.resume()).catch(() => {});
     },
 
@@ -152,13 +147,14 @@ export function createNes(canvas) {
       if (audio.ctx && !paused) (on ? audio.ctx.resume() : audio.ctx.suspend()).catch(() => {});
     },
 
-    // retro.js ticks only every other refresh in steady mode
-    steady(on) { catchUp = on ? 4 : 2; },
+    // Saves everything now, for when the page may be about to close
+    save() { return worker ? ask({ type: 'save' }) : Promise.resolve(); },
 
-    reset() { nes.reset(); },
+    // Starts the game over, without the resume snapshot
+    reset() { worker.postMessage({ type: 'reset' }); },
 
     async quit() {
-      nes = null;
+      await ask({ type: 'quit' });
       stopAudio();
     },
   };

@@ -71,18 +71,29 @@ the apps are served from.
   connections and reports the average after a 2 second warm-up. Data use is
   capped at about 350 MB per test. The last 30 results are kept on the device.
 - `apps/retro`: Retro Console. NES games run on jsnes 2.1.0 (Apache-2.0,
-  `nes.js`); Game Boy, Game Boy Color and Game Boy Advance games run on mGBA
+  `nes.js`), in a worker (`nes-worker.js`) that draws through an
+  OffscreenCanvas and sends sound straight to an AudioWorklet, so the
+  page's main thread stays free (about 5 ms of it a second on a desktop,
+  down from 90); Game Boy, Game Boy Color and Game Boy Advance games run on mGBA
   2.5.1 compiled to WebAssembly (MPL-2.0, `gba.js`, threaded, so it needs the
   COOP/COEP headers); both are vendored unmodified. The console is picked
   from the file's header, and zipped games are unzipped in the browser
-  (`apps/_shared/roms.js`). Game Boy games keep battery saves and a resume
-  snapshot in IndexedDB, so they pick up where they left off; Reset starts
-  over. mGBA's per-frame callback is not used: it makes the emulator thread
+  (`apps/_shared/roms.js`). Every game keeps its battery save and a resume
+  snapshot in IndexedDB (mGBA's files for Game Boy, database "nes" for NES),
+  so it picks up where it left off; Reset starts over and keeps the battery
+  save. Snapshots are taken on pause, when the page is hidden, and when the
+  hub closes the app: the hub posts `{ frunk: 'close' }` to apps that
+  announced `{ frunk: 'save-on-close' }`, and waits up to a second for
+  `{ frunk: 'closed' }`. With a controller in use, the on-screen buttons
+  hide and the game gets their room. mGBA's per-frame callback is not used: it makes the emulator thread
   wait for the page's main thread on every frame, which dropped frames when
-  the CPU was slowed to car speed. Its sound buffer is 4096 samples, since
-  the default 1024 crackled in the car. When the browser can't refresh the
+  the CPU was slowed to car speed. mGBA resamples sound on the main thread,
+  so its AudioContext runs at the consoles' own 32768 Hz (a third less work
+  than 48000) with a 2048-sample buffer (62 ms; the default 21 ms crackled
+  in the car). When the browser can't refresh the
   screen about 60 times a second for 3 seconds (often the case in the car),
-  steady mode draws every other refresh, so frame rates stop bouncing; games
+  steady mode draws every other refresh (the NES worker measures its own
+  refreshes, which keep going when the main thread is slow), so frame rates stop bouncing; games
   keep full speed. Tapping the frame rate shows the refresh rate and whether
   steady mode is on. SNES support (LakeSnes) was removed on 2026-10-15
   because it ran at about 15 fps in the car; it is in git history (commit
