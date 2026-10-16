@@ -8,7 +8,6 @@ export const SYSTEMS = {
   nes: { name: 'NES', exts: ['nes'], max: 2 * MB },
   gb: { name: 'Game Boy', exts: ['gb', 'gbc'], max: 8 * MB },
   gba: { name: 'Game Boy Advance', exts: ['gba'], max: 32 * MB },
-  snes: { name: 'SNES', exts: ['sfc', 'smc'], max: 6 * MB + 512 },
 };
 
 export const GAME_EXTS = Object.values(SYSTEMS).flatMap(s => s.exts);
@@ -23,21 +22,6 @@ export const isZip = bytes => at(bytes, 0, [0x50, 0x4b, 0x03, 0x04]);
 // Worth opening: a game, or a zip that may hold one
 export const maybeGame = name => GAME_EXTS.includes(ext(name)) || ext(name) === 'zip';
 
-// SNES games have no magic number. Accept a .sfc or .smc file when one of
-// the places a header can be (LoROM, HiROM, ExHiROM, each with or without a
-// 512-byte copier header) has a plausible map mode and reset vector.
-function looksSnes(bytes) {
-  if (bytes.length < 0x8000) return false;
-  for (const base of [0x7fc0, 0xffc0, 0x40ffc0]) {
-    for (const h of [base, base + 0x200]) {
-      if (h + 0x40 > bytes.length) continue;
-      const map = bytes[h + 0x15], reset = bytes[h + 0x3c] | (bytes[h + 0x3d] << 8);
-      if ((map & 0xe0) === 0x20 && reset >= 0x8000) return true;
-    }
-  }
-  return false;
-}
-
 // The console a game is for, or null
 export function systemOf(bytes, name = '') {
   if (at(bytes, 0, [0x4e, 0x45, 0x53, 0x1a])) return 'nes';
@@ -45,7 +29,6 @@ export function systemOf(bytes, name = '') {
   if (bytes.length >= 0xc0 && at(bytes, 4, [0x24, 0xff, 0xae, 0x51]) && bytes[0xb2] === 0x96) return 'gba';
   // Game Boy and Game Boy Color: start of the Nintendo logo at 0x104
   if (bytes.length >= 0x150 && at(bytes, 0x104, [0xce, 0xed, 0x66, 0x66])) return 'gb';
-  if (SYSTEMS.snes.exts.includes(ext(name)) && looksSnes(bytes)) return 'snes';
   return null;
 }
 

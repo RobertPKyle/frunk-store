@@ -4,7 +4,6 @@
   "type": "module",
   "scripts": {
     "build:wasm": "node tools/build-wasm.mjs",
-    "build:snes": "node tools/build-snes.mjs",
     "dev": "node tools/dev.mjs",
     "test:e2e": "node tools/e2e.mjs"
   },

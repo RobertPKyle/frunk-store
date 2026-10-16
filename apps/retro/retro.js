@@ -1,20 +1,28 @@
-// Retro Console: NES (jsnes), Game Boy / Color / Advance (mGBA) and SNES
-// (LakeSnes) emulators
+// Retro Console: NES (jsnes) and Game Boy / Color / Advance (mGBA) emulators
 // with free homebrew games built in, plus games the player loads from their
 // own files. Loaded files are kept in this screen's IndexedDB and never leave
 // it.
 //
 // Input comes from up to two gamepads, the on-screen buttons and the
 // keyboard; each frame they're merged and handed to the running core
-// (nes.js, gba.js or snes.js) as sets of button names.
+// (nes.js or gba.js) as sets of button names.
 
 import { openPiece, toBase64Url } from '../_shared/transfer.js';
 import { MAX_FILE, SYSTEMS, cleanName, findGame, isColor, maybeGame } from '../_shared/roms.js';
 import { createNes } from './nes.js';
 import { createGba } from './gba.js';
-import { createSnes } from './snes.js';
 
 const GAMES = [
+  {
+    id: 'tobudx', title: 'Tobu Tobu Girl Deluxe', by: 'Tangram Games, 2019', file: 'games/tobudx.gb', system: 'gb',
+    about: 'Your cat is floating away. Jump, dash and flap your arms to climb after it before time runs out. D-pad moves, A dashes, B flaps.',
+    license: 'MIT (code), CC BY 4.0 (art and music)', source: 'games/tobutobugirl-dx-src.tar.gz',
+  },
+  {
+    id: 'libbet', title: 'Libbet and the Magic Floor', by: 'Damian Yerrick, 2024', file: 'games/libbet.gb', system: 'gb',
+    about: 'Roll Libbet across a floor of four shades and leave tracks on most of it before rolling out. Hold A with the D-pad to jump.',
+    license: 'zlib', source: 'games/libbet-0.08-src.tar.gz',
+  },
   {
     id: 'voxelburg', title: 'Attack on Voxelburg', by: 'John Tsiombikas, 2022', file: 'games/voxelburg.gba', system: 'gba',
     about: 'Fly over a 3D city and destroy the enemy defense pods before they shoot you down. A flies forward, B shoots, D-pad turns, L and R strafe.',
@@ -88,7 +96,7 @@ async function addFiles(files) {
   }
   msg.textContent = added
     ? `Added ${added} game${added === 1 ? '' : 's'}.${skipped ? ` Skipped ${skipped} file${skipped === 1 ? '' : 's'} that weren't games.` : ''}`
-    : files.length ? 'No game files (.nes, .gb, .gbc, .gba, .sfc, .smc or .zip) found there.' : '';
+    : files.length ? 'No game files (.nes, .gb, .gbc, .gba or .zip) found there.' : '';
   renderMine();
 }
 
@@ -286,8 +294,10 @@ async function renderMine() {
       await deleteRom(r.id);
       renderMine();
     };
-    const system = SYSTEMS[r.system || 'nes'].name;
-    wrap.append(card(r.title, [['small', `${system} · ${Math.round(r.size / 1024)} KB · on this screen only`]], () => playStored(r.id)), del);
+    // Games for a console this app no longer plays (SNES, for now) can only be removed
+    const system = SYSTEMS[r.system || 'nes'];
+    const label = system ? system.name : `${r.system.toUpperCase()}, can't be played here for now`;
+    wrap.append(card(r.title, [['small', `${label} · ${Math.round(r.size / 1024)} KB · on this screen only`]], () => system && playStored(r.id)), del);
     return wrap;
   }));
 }
@@ -437,19 +447,47 @@ addEventListener('blur', () => keyboard.clear());
 
 // ---------- running ----------
 
-const cores = { nes: createNes($('screen')), gba: createGba($('gbaScreen')), snes: createSnes($('snesScreen')) };
-const CORE = { nes: 'nes', gb: 'gba', gba: 'gba', snes: 'snes' };
-let core = null, raf = 0, paused = false, frames = 0, fpsSince = 0;
+const cores = { nes: createNes($('screen')), gba: createGba($('gbaScreen')) };
+const CORE = { nes: 'nes', gb: 'gba', gba: 'gba' };
+let core = null, raf = 0, paused = false, frames = 0, fpsSince = 0, refreshes = 0;
+
+// Steady mode: when the browser can't refresh the screen about 60 times a
+// second (the car's often can't), frame rates bounce between 40 and 60 and
+// games judder. After three such seconds, show every other frame instead, a
+// steady 30 fps; the games still run at full speed. It stays on until the
+// next game starts.
+const SLOW_HZ = 54;
+let steady = false, slowSeconds = 0, odd = false;
+
+// Tapping the frame rate shows details for checking speed in the car: how
+// often the screen refreshed (60 when the page keeps up)
+let details = settings.get('details', false);
+$('fps').onclick = () => { details = !details; settings.set('details', details); };
 
 function loop(t) {
   raf = requestAnimationFrame(loop);
-  if (paused || document.hidden) return;
+  if (paused || document.hidden) {
+    // start counting afresh when the game comes back
+    frames = core.frames; fpsSince = t; refreshes = 0;
+    return;
+  }
+  refreshes++;
+  odd = !odd;
   readInput();
-  core.tick(t);
+  // the NES core catches up two frames on the next refresh
+  if (!steady || !odd) core.tick(t);
   if (t - fpsSince >= 1000) {
-    $('fps').textContent = `${Math.round((core.frames - frames) * 1000 / (t - fpsSince))} fps`;
+    const hz = Math.round(refreshes * 1000 / (t - fpsSince));
+    slowSeconds = hz < SLOW_HZ ? slowSeconds + 1 : 0;
+    if (!steady && slowSeconds >= 3) {
+      steady = true;
+      if (core.steady) core.steady(true);
+    }
+    $('fps').textContent = `${Math.round((core.frames - frames) * 1000 / (t - fpsSince))} fps` +
+      (details ? ` · ${hz} Hz${steady ? ' · steady' : ''}` : '');
     frames = core.frames;
     fpsSince = t;
+    refreshes = 0;
   }
 }
 
@@ -500,7 +538,8 @@ async function play(title, system, bytes, fileName) {
   showSound();
   fit();
   setPaused(false);
-  frames = core.frames; fpsSince = performance.now();
+  frames = core.frames; fpsSince = performance.now(); refreshes = 0;
+  steady = false; slowSeconds = 0;
   raf = requestAnimationFrame(loop);
 }
 

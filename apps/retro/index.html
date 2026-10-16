@@ -61,7 +61,7 @@
   #player { position: fixed; inset: 0; display: grid; grid-template-columns: minmax(128px, 1fr) auto minmax(128px, 1fr); grid-template-rows: 60px 1fr; background: #000; }
   .bar { grid-column: 1 / 4; display: flex; align-items: center; gap: 8px; padding: 8px 10px 8px 110px; background: var(--panel); border-bottom: 1px solid var(--line); }
   .bar b { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  #fps { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  #fps { font: inherit; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; background: none; border: 0; padding: 12px 4px; cursor: pointer; }
   .screen { grid-column: 2; display: flex; align-items: center; justify-content: center; min-height: 0; position: relative; }
   canvas { display: block; image-rendering: pixelated; image-rendering: crisp-edges; background: #000; }
   #paused { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(0, 0, 0, .6); font-size: 22px; font-weight: 700; }
@@ -85,14 +85,7 @@
   .pill { min-height: 40px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--line); background: #1d1d29; font-size: 13px; color: var(--muted); }
   #player.pad .side .dpad, #player.pad .side .ab, #player.pad .shoulder { opacity: .25; }
   .shoulder { min-width: 96px; font-size: 15px; font-weight: 700; color: var(--text); }
-  #player:not([data-system=gba]):not([data-system=snes]) .shoulder { display: none; }
-  /* SNES: four face buttons in a diamond, X top, Y left, A right, B bottom */
-  .ab [data-b=x], .ab [data-b=y] { display: none; }
-  #player[data-system=snes] .ab button { width: 48px; height: 48px; font-size: 18px; }
-  #player[data-system=snes] .ab [data-b=x] { display: block; left: 36px; top: 0; }
-  #player[data-system=snes] .ab [data-b=y] { display: block; left: 0; top: 36px; }
-  #player[data-system=snes] .ab [data-b=a] { left: auto; right: 0; top: 36px; }
-  #player[data-system=snes] .ab [data-b=b] { left: 36px; bottom: 0; }
+  #player:not([data-system=gba]) .shoulder { display: none; }
 
   @media (max-width: 640px) {
     html, body { overflow: auto; }
@@ -119,16 +112,16 @@
       <button class="btn" id="addFiles" type="button">Add game files</button>
       <button class="btn" id="addFolder" type="button">Add a folder</button>
     </div>
-    <input id="fileInput" type="file" accept=".nes,.gb,.gbc,.gba,.sfc,.smc,.zip" multiple hidden>
+    <input id="fileInput" type="file" accept=".nes,.gb,.gbc,.gba,.zip" multiple hidden>
     <input id="folderInput" type="file" webkitdirectory multiple hidden>
     <p class="note" id="addMsg" aria-live="polite"></p>
     <div class="games" id="mine"></div>
     <p class="note owned"><b>Only load games you legally own</b>, such as copies you made from your own cartridges. frunk.store doesn't provide, sell or share commercial games, and never keeps yours: they're stored only on this screen. You're responsible for the files you load.</p>
 
     <div class="legal">
-      <p>Plays NES, Game Boy, Game Boy Color, Game Boy Advance and SNES games (.nes, .gb, .gbc, .gba, .sfc, .smc, also zipped). Game Boy and SNES games remember your progress: they pick up where you left off, and Reset starts over.</p>
-      <p>Controls: a USB or Bluetooth controller, the on-screen buttons, or a keyboard (arrows, Z = B, X = A, A = Y, S = X, Q = L, W = R, Enter = Start, Shift = Select).</p>
-      <p>Emulators: jsnes (Apache License 2.0) for NES, mGBA (Mozilla Public License 2.0, source at github.com/thenick775/mgba) for Game Boy, and LakeSnes (MIT License, github.com/dinkc64/LakeSnes) for SNES. The free games are by their authors, under the licenses shown on each card; source code is kept next to each game.</p>
+      <p>Plays NES, Game Boy, Game Boy Color and Game Boy Advance games (.nes, .gb, .gbc, .gba, also zipped). Game Boy games remember your progress: they pick up where you left off, and Reset starts over.</p>
+      <p>Controls: a USB or Bluetooth controller, the on-screen buttons, or a keyboard (arrows, Z = B, X = A, Q = L, W = R, Enter = Start, Shift = Select).</p>
+      <p>Emulators: jsnes (Apache License 2.0) for NES, mGBA (Mozilla Public License 2.0, source at github.com/thenick775/mgba) for Game Boy. The free games are by their authors, under the licenses shown on each card; source code is kept next to each game.</p>
       <p>Not affiliated with or endorsed by Nintendo. Play only while parked.</p>
     </div>
   </div>
@@ -167,7 +160,7 @@
 <section id="player" hidden>
   <div class="bar">
     <b id="title"></b>
-    <span id="fps"></span>
+    <button id="fps" type="button" title="Tap for details"></button>
     <button class="btn" id="pauseBtn" type="button">Pause</button>
     <button class="btn" id="resetBtn" type="button">Reset</button>
     <button class="btn" id="soundBtn" type="button">Sound on</button>
@@ -181,12 +174,11 @@
   <div class="screen">
     <canvas id="screen" width="256" height="240"></canvas>
     <canvas id="gbaScreen" width="240" height="160" hidden></canvas>
-    <canvas id="snesScreen" width="512" height="224" hidden></canvas>
     <div id="paused" hidden>Paused</div>
   </div>
   <div class="side right">
     <button class="pill shoulder" type="button" data-b="r">R</button>
-    <div class="ab"><button type="button" data-b="x">X</button><button type="button" data-b="y">Y</button><button type="button" data-b="b">B</button><button type="button" data-b="a">A</button></div>
+    <div class="ab"><button type="button" data-b="b">B</button><button type="button" data-b="a">A</button></div>
     <div class="pills"><button class="pill" type="button" data-b="start">Start</button></div>
   </div>
 </section>

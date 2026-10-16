@@ -73,17 +73,24 @@ the apps are served from.
 - `apps/retro`: Retro Console. NES games run on jsnes 2.1.0 (Apache-2.0,
   `nes.js`); Game Boy, Game Boy Color and Game Boy Advance games run on mGBA
   2.5.1 compiled to WebAssembly (MPL-2.0, `gba.js`, threaded, so it needs the
-  COOP/COEP headers); both are vendored unmodified. SNES games run on
-  LakeSnes (MIT, `snes.js`), built from `tools/lakesnes` (the dinkc64 fork)
-  by `npm run build:snes`, which needs Docker. The console is picked from the
-  file's header (for SNES, the .sfc/.smc name plus a header check), and
-  zipped games are unzipped in the browser (`apps/_shared/roms.js`). Game Boy
-  and SNES games keep battery saves and a resume snapshot in IndexedDB, so
-  they pick up where they left off; Reset starts over. LakeSnes takes about
-  2.5 ms a frame on a Ryzen 5800X, so expect about 11 ms on the car's Atom,
-  inside the 16.7 ms budget but with little room. Ships only homebrew games whose licenses allow redistribution (Attack
-  on Voxelburg by John Tsiombikas, Thwaite and Concentration Room by Damian
-  Yerrick, all GPL, with their source next to them; see `apps/retro/NOTICE`).
+  COOP/COEP headers); both are vendored unmodified. The console is picked
+  from the file's header, and zipped games are unzipped in the browser
+  (`apps/_shared/roms.js`). Game Boy games keep battery saves and a resume
+  snapshot in IndexedDB, so they pick up where they left off; Reset starts
+  over. mGBA's per-frame callback is not used: it makes the emulator thread
+  wait for the page's main thread on every frame, which dropped frames when
+  the CPU was slowed to car speed. Its sound buffer is 4096 samples, since
+  the default 1024 crackled in the car. When the browser can't refresh the
+  screen about 60 times a second for 3 seconds (often the case in the car),
+  steady mode draws every other refresh, so frame rates stop bouncing; games
+  keep full speed. Tapping the frame rate shows the refresh rate and whether
+  steady mode is on. SNES support (LakeSnes) was removed on 2026-10-15
+  because it ran at about 15 fps in the car; it is in git history (commit
+  32a8df1). Ships only homebrew games whose licenses allow redistribution
+  (Attack on Voxelburg by John Tsiombikas, Thwaite and Concentration Room by
+  Damian Yerrick, GPL; Libbet and the Magic Floor by Damian Yerrick, zlib;
+  Tobu Tobu Girl Deluxe by Tangram Games, MIT and CC BY 4.0), with their
+  source next to them; see `apps/retro/NOTICE`.
   Players add games they own with "Get games from phone" (or from files on a
   computer); those are stored in the screen's IndexedDB only. A one-time
   confirmation asks players to load only games they legally own. Never add
@@ -111,7 +118,6 @@ the apps are served from.
 ```sh
 npm install
 npm run build:wasm                      # after editing apps/fractal/fractal.wat
-npm run build:snes                      # after editing tools/lakesnes (needs Docker)
 npm run dev                             # hub on localhost:5173, apps on 127.0.0.1:5174
 npm run test:e2e                        # checks against the dev server
 node tools/e2e.mjs https://frunk.store  # checks against production

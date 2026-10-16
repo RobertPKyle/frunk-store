@@ -10,11 +10,6 @@ Third-party components
   https://github.com/thenick775/mgba/tree/v2.5.1 (a fork of
   https://github.com/mgba-emu/mgba with the WebAssembly port)
 
-- LakeSnes, copyright 2021-2023 angelo_wf and contributors, MIT License
-  (snes/lakesnes.js and snes/lakesnes.wasm, compiled from the copy in
-  tools/lakesnes of https://github.com/dinkc64/LakeSnes at commit 048a0d7;
-  license text in tools/lakesnes/LICENSE.txt and below)
-
 - Attack on Voxelburg (jam version), copyright 2022 John Tsiombikas, GNU GPL
   version 3 or later (games/voxelburg.gba; complete source in
   games/voxelburg-jam-src.tar.gz, license text in games/gpl-3.0.txt). From
@@ -29,29 +24,17 @@ Third-party components
   (games/croom.nes; source in games/ConcentrationRoom-0.02.zip).
   From https://pineight.com/croom/
 
+- Libbet and the Magic Floor 0.08, copyright 2002, 2012 Martin Korth and
+  2018, 2024 Damian Yerrick, zlib License (games/libbet.gb; source, with the
+  license text in LICENSE, in games/libbet-0.08-src.tar.gz). From
+  https://github.com/pinobatch/libbet/releases/tag/v0.08
+
+- Tobu Tobu Girl Deluxe, copyright 2017 Tangram Games. Code under the MIT
+  License; images, text, sound and music under Creative Commons Attribution
+  4.0 International (https://creativecommons.org/licenses/by/4.0/). Music by
+  potato-tan. (games/tobudx.gb, from https://tangramgames.itch.io/tobu-tobu-girl-deluxe;
+  source, with the MIT license text in LICENSE, in
+  games/tobutobugirl-dx-src.tar.gz, from https://github.com/SimonLarsen/tobutobugirl-dx
+  at commit 4985d4d)
+
 All games are distributed exactly as published by their authors.
-
-LakeSnes license
-----------------
-MIT License
-
-Copyright (c) 2021-2023 angelo_wf and contributors
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-

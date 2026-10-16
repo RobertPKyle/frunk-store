@@ -328,57 +328,20 @@ await check('retro console plays a GBA game with a controller and resumes it', a
   await page.screenshot({ path: shots + 'retro-gba.png' });
 });
 
-// A 32 KB SNES test program: a red screen, bright while B is held on
-// controller 1 and dim otherwise
-function snesTestRom() {
-  const rom = new Uint8Array(0x8000);
-  rom.set([
-    0x78, 0x18, 0xfb, 0xe2, 0x20,         // sei; clc; xce; sep #$20
-    0xa9, 0x80, 0x8d, 0x00, 0x21,         // force blank
-    0x9c, 0x21, 0x21,                     // CGRAM address 0
-    0xa9, 0x1f, 0x8d, 0x22, 0x21,         // backdrop = red
-    0xa9, 0x00, 0x8d, 0x22, 0x21,
-    0xa9, 0x01, 0x8d, 0x00, 0x42,         // auto-read the joypads
-    0xad, 0x19, 0x42, 0x29, 0x80,         // loop: lda JOY1H; and #$80 (B)
-    0xf0, 0x04, 0xa9, 0x0f, 0x80, 0x02,   // beq dim; lda #$0f; bra set
-    0xa9, 0x05,                           // dim: lda #$05
-    0x8d, 0x00, 0x21, 0x80, 0xee,         // set: sta INIDISP; bra loop
-  ]);
-  rom.set(new TextEncoder().encode('FRUNK TEST'.padEnd(21)), 0x7fc0);
-  rom.set([0x20, 0x00, 0x05, 0x00, 0x01, 0x00, 0x00, 0xff, 0xff, 0x00, 0x00], 0x7fd5);
-  rom.set([0x00, 0x80], 0x7ffc);   // reset vector
-  const sum = rom.reduce((a, b) => a + b, 0) & 0xffff;
-  rom.set([~sum & 0xff, (~sum >> 8) & 0xff, sum & 0xff, sum >> 8], 0x7fdc);
-  return rom;
-}
-
-await check('retro console plays a SNES game with a controller', async () => {
-  const file = shots + 'frunk-test.sfc';
-  writeFileSync(file, snesTestRom());
+await check('retro console plays a Game Boy Color game', async () => {
   await openFromHub(/Retro Console/);
-  const frame = () => page.frames().find(f => f.url().includes('/retro/'));
-  await frame().evaluate(() => {
-    const pads = [{ id: 'Tesla Virtual Gamepad', index: 0, mapping: 'standard', connected: true, timestamp: 0, axes: [0, 0, 0, 0], buttons: Array.from({ length: 17 }, () => ({ pressed: false, value: 0 })) }];
-    navigator.getGamepads = () => pads;
-    window.padHold = (b, on) => Object.assign(pads[0].buttons[b], { pressed: on, value: on ? 1 : 0 });
-  });
-  const [chooser] = await Promise.all([page.waitForEvent('filechooser'), appFrame().getByRole('button', { name: 'Add game files' }).click()]);
-  await chooser.setFiles(file);
-  await appFrame().locator('#mine .game').filter({ hasText: 'SNES' }).click();
-  await appFrame().locator('#fps').filter({ hasText: /fps/ }).waitFor({ timeout: 10000 });
-  await page.waitForTimeout(2500);
-  const red = () => frame().evaluate(() => document.getElementById('snesScreen').getContext('2d').getImageData(256, 112, 1, 1).data[0]);
-  const dim = await red();
-  await frame().evaluate(() => padHold(0, true));   // bottom face button: B
-  await page.waitForTimeout(300);
-  const bright = await red();
-  await frame().evaluate(() => padHold(0, false));
+  await appFrame().getByRole('button', { name: /Tobu Tobu Girl Deluxe/ }).click();
+  await appFrame().locator('#fps').filter({ hasText: /fps/ }).waitFor({ timeout: 15000 });
+  await page.waitForTimeout(3000);
+  const size = await appFrame().locator('#gbaScreen').evaluate(c => `${c.width}x${c.height}`);
+  if (size !== '160x144') throw new Error(`screen is ${size}, not the Game Boy's 160x144`);
+  const shot = await appFrame().locator('#gbaScreen').screenshot();
+  if (shot.length < 3000) throw new Error(`screen looks empty (${shot.length} byte PNG)`);
   const fps = parseInt(await appFrame().locator('#fps').textContent());
   if (!(fps >= 50)) throw new Error(`running at ${fps} fps`);
-  if (!(dim > 40 && bright > dim + 60)) throw new Error(`B didn't brighten the screen (red ${dim} -> ${bright})`);
-  console.log(`     ${fps} fps, red ${dim} -> ${bright} with B held`);
+  console.log(`     ${fps} fps`);
+  await page.screenshot({ path: shots + 'retro-gbc.png' });
   await appFrame().getByRole('button', { name: 'Games' }).click();
-  await appFrame().getByRole('button', { name: /Remove frunk-test/ }).click();
 });
 
 await check('no console or page errors', async () => {

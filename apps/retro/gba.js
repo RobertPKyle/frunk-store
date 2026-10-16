@@ -10,6 +10,15 @@
 const BUTTONS = ['a', 'b', 'l', 'r', 'start', 'select', 'up', 'down', 'left', 'right'];
 
 let module = null;   // one mGBA runtime per page; it can't be shut down and restarted
+let shown = 0;       // frames mGBA has put on screen
+
+// Counts frames as mGBA uploads them to its WebGL canvas, once per new frame.
+// (mGBA's frame callback would do it too, but the emulator thread waits for
+// this page's main thread on every call, which dropped frames at car speed.)
+function countFrames(gl) {
+  const upload = gl.texSubImage2D;
+  gl.texSubImage2D = function (...args) { shown++; return upload.apply(this, args); };
+}
 
 async function runtime(canvas) {
   if (!module) {
@@ -18,7 +27,11 @@ async function runtime(canvas) {
       const m = await mGBA({ canvas });
       await m.FSInit();
       m.toggleInput(false);   // keyboard and controllers come from retro.js
-      m.setCoreSettings({ rewindEnable: false, autoSaveStateTimerIntervalSeconds: 20 });
+      countFrames(m.ctx);
+      // A bigger sound buffer (4096 samples, about 85 ms, up from 1024): mGBA
+      // fills it from this page's main thread, which in the car is often too
+      // late for the small one, so sound crackled.
+      m.setCoreSettings({ rewindEnable: false, autoSaveStateTimerIntervalSeconds: 20, audioBufferSize: 4096 });
       return m;
     })();
     module.catch(() => { module = null; });
@@ -45,10 +58,7 @@ export function createGba(canvas) {
     } finally {
       try { m.FS.unlink(path); } catch {}
     }
-    m.addCoreCallbacks({
-      videoFrameEndedCallback: () => { core.frames++; },
-      saveDataUpdatedCallback: syncSoon,
-    });
+    m.addCoreCallbacks({ saveDataUpdatedCallback: syncSoon });
     for (const b of held) m.buttonUnpress(b);
     held = new Set();
     core.width = canvas.width;
@@ -56,13 +66,15 @@ export function createGba(canvas) {
   }
 
   const core = {
-    system: 'gba', canvas, width: 240, height: 160, frames: 0,
+    system: 'gba', canvas, width: 240, height: 160,
+    get frames() { return shown; },
 
     // fileName names the game's saves, so it must stay the same for a game
     async start(bytes, soundEnabled, fileName) {
       m = await runtime(canvas);
       game = fileName;
       rom = bytes;
+      core.steady(false);
       load(true);
       m.setVolume(soundEnabled ? 1 : 0);
       m.resumeGame();
@@ -79,6 +91,14 @@ export function createGba(canvas) {
     },
 
     tick() {},
+
+    // mGBA runs the game on its own timer, so game speed and sound stay right
+    // whatever the screen's refresh rate (tying it to the refresh rate would
+    // run it at double speed on 120 Hz screens). Steady mode draws on every
+    // other refresh.
+    steady(on) {
+      m.setMainLoopTiming(1, on ? 2 : 1);   // 1: requestAnimationFrame; every 1st or 2nd
+    },
 
     pause(p) { p ? m.pauseGame() : m.resumeGame(); },
 

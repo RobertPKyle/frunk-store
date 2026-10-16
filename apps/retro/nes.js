@@ -46,7 +46,7 @@ export function createNes(canvas) {
   const pixels = new Uint32Array(image.data.buffer);
   const audio = { ctx: null, node: null, l: new Float32Array(BATCH), r: new Float32Array(BATCH), n: 0 };
   const held = [new Set(), new Set()];
-  let nes = null, last = 0, due = 0, drawn = true, soundOn = true, paused = false;
+  let nes = null, last = 0, due = 0, drawn = true, soundOn = true, paused = false, catchUp = 2;
 
   function sample(l, r) {
     if (!audio.node) return;
@@ -112,7 +112,7 @@ export function createNes(canvas) {
       held[0].clear(); held[1].clear();
       ctx.fillStyle = '#000';
       ctx.fillRect(0, 0, 256, 240);
-      last = performance.now(); due = 0; paused = false;
+      last = performance.now(); due = 0; paused = false; catchUp = 2;
     },
 
     // players: two Sets of button names (up down left right a b x y l r start select)
@@ -130,15 +130,15 @@ export function createNes(canvas) {
       if (paused) { last = t; return; }
       due += Math.min(t - last, 100);
       last = t;
-      // Catch up at most two frames per screen refresh; drop the rest when the
-      // CPU can't keep up, so the game slows down instead of stuttering
-      if (due > FRAME_MS * 2) due = FRAME_MS * 2;
+      // Catch up at most two frames per screen refresh (four in steady mode,
+      // which ticks every other refresh); drop the rest when the CPU can't
+      // keep up, so the game slows down instead of stuttering
+      if (due > FRAME_MS * catchUp) due = FRAME_MS * catchUp;
       while (due >= FRAME_MS) {
         nes.frame();
         due -= FRAME_MS;
-        core.frames++;
       }
-      if (!drawn) { ctx.putImageData(image, 0, 0); drawn = true; }
+      if (!drawn) { ctx.putImageData(image, 0, 0); drawn = true; core.frames++; }
     },
 
     pause(p) {
@@ -151,6 +151,9 @@ export function createNes(canvas) {
       soundOn = on;
       if (audio.ctx && !paused) (on ? audio.ctx.resume() : audio.ctx.suspend()).catch(() => {});
     },
+
+    // retro.js ticks only every other refresh in steady mode
+    steady(on) { catchUp = on ? 4 : 2; },
 
     reset() { nes.reset(); },
 
