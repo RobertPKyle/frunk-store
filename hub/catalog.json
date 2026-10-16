@@ -145,6 +145,17 @@
       ]
     },
     {
+      "id": "doom",
+      "name": "Freedoom",
+      "tagline": "The classic Doom engine with the free Freedoom games, or Doom games you own sent from your phone, with a controller or on screen.",
+      "path": "/doom/",
+      "icon": "/doom/icon.svg",
+      "tags": [
+        "Game",
+        "Controller"
+      ]
+    },
+    {
       "id": "chess",
       "name": "Chess Puzzle",
       "tagline": "Solve the Lichess daily chess puzzle on your screen.",

@@ -380,6 +380,96 @@ await check('retro console plays a Game Boy Color game', async () => {
   await appFrame().getByRole('button', { name: 'Games' }).click();
 });
 
+await check('freedoom takes WADs from a phone', async () => {
+  await openFromHub(/Freedoom/);
+  // Tiny stand-ins for a player's files: a whole game (IWAD) and an add-on (PWAD)
+  const wad = kind => {
+    const b = Buffer.alloc(32);
+    b.write(kind, 0, 'ascii');
+    b.writeInt32LE(1, 4);       // one lump
+    b.writeInt32LE(16, 8);      // directory after its 4 bytes
+    b.writeInt32LE(12, 16);
+    b.writeInt32LE(4, 20);
+    b.write('E1M1', 24, 'ascii');
+    return b;
+  };
+  writeFileSync(shots + 'mini.wad', wad('IWAD'));
+  writeFileSync(shots + 'addon.wad', wad('PWAD'));
+  await appFrame().getByRole('button', { name: 'Get games from phone' }).click();
+  await appFrame().getByRole('button', { name: 'I own my games' }).click();
+  await appFrame().locator('#transferStatus').filter({ hasText: 'Waiting' }).waitFor({ timeout: 10000 });
+  const link = await appFrame().locator('#qr a').getAttribute('href');
+  if (!link.includes('?app=doom')) throw new Error(`phone link doesn't ask for Doom games: ${link}`);
+  const phone = await browser.newPage({ viewport: { width: 390, height: 800 }, isMobile: true, hasTouch: true });
+  await phone.goto(link);
+  const [pick] = await Promise.all([phone.waitForEvent('filechooser'), phone.getByRole('button', { name: 'Choose games' }).click()]);
+  // A console game is turned away on the phone; both WADs are sent
+  await pick.setFiles([shots + 'mini.wad', shots + 'addon.wad', new URL('../apps/retro/games/croom.nes', import.meta.url).pathname]);
+  await phone.locator('#files li.bad').filter({ hasText: 'croom' }).waitFor({ timeout: 10000 });
+  await phone.locator('#files li.ok').nth(1).waitFor({ timeout: 10000 });
+  await phone.close();
+  // The car keeps the whole game and explains why it can't play the add-on
+  await appFrame().locator('#received li.bad').filter({ hasText: 'PWAD' }).waitFor({ timeout: 10000 });
+  await appFrame().locator('#received li:not(.bad)').filter({ hasText: 'mini' }).waitFor({ timeout: 10000 });
+  await appFrame().getByRole('button', { name: 'Done' }).click();
+  await appFrame().locator('#mine .game').filter({ hasText: 'mini.wad' }).waitFor({ timeout: 5000 });
+  await appFrame().getByRole('button', { name: 'Remove mini' }).click();
+  await appFrame().getByRole('button', { name: 'Remove mini' }).click();
+  await appFrame().locator('#mine .game').waitFor({ state: 'detached', timeout: 5000 });
+});
+
+await check('freedoom plays with a controller and resumes from its autosave', async () => {
+  await openFromHub(/Freedoom/);
+  const frame = () => page.frames().find(f => f.url().includes('/doom/'));
+  await appFrame().locator('#free .game').filter({ hasText: 'Phase 1' }).click();
+  // First time: downloads 10 MB, then starts
+  await appFrame().locator('#fps').filter({ hasText: /fps/ }).waitFor({ timeout: 60000 });
+  // Two pads like the car: the controller's raw device and the car's
+  // standard-mapping copy (A is raw 0, standard 1). Fire (A) opens the menu
+  // and picks New Game, the episode and the skill.
+  await frame().evaluate(() => {
+    const pad = (id, mapping, index) => ({ id, index, mapping, connected: true, timestamp: 0, axes: [0, 0, 0, 0], buttons: Array.from({ length: 17 }, () => ({ pressed: false, value: 0 })) });
+    const pads = [pad('raw', '', 0), pad('Tesla Virtual Gamepad', 'standard', 1)];
+    navigator.getGamepads = () => pads;
+    window.padHold = async (b, ms = 150) => {
+      for (const [p, i] of [[0, b === 1 ? 0 : -1], [1, b]]) if (i >= 0) Object.assign(pads[p].buttons[i], { pressed: true, value: 1 });
+      await new Promise(r => setTimeout(r, ms));
+      for (const p of pads) for (const x of p.buttons) Object.assign(x, { pressed: false, value: 0 });
+      await new Promise(r => setTimeout(r, 500));
+    };
+  });
+  const canvas = appFrame().locator('#canvas');
+  const small = await canvas.evaluate(c => c.getBoundingClientRect().width);
+  const title = await canvas.screenshot();
+  for (let i = 0; i < 4; i++) await frame().evaluate(() => padHold(1));
+  await page.waitForTimeout(1500);   // the screen melts into the level
+  const level = await canvas.screenshot();
+  if (level.equals(title)) throw new Error('controller input did nothing');
+  if (await appFrame().locator('.side.left').isVisible()) throw new Error('on-screen controls still showing with a controller');
+  // D-pad up walks forward
+  await frame().evaluate(() => padHold(12, 1200));
+  if ((await canvas.screenshot()).equals(level)) throw new Error('walking forward changed nothing');
+  const fps = parseInt(await appFrame().locator('#fps').textContent());
+  if (!(fps >= 30)) throw new Error(`running at ${fps} fps`);
+  console.log(`     ${fps} fps, ${small} px wide`);
+  await page.screenshot({ path: shots + 'doom.png' });
+  // Closing the app from the hub saves the game to the autosave slot, and
+  // Continue loads it straight into the level (data-state 1: playing)
+  await page.click('#home');
+  await page.waitForSelector('#runner', { state: 'hidden' });
+  await openFromHub(/Freedoom/);
+  const saves = await frame().evaluate(() => new Promise(r => {
+    const q = indexedDB.open('/doom');
+    q.onsuccess = () => { const g = q.result.transaction('FILE_DATA').objectStore('FILE_DATA').getAllKeys(); g.onsuccess = () => r(g.result); };
+    q.onerror = () => r([]);
+  }));
+  if (!saves.some(k => String(k).endsWith('/free-freedoom1/doomsav77.dsg'))) throw new Error(`no autosave: ${saves.join(', ')}`);
+  await appFrame().getByRole('button', { name: 'Continue Freedoom: Phase 1' }).click();
+  await appFrame().locator('#player[data-state="1"]').waitFor({ timeout: 20000 });
+  await appFrame().getByRole('button', { name: 'Games' }).click();
+  await appFrame().locator('#library').waitFor({ state: 'visible', timeout: 10000 });
+});
+
 await check('no console or page errors', async () => {
   // headless Chrome may log a GPU stall warning for readPixels; ignore those
   const real = errors.filter(e => !/GPU stall|swiftshader/i.test(e));

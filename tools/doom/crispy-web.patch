@@ -1,0 +1,449 @@
+diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
+index 75fb4f79..aeb60dda 100644
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -266,7 +266,7 @@ endif()
+ if (DEFINED EMSCRIPTEN)
+     set_target_properties("${PROGRAM_PREFIX}setup" PROPERTIES LINK_FLAGS "${SDL_FLAGS} -s ALLOW_MEMORY_GROWTH=1 -s ASYNCIFY=1 -s EXPORTED_FUNCTIONS=_main,ccall,cwrap,FS,ENV,PATH,ERRNO_CODES")
+     set_target_properties("${PROGRAM_PREFIX}strife" PROPERTIES LINK_FLAGS "${SDL_FLAGS} -s ALLOW_MEMORY_GROWTH=1 -s ASYNCIFY=1 -s EXPORTED_FUNCTIONS=_main,ccall,cwrap,FS,ENV,PATH,ERRNO_CODES")
+-    set_target_properties("${PROGRAM_PREFIX}doom" PROPERTIES LINK_FLAGS "${SDL_FLAGS} -s ALLOW_MEMORY_GROWTH=1 -s ASYNCIFY=1 -s EXPORTED_FUNCTIONS=_main,ccall,cwrap,FS,ENV,PATH,ERRNO_CODES")
++    set_target_properties("${PROGRAM_PREFIX}doom" PROPERTIES LINK_FLAGS "${SDL_FLAGS} ${WEB_LINK_FLAGS}")
+     set_target_properties("${PROGRAM_PREFIX}heretic" PROPERTIES LINK_FLAGS "${SDL_FLAGS} -s ALLOW_MEMORY_GROWTH=1 -s ASYNCIFY=1 -s EXPORTED_FUNCTIONS=_main,ccall,cwrap,FS,ENV,PATH,ERRNO_CODES")
+     set_target_properties("${PROGRAM_PREFIX}hexen" PROPERTIES LINK_FLAGS "${SDL_FLAGS} -s ALLOW_MEMORY_GROWTH=1 -s ASYNCIFY=1 -s EXPORTED_FUNCTIONS=_main,ccall,cwrap,FS,ENV,PATH,ERRNO_CODES")
+ endif()
+diff --git a/src/doom/CMakeLists.txt b/src/doom/CMakeLists.txt
+index 0c014d66..7ff1d142 100644
+--- a/src/doom/CMakeLists.txt
++++ b/src/doom/CMakeLists.txt
+@@ -16,6 +16,7 @@ add_library(doom STATIC
+                             d_englsh.h
+             d_items.c       d_items.h
+             d_main.c        d_main.h
++            i_web.c         i_web.h
+             d_net.c
+             d_pwad.c        d_pwad.h
+                             doomdata.h
+diff --git a/src/doom/d_main.c b/src/doom/d_main.c
+index 49a200fa..ad558198 100644
+--- a/src/doom/d_main.c
++++ b/src/doom/d_main.c
+@@ -79,6 +79,11 @@
+ 
+ #include "d_main.h"
+ 
++#ifdef __EMSCRIPTEN__
++#include <emscripten.h>
++#include "i_web.h"
++#endif
++
+ #include "doom_icon.c"
+ 
+ //
+@@ -532,12 +537,20 @@ void D_RunFrame()
+ 
+     if (wipe)
+     {
++#ifdef __EMSCRIPTEN__
++        // [frunk] Come back on the next refresh instead of waiting.
++        nowtime = I_GetTime ();
++        tics = nowtime - wipestart;
++        if (tics <= 0)
++            return;
++#else
+         do
+         {
+             nowtime = I_GetTime ();
+             tics = nowtime - wipestart;
+             I_Sleep(1);
+         } while (tics <= 0);
++#endif
+ 
+         wipestart = nowtime;
+         wipe = !wipe_ScreenWipe(wipe_Melt
+@@ -623,10 +636,15 @@ void D_DoomLoop (void)
+         wipegamestate = gamestate;
+     }
+ 
++#ifdef __EMSCRIPTEN__
++    // [frunk] The browser draws on its own refresh; never block it.
++    emscripten_set_main_loop(W_RunFrame, 0, 1);
++#else
+     while (1)
+     {
+         D_RunFrame();
+     }
++#endif
+ }
+ 
+ 
+diff --git a/src/doom/g_game.c b/src/doom/g_game.c
+index f7f7f42d..1d1136d7 100644
+--- a/src/doom/g_game.c
++++ b/src/doom/g_game.c
+@@ -2585,6 +2585,24 @@ G_SaveGame
+     sendsave = true;
+ }
+ 
++#ifdef __EMSCRIPTEN__
++// [frunk] Saves right away (not on the next tic), for when the page may
++// be about to close or stop running.
++void G_WebSaveNow (int slot, const char *description)
++{
++    extern int savepage;
++    const int page = savepage;
++    const char *message = players[consoleplayer].message;
++
++    savepage = 0;
++    savegameslot = slot;
++    M_StringCopy(savedescription, description, sizeof(savedescription));
++    G_DoSaveGame();
++    savepage = page;
++    players[consoleplayer].message = message;
++}
++#endif
++
+ void G_DoSaveGame (void) 
+ { 
+     char *savegame_file;
+diff --git a/src/doom/i_web.c b/src/doom/i_web.c
+new file mode 100644
+index 00000000..a29a7a3b
+--- /dev/null
++++ b/src/doom/i_web.c
+@@ -0,0 +1,204 @@
++//
++// Copyright(C) 2026 frunk.store
++//
++// This program is free software; you can redistribute it and/or
++// modify it under the terms of the GNU General Public License
++// as published by the Free Software Foundation; either version 2
++// of the License, or (at your option) any later version.
++//
++// This program is distributed in the hope that it will be useful,
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU General Public License for more details.
++//
++// DESCRIPTION:
++//    Calls for the browser page (frunk.store Doom). The page reads the
++//    controller and touch controls itself and hands Doom one gamepad
++//    state per frame, so Doom never opens SDL's joystick.
++//
++
++#include <emscripten.h>
++
++#include "d_event.h"
++#include "d_think.h"
++#include "doomstat.h"
++#include "d_main.h"
++#include "m_config.h"
++#include "i_web.h"
++
++// buttons: bitfield of virtual buttons (joyb_* settings);
++// turn, move, strafe: -65536..65536 (FRACUNIT), right/back/right positive;
++// dir: d-pad and stick directions for menus (see i_joystick.h).
++EMSCRIPTEN_KEEPALIVE void web_pad(int buttons, int turn, int move, int strafe,
++                                  int dir)
++{
++    event_t ev;
++
++    ev.type = ev_joystick;
++    ev.data1 = buttons;
++    ev.data2 = turn;
++    ev.data3 = move;
++    ev.data4 = strafe;
++    ev.data5 = 0;
++    ev.data6 = dir;
++    D_PostEvent(&ev);
++}
++
++void G_WebSaveNow(int slot, const char *description);
++
++// Saves the game in progress to slot 77 (the last one on the last page of
++// the save menu), for picking up where the player left off. Returns 1 when
++// it saved, 0 when there's nothing to save.
++EMSCRIPTEN_KEEPALIVE int web_autosave(void)
++{
++    if (gamestate != GS_LEVEL || !usergame || demoplayback || netgame
++     || gameaction != ga_nothing
++     || players[consoleplayer].playerstate == PST_DEAD)
++        return 0;
++
++    G_WebSaveNow(77, "AUTOSAVE");
++    return 1;
++}
++
++void D_RunFrame(void);
++
++static int frames;
++
++// The browser's main loop: one frame on each screen refresh.
++void W_RunFrame(void)
++{
++    D_RunFrame();
++    ++frames;
++}
++
++// Frames drawn so far, for the page's frame rate counter.
++EMSCRIPTEN_KEEPALIVE int web_frames(void)
++{
++    return frames;
++}
++
++EMSCRIPTEN_KEEPALIVE void web_save_config(void)
++{
++    M_SaveDefaults();
++}
++
++// 0 title/demos, 1 playing, 2 intermission or finale; +4 when the menu
++// is open, +8 when paused.
++EMSCRIPTEN_KEEPALIVE int web_state(void)
++{
++    int state;
++
++    if (gamestate == GS_LEVEL && usergame && !demoplayback)
++        state = 1;
++    else if ((gamestate == GS_INTERMISSION || gamestate == GS_FINALE)
++             && !demoplayback)
++        state = 2;
++    else
++        state = 0;
++
++    return state | (menuactive ? 4 : 0) | (paused ? 8 : 0);
++}
++
++// WebAssembly traps when a function is called through a pointer of another
++// type. Doom calls every state's action as action(mobj, player, psp), but
++// these monster actions take only the mobj, so they get called with one.
++
++void A_BFGSpray();
++void A_BabyMetal();
++void A_BetaSkullAttack();
++void A_BossDeath();
++void A_BrainAwake();
++void A_BrainDie();
++void A_BrainExplode();
++void A_BrainPain();
++void A_BrainScream();
++void A_BrainSpit();
++void A_BruisAttack();
++void A_BspiAttack();
++void A_CPosAttack();
++void A_CPosRefire();
++void A_Chase();
++void A_CyberAttack();
++void A_Detonate();
++void A_Die();
++void A_Explode();
++void A_Face();
++void A_FaceTarget();
++void A_Fall();
++void A_FatAttack1();
++void A_FatAttack2();
++void A_FatAttack3();
++void A_FatRaise();
++void A_Fire();
++void A_FireCrackle();
++void A_HeadAttack();
++void A_Hoof();
++void A_KeenDie();
++void A_LineEffect();
++void A_Look();
++void A_Metal();
++void A_Mushroom();
++void A_Pain();
++void A_PainAttack();
++void A_PainDie();
++void A_PlaySound();
++void A_PlayerScream();
++void A_PosAttack();
++void A_SPosAttack();
++void A_SargAttack();
++void A_Scratch();
++void A_Scream();
++void A_SkelFist();
++void A_SkelMissile();
++void A_SkelWhoosh();
++void A_SkullAttack();
++void A_Spawn();
++void A_SpawnFly();
++void A_SpawnSound();
++void A_SpidRefire();
++void A_StartFire();
++void A_Stop();
++void A_Tracer();
++void A_TroopAttack();
++void A_Turn();
++void A_VileAttack();
++void A_VileChase();
++void A_VileStart();
++void A_VileTarget();
++void A_XScream();
++
++static const actionf_v one_arg_actions[] =
++{
++    A_BFGSpray, A_BabyMetal, A_BetaSkullAttack, A_BossDeath,
++    A_BrainAwake, A_BrainDie, A_BrainExplode, A_BrainPain,
++    A_BrainScream, A_BrainSpit, A_BruisAttack, A_BspiAttack,
++    A_CPosAttack, A_CPosRefire, A_Chase, A_CyberAttack,
++    A_Detonate, A_Die, A_Explode, A_Face,
++    A_FaceTarget, A_Fall, A_FatAttack1, A_FatAttack2,
++    A_FatAttack3, A_FatRaise, A_Fire, A_FireCrackle,
++    A_HeadAttack, A_Hoof, A_KeenDie, A_LineEffect,
++    A_Look, A_Metal, A_Mushroom, A_Pain,
++    A_PainAttack, A_PainDie, A_PlaySound, A_PlayerScream,
++    A_PosAttack, A_SPosAttack, A_SargAttack, A_Scratch,
++    A_Scream, A_SkelFist, A_SkelMissile, A_SkelWhoosh,
++    A_SkullAttack, A_Spawn, A_SpawnFly, A_SpawnSound,
++    A_SpidRefire, A_StartFire, A_Stop, A_Tracer,
++    A_TroopAttack, A_Turn, A_VileAttack, A_VileChase,
++    A_VileStart, A_VileTarget, A_XScream
++};
++
++void W_CallAction(actionf_t action, void *mobj, void *player, void *psp)
++{
++    size_t i;
++
++    for (i = 0; i < arrlen(one_arg_actions); ++i)
++    {
++        if (action.acv == one_arg_actions[i])
++        {
++            action.acp1(mobj);
++            return;
++        }
++    }
++
++    action.acp3(mobj, player, psp);
++}
+diff --git a/src/doom/i_web.h b/src/doom/i_web.h
+new file mode 100644
+index 00000000..64b1f898
+--- /dev/null
++++ b/src/doom/i_web.h
+@@ -0,0 +1,26 @@
++//
++// Copyright(C) 2026 frunk.store
++//
++// This program is free software; you can redistribute it and/or
++// modify it under the terms of the GNU General Public License
++// as published by the Free Software Foundation; either version 2
++// of the License, or (at your option) any later version.
++//
++// This program is distributed in the hope that it will be useful,
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU General Public License for more details.
++//
++
++#ifndef __I_WEB__
++#define __I_WEB__
++
++#include "d_think.h"
++
++// Runs one frame; the browser calls it on each screen refresh.
++void W_RunFrame(void);
++
++// Calls a state's action with the arguments its function takes.
++void W_CallAction(actionf_t action, void *mobj, void *player, void *psp);
++
++#endif
+diff --git a/src/doom/p_mobj.c b/src/doom/p_mobj.c
+index c0b4fdad..2a37b590 100644
+--- a/src/doom/p_mobj.c
++++ b/src/doom/p_mobj.c
+@@ -24,6 +24,9 @@
+ 
+ #include "doomdef.h"
+ #include "p_local.h"
++#ifdef __EMSCRIPTEN__
++#include "i_web.h"
++#endif
+ #include "sounds.h"
+ 
+ #include "st_stuff.h"
+@@ -80,7 +83,11 @@ P_SetMobjState
+ 	// Modified handling.
+ 	// Call action functions when the state is set
+ 	if (st->action.acp3)
++#ifdef __EMSCRIPTEN__
++	    W_CallAction(st->action, mobj, NULL, NULL);
++#else
+ 	    st->action.acp3(mobj, NULL, NULL); // [crispy] let pspr action pointers get called from mobj states
++#endif
+ 	
+ 	state = st->nextstate;
+ 
+diff --git a/src/doom/p_pspr.c b/src/doom/p_pspr.c
+index 27d7938f..16e8df85 100644
+--- a/src/doom/p_pspr.c
++++ b/src/doom/p_pspr.c
+@@ -25,6 +25,9 @@
+ 
+ #include "m_random.h"
+ #include "p_local.h"
++#ifdef __EMSCRIPTEN__
++#include "i_web.h"
++#endif
+ #include "s_sound.h"
+ 
+ // State.
+@@ -106,7 +109,11 @@ P_SetPsprite
+ 	// Modified handling.
+ 	if (state->action.acp3)
+ 	{
++#ifdef __EMSCRIPTEN__
++	    W_CallAction(state->action, player->mo, player, psp);
++#else
+ 	    state->action.acp3(player->mo, player, psp); // [crispy] let mobj action pointers get called from pspr states
++#endif
+ 	    if (!psp->state)
+ 		break;
+ 	}
+diff --git a/src/i_system.c b/src/i_system.c
+index 7b0e0ee9..162ca191 100644
+--- a/src/i_system.c
++++ b/src/i_system.c
+@@ -32,6 +32,10 @@
+ 
+ #include "SDL.h"
+ 
++#ifdef __EMSCRIPTEN__
++#include <emscripten.h>
++#endif
++
+ #include "config.h"
+ 
+ #include "deh_str.h"
+@@ -274,6 +278,13 @@ void I_Quit (void)
+ 
+     SDL_Quit();
+ 
++#ifdef __EMSCRIPTEN__
++    // [frunk] Let the page go back to its game list.
++    emscripten_cancel_main_loop();
++    EM_ASM({ if (Module.onQuit) Module.onQuit(); });
++    emscripten_force_exit(0);
++#endif
++
+     exit(0);
+ }
+ 
+@@ -349,8 +360,18 @@ void I_Error (const char *error, ...)
+ 
+     // abort();
+ 
++#ifdef __EMSCRIPTEN__
++    // [frunk] Show the message on the page.
++    emscripten_cancel_main_loop();
++    EM_ASM({ if (Module.onError) Module.onError(UTF8ToString($0)); }, msgbuf);
++#endif
++
+     SDL_Quit();
+ 
++#ifdef __EMSCRIPTEN__
++    emscripten_force_exit(-1);
++#endif
++
+     exit(-1);
+ }
+ 

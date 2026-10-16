@@ -1,6 +1,6 @@
-// Game file checks shared by Retro Console and the phone page: which console
-// a file is for (from its header, not its name), size limits, and pulling the
-// game out of a .zip.
+// Game file checks shared by Retro Console, Freedoom and the phone page:
+// which console a file is for (from its header, not its name), Doom WADs,
+// size limits, and pulling the game out of a .zip.
 
 const MB = 1024 * 1024;
 
@@ -34,9 +34,10 @@ export function systemOf(bytes, name = '') {
 
 export const isColor = bytes => (bytes[0x143] & 0x80) !== 0;
 
-// The first file in a zip with a game's extension, as { name, bytes }, or null.
-// Handles stored and deflated entries, which is what zip tools write.
-async function unzip(zip) {
+// The first file in a zip with one of these extensions and at most max bytes,
+// as { name, bytes }, or null. Handles stored and deflated entries, which is
+// what zip tools write.
+async function unzip(zip, exts = GAME_EXTS, max = MAX_GAME) {
   const v = new DataView(zip.buffer, zip.byteOffset, zip.byteLength);
   let end = -1;
   for (let i = zip.length - 22; i >= Math.max(0, zip.length - 65557); i--) {
@@ -51,7 +52,7 @@ async function unzip(zip) {
     const local = v.getUint32(p + 42, true);
     const name = new TextDecoder().decode(zip.subarray(p + 46, p + 46 + nameLen));
     p += 46 + nameLen + extra + comment;
-    if (!GAME_EXTS.includes(ext(name)) || size > MAX_GAME || (method !== 0 && method !== 8)) continue;
+    if (!exts.includes(ext(name)) || size > max || (method !== 0 && method !== 8)) continue;
     if (local + 30 > zip.length || v.getUint32(local, true) !== 0x04034b50) return null;
     const start = local + 30 + v.getUint16(local + 26, true) + v.getUint16(local + 28, true);
     const data = zip.subarray(start, start + packed);
@@ -73,6 +74,36 @@ export async function findGame(name, bytes) {
   const system = systemOf(bytes, name);
   if (!system || bytes.length > SYSTEMS[system].max) return null;
   return { name, system, bytes };
+}
+
+// ---------- Doom ----------
+
+// Doom's game data: an IWAD is a whole game (doom.wad, doom2.wad, tnt.wad,
+// freedoom1.wad...); a PWAD adds levels or changes to one
+export const MAX_WAD = 64 * MB;
+export const MAX_WAD_FILE = MAX_WAD + 64 * 1024;
+export const maybeWad = name => ['wad', 'zip'].includes(ext(name));
+
+// 'IWAD', 'PWAD' or null, from the header and lump directory
+export function wadKind(bytes) {
+  if (bytes.length < 12) return null;
+  const kind = String.fromCharCode(...bytes.subarray(0, 4));
+  if (kind !== 'IWAD' && kind !== 'PWAD') return null;
+  const v = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const lumps = v.getInt32(4, true), dir = v.getInt32(8, true);
+  return lumps > 0 && dir >= 12 && dir + lumps * 16 <= bytes.length ? kind : null;
+}
+
+// Finds the WAD in a file the player picked (or in a zip): { name, kind,
+// bytes }, or null
+export async function findWad(name, bytes) {
+  if (isZip(bytes)) {
+    const inner = await unzip(bytes, ['wad'], MAX_WAD).catch(() => null);
+    if (!inner) return null;
+    ({ name, bytes } = inner);
+  }
+  const kind = bytes.length <= MAX_WAD && wadKind(bytes);
+  return kind ? { name: name.replace(/^.*\//, ''), kind, bytes } : null;
 }
 
 export const cleanName = name => name.replace(/^.*\//, '').replace(/\.[a-z0-9]{1,4}$/i, '').replace(/[_]+/g, ' ').trim() || 'Game';

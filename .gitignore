@@ -2,3 +2,5 @@ node_modules
 .vercel
 .env*
 .e2e
+tools/.doom-build
+apps/doom/freedoom/*.wad.gz

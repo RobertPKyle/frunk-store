@@ -106,7 +106,36 @@ the apps are served from.
   computer); those are stored in the screen's IndexedDB only. A one-time
   confirmation asks players to load only games they legally own. Never add
   commercial ROMs to this repo or the site.
-- `apps/send` and `apps/api/transfer.js`: "Get games from phone". The car
+- `apps/doom`: Freedoom. The Doom engine Crispy Doom 7.2 (GPL-2.0-or-later)
+  compiled to WebAssembly by `npm run build:doom` (`tools/build-doom.mjs`:
+  the crispy-doom-7.2 tag plus `tools/doom/crispy-web.patch`, Emscripten
+  4.0.10 in Docker; the patched source ships next to the engine in
+  `apps/doom/engine/`). The same script fetches Freedoom 0.13.0 (BSD-3-Clause),
+  checks the release's SHA-256 and gzips both IWADs (29 MB to about 10 MB;
+  they're not in git, so run it before deploying `apps`);
+  the page downloads one the first time it's played, unpacks it with
+  `DecompressionStream` and keeps it in IndexedDB. Players add Doom IWADs
+  they own (doom.wad, doom2.wad, tnt.wad, plutonia.wad...) from their phone
+  or from files; add-ons (PWADs) aren't supported yet. The patch makes the
+  game loop run on `requestAnimationFrame`, calls the one-argument monster
+  actions with one argument (WebAssembly traps on Doom's mismatched
+  function-pointer calls, which crashed the first demo), and adds `web_*`
+  calls for the page: one gamepad state per frame (controllers and the
+  on-screen stick and buttons are merged in `doom.js`; the car's two copies
+  of each controller are handled as in Retro Console), autosave to slot 77,
+  settings, frame count and game state. Settings and saves live in the
+  engine's `/doom` folder, kept in IndexedDB (IDBFS), with a save folder per
+  WAD; leaving the app (hidden page or the hub's close handshake) saves the
+  game, and Continue loads it with `-loadgame 77`. Defaults: classic
+  320x200 at 4:3, frames interpolated on every refresh, always run, sound
+  at 44100 Hz in 46 ms slices. Measured with the CPU slowed 4.5x: drawing a
+  frame takes about 3 ms (6 ms at Crispy's 640x400), and the OPL music synth
+  is the biggest cost, about 100 ms per second. The engine can't restart
+  within a page, so leaving a game reloads the page. Not yet tried in the
+  car.
+- `apps/send` and `apps/api/transfer.js`: "Get games from phone", for Retro
+  Console and Freedoom (the car side is `apps/_shared/phone.js`; Freedoom's
+  code adds `?app=doom` so the phone page checks for WADs). The car
   opens a session and shows a QR code with the session id and an AES-GCM key
   in the URL fragment, which never reaches the server. The phone page
   encrypts each game before upload; the function relays ciphertext through
@@ -129,6 +158,7 @@ the apps are served from.
 ```sh
 npm install
 npm run build:wasm                      # after editing apps/fractal/fractal.wat
+npm run build:doom                      # Doom engine + Freedoom (needs Docker); run before deploying apps
 npm run dev                             # hub on localhost:5173, apps on 127.0.0.1:5174
 npm run test:e2e                        # checks against the dev server
 node tools/e2e.mjs https://frunk.store  # checks against production

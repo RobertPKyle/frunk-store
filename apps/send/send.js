@@ -3,18 +3,27 @@
 // game is checked, encrypted here with AES-GCM and uploaded to the session,
 // in pieces when it's big. Zipped games are sent zipped; the car unzips them.
 import { sealPieces } from '../_shared/transfer.js';
-import { MAX_FILE, findGame } from '../_shared/roms.js';
+import { MAX_FILE, MAX_WAD_FILE, findGame, findWad } from '../_shared/roms.js';
 
 const $ = id => document.getElementById(id);
 
 const [sid, keyText] = location.hash.slice(1).split('.');
 let key = null;
 
+// Which app on the car asked: Retro Console (console games) or Freedoom
+// (Doom WADs). Files are checked here so the wrong kind isn't sent.
+const doom = new URLSearchParams(location.search).get('app') === 'doom';
+const APP = doom
+  ? { name: 'Freedoom', max: MAX_WAD_FILE, check: findWad, wrong: 'Not a Doom WAD',
+      lede: 'Pick Doom game files (.wad, zipped or not) on this phone, such as DOOM.WAD or DOOM2.WAD from a copy you bought. They appear on the car screen in a few seconds.' }
+  : { name: 'Retro Console', max: MAX_FILE, check: findGame, wrong: 'Not a game this plays' };
+if (APP.lede) $('lede').textContent = APP.lede;
+
 async function start() {
   try {
     key = await crypto.subtle.importKey('raw', Uint8Array.from(atob(keyText.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0)), 'AES-GCM', false, ['encrypt']);
   } catch {
-    $('lede').textContent = 'Open this page by scanning the code on the car screen: Retro Console, then Get games from phone.';
+    $('lede').textContent = `Open this page by scanning the code on the car screen: ${APP.name}, then Get games from phone.`;
     $('choose').disabled = true;
   }
 }
@@ -31,9 +40,9 @@ function row(name) {
 }
 
 async function send(file, set) {
-  if (file.size > MAX_FILE) return set('Too big', 'bad');
+  if (file.size > APP.max) return set('Too big', 'bad');
   const bytes = new Uint8Array(await file.arrayBuffer());
-  if (!(await findGame(file.name, bytes))) return set('Not a game this plays', 'bad');
+  if (!(await APP.check(file.name, bytes))) return set(APP.wrong, 'bad');
   const pieces = await sealPieces(key, sid, file.name, bytes);
   for (let i = 0; i < pieces.length; i++) {
     set(pieces.length > 1 ? `Sending ${Math.round(100 * i / pieces.length)}%` : 'Sending…');
