@@ -1,4 +1,4 @@
-// "Get games from phone", shared by Retro Console and Freedoom.
+// "Get games from phone", shared by Retro Console, Freedoom and Adventure Games.
 //
 // The car opens a session on /api/transfer and shows a QR code with the
 // session id and a fresh AES key in the #fragment. The phone uploads games
@@ -13,11 +13,13 @@ import { cleanName } from './roms.js';
 
 const $ = id => document.getElementById(id);
 
-// app: which app the phone page checks files for ('retro' or 'doom').
+// app: which app the phone page checks files for ('retro', 'doom' or
+// 'adventure').
 // save(name, bytes): saves one file; resolves to its title, or null when it
 // isn't a file this app plays. notPlayable() says why, after a null.
-// onSaved(): called after each saved file.
-export function phonePanel({ app, save, onSaved, notPlayable = () => 'not a game this plays' }) {
+// onSaved(): called after each saved file. onClose(): called when the panel
+// closes.
+export function phonePanel({ app, save, onSaved, onClose = () => {}, notPlayable = () => 'not a game this plays' }) {
   // gen changes when the panel closes, so a code still being fetched is dropped.
   // partial holds games still arriving: id -> { name, parts, got: [], item }
   const transfer = { session: null, key: null, taken: 0, timer: 0, busy: false, gen: 0, partial: new Map() };
@@ -149,6 +151,7 @@ export function phonePanel({ app, save, onSaved, notPlayable = () => 'not a game
     transfer.partial.clear();
     if (s) api('close', { sid: s.sid, token: s.token }, 'POST').catch(() => {});
     $('transfer').hidden = true;
+    onClose();
   }
 
   $('transferDone').onclick = close;

@@ -1,6 +1,6 @@
 // Game file checks shared by Retro Console, Freedoom and the phone page:
 // which console a file is for (from its header, not its name), Doom WADs,
-// size limits, and pulling the game out of a .zip.
+// size limits, pulling the game out of a .zip, and adventure game files.
 
 const MB = 1024 * 1024;
 
@@ -34,33 +34,62 @@ export function systemOf(bytes, name = '') {
 
 export const isColor = bytes => (bytes[0x143] & 0x80) !== 0;
 
-// The first file in a zip with one of these extensions and at most max bytes,
-// as { name, bytes }, or null. Handles stored and deflated entries, which is
-// what zip tools write.
-async function unzip(zip, exts = GAME_EXTS, max = MAX_GAME) {
+// The entries of a zip's central directory, in order; stops at the first
+// damaged one
+function* zipEntries(zip) {
   const v = new DataView(zip.buffer, zip.byteOffset, zip.byteLength);
   let end = -1;
   for (let i = zip.length - 22; i >= Math.max(0, zip.length - 65557); i--) {
     if (v.getUint32(i, true) === 0x06054b50) { end = i; break; }
   }
-  if (end < 0) return null;
+  if (end < 0) return;
   let p = v.getUint32(end + 16, true);
   for (let n = v.getUint16(end + 10, true); n > 0 && p + 46 <= zip.length; n--) {
-    if (v.getUint32(p, true) !== 0x02014b50) return null;
+    if (v.getUint32(p, true) !== 0x02014b50) return;
     const method = v.getUint16(p + 10, true), packed = v.getUint32(p + 20, true), size = v.getUint32(p + 24, true);
     const nameLen = v.getUint16(p + 28, true), extra = v.getUint16(p + 30, true), comment = v.getUint16(p + 32, true);
     const local = v.getUint32(p + 42, true);
     const name = new TextDecoder().decode(zip.subarray(p + 46, p + 46 + nameLen));
     p += 46 + nameLen + extra + comment;
-    if (!exts.includes(ext(name)) || size > max || (method !== 0 && method !== 8)) continue;
-    if (local + 30 > zip.length || v.getUint32(local, true) !== 0x04034b50) return null;
-    const start = local + 30 + v.getUint16(local + 26, true) + v.getUint16(local + 28, true);
-    const data = zip.subarray(start, start + packed);
-    if (method === 0) return { name, bytes: data.slice() };
-    const out = new Uint8Array(await new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer());
-    return out.length === size ? { name, bytes: out } : null;
+    yield { name, method, packed, size, local };
+  }
+}
+
+// An entry's bytes, or null when its local header or data is damaged.
+// Handles stored and deflated entries, which is what zip tools write.
+async function inflate(zip, { method, packed, size, local }) {
+  const v = new DataView(zip.buffer, zip.byteOffset, zip.byteLength);
+  if (local + 30 > zip.length || v.getUint32(local, true) !== 0x04034b50) return null;
+  const start = local + 30 + v.getUint16(local + 26, true) + v.getUint16(local + 28, true);
+  const data = zip.subarray(start, start + packed);
+  if (method === 0) return data.length === size ? data.slice() : null;
+  const out = new Uint8Array(await new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer());
+  return out.length === size ? out : null;
+}
+
+// The first file in a zip with one of these extensions and at most max bytes,
+// as { name, bytes }, or null
+async function unzip(zip, exts = GAME_EXTS, max = MAX_GAME) {
+  for (const e of zipEntries(zip)) {
+    if (!exts.includes(ext(e.name)) || e.size > max || (e.method !== 0 && e.method !== 8)) continue;
+    const bytes = await inflate(zip, e);
+    return bytes ? { name: e.name, bytes } : null;
   }
   return null;
+}
+
+// Every file in a zip (folders are left out), as [{ name, bytes }], or null
+// when one can't be read or they come to more than max bytes
+export async function unzipAll(zip, max) {
+  const entries = [...zipEntries(zip)].filter(e => !e.name.endsWith('/'));
+  if (!entries.length || entries.reduce((n, e) => n + e.size, 0) > max) return null;
+  const files = [];
+  for (const e of entries) {
+    const bytes = (e.method === 0 || e.method === 8) && await inflate(zip, e);
+    if (!bytes) return null;
+    files.push({ name: e.name, bytes });
+  }
+  return files;
 }
 
 // Finds the game in a file the player picked: { name, system, bytes }, or
@@ -107,3 +136,9 @@ export async function findWad(name, bytes) {
 }
 
 export const cleanName = name => name.replace(/^.*\//, '').replace(/\.[a-z0-9]{1,4}$/i, '').replace(/[_]+/g, ' ').trim() || 'Game';
+
+// ---------- adventure games (ScummVM) ----------
+// A game is a folder of files, sent as a .zip of the folder or as its files.
+// Any file may belong to one; ScummVM recognises the game on the car.
+export const MAX_ADVENTURE_FILE = 80e6;   // what one phone code carries
+export const findAdventureFile = async (name, bytes) => bytes.length ? { name } : null;

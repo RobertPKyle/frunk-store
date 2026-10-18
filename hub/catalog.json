@@ -156,6 +156,18 @@
       ]
     },
     {
+      "id": "adventure",
+      "name": "Adventure Games",
+      "tagline": "Classic point-and-click adventures on ScummVM: seven free games, or ones you own sent from your phone.",
+      "path": "/adventure/",
+      "icon": "/adventure/icon.svg",
+      "tags": [
+        "Game",
+        "Touch",
+        "Controller"
+      ]
+    },
+    {
       "id": "chess",
       "name": "Chess Puzzle",
       "tagline": "Solve the Lichess daily chess puzzle on your screen.",

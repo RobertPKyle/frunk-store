@@ -3,20 +3,24 @@
 // game is checked, encrypted here with AES-GCM and uploaded to the session,
 // in pieces when it's big. Zipped games are sent zipped; the car unzips them.
 import { sealPieces } from '../_shared/transfer.js';
-import { MAX_FILE, MAX_WAD_FILE, findGame, findWad } from '../_shared/roms.js';
+import { MAX_ADVENTURE_FILE, MAX_FILE, MAX_WAD_FILE, findAdventureFile, findGame, findWad } from '../_shared/roms.js';
 
 const $ = id => document.getElementById(id);
 
 const [sid, keyText] = location.hash.slice(1).split('.');
 let key = null;
 
-// Which app on the car asked: Retro Console (console games) or Freedoom
-// (Doom WADs). Files are checked here so the wrong kind isn't sent.
-const doom = new URLSearchParams(location.search).get('app') === 'doom';
-const APP = doom
-  ? { name: 'Freedoom', max: MAX_WAD_FILE, check: findWad, wrong: 'Not a Doom WAD',
-      lede: 'Pick Doom game files (.wad, zipped or not) on this phone, such as DOOM.WAD or DOOM2.WAD from a copy you bought. They appear on the car screen in a few seconds.' }
-  : { name: 'Retro Console', max: MAX_FILE, check: findGame, wrong: 'Not a game this plays' };
+// Which app on the car asked: Retro Console (console games), Freedoom (Doom
+// WADs) or Adventure Games (folders of game files). Files are checked here
+// so the wrong kind isn't sent.
+const APPS = {
+  doom: { name: 'Freedoom', max: MAX_WAD_FILE, check: findWad, wrong: 'Not a Doom WAD',
+    lede: 'Pick Doom game files (.wad, zipped or not) on this phone, such as DOOM.WAD or DOOM2.WAD from a copy you bought. They appear on the car screen in a few seconds.' },
+  adventure: { name: 'Adventure Games', max: MAX_ADVENTURE_FILE, check: findAdventureFile, wrong: 'Empty file',
+    lede: 'Pick one game: a .zip of its folder (in the Files app, long-press the folder and choose Compress), or all of its files at once, from a copy you own. Up to 80 MB per code. Then tap Done on the car screen.' },
+  retro: { name: 'Retro Console', max: MAX_FILE, check: findGame, wrong: 'Not a game this plays' },
+};
+const APP = APPS[new URLSearchParams(location.search).get('app')] || APPS.retro;
 if (APP.lede) $('lede').textContent = APP.lede;
 
 async function start() {

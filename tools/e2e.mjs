@@ -41,9 +41,12 @@ page.on('console', m => {
 });
 
 let failed = 0;
+// ONLY=freedoom node tools/e2e.mjs runs just the checks with that in their name
+const only = process.env.ONLY;
 async function check(name, fn) {
+  if (only && !name.includes(only) && name !== 'no console or page errors') return;
   try { await fn(); console.log(`ok   ${name}`); }
-  catch (e) { failed++; console.log(`FAIL ${name}\n     ${e.message.split('\n')[0]}`); }
+  catch (e) { failed++; console.log(`FAIL ${name}\n     ${process.env.VERBOSE ? e.message : e.message.split('\n')[0]}`); }
 }
 const appFrame = () => page.frameLocator('#frame');
 async function openFromHub(name) {
@@ -466,6 +469,106 @@ await check('freedoom plays with a controller and resumes from its autosave', as
   if (!saves.some(k => String(k).endsWith('/free-freedoom1/doomsav77.dsg'))) throw new Error(`no autosave: ${saves.join(', ')}`);
   await appFrame().getByRole('button', { name: 'Continue Freedoom: Phase 1' }).click();
   await appFrame().locator('#player[data-state="1"]').waitFor({ timeout: 20000 });
+  await appFrame().getByRole('button', { name: 'Games' }).click();
+  await appFrame().locator('#library').waitFor({ state: 'visible', timeout: 10000 });
+});
+
+await check('adventure games takes game folders from a phone', async () => {
+  await openFromHub(/Adventure Games/);
+  const frame = () => page.frames().find(f => f.url().includes('/adventure/'));
+  // A zipped game folder (Nippon Safes, freeware) and two loose files that
+  // aren't a game: the zip is one game, the loose files another when Done
+  writeFileSync(shots + 'notes.txt', 'not a game, but the bigger of the two loose files');
+  writeFileSync(shots + 'n.txt', 'nope');
+  await appFrame().getByRole('button', { name: 'Get games from phone' }).click();
+  await appFrame().getByRole('button', { name: 'I own my games' }).click();
+  await appFrame().locator('#transferStatus').filter({ hasText: 'Waiting' }).waitFor({ timeout: 10000 });
+  const link = await appFrame().locator('#qr a').getAttribute('href');
+  if (!link.includes('?app=adventure')) throw new Error(`phone link doesn't ask for adventure games: ${link}`);
+  const phone = await browser.newPage({ viewport: { width: 390, height: 800 }, isMobile: true, hasTouch: true });
+  await phone.goto(link);
+  const [pick] = await Promise.all([phone.waitForEvent('filechooser'), phone.getByRole('button', { name: 'Choose games' }).click()]);
+  await pick.setFiles([new URL('../apps/adventure/games/nippon-1.0.zip', import.meta.url).pathname, shots + 'notes.txt', shots + 'n.txt']);
+  await phone.locator('#files li.ok').nth(2).waitFor({ timeout: 20000 });
+  await phone.close();
+  await appFrame().locator('#received li:not(.bad):not(.busy)').nth(2).waitFor({ timeout: 20000 });
+  await appFrame().getByRole('button', { name: 'Done' }).click();
+  await appFrame().locator('#mine .game').filter({ hasText: 'notes' }).waitFor({ timeout: 5000 });
+  // ScummVM finds no game in the loose files and the page says so
+  await appFrame().locator('#mine .game').filter({ hasText: 'notes' }).click();
+  await appFrame().locator('#status').filter({ hasText: 'didn\'t recognise' }).waitFor({ timeout: 60000 });
+  await appFrame().getByRole('button', { name: 'Remove notes' }).click();
+  await appFrame().getByRole('button', { name: 'Remove notes' }).click();
+  // The zip plays, and takes the name ScummVM gives it
+  await appFrame().locator('#mine .game').filter({ hasText: 'nippon' }).click();
+  await appFrame().locator('#title').filter({ hasText: 'Nippon Safes, Inc.' }).waitFor({ timeout: 60000 });
+  await frame().waitForFunction(() => document.title.startsWith('Nippon'));
+  await appFrame().getByRole('button', { name: 'Games' }).click();
+  await appFrame().locator('#mine .game').filter({ hasText: 'Nippon Safes, Inc.' }).waitFor({ timeout: 20000 });
+  await appFrame().getByRole('button', { name: 'Remove Nippon Safes, Inc.' }).click();
+  await appFrame().getByRole('button', { name: 'Remove Nippon Safes, Inc.' }).click();
+  await appFrame().locator('#mine .game').waitFor({ state: 'detached', timeout: 5000 });
+});
+
+await check('adventure games plays with touch and a controller and resumes from its autosave', async () => {
+  await openFromHub(/Adventure Games/);
+  const frame = () => page.frames().find(f => f.url().includes('/adventure/'));
+  await appFrame().locator('#free .game').filter({ hasText: 'Lure of the Temptress' }).click();
+  // First time: downloads 5.4 MB, then ScummVM recognises it and starts
+  await appFrame().locator('#title').filter({ hasText: /^Lure of the Temptress$/ }).waitFor({ timeout: 60000 });
+  await page.waitForTimeout(4000);
+  // Skip (Esc) skips the intro; if a press reaches the game instead, Lure
+  // asks whether to quit, and N says no
+  for (let i = 0; i < 2; i++) { await appFrame().getByRole('button', { name: 'Skip' }).click(); await page.waitForTimeout(3000); }
+  await page.keyboard.press('n');
+  await page.waitForTimeout(1500);
+  const canvas = appFrame().locator('#canvas');
+  const box = await canvas.boundingBox();
+  // Two pads like the car: the stick moves ScummVM's pointer
+  await frame().evaluate(() => {
+    const pad = (id, mapping, index) => ({ id, index, mapping, connected: true, timestamp: 0, axes: [0, 0, 0, 0], buttons: Array.from({ length: 17 }, () => ({ pressed: false, value: 0 })) });
+    const pads = [pad('raw', '', 0), pad('Tesla Virtual Gamepad', 'standard', 1)];
+    navigator.getGamepads = () => pads;
+    dispatchEvent(new Event('gamepadconnected'));
+    window.padStick = async (x, y, ms) => {
+      for (const p of pads) p.axes = [x, y, 0, 0];
+      await new Promise(r => setTimeout(r, ms));
+      for (const p of pads) p.axes = [0, 0, 0, 0];
+      await new Promise(r => setTimeout(r, 300));
+    };
+  });
+  const before = await canvas.screenshot();
+  await frame().evaluate(() => padStick(1, -1, 700));
+  if ((await canvas.screenshot()).equals(before)) throw new Error('the controller didn\'t move the pointer');
+  // Right-click holds the right button while the finger is down: Lure shows
+  // its menu of actions
+  const cdp = await page.context().newCDPSession(page);
+  const touch = (type, x, y) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x: box.x + x, y: box.y + y }] });
+  await appFrame().getByRole('button', { name: 'Right-click' }).click();
+  const cell = await canvas.screenshot();
+  await touch('touchStart', box.width / 2, box.height * 0.45);
+  await page.waitForTimeout(600);
+  const menu = await canvas.screenshot({ path: shots + 'adventure-menu.png' });
+  await touch('touchEnd');
+  if (menu.equals(cell)) throw new Error('right-click did nothing');
+  // Close the menu (the game can't save while it's open) with a tap away from it
+  await touch('touchStart', box.width * 0.75, box.height * 0.85);
+  await touch('touchEnd');
+  await page.waitForTimeout(5000);   // and the walk there that it starts
+  await page.screenshot({ path: shots + 'adventure.png' });
+  // Leaving with Games autosaves (the hub's Apps button can't be relied on
+  // for that: going back in its history stops the frame's timers, which
+  // ScummVM's loop needs), and Continue loads the save
+  await appFrame().getByRole('button', { name: 'Games' }).click();
+  await appFrame().locator('#library').waitFor({ state: 'visible', timeout: 10000 });
+  const saves = await frame().evaluate(() => new Promise(r => {
+    const q = indexedDB.open('/home/web_user');
+    q.onsuccess = () => { const g = q.result.transaction('FILE_DATA').objectStore('FILE_DATA').getAllKeys(); g.onsuccess = () => r(g.result); };
+    q.onerror = () => r([]);
+  }));
+  if (!saves.includes('/home/web_user/saves/lure.000')) throw new Error(`no autosave: ${saves.join(', ')}`);
+  await appFrame().getByRole('button', { name: 'Continue Lure of the Temptress' }).click();
+  await appFrame().locator('#title').filter({ hasText: /^Lure of the Temptress$/ }).waitFor({ timeout: 60000 });
   await appFrame().getByRole('button', { name: 'Games' }).click();
   await appFrame().locator('#library').waitFor({ state: 'visible', timeout: 10000 });
 });

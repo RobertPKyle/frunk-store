@@ -1,0 +1,47 @@
+Third-party components
+======================
+
+- ScummVM 2026.4.0, copyright the ScummVM Team and contributors (see
+  COPYRIGHT in its source), GNU GPL version 3 or later (engine/scummvm.js
+  and engine/scummvm.wasm; license text in engine/COPYING). Built from the
+  v2026.4.0 tag of https://github.com/scummvm/scummvm (commit
+  7d2709da5136866589f7602f5f5a7b17de03420e) with the changes in
+  engine/scummvm-web.patch (hooks for this page: autosave on request, the
+  page's own game list in place of ScummVM's launcher, data files read
+  next to the page, a keyboard fix for SDL), compiled with Emscripten
+  4.0.10 by tools/build-scummvm.mjs in
+  https://github.com/RobertPKyle/frunk-store, which also lists the engines
+  built in. The Corresponding Source is that tag of ScummVM's repository
+  plus engine/scummvm-web.patch and the build script; ask
+  frunkstore@protonmail.com for a copy if either is ever unavailable. The
+  data files in data/ (menu themes, engine tables) come from the same
+  source tree.
+
+  The build includes libmad 0.15.1b (GNU GPL version 2 or later; source in
+  engine/libmad-0.15.1b.tar.gz, from https://www.underbit.com/products/mad/),
+  and, from Emscripten's ports, SDL 3.2.4 (zlib License), libogg and
+  libvorbis (BSD 3-Clause), zlib (zlib License) and libpng (libpng
+  License).
+
+- Free games, freeware from their makers as distributed by the ScummVM
+  project at https://www.scummvm.org/games/, in games/, each zip
+  unmodified with its license inside (readme.txt, README, LICENSE.txt or
+  license.txt):
+  - Beneath a Steel Sky (floppy version 1.3), copyright Revolution
+    Software Ltd (BASS-Floppy-1.3.zip)
+  - Flight of the Amazon Queen (floppy version), copyright John Passfield
+    and Steve Stamatiadis (FOTAQ_Floppy.zip)
+  - Lure of the Temptress 1.1, copyright Revolution Software Ltd
+    (lure-1.1.zip)
+  - Drascula: The Vampire Strikes Back 1.0 and its music pack 2.0,
+    copyright Alcachofa Soft S.L. (drascula-1.0.zip,
+    drascula-audio-2.0.zip)
+  - Sołtys 1.0 and Sfinx 1.1, copyright Laboratorium Komputerowe Avalon
+    (soltys-en-v1.0.zip, sfinx-en-v1.1.zip)
+  - Nippon Safes, Inc. 1.0, copyright Dynabyte Software (nippon-1.0.zip)
+  Their licenses allow free distribution with the license and copyright
+  notices intact, and forbid charging for the games; frunk.store charges
+  nothing for them.
+
+ScummVM and frunk.store are not affiliated with or endorsed by the makers of
+the games. All game names and trademarks belong to their owners.

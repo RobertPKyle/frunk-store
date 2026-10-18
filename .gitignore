@@ -4,3 +4,7 @@ node_modules
 .e2e
 tools/.doom-build
 apps/doom/freedoom/*.wad.gz
+tools/.scummvm-build
+apps/adventure/games/*.zip
+apps/adventure/engine/scummvm.js
+apps/adventure/engine/scummvm.wasm

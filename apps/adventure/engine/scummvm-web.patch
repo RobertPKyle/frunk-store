@@ -1,0 +1,238 @@
+diff --git a/backends/events/default/default-events.cpp b/backends/events/default/default-events.cpp
+index 1179c478..5882679a 100644
+--- a/backends/events/default/default-events.cpp
++++ b/backends/events/default/default-events.cpp
+@@ -27,6 +27,9 @@
+ #include "common/config-manager.h"
+ #include "common/translation.h"
+ #include "backends/events/default/default-events.h"
++#ifdef EMSCRIPTEN
++void webHandleSaveRequest(); // backends/platform/sdl/emscripten/emscripten.cpp
++#endif
+ #include "backends/keymapper/action.h"
+ #include "backends/keymapper/keymapper.h"
+ #include "backends/keymapper/virtual-mouse.h"
+@@ -85,6 +88,9 @@ bool DefaultEventManager::pollEvent(Common::Event &event) {
+ 	if (g_engine)
+ 		// Handle autosaves if enabled
+ 		g_engine->handleAutoSave();
++#ifdef EMSCRIPTEN
++	webHandleSaveRequest();
++#endif
+ 
+ 	if (_eventQueue.empty()) {
+ 		return false;
+diff --git a/backends/fs/emscripten/http-fs.cpp b/backends/fs/emscripten/http-fs.cpp
+index 7eecaf22..6652b0aa 100644
+--- a/backends/fs/emscripten/http-fs.cpp
++++ b/backends/fs/emscripten/http-fs.cpp
+@@ -51,7 +51,7 @@ HTTPFilesystemNode::HTTPFilesystemNode(const Common::String &p) : _path(p), _isV
+ 	if (_path == DATA_PATH) { // need special case for handling the root of the http-filesystem
+ 		_isDirectory = true;
+ 		_isValid = true;
+-		_url = _path;
++		_url = _path.substr(1); // frunk.store: relative to the page
+ 	} else { // we need to peek in the parent folder to see if the node exists and if it's a directory
+ 		AbstractFSNode *parent = getParent();
+ 		AbstractFSList tmp = AbstractFSList();
+diff --git a/backends/platform/sdl/emscripten/emscripten.cpp b/backends/platform/sdl/emscripten/emscripten.cpp
+index b6794c84..2e2b0003 100644
+--- a/backends/platform/sdl/emscripten/emscripten.cpp
++++ b/backends/platform/sdl/emscripten/emscripten.cpp
+@@ -33,6 +33,10 @@
+ #include "backends/platform/sdl/emscripten/emscripten.h"
+ #include "backends/timer/emscripten/emscripten-timer.h"
+ #include "common/file.h"
++#include "common/config-manager.h"
++#include "common/translation.h"
++#include "engines/engine.h"
++#include "engines/metaengine.h"
+ #ifdef USE_TTS
+ #include "backends/text-to-speech/emscripten/emscripten-text-to-speech.h"
+ #endif
+@@ -101,6 +105,73 @@ void EMSCRIPTEN_KEEPALIVE cloud_connection_json_callback(char *str) {
+ #endif
+ }
+ 
++// frunk.store hooks. The page asks for an autosave when it is hidden or about
++// to close; the request is handled from the event loop, where engines also
++// make their timed autosaves. The page counts handled requests to know when
++// it's done. The autosave is skipped when the game can't save right now,
++// and when the autosave slot holds the player's own save, which the page
++// must never overwrite. Then web_last_save() says which slot holds an
++// autosave, made now or earlier, or -1 for none.
++static int webSaveRequests = 0;
++static int webSavesDone = 0;
++static int webLastSave = -1;
++
++extern "C" {
++void EMSCRIPTEN_KEEPALIVE web_request_save() {
++	webSaveRequests++;
++}
++
++int EMSCRIPTEN_KEEPALIVE web_saves_done() {
++	return webSavesDone;
++}
++
++int EMSCRIPTEN_KEEPALIVE web_last_save() {
++	return webLastSave;
++}
++}
++
++// What's in a save slot of the running game. Engines with their own save
++// format (Lure, for one) only describe their saves in listSaves().
++static SaveStateDescriptor webSaveInfo(int slot) {
++	const MetaEngine *metaEngine = g_engine->getMetaEngine();
++	const char *target = ConfMan.getActiveDomainName().c_str();
++	SaveStateDescriptor desc = metaEngine->querySaveMetaInfos(target, slot);
++	if (desc.isValid())
++		return desc;
++	SaveStateList saves = metaEngine->listSaves(target);
++	for (SaveStateList::const_iterator s = saves.begin(); s != saves.end(); ++s) {
++		if (s->getSaveSlot() == slot)
++			return *s;
++	}
++	return SaveStateDescriptor();
++}
++
++void webHandleSaveRequest() {
++	if (webSavesDone == webSaveRequests)
++		return;
++	int requests = webSaveRequests;
++	webLastSave = -1;
++	int slot = g_engine ? g_engine->getAutosaveSlot() : -1;
++	if (slot >= 0) {
++		SaveStateDescriptor desc = webSaveInfo(slot);
++		if ((!desc.isValid() || desc.isAutosave()) && g_engine->canSaveAutosaveCurrently())
++			g_engine->saveGameState(slot, Common::convertFromU32String(_("Autosave")), true);
++		desc = webSaveInfo(slot);
++		if (desc.isValid() && desc.isAutosave())
++			webLastSave = slot;
++	}
++	webSavesDone = requests;
++}
++
++EM_JS(void, webLauncherJS, (), {
++	if (Module['onLauncher'])
++		Module['onLauncher']();
++});
++
++void webLauncher() {
++	webLauncherJS();
++}
++
+ // Overridden functions
+ 
+ void OSystem_Emscripten::initBackend() {
+@@ -132,6 +203,12 @@ void OSystem_Emscripten::init() {
+ 	EmscriptenFilesystemFactory *fsFactory = new EmscriptenFilesystemFactory();
+ 	_fsFactory = fsFactory;
+ 
++	// frunk.store: name the keyboard's target. Without it, SDL 3.2 adds its
++	// key listeners every time ScummVM recreates the window and never removes
++	// them, so each key press arrives several times. "#window" is mapped to
++	// the window in custom_shell-post.js.
++	SDL_SetHint(SDL_HINT_EMSCRIPTEN_KEYBOARD_ELEMENT, "#window");
++
+ 	// Invoke parent implementation of this method
+ 	OSystem_SDL::init();
+ }
+diff --git a/backends/platform/sdl/emscripten/emscripten.h b/backends/platform/sdl/emscripten/emscripten.h
+index ecd1c541..80aaa346 100644
+--- a/backends/platform/sdl/emscripten/emscripten.h
++++ b/backends/platform/sdl/emscripten/emscripten.h
+@@ -31,7 +31,12 @@ typedef Common::BaseCallback<const Common::String *> *CloudConnectionCallback;
+ 
+ extern "C" {
+ void cloud_connection_json_callback(char *str);       // pass cloud storage activation data from JS to setup wizard
++void web_request_save();                              // frunk.store: the page asks for an autosave...
++int web_saves_done();                                 // ...counts the requests handled...
++int web_last_save();                                  // ...and the slot holding an autosave
+ }
++void webHandleSaveRequest();                          // called from the event loop
++void webLauncher();                                   // the launcher would show: Module.onLauncher()
+ class OSystem_Emscripten : public OSystem_POSIX {
+ #ifdef USE_CLOUD
+ 	friend void ::cloud_connection_json_callback(char *str);
+diff --git a/base/main.cpp b/base/main.cpp
+index ef3997f1..76ae758e 100644
+--- a/base/main.cpp
++++ b/base/main.cpp
+@@ -99,8 +99,15 @@
+ #endif
+ 
+ #include "gui/dump-all-dialogs.h"
++#ifdef EMSCRIPTEN
++void webLauncher(); // backends/platform/sdl/emscripten/emscripten.cpp
++#endif
+ 
+ static bool launcherDialog() {
++#ifdef EMSCRIPTEN
++	// frunk.store: the page has its own game list, so it takes over here
++	webLauncher();
++#endif
+ 
+ 	// Discard any command line options. Those that affect the graphics
+ 	// mode and the others (like bootparam etc.) should not
+diff --git a/configure b/configure
+index ff45575d..a4283ede 100755
+--- a/configure
++++ b/configure
+@@ -3386,7 +3386,7 @@ EOF
+ 		append_var LDFLAGS "-s ASYNCIFY=1 -s ASYNCIFY_STACK_SIZE=1048576"
+ 
+ 		append_var LDFLAGS "-s EXPORTED_FUNCTIONS=[_main,_malloc,_free,_raise]"
+-		append_var LDFLAGS "-s EXPORTED_RUNTIME_METHODS=[ccall,lengthBytesUTF8,setValue,writeArrayToMemory]"
++		append_var LDFLAGS "-s EXPORTED_RUNTIME_METHODS=[ccall,lengthBytesUTF8,setValue,writeArrayToMemory,FS]"
+ 		append_var LDFLAGS "--js-library backends/networking/http/emscripten/networkreadstream-emscripten.js"
+ 
+ 		append_var LDFLAGS "-O2"
+diff --git a/dists/emscripten/custom_shell-post.js b/dists/emscripten/custom_shell-post.js
+index 8ca26759..49155a04 100644
+--- a/dists/emscripten/custom_shell-post.js
++++ b/dists/emscripten/custom_shell-post.js
+@@ -4,6 +4,10 @@
+ /*global JSEvents*/
+ JSEvents.removeAllHandlersOnTarget = function(){};
+ 
++// frunk.store: the keyboard target SDL is told to use (see emscripten.cpp)
++/*global specialHTMLTargets*/
++specialHTMLTargets["#window"] = window;
++
+ // Make sure to release any resources (e.g. RetroWave or Midi Devices) when leaving the page
+ window.addEventListener("beforeunload", function (e) {
+ 	Module["_raise"](2); // SIGINT
+diff --git a/dists/emscripten/custom_shell-pre.js b/dists/emscripten/custom_shell-pre.js
+index c567e001..8e417641 100644
+--- a/dists/emscripten/custom_shell-pre.js
++++ b/dists/emscripten/custom_shell-pre.js
+@@ -1,25 +1,5 @@
+ /*global Module*/
+-Module["arguments"] = [];
+-
+-// Add all parameters passed via the fragment identifier
+-if (window.location.hash.length > 0) {
+-    params = decodeURI(window.location.hash.substring(1)).split(" ")
+-    params.forEach((param) => {
+-        Module["arguments"].push(param);
+-    })
+-}
+-
+-// MIDI support
+-var midiOutputMap;
+-if (!("requestMIDIAccess" in navigator)) {
+-	console.error("No MIDI support in your browser.");
+-} else {
+-	navigator
+-		.requestMIDIAccess({ sysex: true, software: true })
+-		.then((midiAccess) => {
+-			midiOutputMap = midiAccess.outputs;
+-			midiAccess.onstatechange = (e) => {
+-				midiOutputMap = e.target.outputs;
+-			};
+-		});
+-}
++// frunk.store: the page passes the command line in Module["arguments"], and
++// doesn't use Web MIDI (asking for it shows a permission prompt)
++Module["arguments"] = Module["arguments"] || [];
++var midiOutputMap = new Map(); // no MIDI devices; read by backends/midi/webmidi.cpp
