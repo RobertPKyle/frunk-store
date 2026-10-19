@@ -1,4 +1,5 @@
-// "Get games from phone", shared by Retro Console, Freedoom and Adventure Games.
+// "Get games from phone", shared by Retro Console, Freedoom, Adventure Games
+// and Text Adventures.
 //
 // The car opens a session on /api/transfer and shows a QR code with the
 // session id and a fresh AES key in the #fragment. The phone uploads games
@@ -13,8 +14,8 @@ import { cleanName } from './roms.js';
 
 const $ = id => document.getElementById(id);
 
-// app: which app the phone page checks files for ('retro', 'doom' or
-// 'adventure').
+// app: which app the phone page checks files for ('retro', 'doom',
+// 'adventure' or 'text').
 // save(name, bytes): saves one file; resolves to its title, or null when it
 // isn't a file this app plays. notPlayable() says why, after a null.
 // onSaved(): called after each saved file. onClose(): called when the panel

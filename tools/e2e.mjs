@@ -603,6 +603,95 @@ await check('adventure games plays with touch and a controller and resumes from 
   await appFrame().locator('#library').waitFor({ state: 'visible', timeout: 10000 });
 });
 
+await check('text adventures plays zork by tapping words, undoes and picks up where it was left', async () => {
+  await openFromHub(/Text Adventures/);
+  const frame = () => page.frames().find(f => f.url().includes('/text/'));
+  const app = appFrame();
+  const where = place => app.locator('#where').filter({ hasText: place }).waitFor({ timeout: 10000 });
+  await app.locator('#free .game').filter({ hasText: 'Zork I:' }).click();
+  await where('West of House');
+  // Taps the newest place the story says a word, like a finger would
+  const tap = async word => {
+    const at = await frame().evaluate(w => {
+      const walk = document.createTreeWalker(document.getElementById('story'), NodeFilter.SHOW_TEXT);
+      let found = null;
+      for (let n; (n = walk.nextNode());) { const i = n.data.lastIndexOf(w); if (i >= 0) found = [n, i]; }
+      const r = document.createRange();
+      r.setStart(found[0], found[1] + 1);
+      r.setEnd(found[0], found[1] + 2);
+      const b = r.getBoundingClientRect();
+      return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
+    }, word);
+    const f = await page.locator('#frame').boundingBox();
+    await page.touchscreen.tap(f.x + at.x, f.y + at.y);
+  };
+  // A verb, then words from the story; ones the game doesn't know are left out
+  await app.getByRole('button', { name: 'Open', exact: true }).click();
+  await tap('standing');
+  await tap('mailbox');
+  const made = await app.locator('#cmd').inputValue();
+  if (made !== 'open mailbox') throw new Error(`tapping made "${made}"`);
+  await app.getByRole('button', { name: 'Go' }).click();
+  await app.locator('#story').filter({ hasText: 'reveals a leaflet' }).waitFor({ timeout: 5000 });
+  // The compass walks, and Undo takes a move back, text and all
+  await app.locator('#pad').getByRole('button', { name: 'N', exact: true }).click();
+  await where('North of House');
+  await app.locator('#pad').getByRole('button', { name: 'E', exact: true }).click();
+  await where('Behind House');
+  await app.getByRole('button', { name: 'Undo' }).click();
+  await where('North of House');
+  if ((await app.locator('#story').textContent()).includes('Behind House')) throw new Error('the undone move is still on screen');
+  // A keyboard types commands; the game's own SAVE and RESTORE work
+  const type = async text => {
+    await app.locator('#cmd').click();
+    await page.keyboard.type(text);
+    await page.keyboard.press('Enter');
+  };
+  await type('east');
+  await where('Behind House');
+  await type('save');
+  await app.locator('#story').filter({ hasText: /save\s*Ok\./ }).waitFor({ timeout: 5000 });
+  await type('north');
+  await where('North of House');
+  await type('restore');
+  await where('Behind House');
+  // Leaving with the hub's Apps button keeps the game; Continue picks it up
+  await page.click('#home');
+  await page.waitForSelector('#runner', { state: 'hidden' });
+  await openFromHub(/Text Adventures/);
+  await app.getByRole('button', { name: 'Continue Zork I' }).click();
+  await where('Behind House');
+  if (!(await app.locator('#story').textContent()).includes('reveals a leaflet')) throw new Error('the story so far wasn\'t kept');
+  await type('inventory');
+  await app.locator('#story').filter({ hasText: 'You are empty-handed' }).waitFor({ timeout: 5000 });
+  await page.screenshot({ path: shots + 'text.png' });
+});
+
+await check('text adventures takes story files from a phone', async () => {
+  await openFromHub(/Text Adventures/);
+  writeFileSync(shots + 'not-a-story.z5', 'not a story file');
+  await appFrame().getByRole('button', { name: 'Get games from phone' }).click();
+  await appFrame().getByRole('button', { name: 'OK' }).click();
+  await appFrame().locator('#transferStatus').filter({ hasText: 'Waiting' }).waitFor({ timeout: 10000 });
+  const link = await appFrame().locator('#qr a').getAttribute('href');
+  if (!link.includes('?app=text')) throw new Error(`phone link doesn't ask for story files: ${link}`);
+  const phone = await browser.newPage({ viewport: { width: 390, height: 800 }, isMobile: true, hasTouch: true });
+  await phone.goto(link);
+  const [pick] = await Promise.all([phone.waitForEvent('filechooser'), phone.getByRole('button', { name: 'Choose games' }).click()]);
+  await pick.setFiles([new URL('../apps/text/games/zork2.z3', import.meta.url).pathname, shots + 'not-a-story.z5']);
+  await phone.locator('#files li.ok').waitFor({ timeout: 20000 });
+  await phone.locator('#files li.bad').filter({ hasText: 'Not a story file' }).waitFor({ timeout: 5000 });
+  await phone.close();
+  await appFrame().locator('#received li:not(.bad):not(.busy)').filter({ hasText: 'zork2' }).waitFor({ timeout: 20000 });
+  await appFrame().getByRole('button', { name: 'Done' }).click();
+  await appFrame().locator('#mine .game').filter({ hasText: 'zork2' }).click();
+  await appFrame().locator('#story').filter({ hasText: 'ZORK II' }).waitFor({ timeout: 10000 });
+  await appFrame().getByRole('button', { name: 'Games' }).click();
+  await appFrame().getByRole('button', { name: 'Remove zork2' }).click();
+  await appFrame().getByRole('button', { name: 'Remove zork2' }).click();
+  await appFrame().locator('#mine .game').waitFor({ state: 'detached', timeout: 5000 });
+});
+
 await check('a place from the car\'s location follows the car', async () => {
   await openFromHub(/Star Map/);
   const appsOrigin = new URL(page.frames().find(f => f.url().includes('/stars/')).url()).origin;

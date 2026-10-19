@@ -192,10 +192,37 @@ to the cache again.
   doesn't mind). Like Freedoom, leaving a game reloads the page. Measured with
   the CPU slowed 4.5x: about 50 ms of script per second during Beneath a
   Steel Sky's intro. Not yet tried in the car.
+- `apps/text`: Text Adventures. Zork I, II and III (Infocom; source code
+  and story files released by Microsoft under the MIT License in November
+  2025, from github.com/historicalsource; the story files are in
+  `apps/text/games/`, unmodified, with their licenses) on this site's own
+  Z-machine, `apps/text/zmachine.js`. It plays versions 1 to 5, 7 and 8
+  (everything but version 6, which has pictures) after the Z-Machine
+  Standards Document 1.1, and has no DOM, so it also runs in Node. It was
+  checked against CZECH 0.8 (406 of 406 passed), Praxix (all passed) and
+  TerpEtude, and Zork I to III matched Frotz word for word apart from
+  random events; those test files aren't in this repo. Made for the car's
+  touchscreen: a verb button starts a command, tapping a word in the story
+  adds it (only words in the game's dictionary; others show a hint), the
+  compass and "now" buttons send a command at once, and Go sends what's
+  made. A real or on-screen keyboard works too (arrow keys recall earlier
+  commands), and "press a key" moments get a row of keys. In versions 1 to
+  3 the status line goes in the top bar, and the line that matches the
+  room's name is drawn as a heading; later games draw their own status
+  line, which is shown in the upper window's fixed-width font. After every
+  move the game's state (a snapshot of its memory and stack, taken while it
+  waits, so restoring it asks for the move again) and the last 60,000
+  characters of the story are kept in IndexedDB (database `text`), so
+  leaving loses nothing and Continue picks up there; Undo goes back up to
+  50 moves using the same snapshots, in any game, and the game's own SAVE
+  and RESTORE use one more slot per game. Players add .z1-.z8 and .zblorb
+  files (zipped or not) from their phone or from files. A move takes about
+  15 ms with the CPU slowed 4.5x. Not yet tried in the car.
 - `apps/send` and `apps/api/transfer.js`: "Get games from phone", for Retro
-  Console, Freedoom and Adventure Games (the car side is
+  Console, Freedoom, Adventure Games and Text Adventures (the car side is
   `apps/_shared/phone.js`; Freedoom adds `?app=doom` so the phone page
-  checks for WADs, Adventure Games `?app=adventure`). The car
+  checks for WADs, Adventure Games `?app=adventure`, Text Adventures
+  `?app=text` for story files). The car
   opens a session and shows a QR code with the session id and an AES-GCM key
   in the URL fragment, which never reaches the server. The phone page
   encrypts each game before upload; the function relays ciphertext through

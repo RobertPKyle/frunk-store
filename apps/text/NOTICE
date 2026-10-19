@@ -1,0 +1,32 @@
+Text Adventures (apps/text)
+
+The interpreter
+  zmachine.js is frunk.store's own Z-machine, written after The Z-Machine
+  Standards Document 1.1 (Graham Nelson, Andrew Plotkin and others). It
+  plays story files of versions 1 to 5, 7 and 8. It was checked against
+  CZECH 0.8 (Amir Karger), Praxix and TerpEtude (Andrew Plotkin), and
+  against Frotz (2.56 pre-release) on the Zork games; those tests aren't part of this
+  repository.
+
+Zork I, Zork II and Zork III (games/)
+  By Tim Anderson, Marc Blank, Bruce Daniels and Dave Lebling; published by
+  Infocom (1980, 1981, 1982).
+  Source code and story files: copyright (c) 2025 Microsoft, released under
+  the MIT License. The story files are COMPILED/zork1.z3, zork2.z3 and
+  zork3.z3, unmodified, from:
+    https://github.com/historicalsource/zork1  (Release 119, serial 880429)
+    https://github.com/historicalsource/zork2  (Release 63, serial 860811)
+    https://github.com/historicalsource/zork3  (Release 25, serial 860811)
+  SHA-256:
+    37084966477dff679282de42974b2077156b1bd68fad92a65d4ea94d8eb64d79  zork1.z3
+    3ae7d5558943e9721f3e4b273c8a7faec1a03a604e1ae4ee1cde472c21cb24ac  zork2.z3
+    b637a242865d059890184164ce8dec28554cc80901dcbf26c740b2d1ed0d4eb8  zork3.z3
+  Each repository's LICENSE is copied next to its story file
+  (games/zork1-LICENSE.txt and so on). The MIT License covers the code;
+  ZORK and the other trademarks and brands stay with their owner.
+  Text Adventures and frunk.store aren't affiliated with or endorsed by
+  Microsoft, Activision or Infocom.
+
+Players' own games
+  Story files a player adds are kept in that screen's IndexedDB only.
+  frunk.store doesn't provide, sell or share commercial games.

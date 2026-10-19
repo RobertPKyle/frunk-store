@@ -168,6 +168,18 @@
       ]
     },
     {
+      "id": "text",
+      "name": "Text Adventures",
+      "tagline": "Zork I, II and III, the Infocom classics, now open source. Tap words to build commands, or type.",
+      "path": "/text/",
+      "icon": "/text/icon.svg",
+      "tags": [
+        "Game",
+        "Touch",
+        "Offline"
+      ]
+    },
+    {
       "id": "chess",
       "name": "Chess Puzzle",
       "tagline": "Solve the Lichess daily chess puzzle on your screen.",

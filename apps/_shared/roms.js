@@ -1,6 +1,7 @@
-// Game file checks shared by Retro Console, Freedoom and the phone page:
-// which console a file is for (from its header, not its name), Doom WADs,
-// size limits, pulling the game out of a .zip, and adventure game files.
+// Game file checks shared by Retro Console, Freedoom, Adventure Games, Text
+// Adventures and the phone page: which console a file is for (from its
+// header, not its name), Doom WADs, size limits, pulling the game out of a
+// .zip, adventure game files and Z-machine story files.
 
 const MB = 1024 * 1024;
 
@@ -142,3 +143,43 @@ export const cleanName = name => name.replace(/^.*\//, '').replace(/\.[a-z0-9]{1
 // Any file may belong to one; ScummVM recognises the game on the car.
 export const MAX_ADVENTURE_FILE = 80e6;   // what one phone code carries
 export const findAdventureFile = async (name, bytes) => bytes.length ? { name } : null;
+
+// ---------- text adventures (Z-machine) ----------
+// A story file (.z3, .z5, .z8...) or a Blorb (.zblorb) with one inside.
+// Version 6 games draw pictures, which Text Adventures doesn't do.
+export const MAX_STORY = 512 * 1024;          // the biggest a version 8 story can be
+export const MAX_STORY_FILE = 64 * MB;        // a Blorb with pictures and sounds
+const STORY_EXTS = ['z1', 'z2', 'z3', 'z4', 'z5', 'z7', 'z8', 'dat', 'zblorb', 'zlb', 'blorb', 'blb'];
+
+// The story file in a Blorb (its ZCOD chunk), or null
+export function unblorb(bytes) {
+  if (!at(bytes, 0, [0x46, 0x4f, 0x52, 0x4d]) || !at(bytes, 8, [0x49, 0x46, 0x52, 0x53])) return null;   // FORM ... IFRS
+  const v = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  for (let p = 12; p + 8 <= bytes.length;) {
+    const type = String.fromCharCode(...bytes.subarray(p, p + 4)), len = v.getUint32(p + 4);
+    if (type === 'ZCOD') return bytes.subarray(p + 8, p + 8 + len);
+    p += 8 + len + (len & 1);
+  }
+  return null;
+}
+
+// Whether bytes look like a story this plays: a known version, and header
+// addresses inside the file
+export function isStory(bytes) {
+  if (bytes.length < 64 || bytes.length > MAX_STORY || ![1, 2, 3, 4, 5, 7, 8].includes(bytes[0])) return false;
+  const w = a => (bytes[a] << 8) | bytes[a + 1];
+  const staticBase = w(0x0e);
+  return staticBase >= 64 && staticBase <= bytes.length && w(0x06) < bytes.length && w(0x08) < bytes.length && w(0x0a) < bytes.length;
+}
+
+// Finds the story in a file the player picked: { name, bytes } with bytes
+// the bare story file, or null
+export async function findStory(name, bytes) {
+  if (isZip(bytes)) {
+    const inner = await unzip(bytes, STORY_EXTS, MAX_STORY_FILE).catch(() => null);
+    if (!inner) return null;
+    ({ name, bytes } = inner);
+  }
+  const story = unblorb(bytes) || bytes;
+  return isStory(story) ? { name: name.replace(/^.*\//, ''), bytes: story.slice() } : null;
+}

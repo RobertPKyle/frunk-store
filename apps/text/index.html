@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Text Adventures</title>
+<style>
+  :root { --bg: #0c0d0b; --panel: #141612; --card: #1c1f1a; --line: rgba(210, 225, 190, .13); --text: #ebe8dc; --muted: #9c9b8c;
+          --accent: #8fd18b; --cmd: #e6bd62; --ok: #9bd88f; --bad: #f08a6a; --size: 19px; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 16px/1.4 system-ui, sans-serif; overflow: hidden;
+               -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  .btn { min-height: 44px; padding: 8px 16px; border-radius: 12px; background: var(--card); border: 1px solid var(--line); white-space: nowrap; }
+  .btn.primary { background: var(--accent); border-color: transparent; color: #0d1f0c; font-weight: 700; }
+  .btn:disabled { opacity: .45; }
+  [hidden] { display: none !important; }
+
+  /* ---------- library ---------- */
+  #library { display: flex; flex-direction: column; height: 100%; }
+  /* left padding keeps clear of the hub's Apps button */
+  header { display: flex; align-items: center; gap: 10px; min-height: 60px; padding: 8px 12px 8px 110px; border-bottom: 1px solid var(--line); }
+  header h1 { margin: 0; font-size: 18px; font-weight: 600; flex: 1; }
+  #continue { max-width: 55%; overflow: hidden; text-overflow: ellipsis; }
+  .scroll { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 12px 16px 20px; touch-action: pan-y; }
+  h2 { margin: 10px 2px 8px; font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .games { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+  .game { position: relative; display: flex; flex-direction: column; gap: 4px; text-align: left; padding: 12px 14px; border-radius: 14px; background: var(--card); border: 1px solid var(--line); min-height: 96px; }
+  .game b { font-size: 17px; }
+  .game small { color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
+  .game p { margin: 2px 0 0; font-size: 14px; color: #d6d3c6; }
+  .wrap { position: relative; display: grid; }
+  .wrap .game { padding-right: 90px; }
+  .wrap .del { position: absolute; top: 6px; right: 6px; min-height: 36px; min-width: 36px; padding: 0 10px; border-radius: 10px; background: transparent; border: 1px solid var(--line); color: var(--muted); font-size: 13px; }
+  .add { display: flex; gap: 8px; flex-wrap: wrap; margin: 4px 0 6px; }
+  .note { font-size: 13px; color: var(--muted); margin: 6px 2px; max-width: 60em; }
+  #addMsg:empty, #status:empty { display: none; }
+  #status { margin: 0 2px 10px; color: var(--text); }
+  .game.busy, .btn.busy { opacity: .6; }
+  #mine:empty::before { content: 'None yet.'; color: var(--muted); font-size: 14px; padding: 2px; }
+  .howto { max-width: 60em; margin: 4px 2px 0; font-size: 14px; color: #d6d3c6; }
+  .howto p { margin: 0 0 8px; }
+  .howto code { font: 14px ui-monospace, "DejaVu Sans Mono", monospace; color: var(--cmd); }
+  .legal { margin-top: 18px; font-size: 12px; color: var(--muted); user-select: text; -webkit-user-select: text; }
+  .legal p { margin: 4px 0; }
+
+  /* ---------- overlays: terms, phone, errors, the end ---------- */
+  .overlay { position: fixed; inset: 0; z-index: 5; display: grid; place-items: center; padding: 64px 16px 16px; background: rgba(6, 7, 5, .9); }
+  .sheet { display: flex; gap: 22px; align-items: center; max-width: 680px; padding: 18px; border-radius: 18px; background: var(--panel); border: 1px solid var(--line); }
+  .sheet.terms { flex-direction: column; align-items: stretch; gap: 0; max-width: 560px; }
+  .terms h2 { margin: 0 0 8px; font-size: 19px; color: var(--text); letter-spacing: 0; text-transform: none; }
+  .terms p { margin: 0 0 10px; font-size: 15px; color: #d6d3c6; overflow-wrap: anywhere; }
+  .qr { flex: none; display: grid; place-items: center; width: 236px; height: 236px; border-radius: 12px; background: #fff; }
+  .qr a { display: block; }
+  .qr img, .qr canvas { display: block; width: 216px; height: 216px; image-rendering: pixelated; }
+  .steps h2 { margin: 0 0 6px; font-size: 19px; color: var(--text); letter-spacing: 0; text-transform: none; }
+  .steps ol { margin: 0 0 10px; padding-left: 20px; font-size: 15px; color: #d6d3c6; }
+  #transferStatus { margin: 0 0 6px; font-size: 14px; color: var(--muted); }
+  #received { list-style: none; margin: 0 0 10px; padding: 0; max-height: 110px; overflow-y: auto; font-size: 14px; }
+  #received li::before { content: '✓ '; color: var(--ok); }
+  #received li.bad::before { content: '✕ '; color: var(--bad); }
+  #received li.busy::before { content: '… '; color: var(--muted); }
+  @media (max-width: 640px) { .sheet { flex-direction: column; } }
+
+  /* ---------- player ---------- */
+  #player { position: fixed; inset: 0; display: grid; grid-template-rows: 60px minmax(0, 1fr) auto; grid-template-columns: minmax(0, 1fr); background: var(--bg); }
+  .bar { display: flex; align-items: center; gap: 6px; padding: 8px 8px 8px 110px; background: var(--panel); border-bottom: 1px solid var(--line); min-width: 0; }
+  .where { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.2; }
+  .where b, .where small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .where b { font-size: 16px; }
+  .where small { font-size: 13px; color: var(--muted); }
+  .where small:empty { display: none; }
+  .bar .btn { flex: none; padding: 8px 12px; font-size: 14px; }
+  .main { display: grid; grid-template-columns: minmax(0, 1fr) auto; min-height: 0; }
+  .page { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+  .fixed, #upper { font-family: ui-monospace, "DejaVu Sans Mono", "Liberation Mono", monospace; }
+  /* status lines and boxes the game draws in its upper window */
+  #upper { position: relative; margin: 0; padding: 6px 16px; font-size: calc(var(--size) * .82); line-height: 1.35; white-space: pre; overflow: hidden; border-bottom: 1px solid var(--line); background: var(--panel); }
+  #upper > div { min-height: 1.35em; }
+  #upper span { display: inline-block; vertical-align: top; }   /* reverse video fills the line, so status bars have no gaps */
+  #upper:empty { display: none; }
+  #story { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; padding: 12px 18px 18px;
+           font: var(--size)/1.5 "Iowan Old Style", "Palatino Linotype", Charter, "DejaVu Serif", Georgia, serif; white-space: pre-wrap; overflow-wrap: break-word;
+           user-select: text; -webkit-user-select: text; }
+  #story .fixed { font-size: .86em; }
+  .b { font-weight: 700; }
+  .i { font-style: italic; }
+  .r { background: var(--text); color: var(--bg); }
+  .cmd { color: var(--cmd); font-family: system-ui, sans-serif; font-weight: 600; font-size: .92em; }
+  .room { font-weight: 700; color: var(--accent); }
+  .note-line { color: var(--muted); font-style: italic; font-family: system-ui, sans-serif; font-size: .85em; }
+  .tapped { background: rgba(143, 209, 139, .3); border-radius: 4px; }
+
+  /* compass, right of the story */
+  #pad { display: grid; grid-template-columns: repeat(3, 50px); grid-auto-rows: 46px; gap: 6px; align-content: start; padding: 10px 10px 10px 4px; }
+  #pad button { border-radius: 10px; background: var(--card); border: 1px solid var(--line); font-size: 14px; font-weight: 600; padding: 0; }
+  #pad .look { color: var(--accent); }
+  #pad .sep { margin-top: 8px; }
+  #pad .wide { grid-column: span 3; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  #pad .wide button { min-height: 0; }
+  @media (max-width: 620px) { #pad { display: none; } }
+
+  .controls { border-top: 1px solid var(--line); background: var(--panel); padding: 8px 8px 6px; display: flex; flex-direction: column; gap: 6px; }
+  .cmdrow { display: flex; gap: 6px; }
+  #cmd { flex: 1; min-width: 0; min-height: 46px; padding: 8px 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); color: var(--text);
+         font: 600 18px system-ui, sans-serif; user-select: text; -webkit-user-select: text; }
+  #cmd::placeholder { color: var(--muted); font-weight: 400; }
+  #cmd:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  #clear { width: 46px; padding: 0; font-size: 20px; color: var(--muted); }
+  #go { min-width: 84px; }
+  .chips { display: flex; gap: 6px; overflow-x: auto; overscroll-behavior: contain; touch-action: pan-x; scrollbar-width: none; padding-bottom: 2px; }
+  .chips::-webkit-scrollbar { display: none; }
+  .chips button { flex: none; min-height: 40px; padding: 6px 13px; border-radius: 20px; background: var(--card); border: 1px solid var(--line); font-size: 15px; }
+  .chips .word { color: var(--cmd); }
+  .chips .now { color: var(--accent); }
+  #hint { position: fixed; left: 50%; top: 70px; transform: translateX(-50%); z-index: 3; padding: 6px 12px; border-radius: 10px; background: rgba(20, 22, 18, .94);
+          border: 1px solid var(--line); font-size: 14px; color: var(--text); pointer-events: none; white-space: nowrap; }
+</style>
+</head>
+<body>
+<section id="library">
+  <header>
+    <h1>Text Adventures</h1>
+    <button class="btn" id="continue" type="button" hidden></button>
+  </header>
+  <div class="scroll">
+    <p class="note" id="status" aria-live="polite"></p>
+    <h2>The Zork trilogy</h2>
+    <div class="games" id="free"></div>
+
+    <h2 style="margin-top:20px">How to play</h2>
+    <div class="howto">
+      <p>The game tells you where you are and what you see; you say what to do, in a few plain words: <code>north</code>, <code>open the mailbox</code>, <code>take lamp</code>, <code>put the coin in the slot</code>, <code>kill troll with sword</code>.</p>
+      <p>No typing needed: tap a verb, then tap words in the story to add them (tap Take, then "lamp"), and Go. The compass walks you around. Undo takes back your last move, and the game is kept after every move, so you can stop any time.</p>
+      <p>Draw a map as you go, and look at everything: <code>examine</code> things, <code>read</code> what has writing. <code>inventory</code> shows what you carry.</p>
+    </div>
+
+    <h2 style="margin-top:20px">Your games</h2>
+    <div class="add">
+      <button class="btn primary" id="fromPhone" type="button">Get games from phone</button>
+      <button class="btn" id="addFiles" type="button">Add story files</button>
+    </div>
+    <input id="fileInput" type="file" multiple hidden>
+    <p class="note" id="addMsg" aria-live="polite"></p>
+    <div class="games" id="mine"></div>
+    <p class="note">Plays Z-machine story files (.z1 to .z5, .z7, .z8, or .zblorb), which is all of Infocom's text games but the few with pictures, and thousands of later ones made with Inform. Free games are at the Interactive Fiction Archive (ifarchive.org) and IFDB (ifdb.org). Glulx (.ulx, .gblorb) and other systems aren't supported. Only load games you may play: free ones, or copies you own. Your games are stored only on this screen.</p>
+
+    <div class="legal">
+      <p>Zork I, Zork II and Zork III by Tim Anderson, Marc Blank, Bruce Daniels and Dave Lebling, Infocom. Source code and story files copyright 2025 Microsoft, released under the MIT License (github.com/historicalsource/zork1, zork2 and zork3); the license is next to each story in /text/games/. ZORK is a trademark of its owner. Text Adventures and frunk.store aren't affiliated with Microsoft, Activision or Infocom.</p>
+      <p>The interpreter is frunk.store's own, after the Z-Machine Standards Document 1.1; see /text/NOTICE. Play only while parked.</p>
+    </div>
+  </div>
+</section>
+
+<section id="terms" class="overlay" hidden aria-labelledby="termsTitle">
+  <div class="sheet terms">
+    <h2 id="termsTitle">Your own games</h2>
+    <p>Only load games you may play: free ones, such as those at the Interactive Fiction Archive, or copies you own. Downloading or sharing games you don't own can break copyright law.</p>
+    <p>frunk.store doesn't provide, sell or share commercial games. Games you load stay on this screen; when you send them from your phone they're encrypted and deleted from our server as soon as the car picks them up.</p>
+    <div class="add">
+      <button class="btn primary" id="termsOk" type="button">OK</button>
+      <button class="btn" id="termsCancel" type="button">Cancel</button>
+    </div>
+  </div>
+</section>
+
+<section id="transfer" class="overlay" hidden aria-labelledby="transferTitle">
+  <div class="sheet">
+    <div class="qr" id="qr" aria-hidden="true"></div>
+    <div class="steps">
+      <h2 id="transferTitle">Get games from phone</h2>
+      <ol>
+        <li>Scan this code with your phone's camera.</li>
+        <li>On the page that opens, choose story files (.z5, .z8, .zblorb...).</li>
+        <li>They show up here in a few seconds. Tap Done when you're finished.</li>
+      </ol>
+      <p id="transferStatus" aria-live="polite">Getting a code…</p>
+      <ul id="received"></ul>
+      <button class="btn primary" id="transferDone" type="button">Done</button>
+    </div>
+  </div>
+</section>
+
+<section id="failed" class="overlay" hidden aria-labelledby="failedTitle">
+  <div class="sheet terms">
+    <h2 id="failedTitle">The game stopped</h2>
+    <p id="failedText"></p>
+    <div class="add">
+      <button class="btn primary" id="failedUndo" type="button">Take back the last move</button>
+      <button class="btn" id="failedOk" type="button">Back to games</button>
+    </div>
+  </div>
+</section>
+
+<section id="ended" class="overlay" hidden aria-labelledby="endedTitle">
+  <div class="sheet terms">
+    <h2 id="endedTitle">The story has ended</h2>
+    <p>Start it again from the beginning, or go back to the list.</p>
+    <div class="add">
+      <button class="btn primary" id="again" type="button">Play again</button>
+      <button class="btn" id="endedUndo" type="button">Undo</button>
+      <button class="btn" id="endedOk" type="button">Back to games</button>
+    </div>
+  </div>
+</section>
+
+<section id="player" hidden>
+  <div class="bar">
+    <div class="where"><b id="where"></b><small id="score"></small></div>
+    <button class="btn" id="undoBtn" type="button" disabled>Undo</button>
+    <button class="btn" id="sizeBtn" type="button" aria-label="Text size">Aa</button>
+    <button class="btn" id="quitBtn" type="button">Games</button>
+  </div>
+  <div class="main">
+    <div class="page">
+      <pre id="upper" aria-hidden="true"></pre>
+      <div id="story" role="log" aria-live="polite"></div>
+    </div>
+    <div id="pad" aria-label="Directions">
+      <button type="button" data-go="northwest">NW</button>
+      <button type="button" data-go="north">N</button>
+      <button type="button" data-go="northeast">NE</button>
+      <button type="button" data-go="west">W</button>
+      <button type="button" data-go="look" class="look">Look</button>
+      <button type="button" data-go="east">E</button>
+      <button type="button" data-go="southwest">SW</button>
+      <button type="button" data-go="south">S</button>
+      <button type="button" data-go="southeast">SE</button>
+      <div class="wide sep"><button type="button" data-go="up">Up</button><button type="button" data-go="down">Down</button></div>
+      <div class="wide"><button type="button" data-go="in">In</button><button type="button" data-go="out">Out</button></div>
+    </div>
+  </div>
+  <div class="controls">
+    <div class="cmdrow">
+      <input id="cmd" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="go" aria-label="Command">
+      <button class="btn" id="clear" type="button" aria-label="Clear">×</button>
+      <button class="btn primary" id="go" type="button">Go</button>
+    </div>
+    <div class="chips" id="chips"></div>
+  </div>
+  <div id="hint" hidden></div>
+</section>
+
+<script src="/probe/qrcode.min.js"></script>
+<script type="module" src="text.js"></script>
+<script src="/sw-register.js"></script>
+</body>
+</html>
