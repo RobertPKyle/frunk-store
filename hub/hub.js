@@ -216,5 +216,20 @@ async function init() {
   }
 }
 
+// Copies the community token's address; selects it when the clipboard is
+// off limits, so it can still be copied by hand
+document.getElementById('copyToken').addEventListener('click', async e => {
+  const btn = e.currentTarget;
+  const code = document.getElementById('tokenAddress');
+  try {
+    await navigator.clipboard.writeText(code.textContent);
+    btn.textContent = 'Copied';
+  } catch {
+    getSelection().selectAllChildren(code);
+    btn.textContent = 'Selected';
+  }
+  setTimeout(() => { btn.textContent = 'Copy'; }, 2000);
+});
+
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
 init();
