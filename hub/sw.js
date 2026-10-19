@@ -2,7 +2,7 @@
 // the hub still opens when the car has a weak or no connection. A page that
 // doesn't arrive within a few seconds comes from the cache, and so do the
 // files it loads, so the shell and catalog stay from one version.
-const CACHE = 'frunk-hub-v12';
+const CACHE = 'frunk-hub-v13';
 const SHELL = ['/', '/hub.css', '/hub.js', '/catalog.json', '/icon.svg', '/brand/frunk-mark-on-dark.svg', '/fonts/unbounded-latin.woff2'];
 const SLOW = 3000;   // ms to wait for the page before using the cached copy
 
@@ -20,8 +20,9 @@ self.addEventListener('activate', e => {
   })());
 });
 
-// The icons live on the apps origin. They arrive opaque (no CORS), which the
-// cache keeps as they are.
+// The icons live on the apps origin. The page asks for them without CORS, but
+// under the hub's COEP Chrome won't read an opaque copy back from the cache,
+// so the worker asks with CORS (apps/vercel.json allows it for icons).
 const isIcon = (req, url) => req.destination === 'image' && url.pathname.endsWith('/icon.svg');
 
 self.addEventListener('fetch', e => {
@@ -35,15 +36,16 @@ async function respond(e, req) {
   const cache = await caches.open(CACHE);
   const page = req.mode === 'navigate';
   // Deep links like /app/x fall back to the cached shell
-  const cached = cache.match(req).then(hit => hit || (page ? cache.match('/') : undefined));
+  const cached = cache.match(req).then(hit => hit || (page ? cache.match('/') : undefined)).catch(() => undefined);
   if (!page && fromCache.has(e.clientId)) {
     const hit = await cached;
     if (hit) return hit;
   }
 
   let saved = Promise.resolve();
-  const network = fetch(req).then(res => {
-    if (res.ok || res.type === 'opaque') saved = cache.put(req, res.clone());
+  const icon = new URL(req.url).origin !== self.location.origin;
+  const network = (icon ? fetch(req.url, { mode: 'cors', credentials: 'omit' }).catch(() => fetch(req)) : fetch(req)).then(res => {
+    if (res.ok) saved = cache.put(req, res.clone());
     return res;
   });
   e.waitUntil(network.then(() => saved).catch(() => {}));
