@@ -3,6 +3,8 @@
 // storage or navigate the top page.
 
 const grid = document.getElementById('grid');
+const recentRow = document.getElementById('recent');
+const filterRow = document.getElementById('filters');
 const runner = document.getElementById('runner');
 let frame = document.getElementById('frame');
 const loading = document.getElementById('loading');
@@ -15,6 +17,16 @@ let pushedHistory = false; // true when the open app added a history entry
 // second for { frunk: 'closed' } before unloading it, so it can save first.
 let saveOnClose = false;
 let opened = 0;            // counts openApp calls, so a late unload can't hit a newer app
+
+const store = {
+  get(key, fallback) { try { return JSON.parse(localStorage.getItem('hub.' + key)) ?? fallback; } catch { return fallback; } },
+  set(key, value) { try { localStorage.setItem('hub.' + key, JSON.stringify(value)); } catch {} },
+};
+
+// Categories come from the apps' tags; an app can be in more than one
+const FILTERS = [['all', 'All'], ['Game', 'Games'], ['Camp Mode', 'Camp Mode'], ['Road Trip', 'Road Trip'], ['Tool', 'Tools']];
+let filter = store.get('filter', 'all');
+const RECENT = 3;          // apps in the Recent row: as many as fit across the car's screen
 
 // Local dev (tools/dev.mjs) serves apps on the next port. 127.0.0.1 is a
 // different site from localhost, which mirrors production isolation.
@@ -31,16 +43,60 @@ function el(tag, attrs = {}, ...children) {
 }
 
 function renderGrid() {
-  grid.replaceChildren(...catalog.apps.map(app => {
+  const shown = catalog.apps.filter(app => filter === 'all' || app.tags.includes(filter));
+  grid.replaceChildren(...shown.map(app => {
     const card = el('button', { class: 'card', type: 'button' },
       el('img', { src: appsOrigin + app.icon, alt: '', width: 64, height: 64 }),
       el('h2', {}, app.name),
       el('p', {}, app.tagline),
       el('div', { class: 'tags' }, ...app.tags.map(t => el('span', { class: 'tag' }, t))),
     );
-    card.addEventListener('click', () => openApp(app.id, { push: true }));
+    card.addEventListener('click', () => launch(app.id));
     return card;
   }));
+}
+
+function renderFilters() {
+  if (!FILTERS.some(([tag]) => tag === filter)) filter = 'all';
+  filterRow.replaceChildren(...FILTERS
+    .filter(([tag]) => tag === 'all' || catalog.apps.some(app => app.tags.includes(tag)))
+    .map(([tag, label]) => {
+      const chip = el('button', { class: 'chip', type: 'button', 'aria-pressed': String(tag === filter) }, label);
+      chip.addEventListener('click', () => {
+        filter = tag;
+        store.set('filter', tag);
+        for (const c of filterRow.children) c.setAttribute('aria-pressed', String(c === chip));
+        renderGrid();
+      });
+      return chip;
+    }));
+  filterRow.hidden = false;
+}
+
+// The last few apps opened, newest first, one tap away. Returning visitors
+// know what the site is, so the row takes the place of the lede.
+function renderRecent() {
+  if (!catalog) return;
+  const apps = store.get('recent', []).map(id => catalog.apps.find(a => a.id === id)).filter(Boolean).slice(0, RECENT);
+  recentRow.replaceChildren(...apps.map(app => {
+    const b = el('button', { class: 'recent-app', type: 'button' },
+      el('img', { src: appsOrigin + app.icon, alt: '', width: 28, height: 28 }), el('span', {}, app.name));
+    b.addEventListener('click', () => launch(app.id));
+    return b;
+  }));
+  recentRow.hidden = !apps.length;
+  document.getElementById('lede').hidden = apps.length > 0;
+}
+
+function remember(id) {
+  store.set('recent', [id, ...store.get('recent', []).filter(r => r !== id)].slice(0, 12));
+}
+
+// A tap on an app. Someone who used full screen last time gets it again:
+// it can only be asked for during a tap, so this is the first chance.
+function launch(id) {
+  if (store.get('fullscreen', false) && !document.fullscreenElement) document.documentElement.requestFullscreen?.().catch(() => {});
+  openApp(id, { push: true });
 }
 
 // Each app gets a fresh, empty frame, and closing one removes its frame.
@@ -68,6 +124,7 @@ function openApp(id, { push }) {
   loading.hidden = false;
   opened++;
   saveOnClose = false;
+  remember(id);
   freshFrame();
   frame.src = appsOrigin + app.path;
   runner.hidden = false;
@@ -77,6 +134,7 @@ function openApp(id, { push }) {
 function closeApp() {
   runner.hidden = true;
   document.title = 'frunk.store';
+  renderRecent();
   // unload the app so it stops using CPU and memory
   const unload = () => freshFrame();
   if (!saveOnClose) return unload();
@@ -120,8 +178,11 @@ if (document.documentElement.requestFullscreen) {
     if (document.fullscreenElement) document.exitFullscreen();
     else document.documentElement.requestFullscreen().catch(() => { fsBtn.textContent = 'Full screen blocked'; });
   });
+  // Leaving the page ends full screen without an event, so the choice is
+  // kept until it's turned off
   document.addEventListener('fullscreenchange', () => {
     fsBtn.textContent = document.fullscreenElement ? 'Exit full screen' : 'Full screen';
+    store.set('fullscreen', !!document.fullscreenElement);
   });
 }
 
@@ -139,6 +200,8 @@ async function init() {
     return;
   }
   appsOrigin = resolveAppsOrigin(catalog.appsOrigin);
+  renderRecent();
+  renderFilters();
   renderGrid();
 
   // /app/<id> deep links; ?app=<id> is the older form, still accepted.

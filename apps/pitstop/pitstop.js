@@ -1,7 +1,7 @@
 // Pit Stop: restrooms, coffee, food, shops and parks within walking distance
 // of where the car is parked, from OpenStreetMap. Shows what's open now, and
 // a QR code that opens walking directions on a phone.
-import { getPlace, pickPlace, savePlace } from '../_shared/place.js';
+import { getPlace, herePlace, pickPlace, savePlace } from '../_shared/place.js';
 import { DAYS, openState, parseHours } from './hours.js';
 
 const CACHE_KEY = 'pitstop.cache';
@@ -466,8 +466,7 @@ function locate() {
   setMsg('Finding this car\'s location…');
   navigator.geolocation.getCurrentPosition(
     pos => {
-      const { latitude: lat, longitude: lon } = pos.coords;
-      const p = { lat, lon, name: `Here (${lat.toFixed(1)}°, ${lon.toFixed(1)}°)` };
+      const p = herePlace(pos.coords.latitude, pos.coords.longitude);
       savePlace(p);
       setPlace(p);
     },

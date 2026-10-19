@@ -4,7 +4,7 @@
 // with SGP4 in a worker, and the sky dome shows what is overhead right now.
 import { json2satrec, propagate, gstime, eciToEcf, ecfToLookAngles } from './satellite.js';
 import { julianDay, localSiderealTime, toHorizon, sun } from '../_shared/astro.js';
-import { getPlace, pickPlace } from '../_shared/place.js';
+import { followCar, getPlace, pickPlace } from '../_shared/place.js';
 
 const CELESTRAK = group => `https://celestrak.org/NORAD/elements/gp.php?GROUP=${group}&FORMAT=json`;
 const GROUPS = ['stations', 'visual', 'last-30-days'];
@@ -478,7 +478,7 @@ setInterval(() => {
 
 layout();
 setRed(settings.red);
-if (place) $('placeBtn').textContent = place.name;
+if (place) { $('placeBtn').textContent = place.name; followCar(setPlace); }
 else pickPlace({ required: true }).then(setPlace);
 
 fetch('../stars/sky.json')

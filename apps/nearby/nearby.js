@@ -1,7 +1,7 @@
 // What's Around Me: Wikipedia articles about places near the car (towns,
 // landmarks, trails, historic sites), on a north-up map and a list. Tap one
 // to read the article. Text is rendered as plain text, never as HTML.
-import { getPlace, pickPlace, savePlace } from '../_shared/place.js';
+import { getPlace, herePlace, pickPlace, savePlace } from '../_shared/place.js';
 
 const API = 'https://en.wikipedia.org/w/api.php';
 const CACHE_KEY = 'nearby.cache';
@@ -442,8 +442,7 @@ function locate() {
   setMsg('Finding this car\'s location…');
   navigator.geolocation.getCurrentPosition(
     pos => {
-      const { latitude: lat, longitude: lon } = pos.coords;
-      const p = { lat, lon, name: `Here (${lat.toFixed(1)}°, ${lon.toFixed(1)}°)` };
+      const p = herePlace(pos.coords.latitude, pos.coords.longitude);
       savePlace(p);
       setPlace(p);
     },

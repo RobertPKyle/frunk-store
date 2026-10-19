@@ -2,7 +2,7 @@
 // (zenith in the center, horizon on the rim, north up, east left). Stars and
 // constellations come from sky.json; the Sun, Moon and planets are computed.
 import { julianDay, localSiderealTime, toHorizon, sun, moon, planet, PLANETS } from '../_shared/astro.js';
-import { getPlace, pickPlace } from '../_shared/place.js';
+import { followCar, getPlace, pickPlace } from '../_shared/place.js';
 
 const STORE_KEY = 'stars.settings';
 const BAR = 72; // height reserved for the bottom bar, CSS px
@@ -363,7 +363,7 @@ setInterval(() => { if (!offsetMin && !pointers.size) redraw(); }, 30_000);
 layout();
 setRed(state.red);
 if (state.lat == null) pickPlace({ required: true }).then(setPlace);
-else $('placeBtn').textContent = state.place;
+else { $('placeBtn').textContent = state.place; followCar(setPlace); }
 
 fetch('sky.json')
   .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })

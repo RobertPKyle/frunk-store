@@ -43,16 +43,32 @@ function row(name) {
   return (text, cls) => { status.textContent = text; li.className = cls || ''; };
 }
 
+// A phone on a weak signal can drop an upload. Each piece is tried up to
+// three times; the server's own refusals (expired code, too big) are final.
+async function upload(body, set, label) {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      const res = await fetch(`/api/transfer?op=put&sid=${encodeURIComponent(sid)}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body,
+      });
+      if (res.status < 500 || attempt === 3) return res;
+    } catch (e) {
+      if (attempt === 3) throw e;
+    }
+    set(`${label} (trying again)`);
+    await new Promise(resolve => setTimeout(resolve, 2000 * attempt));
+  }
+}
+
 async function send(file, set) {
   if (file.size > APP.max) return set('Too big', 'bad');
   const bytes = new Uint8Array(await file.arrayBuffer());
   if (!(await APP.check(file.name, bytes))) return set(APP.wrong, 'bad');
   const pieces = await sealPieces(key, sid, file.name, bytes);
   for (let i = 0; i < pieces.length; i++) {
-    set(pieces.length > 1 ? `Sending ${Math.round(100 * i / pieces.length)}%` : 'Sending…');
-    const res = await fetch(`/api/transfer?op=put&sid=${encodeURIComponent(sid)}`, {
-      method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: pieces[i],
-    });
+    const label = pieces.length > 1 ? `Sending ${Math.round(100 * i / pieces.length)}%` : 'Sending…';
+    set(label);
+    const res = await upload(pieces[i], set, label);
     if (res.ok) continue;
     const { error } = await res.json().catch(() => ({}));
     set('Not sent', 'bad');

@@ -51,7 +51,7 @@ async function check(name, fn) {
 const appFrame = () => page.frameLocator('#frame');
 async function openFromHub(name) {
   await page.goto(base + '/');
-  await page.getByRole('button', { name }).click();
+  await page.locator('#grid').getByRole('button', { name }).click();
   await page.waitForSelector('#loading', { state: 'hidden' });
 }
 
@@ -88,13 +88,32 @@ await check('home button closes apps opened one after another', async () => {
   // second app's home button only moved its frame back a page
   const before = await page.evaluate(() => history.length);
   for (const name of [/Brick Breaker/, /Retro Console/, /Brick Breaker/]) {
-    await page.getByRole('button', { name }).click();
+    await page.locator('#grid').getByRole('button', { name }).click();
     await page.waitForSelector('#loading', { state: 'hidden' });
     await page.click('#home');
     await page.waitForSelector('#runner', { state: 'hidden', timeout: 3000 });
   }
   const after = await page.evaluate(() => history.length);
   if (after > before + 1) throw new Error(`history grew from ${before} to ${after}`);
+});
+
+await check('hub shows recent apps and filters by category', async () => {
+  // the apps opened above, newest first, in place of the lede
+  const recent = await page.locator('#recent .recent-app').allTextContents();
+  if (recent[0] !== 'Brick Breaker' || recent[1] !== 'Retro Console') throw new Error(`recent row: ${recent.join(', ')}`);
+  if (await page.locator('#lede').isVisible()) throw new Error('lede still shown next to the recent row');
+  await page.getByRole('button', { name: 'Games', exact: true }).click();
+  const games = await page.locator('#grid .card h2').allTextContents();
+  if (!games.includes('Retro Console') || games.includes('Weather')) throw new Error(`Games shows ${games.join(', ')}`);
+  await page.reload();
+  await page.waitForSelector('#grid .card');
+  if (await page.locator('#grid .card').count() !== games.length) throw new Error('the filter wasn\'t remembered');
+  await page.getByRole('button', { name: 'All', exact: true }).click();
+  await page.locator('#recent').getByRole('button', { name: 'Retro Console' }).click();
+  await page.waitForSelector('#loading', { state: 'hidden' });
+  if (!page.frames().some(f => f.url().includes('/retro/'))) throw new Error('recent app didn\'t open');
+  await page.click('#home');
+  await page.waitForSelector('#runner', { state: 'hidden' });
 });
 
 await check('breakout runs and launches', async () => {
@@ -404,16 +423,27 @@ await check('freedoom takes WADs from a phone', async () => {
   const link = await appFrame().locator('#qr a').getAttribute('href');
   if (!link.includes('?app=doom')) throw new Error(`phone link doesn't ask for Doom games: ${link}`);
   const phone = await browser.newPage({ viewport: { width: 390, height: 800 }, isMobile: true, hasTouch: true });
+  // A weak signal on the phone: the first upload is lost on the way, and the
+  // second reaches the server but its answer is lost. The phone tries again,
+  // and the car uses the piece it gets twice only once.
+  let puts = 0;
+  await phone.route(/\/api\/transfer\?op=put/, async route => {
+    if (++puts === 1) return route.abort();
+    if (puts === 2) { await route.fetch(); return route.abort(); }
+    return route.continue();
+  });
   await phone.goto(link);
   const [pick] = await Promise.all([phone.waitForEvent('filechooser'), phone.getByRole('button', { name: 'Choose games' }).click()]);
   // A console game is turned away on the phone; both WADs are sent
   await pick.setFiles([shots + 'mini.wad', shots + 'addon.wad', new URL('../apps/retro/games/croom.nes', import.meta.url).pathname]);
   await phone.locator('#files li.bad').filter({ hasText: 'croom' }).waitFor({ timeout: 10000 });
-  await phone.locator('#files li.ok').nth(1).waitFor({ timeout: 10000 });
+  await phone.locator('#files li.ok').nth(1).waitFor({ timeout: 20000 });
   await phone.close();
   // The car keeps the whole game and explains why it can't play the add-on
   await appFrame().locator('#received li.bad').filter({ hasText: 'PWAD' }).waitFor({ timeout: 10000 });
   await appFrame().locator('#received li:not(.bad)').filter({ hasText: 'mini' }).waitFor({ timeout: 10000 });
+  const copies = await appFrame().locator('#received li').filter({ hasText: 'mini' }).count();
+  if (copies !== 1) throw new Error(`the retried piece was used ${copies} times`);
   await appFrame().getByRole('button', { name: 'Done' }).click();
   await appFrame().locator('#mine .game').filter({ hasText: 'mini.wad' }).waitFor({ timeout: 5000 });
   await appFrame().getByRole('button', { name: 'Remove mini' }).click();
@@ -571,6 +601,53 @@ await check('adventure games plays with touch and a controller and resumes from 
   await appFrame().locator('#title').filter({ hasText: /^Lure of the Temptress$/ }).waitFor({ timeout: 60000 });
   await appFrame().getByRole('button', { name: 'Games' }).click();
   await appFrame().locator('#library').waitFor({ state: 'visible', timeout: 10000 });
+});
+
+await check('a place from the car\'s location follows the car', async () => {
+  await openFromHub(/Star Map/);
+  const appsOrigin = new URL(page.frames().find(f => f.url().includes('/stars/')).url()).origin;
+  await page.frames().find(f => f.url().includes('/stars/')).evaluate(() =>
+    localStorage.setItem('frunk.place', JSON.stringify({ lat: 38.57, lon: -109.55, name: 'Here (38.6°, -109.6°)' })));
+  await page.context().grantPermissions(['geolocation'], { origin: new URL(base).origin });
+  await page.context().grantPermissions(['geolocation'], { origin: appsOrigin });
+  await page.context().setGeolocation({ latitude: 39.74, longitude: -104.99 });   // Denver, 350 km away
+  await page.click('#home');
+  await openFromHub(/Star Map/);
+  await appFrame().locator('#placeBtn').filter({ hasText: 'Here (39.7°, -105.0°)' }).waitFor({ timeout: 8000 });
+  await page.context().clearPermissions();
+});
+
+await check('hub and a cached app open offline and on a slow connection', async () => {
+  const context = page.context();
+  const before = errors.length;   // failed requests while offline are expected
+  // A slow page comes from the cache after a few seconds, not when the
+  // connection finally gives up
+  await context.route(/\/(app\/weather|weather\/)$/, async route => {
+    await new Promise(r => setTimeout(r, 15000));
+    route.continue().catch(() => {});
+  });
+  try {
+    const t0 = Date.now();
+    await page.goto(base + '/app/weather');
+    await appFrame().locator('#temp').filter({ hasText: /°/ }).waitFor({ timeout: 12000 });
+    console.log(`     slow connection: Weather showed in ${((Date.now() - t0) / 1000).toFixed(1)} s`);
+  } finally {
+    await context.unroute(/\/(app\/weather|weather\/)$/);
+  }
+  await context.setOffline(true);
+  try {
+    await page.goto(base + '/');
+    await page.waitForSelector('#grid .card');
+    await page.waitForFunction(() => [...document.querySelectorAll('#grid .card img')].every(i => i.complete));
+    const missing = await page.locator('#grid .card img').evaluateAll(imgs => imgs.filter(i => !i.naturalWidth).length);
+    if (missing) throw new Error(`${missing} app icons missing offline`);
+    await page.locator('#grid').getByRole('button', { name: /Weather/ }).click();
+    await appFrame().locator('#temp').filter({ hasText: /°/ }).waitFor({ timeout: 10000 });
+    await page.screenshot({ path: shots + 'offline.png' });
+  } finally {
+    await context.setOffline(false);
+    errors.length = before;
+  }
 });
 
 await check('no console or page errors', async () => {

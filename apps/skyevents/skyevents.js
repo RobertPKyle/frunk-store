@@ -1,7 +1,7 @@
 // Sky Events: what's coming up in the night sky over the next year (meteor
 // showers, full moons, eclipses, planets) and what's up tonight. Everything
 // except the solar eclipse table is computed here, so it works offline.
-import { getPlace, pickPlace } from '../_shared/place.js';
+import { followCar, getPlace, pickPlace } from '../_shared/place.js';
 import { findEvents, tonight, position, phaseName } from './events.js';
 
 const DAY = 86400_000;
@@ -218,6 +218,7 @@ $('placeBtn').onclick = async () => {
 setInterval(() => { if (events.length) renderTonight(); }, 15 * 60_000);
 
 (async () => {
-  if (!place) place = await pickPlace({ required: true });
+  if (place) followCar(p => { place = p; compute(); });
+  else place = await pickPlace({ required: true });
   compute();
 })();

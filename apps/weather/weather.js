@@ -3,7 +3,7 @@
 // the Moon, a stargazing rating and the aurora chance (NOAA Kp forecast).
 // Sun and Moon times are computed here with the Star Map's astronomy code.
 import { julianDay, localSiderealTime, toHorizon, sun, moon } from '../_shared/astro.js';
-import { getPlace, pickPlace } from '../_shared/place.js';
+import { followCar, getPlace, pickPlace } from '../_shared/place.js';
 import { weatherIcon, weatherName } from './icons.js';
 
 const FORECAST = 'https://api.open-meteo.com/v1/forecast';
@@ -321,13 +321,13 @@ async function load(force = false) {
 
 // ---------- controls ----------
 
-$('placeBtn').onclick = async () => {
-  const p = await pickPlace();
+function setPlace(p) {
   if (!p) return;
   place = p;
   forecast = null;
   load(true);
-};
+}
+$('placeBtn').onclick = () => pickPlace().then(setPlace);
 $('unitBtn').onclick = () => {
   units = units === 'us' ? 'metric' : 'us';
   store.set(UNITS_KEY, units);
@@ -339,5 +339,5 @@ addEventListener('online', () => load());
 // Refresh when stale, and keep "Now" and "updated" current
 setInterval(() => { if (forecast && Date.now() - forecast.fetched >= STALE) load(); else render(); }, 60_000);
 
-if (place) load();
-else pickPlace({ required: true }).then(p => { place = p; load(true); });
+if (place) { load(); followCar(setPlace); }
+else pickPlace({ required: true }).then(setPlace);

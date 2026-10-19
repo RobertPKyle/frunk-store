@@ -36,13 +36,31 @@ main { flex: 1; padding: 4px 24px 24px; max-width: 1100px; width: 100%; margin: 
 h1 { font-size: 30px; line-height: 1.15; margin: 8px 0 4px; letter-spacing: -0.02em; }
 .lede { color: var(--muted); margin: 0 0 20px; }
 
+.recent { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 12px; }
+.recent-app {
+  display: inline-flex; align-items: center; gap: 10px; min-width: 0; min-height: 48px; padding: 8px 16px 8px 10px;
+  background: var(--card); border: 1px solid var(--line); border-radius: 14px; font-size: 15px; font-weight: 600;
+}
+.recent-app img { flex: none; border-radius: 8px; }
+.recent-app span { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.recent-app:active, .chip:active { transform: scale(.97); }
+.filters { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 16px; }
+.chip {
+  min-height: 44px; padding: 8px 16px; border-radius: 999px; background: transparent;
+  border: 1px solid var(--line); color: #c3cad6; font-size: 15px; font-weight: 600;
+}
+.chip[aria-pressed="true"] { background: var(--accent); border-color: transparent; color: #111418; }
+.recent[hidden], .filters[hidden] { display: none; }
+
 .grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
 .card {
   display: flex; flex-direction: column; gap: 10px; text-align: left;
   background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
   padding: 16px; min-height: 190px; transition: background .12s, transform .12s;
 }
-.card:hover { background: var(--card-hover); }
+/* hover only where there's a mouse: on the car's touch screen it stays lit
+   on the card last tapped */
+@media (hover: hover) { .card:hover { background: var(--card-hover); } }
 .card:active { transform: scale(.98); }
 .card img { width: 64px; height: 64px; border-radius: 16px; }
 .card h2 { font-size: 19px; margin: 0; }
@@ -109,6 +127,9 @@ h1 { font-size: 30px; line-height: 1.15; margin: 8px 0 4px; letter-spacing: -0.0
   .top, main { padding-left: 16px; padding-right: 16px; }
   h1 { font-size: 24px; }
   .grid { grid-template-columns: 1fr 1fr; }
+  /* one row of chips that scrolls sideways, rather than two */
+  .filters { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin: 0 -16px 16px; padding: 0 16px; }
+  .chip { flex: none; }
 }
 @media (prefers-reduced-motion: reduce) {
   .card, .spinner { transition: none; animation-duration: 2s; }

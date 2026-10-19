@@ -21,8 +21,10 @@ const $ = id => document.getElementById(id);
 // closes.
 export function phonePanel({ app, save, onSaved, onClose = () => {}, notPlayable = () => 'not a game this plays' }) {
   // gen changes when the panel closes, so a code still being fetched is dropped.
-  // partial holds games still arriving: id -> { name, parts, got: [], item }
-  const transfer = { session: null, key: null, taken: 0, timer: 0, busy: false, gen: 0, partial: new Map() };
+  // partial holds games still arriving: id -> { name, parts, got: [], item }.
+  // done holds the ids of games already saved: a phone that retried an upload
+  // can send a piece twice.
+  const transfer = { session: null, key: null, taken: 0, timer: 0, busy: false, gen: 0, partial: new Map(), done: new Set() };
 
   async function api(op, params = {}, method = 'GET') {
     const q = new URLSearchParams({ op, ...params });
@@ -48,6 +50,7 @@ export function phonePanel({ app, save, onSaved, onClose = () => {}, notPlayable
       transfer.key = key;
       transfer.taken = 0;
       transfer.partial.clear();
+      transfer.done.clear();
       const link = `${location.origin}/send/${app === 'retro' ? '' : `?app=${app}`}#${transfer.session.sid}.${toBase64Url(raw)}`;
       // The code is also a link, so the phone page can be tried on a computer;
       // the car's browser blocks new windows, so tapping it there does nothing
@@ -108,6 +111,7 @@ export function phonePanel({ app, save, onSaved, onClose = () => {}, notPlayable
       return;
     }
     const { name, id, part, parts, bytes } = piece;
+    if (id && transfer.done.has(id)) return;
     let game = { name, parts, got: [bytes] };
     if (parts > 1) {
       game = transfer.partial.get(id) || { name, parts, got: [], item: received('') };
@@ -120,6 +124,7 @@ export function phonePanel({ app, save, onSaved, onClose = () => {}, notPlayable
       if (have < parts) return;
       transfer.partial.delete(id);
     }
+    if (id) transfer.done.add(id);
     const whole = new Uint8Array(game.got.reduce((n, b) => n + b.length, 0));
     game.got.reduce((at, b) => (whole.set(b, at), at + b.length), 0);
     const item = game.item || received('');

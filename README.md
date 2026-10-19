@@ -18,7 +18,18 @@ threaded WebAssembly. The apps origin also sends CORP `cross-origin` and a CSP
 `frame-ancestors` rule that allows only the hub to embed it.
 
 The app list lives in `hub/catalog.json`. `appsOrigin` in that file sets where
-the apps are served from.
+the apps are served from. The hub shows the last three apps opened in place of
+its lede, and chips that filter the grid by tag (Game, Camp Mode, Road Trip,
+Tool); both are kept in the hub's localStorage, along with whether full
+screen was on, so the next tap on an app turns it back on.
+
+Both origins have a network-first service worker (`hub/sw.js`, `apps/sw.js`;
+the hub's also keeps the app icons). When a page doesn't arrive within 3
+seconds, as on a weak connection, the cached copy is shown and the files that
+page loads come from the cache too, so its code stays from one version.
+Freedoom's WADs and Adventure Games' free games are left out, because those
+apps keep them in IndexedDB, and an unchanged file (same ETag) isn't written
+to the cache again.
 
 ## Sample apps
 
@@ -191,7 +202,9 @@ the apps are served from.
   Upstash Redis (Vercel Marketplace, free plan, env `KV_REST_API_URL` and
   `KV_REST_API_TOKEN`) for at most 15 minutes and deletes each file when the
   car takes it. Games over 2 MB are split into 2 MB pieces on the phone and
-  joined on the car. Limits: 2 MB per piece, 200 pieces and 80 MB per
+  joined on the car. The phone tries each piece up to three times when the
+  connection drops or the server has a problem, and the car ignores a piece
+  it has already used. Limits: 2 MB per piece, 200 pieces and 80 MB per
   session, rate limits per IP. `npm run dev` serves `/api/*` locally with an in-memory store.
 - `apps/chess`: the Lichess daily chess puzzle, playable on the board. Tap a
   piece, then a highlighted square; the opponent's reply is played
@@ -200,7 +213,11 @@ the apps are served from.
   the cburnett set (CC BY-SA 3.0).
 - `apps/_shared/place.js`: the location picker. Star Map, Weather,
   Satellites, Sky Events, What's Around Me and Pit Stop share one saved place
-  (`frunk.place` in localStorage).
+  (`frunk.place` in localStorage). A place picked as the car's location
+  follows the car: when the browser already shares the location, each app
+  checks it on start and moves the place once the car is more than 5 km
+  away. What's Around Me and Pit Stop always use the car's location when
+  they're allowed to.
 
 ## Commands
 

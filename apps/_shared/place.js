@@ -1,4 +1,5 @@
-// Shared location for apps that need one (Star Map, Weather, Satellites).
+// Shared location for apps that need one (Star Map, Weather, Satellites,
+// Sky Events, What's Around Me, Pit Stop).
 // One saved place is used by every app on this origin, so picking it once is
 // enough. The picker offers the car's location, a search for any town or park
 // (Open-Meteo geocoding), and a list of presets that works offline.
@@ -42,6 +43,35 @@ export function getPlace() {
 
 export function savePlace(place) {
   try { localStorage.setItem(KEY, JSON.stringify(place)); } catch {}
+}
+
+// A place from the car's location, named the same way by every app
+export const herePlace = (lat, lon) => ({ lat, lon, name: `Here (${lat.toFixed(1)}°, ${lon.toFixed(1)}°)` });
+
+const FOLLOW_KM = 5;
+
+function km(a, b) {
+  const rad = Math.PI / 180, dLat = (b.lat - a.lat) * rad, dLon = (b.lon - a.lon) * rad;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * rad) * Math.cos(b.lat * rad) * Math.sin(dLon / 2) ** 2;
+  return 12742 * Math.asin(Math.sqrt(h));
+}
+
+// A saved place that came from the car's location follows the car: when the
+// browser already shares the location, it is checked again and moved (and
+// onMove called) once the car is more than a few km away, so Weather doesn't
+// show yesterday's campsite. Places picked by name stay put.
+export async function followCar(onMove) {
+  const was = getPlace();
+  if (!was || !/^Here\b/.test(was.name) || !navigator.geolocation) return;
+  try { if ((await navigator.permissions.query({ name: 'geolocation' })).state !== 'granted') return; } catch { return; }
+  navigator.geolocation.getCurrentPosition(pos => {
+    const now = getPlace();
+    if (!now || now.lat !== was.lat || now.lon !== was.lon) return;   // another place was picked meanwhile
+    const p = herePlace(pos.coords.latitude, pos.coords.longitude);
+    if (km(was, p) < FOLLOW_KM) return;
+    savePlace(p);
+    onMove(p);
+  }, () => {}, { timeout: 15000, maximumAge: 600_000 });
 }
 
 const CSS = `
@@ -125,8 +155,7 @@ export function pickPlace({ required = false } = {}) {
       status.textContent = 'Finding location…';
       navigator.geolocation.getCurrentPosition(
         pos => {
-          const { latitude: lat, longitude: lon } = pos.coords;
-          finish({ lat, lon, name: `Here (${lat.toFixed(1)}°, ${lon.toFixed(1)}°)` });
+          finish(herePlace(pos.coords.latitude, pos.coords.longitude));
         },
         err => { status.textContent = `Couldn't get location (${err.message || 'denied'}). Search or pick a place below.`; },
         { timeout: 12000, maximumAge: 600_000 },
