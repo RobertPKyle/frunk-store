@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<!-- user-scalable=no matters here: a double-tap zoom in the middle of feeding
+     the fish is the fastest way to make a canvas game feel broken. -->
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#01060c">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23061420'/%3E%3Cellipse cx='17' cy='16' rx='8' ry='4' fill='%235fd6c4'/%3E%3Cpath d='M9 16 L3 11 L3 21 Z' fill='%235fd6c4'/%3E%3Ccircle cx='21' cy='15' r='1.3' fill='%23061420'/%3E%3C/svg%3E">
+<script>
+/* Five capabilities - Service Worker, Wake Lock, DeviceMotion, DeviceOrientation
+   and getUserMedia - are secure-context gated, and vanish silently over HTTP.
+   The offline cache is the one that matters: on http:// the service worker
+   never registers, so the tank will not open at a charger with no signal, and
+   nothing anywhere says so. Measured in a car, over HTTP, before this existed.
+   localhost is already a secure context, which is why local testing never
+   caught it. ES5 on purpose - this must run everywhere. */
+(function () {
+  var h = location.hostname;
+  if (location.protocol === 'http:' && h !== 'localhost' && h !== '127.0.0.1' && h !== '[::1]') {
+    location.replace('https://' + location.host + location.pathname +
+                     location.search + location.hash);
+  }
+})();
+</script>
+<title>Terrarium</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<canvas id="tank"></canvas>
+<!-- Static markup, not rendered by main.js. The point of a version number is
+     to tell you which files the browser is actually running, so it must not
+     come from the same bundle whose freshness is in question. If this line is
+     stale, index.html itself is stale; if it is current while the tank looks
+     wrong, the problem is elsewhere. Never hidden with the rest of the chrome
+     - it is most needed when nothing else on screen is telling the truth. -->
+<div id="version">v55</div>
+<!-- Plain text, not a link: the frunk.store hub frame blocks pop-ups and
+     top-level navigation, so a link here would be a dead tap. -->
+<div id="credit">by Jason Goldfeder · jasongoldfeder.com</div>
+<div id="overlay"></div>
+<script type="module" src="main.js"></script>
+</body>
+</html>

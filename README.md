@@ -198,6 +198,12 @@ the apps are served from.
   automatically and only the best move is accepted. The last puzzle is cached
   for offline use. Rules come from chess.js (BSD-2-Clause); the piece art is
   the cburnett set (CC BY-SA 3.0).
+- `apps/terrarium`: Terrarium, by Jason Goldfeder (jasongoldfeder.com). An
+  artificial-life aquarium on Canvas 2D whose fish carry genomes, breed and
+  evolve. It saves to localStorage and, when reopened, catches up on the time
+  it was away. Ported from https://github.com/jasongold/tesla-demo, where it
+  lives at `games/terrarium/`; the shared helpers it needs are copied into
+  `apps/terrarium/engine/`.
 - `apps/_shared/place.js`: the location picker. Star Map, Weather,
   Satellites, Sky Events, What's Around Me and Pit Stop share one saved place
   (`frunk.place` in localStorage).

@@ -1,0 +1,236 @@
+/* Dark-first. The car's screen is the brightest object in the cabin at night,
+   and this is a thing you are meant to be able to leave running. */
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #01060c;
+  color: #d8ecf5;
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
+}
+
+#tank {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+}
+
+#overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+
+#overlay > * { pointer-events: auto; }
+
+/* ---- HUD ---------------------------------------------------------------- */
+
+.hud {
+  position: absolute;
+  left: max(24px, env(safe-area-inset-left));
+  bottom: max(24px, env(safe-area-inset-bottom));
+  display: flex;
+  gap: 12px;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity .45s ease, transform .45s ease;
+  pointer-events: none;
+}
+
+.hud.visible { opacity: 1; transform: none; pointer-events: auto; }
+
+.hud-btn {
+  /* Fat targets: this is used with a fingertip, in a car, often in the dark. */
+  min-width: 96px;
+  height: 76px;
+  padding: 8px 16px;
+  border: 1px solid rgba(150, 220, 240, .18);
+  border-radius: 16px;
+  background: rgba(8, 26, 38, .58);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  color: #bfe4f2;
+  font-size: 15px;
+  letter-spacing: .04em;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  cursor: pointer;
+  transition: background .2s ease, transform .12s ease;
+}
+
+.hud-btn:active { background: rgba(24, 68, 90, .8); transform: scale(.96); }
+.hud-btn .glyph { font-size: 20px; line-height: 1; opacity: .85; }
+.hud-btn .label { font-size: 13px; opacity: .75; }
+
+/* ---- readout ------------------------------------------------------------ */
+
+.readout {
+  position: absolute;
+  /* 72px, not 24: the frunk.store hub floats its "‹ Apps" button over the
+     top-left corner of every app, and at 24px it covered the readout. */
+  top: max(72px, env(safe-area-inset-top));
+  left: max(26px, env(safe-area-inset-left));
+  font-size: 15px;
+  line-height: 1.5;
+  letter-spacing: .06em;
+  color: rgba(190, 226, 240, .62);
+  text-transform: lowercase;
+  opacity: 0;
+  transition: opacity .6s ease;
+  text-shadow: 0 1px 12px rgba(0, 0, 0, .7);
+}
+
+.readout.visible { opacity: 1; }
+
+/* Warm, because it only shows when something is hunting: the line appearing at
+   all is the signal, and it should read differently from the population count
+   above it rather than blending into it. */
+.readout .hunters { color: rgba(238, 156, 132, .78); }
+
+/* Deliberately quiet: it answers "which build is this" when something looks
+   wrong, and should not compete with the tank the rest of the time. */
+.readout .build {
+  font-size: 11px;
+  letter-spacing: .10em;
+  color: rgba(190, 226, 240, .34);
+}
+
+/* ---- cards -------------------------------------------------------------- */
+
+.card {
+  position: absolute;
+  border-radius: 20px;
+  border: 1px solid rgba(150, 220, 240, .16);
+  background: rgba(6, 20, 32, .82);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  padding: 22px 26px;
+  opacity: 0;
+  transform: translateY(14px) scale(.98);
+  transition: opacity .5s ease, transform .5s ease;
+  pointer-events: none;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, .5);
+}
+
+.card.visible { opacity: 1; transform: none; pointer-events: auto; }
+
+.card-title {
+  font-size: 21px;
+  font-weight: 500;
+  letter-spacing: .01em;
+  margin-bottom: 4px;
+}
+
+.card-sub {
+  font-size: 14px;
+  color: rgba(180, 214, 232, .6);
+  margin-bottom: 16px;
+}
+
+.card-foot {
+  margin-top: 14px;
+  font-size: 13px;
+  color: rgba(180, 214, 232, .5);
+}
+
+.inspect { right: max(26px, env(safe-area-inset-right)); top: max(26px, env(safe-area-inset-top)); width: 290px; }
+.away    { right: max(26px, env(safe-area-inset-right)); top: max(26px, env(safe-area-inset-top)); width: 340px; }
+.journal { right: max(26px, env(safe-area-inset-right)); bottom: max(26px, env(safe-area-inset-bottom)); width: 340px; max-height: 62vh; overflow-y: auto; }
+
+/* ---- genome bars -------------------------------------------------------- */
+
+.gene { display: flex; align-items: center; gap: 12px; margin: 9px 0; }
+.gene-label { width: 82px; font-size: 13px; color: rgba(186, 218, 234, .72); }
+.gene-track {
+  flex: 1; height: 7px; border-radius: 4px;
+  background: rgba(140, 200, 225, .13); overflow: hidden;
+}
+.gene-fill { display: block; height: 100%; border-radius: 4px; transition: width .4s ease; }
+
+/* ---- observations ------------------------------------------------------- */
+
+.obs { list-style: none; margin: 0 0 4px; padding: 0; }
+
+.obs li {
+  font-size: 15px;
+  line-height: 1.55;
+  padding: 7px 0 7px 16px;
+  position: relative;
+  color: rgba(216, 236, 245, .92);
+}
+
+.obs li::before {
+  content: "";
+  position: absolute;
+  left: 0; top: 15px;
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: rgba(110, 214, 196, .8);
+}
+
+.obs .day {
+  display: inline-block;
+  min-width: 62px;
+  color: rgba(160, 200, 220, .5);
+  font-size: 13px;
+}
+
+.tally {
+  display: flex;
+  gap: 20px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(150, 220, 240, .12);
+  font-size: 13px;
+  color: rgba(180, 214, 232, .6);
+}
+
+.tally b { color: #7fe0cc; font-weight: 600; font-size: 16px; }
+
+.empty { font-size: 14px; color: rgba(180, 214, 232, .5); line-height: 1.6; }
+
+
+/* ---- version -------------------------------------------------------------
+   Top right, always on. Deliberately legible rather than decorative: it exists
+   to be read from the driver's seat when the tank is not doing what it should,
+   and a marker you have to hunt for cannot do that job. Sits opposite the
+   readout so the two never collide. */
+.version, #version {
+  position: absolute;
+  top: max(24px, env(safe-area-inset-top));
+  right: max(26px, env(safe-area-inset-right));
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 15px;
+  letter-spacing: .10em;
+  color: rgba(190, 226, 240, .62);
+  text-shadow: 0 1px 12px rgba(0, 0, 0, .7);
+  pointer-events: none;
+  z-index: 5;
+}
+
+/* ---- credit --------------------------------------------------------------
+   Under the version stamp, quieter than it, and never in the way of a tap. */
+#credit {
+  position: absolute;
+  top: calc(max(24px, env(safe-area-inset-top)) + 24px);
+  right: max(26px, env(safe-area-inset-right));
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 12px;
+  letter-spacing: .06em;
+  color: rgba(190, 226, 240, .42);
+  text-shadow: 0 1px 12px rgba(0, 0, 0, .7);
+  pointer-events: none;
+  z-index: 5;
+}
