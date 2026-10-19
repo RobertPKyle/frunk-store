@@ -221,10 +221,11 @@ html, body {
 }
 
 /* ---- credit --------------------------------------------------------------
-   Under the version stamp, quieter than it, and never in the way of a tap. */
+   Top right, where the tesla-demo build shows its version stamp (dropped
+   here), quiet and never in the way of a tap. */
 #credit {
   position: absolute;
-  top: calc(max(24px, env(safe-area-inset-top)) + 24px);
+  top: max(24px, env(safe-area-inset-top));
   right: max(26px, env(safe-area-inset-right));
   font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
   font-size: 12px;
