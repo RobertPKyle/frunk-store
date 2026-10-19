@@ -11,3 +11,4 @@ apps/adventure/engine/scummvm.wasm
 tools/.quake-build
 apps/quake/librequake/*.pak.gz
 apps/quake/librequake/music
+apps/heretic/blasphemer/*.wad.gz

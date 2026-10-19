@@ -1,0 +1,27 @@
+Third-party components
+======================
+
+- Crispy Heretic, part of Crispy Doom 7.2, copyright 1993-1996 id Software,
+  1993-2008 Raven Software, 2005-2014 Simon Howard and the Chocolate Doom
+  and Crispy Doom authors, GNU GPL version 2 or later
+  (engine/crispy-heretic.js and engine/crispy-heretic.wasm; license text in
+  engine/COPYING.md). Built from the crispy-doom-7.2 tag of
+  https://github.com/fabiangreffrath/crispy-doom with the changes in
+  tools/doom/crispy-web.patch (a game loop driven by the browser, gamepad
+  input, autosave and quit hooks for the page). The complete source of the
+  build, with those changes applied, is in
+  engine/crispy-doom-7.2-web-src.tar.gz; it is compiled with Emscripten
+  4.0.10 by tools/build-doom.mjs in https://github.com/RobertPKyle/frunk-store.
+
+  The build includes SDL 2.32.0 and SDL_mixer 2.8.0 (zlib License), from
+  Emscripten's ports, and the Nuked OPL3 emulator that is part of
+  Crispy Doom's source (GNU LGPL version 2.1 or later).
+
+- Blasphemer 0.1.8, copyright 2021 the contributors to the Blasphemer
+  project, BSD 3-Clause License (blasphemer/blasphem-0.1.8.wad.gz, gzipped
+  and otherwise unmodified from blasphem-0.1.8.zip; license text in
+  blasphemer/COPYING.md, contributors in blasphemer/CREDITS.md). From
+  https://github.com/Blasphemer/blasphemer/releases/tag/v0.1.8
+
+Blasphemer and frunk.store are not affiliated with or endorsed by id
+Software, Raven Software, Bethesda Softworks or ZeniMax Media.

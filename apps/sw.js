@@ -9,10 +9,10 @@
 const CACHE = 'frunk-apps-v2';
 const SLOW = 3000;   // ms to wait for a page before using the cached copy
 
-// Big downloads the apps keep in IndexedDB themselves (Freedoom's WADs,
-// Adventure Games' free games, LibreQuake's paks and music). A second copy
+// Big downloads the apps keep in IndexedDB themselves (Freedoom's and
+// Blasphemer's WADs, Adventure Games' free games, LibreQuake's paks and music). A second copy
 // here would only fill storage.
-const SKIP = /^\/(doom\/freedoom\/[^/]+\.wad\.gz|adventure\/games\/[^/]+\.zip|quake\/librequake\/([^/]+\.pak\.gz|music\/[^/]+\.ogg))$/;
+const SKIP = /^\/(doom\/freedoom\/[^/]+\.wad\.gz|heretic\/blasphemer\/[^/]+\.wad\.gz|adventure\/games\/[^/]+\.zip|quake\/librequake\/([^/]+\.pak\.gz|music\/[^/]+\.ogg))$/;
 
 // Pages shown from the cache: their files come from the cache first. Lost
 // when the worker stops, which only means going back to network-first.

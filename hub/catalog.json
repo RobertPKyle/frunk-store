@@ -156,6 +156,17 @@
       ]
     },
     {
+      "id": "heretic",
+      "name": "Blasphemer",
+      "tagline": "The Heretic engine with the free dark-fantasy game Blasphemer, or Heretic you own sent from your phone. Spells, relics and flight.",
+      "path": "/heretic/",
+      "icon": "/heretic/icon.svg",
+      "tags": [
+        "Game",
+        "Controller"
+      ]
+    },
+    {
       "id": "quake",
       "name": "LibreQuake",
       "tagline": "The classic Quake engine with the free LibreQuake, or Quake you own sent from your phone, with a controller or on screen.",

@@ -503,6 +503,101 @@ await check('freedoom plays with a controller and resumes from its autosave', as
   await appFrame().locator('#library').waitFor({ state: 'visible', timeout: 10000 });
 });
 
+await check('blasphemer takes Heretic WADs from a phone and turns Doom ones away', async () => {
+  await openFromHub(/Blasphemer/);
+  // Tiny stand-ins: a Heretic IWAD (episode maps and Heretic's status bar)
+  // and a Doom one (episode maps only)
+  const wad = names => {
+    const b = Buffer.alloc(12 + 4 + 16 * names.length);
+    b.write('IWAD', 0, 'ascii');
+    b.writeInt32LE(names.length, 4);
+    b.writeInt32LE(16, 8);
+    names.forEach((n, i) => { b.writeInt32LE(12, 16 + 16 * i); b.writeInt32LE(4, 20 + 16 * i); b.write(n, 24 + 16 * i, 'ascii'); });
+    return b;
+  };
+  writeFileSync(shots + 'mini-heretic.wad', wad(['E1M1', 'BARBACK']));
+  writeFileSync(shots + 'mini-doom.wad', wad(['E1M1', 'STBAR']));
+  await appFrame().getByRole('button', { name: 'Get games from phone' }).click();
+  await appFrame().getByRole('button', { name: 'I own my games' }).click();
+  await appFrame().locator('#transferStatus').filter({ hasText: 'Waiting' }).waitFor({ timeout: 10000 });
+  const link = await appFrame().locator('#qr a').getAttribute('href');
+  if (!link.includes('?app=heretic')) throw new Error(`phone link doesn't ask for Heretic games: ${link}`);
+  const phone = await browser.newPage({ viewport: { width: 390, height: 800 }, isMobile: true, hasTouch: true });
+  await phone.goto(link);
+  if (!/Heretic/.test(await phone.locator('#lede').textContent())) throw new Error('phone page not set up for Heretic');
+  const [pick] = await Promise.all([phone.waitForEvent('filechooser'), phone.getByRole('button', { name: 'Choose games' }).click()]);
+  await pick.setFiles([shots + 'mini-heretic.wad', shots + 'mini-doom.wad']);
+  await phone.locator('#files li.ok').nth(1).waitFor({ timeout: 20000 });
+  await phone.close();
+  await appFrame().locator('#received li.bad').filter({ hasText: 'Freedoom' }).waitFor({ timeout: 10000 });
+  await appFrame().locator('#received li:not(.bad)').filter({ hasText: 'mini' }).waitFor({ timeout: 10000 });
+  await appFrame().getByRole('button', { name: 'Done' }).click();
+  await appFrame().locator('#mine .game').filter({ hasText: 'mini-heretic.wad' }).waitFor({ timeout: 5000 });
+  await appFrame().getByRole('button', { name: 'Remove mini' }).click();
+  await appFrame().getByRole('button', { name: 'Remove mini' }).click();
+  await appFrame().locator('#mine .game').waitFor({ state: 'detached', timeout: 5000 });
+});
+
+await check('blasphemer plays with a controller and resumes from its autosave', async () => {
+  await openFromHub(/Blasphemer/);
+  const frame = () => page.frames().find(f => f.url().includes('/heretic/'));
+  await appFrame().locator('#free .game').filter({ hasText: 'Blasphemer' }).click();
+  // First time: downloads 8 MB, then starts
+  await appFrame().locator('#fps').filter({ hasText: /fps/ }).waitFor({ timeout: 60000 });
+  // The car's two pads, as in the Freedoom check. Fire opens the menu and
+  // picks New Game, the episode and the skill.
+  await frame().evaluate(() => {
+    const pad = (id, mapping, index) => ({ id, index, mapping, connected: true, timestamp: 0, axes: [0, 0, 0, 0], buttons: Array.from({ length: 17 }, () => ({ pressed: false, value: 0 })) });
+    const pads = [pad('raw', '', 0), pad('Tesla Virtual Gamepad', 'standard', 1)];
+    navigator.getGamepads = () => pads;
+    window.padHold = async (bs, ms = 150) => {
+      for (const b of [].concat(bs)) for (const [p, i] of [[0, b === 1 ? 0 : -1], [1, b]]) if (i >= 0) Object.assign(pads[p].buttons[i], { pressed: true, value: 1 });
+      await new Promise(r => setTimeout(r, ms));
+      for (const p of pads) for (const x of p.buttons) Object.assign(x, { pressed: false, value: 0 });
+      await new Promise(r => setTimeout(r, 500));
+    };
+  });
+  const canvas = appFrame().locator('#canvas');
+  const title = await canvas.screenshot();
+  for (let i = 0; i < 4; i++) await frame().evaluate(() => padHold(1));
+  await appFrame().locator('#player[data-state="1"]').waitFor({ timeout: 10000 });
+  await page.waitForTimeout(1000);
+  const level = await canvas.screenshot();
+  if (level.equals(title)) throw new Error('controller input did nothing');
+  if (await appFrame().locator('.side.left').isVisible()) throw new Error('on-screen controls still showing with a controller');
+  // D-pad up walks forward
+  await frame().evaluate(() => padHold(12, 1200));
+  const walked = await canvas.screenshot();
+  if (walked.equals(level)) throw new Error('walking forward changed nothing');
+  // Select alone shows the map, once it's let go; Select with L picks an item
+  // instead, without the map
+  await frame().evaluate(() => padHold([8, 4]));
+  await page.waitForTimeout(300);
+  const combo = await canvas.screenshot();
+  await frame().evaluate(() => padHold(8));
+  await page.waitForTimeout(300);
+  const map = await canvas.screenshot();
+  if (map.equals(combo)) throw new Error('Select did not show the map');
+  await frame().evaluate(() => padHold(8));
+  const fps = parseInt(await appFrame().locator('#fps').textContent());
+  if (!(fps >= 30)) throw new Error(`running at ${fps} fps`);
+  console.log(`     ${fps} fps`);
+  await page.screenshot({ path: shots + 'heretic.png' });
+  await page.click('#home');
+  await page.waitForSelector('#runner', { state: 'hidden' });
+  await openFromHub(/Blasphemer/);
+  const saves = await frame().evaluate(() => new Promise(r => {
+    const q = indexedDB.open('/heretic');
+    q.onsuccess = () => { const g = q.result.transaction('FILE_DATA').objectStore('FILE_DATA').getAllKeys(); g.onsuccess = () => r(g.result); };
+    q.onerror = () => r([]);
+  }));
+  if (!saves.some(k => String(k).endsWith('/free-blasphemer/hticsav47.hsg'))) throw new Error(`no autosave: ${saves.join(', ')}`);
+  await appFrame().getByRole('button', { name: 'Continue Blasphemer' }).click();
+  await appFrame().locator('#player[data-state="1"]').waitFor({ timeout: 20000 });
+  await appFrame().getByRole('button', { name: 'Games' }).click();
+  await appFrame().locator('#library').waitFor({ state: 'visible', timeout: 10000 });
+});
+
 await check('adventure games takes game folders from a phone', async () => {
   await openFromHub(/Adventure Games/);
   const frame = () => page.frames().find(f => f.url().includes('/adventure/'));

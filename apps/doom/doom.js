@@ -39,8 +39,10 @@ const TITLES = {
   'freedoom1.wad': 'Freedoom: Phase 1', 'freedoom2.wad': 'Freedoom: Phase 2', 'freedm.wad': 'FreeDM',
   'chex.wad': 'Chex Quest', 'hacx.wad': 'Hacx', 'rekkrsa.wad': 'REKKR', 'rekkrsl.wad': 'REKKR: Sunken Land',
 };
-// Games for Crispy Doom's sister engines, which this app doesn't include
-const OTHER_ENGINES = ['heretic.wad', 'heretic1.wad', 'hexen.wad', 'strife0.wad', 'strife1.wad'];
+// Games for Crispy Doom's sister engines: Heretic's play in Blasphemer
+// (../heretic/), the others not yet
+const HERETIC = ['heretic.wad', 'heretic1.wad', 'blasphem.wad'];
+const OTHER_ENGINES = ['hexen.wad', 'strife0.wad', 'strife1.wad'];
 
 const AUTOSAVE = 77;
 
@@ -107,7 +109,8 @@ async function saveWad(name, file) {
   if (!found) return null;
   const wad = wadName(/\.wad$/i.test(found.name) ? found.name : `${cleanName(found.name)}.wad`);
   if (found.kind !== 'IWAD') { lastProblem = 'an add-on (PWAD); only whole games (IWADs) for now'; return null; }
-  if (OTHER_ENGINES.includes(wad)) { lastProblem = 'Heretic, Hexen and Strife aren\'t supported'; return null; }
+  if (HERETIC.includes(wad)) { lastProblem = 'a Heretic game; add it in the Blasphemer app'; return null; }
+  if (OTHER_ENGINES.includes(wad)) { lastProblem = 'Hexen and Strife aren\'t supported'; return null; }
   const title = TITLES[wad] || cleanName(found.name);
   await putWad({ id: `${wad}|${found.bytes.length}`, title, wad, size: found.bytes.length, added: Date.now(), data: found.bytes });
   return title;

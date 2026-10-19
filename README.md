@@ -27,8 +27,8 @@ Both origins have a network-first service worker (`hub/sw.js`, `apps/sw.js`;
 the hub's also keeps the app icons). When a page doesn't arrive within 3
 seconds, as on a weak connection, the cached copy is shown and the files that
 page loads come from the cache too, so its code stays from one version.
-Freedoom's WADs, Adventure Games' free games and LibreQuake's paks and
-music are left out, because those apps keep them in IndexedDB, and an unchanged file (same ETag) isn't written
+Freedoom's and Blasphemer's WADs, Adventure Games' free games and
+LibreQuake's paks and music are left out, because those apps keep them in IndexedDB, and an unchanged file (same ETag) isn't written
 to the cache again.
 
 ## Sample apps
@@ -144,6 +144,25 @@ to the cache again.
   is the biggest cost, about 100 ms per second. The engine can't restart
   within a page, so leaving a game reloads the page. Not yet tried in the
   car.
+- `apps/heretic`: Blasphemer. Crispy Heretic, the Heretic engine from the
+  same Crispy Doom source, built by the same `npm run build:doom` with the
+  same patch and the same `web_*` calls (Heretic's actions all take three
+  arguments, so it needs no call fix), into `apps/heretic/engine/`. The
+  script also fetches Blasphemer 0.1.8 (BSD-3-Clause, a free IWAD for the
+  Heretic engine with five episodes and MIDI music), checks it and gzips it
+  (20 MB to 7.7 MB, not in git). `heretic.js` is `doom.js` made over for
+  Heretic: an inventory (‹ Item › on screen; left trigger, or Select held
+  with L, R or the fire button, on a controller), fly buttons that show only
+  while the Wings of Wrath are on (`web_state` +16), Heretic's 42-line status
+  bar, `/heretic` saves with the autosave in slot 47 (last slot of the last
+  save page; the patch lets `-loadgame` take any slot). Players add Heretic
+  IWADs they own (heretic.wad, heretic1.wad), told apart from Doom ones by
+  the BARBACK lump. For both engines the patch also opens Heretic's menu
+  from the title with Fire or Use (as any key does in Doom), holds pad
+  states back while a menu's `joywait` runs, and makes buttons act once per
+  press in menus, so a tap no longer races through several menus. Measured
+  with the CPU slowed 4.5x: 60 fps and about 220 ms of script per second.
+  Not yet tried in the car.
 - `apps/quake`: LibreQuake. The Quake engine Chocolate Quake 2.1.0 (GPL-3.0,
   a faithful port of Quake 1.09's software renderer) compiled to WebAssembly
   by `npm run build:quake` (`tools/build-quake.mjs`: the
@@ -264,9 +283,10 @@ to the cache again.
   files (zipped or not) from their phone or from files. A move takes about
   15 ms with the CPU slowed 4.5x. Not yet tried in the car.
 - `apps/send` and `apps/api/transfer.js`: "Get games from phone", for Retro
-  Console, Freedoom, Adventure Games, Text Adventures and LibreQuake (the car
-  side is `apps/_shared/phone.js`; Freedoom adds `?app=doom` so the phone
-  page checks for WADs, Adventure Games `?app=adventure`, Text Adventures
+  Console, Freedoom, Blasphemer, Adventure Games, Text Adventures and
+  LibreQuake (the car side is `apps/_shared/phone.js`; Freedoom adds
+  `?app=doom` so the phone page checks for WADs, Blasphemer `?app=heretic`,
+  Adventure Games `?app=adventure`, Text Adventures
   `?app=text` for story files, LibreQuake `?app=quake` for paks and music). The car
   opens a session and shows a QR code with the session id and an AES-GCM key
   in the URL fragment, which never reaches the server. The phone page
@@ -296,7 +316,7 @@ to the cache again.
 ```sh
 npm install
 npm run build:wasm                      # after editing apps/fractal/fractal.wat
-npm run build:doom                      # Doom engine + Freedoom (needs Docker); run before deploying apps
+npm run build:doom                      # Doom and Heretic engines + Freedoom and Blasphemer (needs Docker); run before deploying apps
 npm run build:scummvm                   # ScummVM engine + free adventures (needs Docker); run before deploying apps
 npm run build:quake                     # Quake engine + LibreQuake (needs Docker); run before deploying apps
 npm run dev                             # hub on localhost:5173, apps on 127.0.0.1:5174

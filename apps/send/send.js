@@ -11,12 +11,14 @@ const [sid, keyText] = location.hash.slice(1).split('.');
 let key = null;
 
 // Which app on the car asked: Retro Console (console games), Freedoom (Doom
-// WADs), Adventure Games (folders of game files), Text Adventures (story
+// WADs), Blasphemer (Heretic WADs), Adventure Games (folders of game files), Text Adventures (story
 // files) or LibreQuake (Quake paks). Files are checked here so the wrong
 // kind isn't sent.
 const APPS = {
   doom: { name: 'Freedoom', max: MAX_WAD_FILE, check: findWad, wrong: 'Not a Doom WAD',
     lede: 'Pick Doom game files (.wad, zipped or not) on this phone, such as DOOM.WAD or DOOM2.WAD from a copy you bought. They appear on the car screen in a few seconds.' },
+  heretic: { name: 'Blasphemer', max: MAX_WAD_FILE, check: findWad, wrong: 'Not a WAD file',
+    lede: 'Pick Heretic game files (.wad, zipped or not) on this phone, such as HERETIC.WAD from a copy you bought. They appear on the car screen in a few seconds.' },
   adventure: { name: 'Adventure Games', max: MAX_ADVENTURE_FILE, check: findAdventureFile, wrong: 'Empty file',
     lede: 'Pick one game: a .zip of its folder (in the Files app, long-press the folder and choose Compress), or all of its files at once, from a copy you own. Up to 80 MB per code. Then tap Done on the car screen.' },
   text: { name: 'Text Adventures', max: MAX_STORY_FILE, check: findStory, wrong: 'Not a story file this plays',

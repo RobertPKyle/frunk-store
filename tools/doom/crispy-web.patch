@@ -1,18 +1,20 @@
 diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
-index 75fb4f79..aeb60dda 100644
+index 75fb4f7..eb81063 100644
 --- a/src/CMakeLists.txt
 +++ b/src/CMakeLists.txt
-@@ -266,7 +266,7 @@ endif()
+@@ -266,8 +266,8 @@ endif()
  if (DEFINED EMSCRIPTEN)
      set_target_properties("${PROGRAM_PREFIX}setup" PROPERTIES LINK_FLAGS "${SDL_FLAGS} -s ALLOW_MEMORY_GROWTH=1 -s ASYNCIFY=1 -s EXPORTED_FUNCTIONS=_main,ccall,cwrap,FS,ENV,PATH,ERRNO_CODES")
      set_target_properties("${PROGRAM_PREFIX}strife" PROPERTIES LINK_FLAGS "${SDL_FLAGS} -s ALLOW_MEMORY_GROWTH=1 -s ASYNCIFY=1 -s EXPORTED_FUNCTIONS=_main,ccall,cwrap,FS,ENV,PATH,ERRNO_CODES")
 -    set_target_properties("${PROGRAM_PREFIX}doom" PROPERTIES LINK_FLAGS "${SDL_FLAGS} -s ALLOW_MEMORY_GROWTH=1 -s ASYNCIFY=1 -s EXPORTED_FUNCTIONS=_main,ccall,cwrap,FS,ENV,PATH,ERRNO_CODES")
+-    set_target_properties("${PROGRAM_PREFIX}heretic" PROPERTIES LINK_FLAGS "${SDL_FLAGS} -s ALLOW_MEMORY_GROWTH=1 -s ASYNCIFY=1 -s EXPORTED_FUNCTIONS=_main,ccall,cwrap,FS,ENV,PATH,ERRNO_CODES")
 +    set_target_properties("${PROGRAM_PREFIX}doom" PROPERTIES LINK_FLAGS "${SDL_FLAGS} ${WEB_LINK_FLAGS}")
-     set_target_properties("${PROGRAM_PREFIX}heretic" PROPERTIES LINK_FLAGS "${SDL_FLAGS} -s ALLOW_MEMORY_GROWTH=1 -s ASYNCIFY=1 -s EXPORTED_FUNCTIONS=_main,ccall,cwrap,FS,ENV,PATH,ERRNO_CODES")
++    set_target_properties("${PROGRAM_PREFIX}heretic" PROPERTIES LINK_FLAGS "${SDL_FLAGS} ${WEB_LINK_FLAGS}")
      set_target_properties("${PROGRAM_PREFIX}hexen" PROPERTIES LINK_FLAGS "${SDL_FLAGS} -s ALLOW_MEMORY_GROWTH=1 -s ASYNCIFY=1 -s EXPORTED_FUNCTIONS=_main,ccall,cwrap,FS,ENV,PATH,ERRNO_CODES")
  endif()
+ 
 diff --git a/src/doom/CMakeLists.txt b/src/doom/CMakeLists.txt
-index 0c014d66..7ff1d142 100644
+index 0c014d6..7ff1d14 100644
 --- a/src/doom/CMakeLists.txt
 +++ b/src/doom/CMakeLists.txt
 @@ -16,6 +16,7 @@ add_library(doom STATIC
@@ -24,7 +26,7 @@ index 0c014d66..7ff1d142 100644
              d_pwad.c        d_pwad.h
                              doomdata.h
 diff --git a/src/doom/d_main.c b/src/doom/d_main.c
-index 49a200fa..ad558198 100644
+index 49a200f..ad55819 100644
 --- a/src/doom/d_main.c
 +++ b/src/doom/d_main.c
 @@ -79,6 +79,11 @@
@@ -77,7 +79,7 @@ index 49a200fa..ad558198 100644
  
  
 diff --git a/src/doom/g_game.c b/src/doom/g_game.c
-index f7f7f42d..1d1136d7 100644
+index f7f7f42..1d1136d 100644
 --- a/src/doom/g_game.c
 +++ b/src/doom/g_game.c
 @@ -2585,6 +2585,24 @@ G_SaveGame
@@ -107,10 +109,10 @@ index f7f7f42d..1d1136d7 100644
      char *savegame_file;
 diff --git a/src/doom/i_web.c b/src/doom/i_web.c
 new file mode 100644
-index 00000000..a29a7a3b
+index 0000000..5028376
 --- /dev/null
 +++ b/src/doom/i_web.c
-@@ -0,0 +1,204 @@
+@@ -0,0 +1,215 @@
 +//
 +// Copyright(C) 2026 frunk.store
 +//
@@ -136,6 +138,8 @@ index 00000000..a29a7a3b
 +#include "d_think.h"
 +#include "doomstat.h"
 +#include "d_main.h"
++#include "i_timer.h"
++#include "i_video.h"
 +#include "m_config.h"
 +#include "i_web.h"
 +
@@ -145,10 +149,19 @@ index 00000000..a29a7a3b
 +EMSCRIPTEN_KEEPALIVE void web_pad(int buttons, int turn, int move, int strafe,
 +                                  int dir)
 +{
++    static int held;
 +    event_t ev;
 +
++    // A menu that just acted on the pad waits a moment before the next
++    // state, as it does for SDL's joysticks. In menus, a button acts once
++    // per press rather than repeating while held, so one tap doesn't race
++    // through several menus.
++    if (joywait >= I_GetTime())
++        return;
++
 +    ev.type = ev_joystick;
-+    ev.data1 = buttons;
++    ev.data1 = menuactive ? buttons & ~held : buttons;
++    held = buttons;
 +    ev.data2 = turn;
 +    ev.data3 = move;
 +    ev.data4 = strafe;
@@ -317,7 +330,7 @@ index 00000000..a29a7a3b
 +}
 diff --git a/src/doom/i_web.h b/src/doom/i_web.h
 new file mode 100644
-index 00000000..64b1f898
+index 0000000..64b1f89
 --- /dev/null
 +++ b/src/doom/i_web.h
 @@ -0,0 +1,26 @@
@@ -348,7 +361,7 @@ index 00000000..64b1f898
 +
 +#endif
 diff --git a/src/doom/p_mobj.c b/src/doom/p_mobj.c
-index c0b4fdad..2a37b590 100644
+index c0b4fda..2a37b59 100644
 --- a/src/doom/p_mobj.c
 +++ b/src/doom/p_mobj.c
 @@ -24,6 +24,9 @@
@@ -374,7 +387,7 @@ index c0b4fdad..2a37b590 100644
  	state = st->nextstate;
  
 diff --git a/src/doom/p_pspr.c b/src/doom/p_pspr.c
-index 27d7938f..16e8df85 100644
+index 27d7938..16e8df8 100644
 --- a/src/doom/p_pspr.c
 +++ b/src/doom/p_pspr.c
 @@ -25,6 +25,9 @@
@@ -399,8 +412,292 @@ index 27d7938f..16e8df85 100644
  	    if (!psp->state)
  		break;
  	}
+diff --git a/src/heretic/CMakeLists.txt b/src/heretic/CMakeLists.txt
+index 1a87d09..2d466c0 100644
+--- a/src/heretic/CMakeLists.txt
++++ b/src/heretic/CMakeLists.txt
+@@ -16,6 +16,7 @@ add_library(heretic STATIC
+                                 dstrings.h
+             f_finale.c
+             g_game.c
++            i_web.c             i_web.h
+             info.c              info.h
+             in_lude.c
+             m_random.c          m_random.h
+diff --git a/src/heretic/d_main.c b/src/heretic/d_main.c
+index e71dae9..5c20dca 100644
+--- a/src/heretic/d_main.c
++++ b/src/heretic/d_main.c
+@@ -32,6 +32,10 @@
+ #include "i_endoom.h"
+ #include "i_input.h"
+ #include "i_joystick.h"
++#ifdef __EMSCRIPTEN__
++#include <emscripten.h>
++#include "i_web.h"
++#endif
+ #include "i_sound.h"
+ #include "i_swap.h" // [crispy] SHORT()
+ #include "i_system.h"
+@@ -383,6 +387,8 @@ boolean D_GrabMouseCallback(void)
+ //
+ //---------------------------------------------------------------------------
+ 
++void D_RunFrame(void);
++
+ void D_DoomLoop(void)
+ {
+     // [crispy] update the "singleplayer" variable
+@@ -426,8 +432,20 @@ void D_DoomLoop(void)
+ 
+     main_loop_started = true;
+ 
++#ifdef __EMSCRIPTEN__
++    // [frunk] The browser draws on its own refresh; never block it.
++    emscripten_set_main_loop(W_RunFrame, 0, 1);
++#else
+     while (1)
+     {
++        D_RunFrame();
++    }
++#endif
++}
++
++// [frunk] One pass of the main loop, also called by the browser's
++void D_RunFrame(void)
++{
+         static int oldgametic;
+         // Frame syncronous IO operations
+         I_StartFrame();
+@@ -452,7 +470,6 @@ void D_DoomLoop(void)
+             crispy->post_rendering_hook();
+             crispy->post_rendering_hook = NULL;
+         }
+-    }
+ }
+ 
+ /*
+@@ -1497,7 +1514,16 @@ void D_DoomMain(void)
+     {
+         char *filename;
+ 
++#ifdef __EMSCRIPTEN__
++        // [frunk] Any slot, on any page of the save menu
++        const int slot = atoi(myargv[p + 1]);
++
++        savepage = slot / SAVES_PER_PAGE;
++        filename = SV_Filename(slot % SAVES_PER_PAGE);
++        savepage = 0;
++#else
+ 	filename = SV_Filename(myargv[p + 1][0] - '0');
++#endif
+         G_LoadGame(filename);
+ 	free(filename);
+     }
+diff --git a/src/heretic/g_game.c b/src/heretic/g_game.c
+index d22415f..9e32aa9 100644
+--- a/src/heretic/g_game.c
++++ b/src/heretic/g_game.c
+@@ -2892,6 +2892,29 @@ void G_SaveGame(int slot, char *description)
+     sendsave = true;
+ }
+ 
++#ifdef __EMSCRIPTEN__
++// [frunk] Saves right away (not on the next tic), for when the page may
++// be about to close or stop running, without the "game saved" message.
++void G_WebSaveNow(int slot, const char *description)
++{
++    extern boolean ultimatemsg;
++    player_t *player = &players[consoleplayer];
++    const int page = savepage;
++    const char *message = player->message;
++    const int messageTics = player->messageTics;
++    const boolean ultimate = ultimatemsg;
++
++    savepage = slot / SAVES_PER_PAGE;
++    savegameslot = slot % SAVES_PER_PAGE;
++    M_StringCopy(savedescription, description, sizeof(savedescription));
++    G_DoSaveGame();
++    savepage = page;
++    player->message = message;
++    player->messageTics = messageTics;
++    ultimatemsg = ultimate;
++}
++#endif
++
+ //==========================================================================
+ //
+ // G_DoSaveGame
+diff --git a/src/heretic/i_web.c b/src/heretic/i_web.c
+new file mode 100644
+index 0000000..4597a62
+--- /dev/null
++++ b/src/heretic/i_web.c
+@@ -0,0 +1,111 @@
++//
++// Copyright(C) 2026 frunk.store
++//
++// This program is free software; you can redistribute it and/or
++// modify it under the terms of the GNU General Public License
++// as published by the Free Software Foundation; either version 2
++// of the License, or (at your option) any later version.
++//
++// This program is distributed in the hope that it will be useful,
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU General Public License for more details.
++//
++// DESCRIPTION:
++//    Calls for the browser page (frunk.store Blasphemer), the same ones
++//    as Doom's (src/doom/i_web.c). The page reads the controller and touch
++//    controls itself and hands Heretic one gamepad state per frame, so
++//    Heretic never opens SDL's joystick.
++//
++
++#include <emscripten.h>
++
++#include "d_event.h"
++#include "doomdef.h"
++#include "i_timer.h"
++#include "i_video.h"
++#include "m_config.h"
++#include "i_web.h"
++
++// buttons: bitfield of virtual buttons (joyb_* settings);
++// turn, move, strafe: -65536..65536 (FRACUNIT), right/back/right positive;
++// dir: d-pad and stick directions for menus (see i_joystick.h).
++EMSCRIPTEN_KEEPALIVE void web_pad(int buttons, int turn, int move, int strafe,
++                                  int dir)
++{
++    static int held;
++    event_t ev;
++
++    // A menu that just acted on the pad waits a moment before the next
++    // state, as it does for SDL's joysticks. In menus, a button acts once
++    // per press rather than repeating while held, so one tap doesn't race
++    // through several menus.
++    if (joywait >= I_GetTime())
++        return;
++
++    ev.type = ev_joystick;
++    ev.data1 = MenuActive ? buttons & ~held : buttons;
++    held = buttons;
++    ev.data2 = turn;
++    ev.data3 = move;
++    ev.data4 = strafe;
++    ev.data5 = 0;
++    ev.data6 = dir;
++    D_PostEvent(&ev);
++}
++
++void G_WebSaveNow(int slot, const char *description);
++
++// Saves the game in progress to slot 47 (the last one on the last page of
++// the save menu), for picking up where the player left off. Returns 1 when
++// it saved, 0 when there's nothing to save.
++EMSCRIPTEN_KEEPALIVE int web_autosave(void)
++{
++    if (gamestate != GS_LEVEL || !usergame || demoplayback || netgame
++     || gameaction != ga_nothing
++     || players[consoleplayer].playerstate == PST_DEAD)
++        return 0;
++
++    G_WebSaveNow(SAVES_PER_PAGE * (SAVEPAGE_MAX + 1) - 1, "AUTOSAVE");
++    return 1;
++}
++
++void D_RunFrame(void);
++
++static int frames;
++
++// The browser's main loop: one frame on each screen refresh.
++void W_RunFrame(void)
++{
++    D_RunFrame();
++    ++frames;
++}
++
++// Frames drawn so far, for the page's frame rate counter.
++EMSCRIPTEN_KEEPALIVE int web_frames(void)
++{
++    return frames;
++}
++
++EMSCRIPTEN_KEEPALIVE void web_save_config(void)
++{
++    M_SaveDefaults();
++}
++
++// 0 title/demos, 1 playing, 2 intermission or finale; +4 when the menu
++// is open, +8 when paused, +16 while the player can fly.
++EMSCRIPTEN_KEEPALIVE int web_state(void)
++{
++    int state;
++
++    if (gamestate == GS_LEVEL && usergame && !demoplayback)
++        state = 1;
++    else if ((gamestate == GS_INTERMISSION || gamestate == GS_FINALE)
++             && !demoplayback)
++        state = 2;
++    else
++        state = 0;
++
++    return state | (MenuActive ? 4 : 0) | (paused ? 8 : 0)
++         | (state == 1 && players[consoleplayer].powers[pw_flight] ? 16 : 0);
++}
+diff --git a/src/heretic/i_web.h b/src/heretic/i_web.h
+new file mode 100644
+index 0000000..78288de
+--- /dev/null
++++ b/src/heretic/i_web.h
+@@ -0,0 +1,21 @@
++//
++// Copyright(C) 2026 frunk.store
++//
++// This program is free software; you can redistribute it and/or
++// modify it under the terms of the GNU General Public License
++// as published by the Free Software Foundation; either version 2
++// of the License, or (at your option) any later version.
++//
++// This program is distributed in the hope that it will be useful,
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU General Public License for more details.
++//
++
++#ifndef HERETIC_I_WEB_H
++#define HERETIC_I_WEB_H
++
++// Runs one frame; the browser calls it on each screen refresh.
++void W_RunFrame(void);
++
++#endif
+diff --git a/src/heretic/mn_menu.c b/src/heretic/mn_menu.c
+index b4a2836..919db36 100644
+--- a/src/heretic/mn_menu.c
++++ b/src/heretic/mn_menu.c
+@@ -2084,6 +2084,19 @@ boolean MN_Responder(event_t * event)
+             joywait = I_GetTime() + 5;
+             return true;
+         }
++#ifdef __EMSCRIPTEN__
++        // [frunk] On the title screen and demos, Fire or Use opens the
++        // menu too, as any key does in Doom: the on-screen controls have
++        // no Start button.
++        if (!MenuActive && !askforquit
++         && (gamestate == GS_DEMOSCREEN || demoplayback)
++         && (JOY_BUTTON_PRESSED(joybfire) || JOY_BUTTON_PRESSED(joybuse)))
++        {
++            MN_ActivateMenu();
++            joywait = I_GetTime() + 5;
++            return true;
++        }
++#endif
+     }
+     else // [crispy] allow menu control with the mouse
+     {
 diff --git a/src/i_system.c b/src/i_system.c
-index 7b0e0ee9..162ca191 100644
+index 7b0e0ee..162ca19 100644
 --- a/src/i_system.c
 +++ b/src/i_system.c
 @@ -32,6 +32,10 @@
