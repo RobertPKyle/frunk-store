@@ -156,6 +156,17 @@
       ]
     },
     {
+      "id": "quake",
+      "name": "LibreQuake",
+      "tagline": "The classic Quake engine with the free LibreQuake, or Quake you own sent from your phone, with a controller or on screen.",
+      "path": "/quake/",
+      "icon": "/quake/icon.svg",
+      "tags": [
+        "Game",
+        "Controller"
+      ]
+    },
+    {
       "id": "adventure",
       "name": "Adventure Games",
       "tagline": "Classic point-and-click adventures on ScummVM: seven free games, or ones you own sent from your phone.",

@@ -692,6 +692,127 @@ await check('text adventures takes story files from a phone', async () => {
   await appFrame().locator('#mine .game').waitFor({ state: 'detached', timeout: 5000 });
 });
 
+await check('librequake plays with touch and a controller and resumes from its autosave', async () => {
+  await openFromHub(/LibreQuake/);
+  const frame = () => page.frames().find(f => f.url().includes('/quake/'));
+  await appFrame().locator('#free .game').filter({ hasText: 'LibreQuake' }).click();
+  // First time: downloads 25 MB, then starts in the start map
+  await appFrame().locator('#player[data-mode="game"]').waitFor({ timeout: 60000 });
+  // the start map's music, played by the page from LibreQuake's track02.ogg
+  await appFrame().locator('#player[data-music="2"]').waitFor({ timeout: 10000 });
+  await page.waitForTimeout(1500);
+  const canvas = appFrame().locator('#canvas');
+  const box = await canvas.boundingBox();
+  const cdp = await page.context().newCDPSession(page);
+  const touch = (type, points) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: points.map(([x, y], id) => ({ x, y, id })) });
+  // Menu opens Quake's menu, with the arrows pad; Back closes it. (Done
+  // first: after a screenshot, headless Chrome's taps and clicks miss
+  // their place in the app's frame.)
+  const tap = async name => {
+    const b = await appFrame().getByRole('button', { name, exact: true }).boundingBox();
+    await touch('touchStart', [[b.x + b.width / 2, b.y + b.height / 2]]);
+    await page.waitForTimeout(60);
+    await touch('touchEnd', []);
+  };
+  await tap('Menu');
+  await appFrame().locator('#player[data-mode="menu"]').waitFor({ timeout: 3000 });
+  await tap('Back');
+  await appFrame().locator('#player[data-mode="game"]').waitFor({ timeout: 3000 });
+  // A finger dragged across the game turns the view
+  const before = await canvas.screenshot();
+  await touch('touchStart', [[box.x + box.width * 0.6, box.y + box.height * 0.3]]);
+  for (let i = 1; i <= 10; i++) { await touch('touchMove', [[box.x + box.width * 0.6 + i * 12, box.y + box.height * 0.3]]); await page.waitForTimeout(30); }
+  await touch('touchEnd', []);
+  await page.waitForTimeout(300);
+  const turned = await canvas.screenshot();
+  if (turned.equals(before)) throw new Error('dragging didn\'t turn the view');
+  // The stick walks
+  const stick = await appFrame().locator('#stick').boundingBox();
+  const cx = stick.x + stick.width / 2, cy = stick.y + stick.height / 2;
+  await touch('touchStart', [[cx, cy]]);
+  await touch('touchMove', [[cx, cy - 60]]);
+  await page.waitForTimeout(800);
+  await touch('touchEnd', []);
+  await page.waitForTimeout(300);
+  if ((await canvas.screenshot()).equals(turned)) throw new Error('the stick didn\'t walk');
+  // Two pads like the car: the controller's raw device and the car's
+  // standard-mapping copy. Start opens the menu, the bottom button closes
+  // it, and D-pad up walks; the on-screen controls hide.
+  await frame().evaluate(() => {
+    const pad = (id, mapping, index) => ({ id, index, mapping, connected: true, timestamp: 0, axes: [0, 0, 0, 0], buttons: Array.from({ length: 17 }, () => ({ pressed: false, value: 0 })) });
+    const pads = [pad('raw', '', 0), pad('Tesla Virtual Gamepad', 'standard', 1)];
+    navigator.getGamepads = () => pads;
+    window.padHold = async (b, ms = 150) => {
+      Object.assign(pads[1].buttons[b], { pressed: true, value: 1 });
+      await new Promise(r => setTimeout(r, ms));
+      for (const p of pads) for (const x of p.buttons) Object.assign(x, { pressed: false, value: 0 });
+      await new Promise(r => setTimeout(r, 300));
+    };
+  });
+  await frame().evaluate(() => padHold(9));
+  await appFrame().locator('#player[data-mode="menu"]').waitFor({ timeout: 3000 });
+  await frame().evaluate(() => padHold(0));
+  await appFrame().locator('#player[data-mode="game"]').waitFor({ timeout: 3000 });
+  const still = await canvas.screenshot();
+  await frame().evaluate(() => padHold(12, 1000));
+  if ((await canvas.screenshot()).equals(still)) throw new Error('the D-pad didn\'t walk');
+  if (await appFrame().locator('#stick').isVisible()) throw new Error('on-screen controls still showing with a controller');
+  const fps = parseInt(await appFrame().locator('#fps').textContent());
+  if (!(fps >= 30)) throw new Error(`running at ${fps} fps`);
+  console.log(`     ${fps} fps`);
+  await page.screenshot({ path: shots + 'quake.png' });
+  // Closing the app from the hub saves the game as "auto", and Continue
+  // loads it
+  await page.click('#home');
+  await page.waitForSelector('#runner', { state: 'hidden' });
+  await openFromHub(/LibreQuake/);
+  const saves = await frame().evaluate(() => new Promise(r => {
+    const q = indexedDB.open('quake');
+    q.onsuccess = () => { const g = q.result.transaction('saves').objectStore('saves').get('librequake'); g.onsuccess = () => r((g.result?.files || []).map(f => f.name)); };
+    q.onerror = () => r([]);
+  }));
+  if (!saves.includes('auto.sav')) throw new Error(`no autosave: ${saves.join(', ')}`);
+  await appFrame().getByRole('button', { name: 'Continue LibreQuake' }).click();
+  await appFrame().locator('#player[data-mode="game"]').waitFor({ timeout: 30000 });
+  await appFrame().getByRole('button', { name: 'Games' }).click();
+  await appFrame().locator('#library').waitFor({ state: 'visible', timeout: 10000 });
+});
+
+await check('librequake takes quake files from a phone', async () => {
+  await openFromHub(/LibreQuake/);
+  // A made-up pak with the files the first pak of Quake has, and a file
+  // that isn't Quake's
+  const pak = (names) => {
+    const dir = Buffer.alloc(64 * names.length);
+    names.forEach((n, i) => { dir.write(n, i * 64); dir.writeInt32LE(12, i * 64 + 56); dir.writeInt32LE(0, i * 64 + 60); });
+    const head = Buffer.alloc(12);
+    head.write('PACK');
+    head.writeInt32LE(12, 4);
+    head.writeInt32LE(dir.length, 8);
+    return Buffer.concat([head, dir]);
+  };
+  writeFileSync(shots + 'PAK0.PAK', pak(['gfx/palette.lmp', 'progs.dat', 'maps/e1m1.bsp']));
+  writeFileSync(shots + 'notes.pak', 'not a pak');
+  await appFrame().getByRole('button', { name: 'Get files from phone' }).click();
+  await appFrame().getByRole('button', { name: 'I own my games' }).click();
+  await appFrame().locator('#transferStatus').filter({ hasText: 'Waiting' }).waitFor({ timeout: 10000 });
+  const link = await appFrame().locator('#qr a').getAttribute('href');
+  if (!link.includes('?app=quake')) throw new Error(`phone link doesn't ask for Quake files: ${link}`);
+  const phone = await browser.newPage({ viewport: { width: 390, height: 800 }, isMobile: true, hasTouch: true });
+  await phone.goto(link);
+  const [pick] = await Promise.all([phone.waitForEvent('filechooser'), phone.getByRole('button', { name: 'Choose games' }).click()]);
+  await pick.setFiles([shots + 'PAK0.PAK', shots + 'notes.pak']);
+  await phone.locator('#files li.ok').waitFor({ timeout: 20000 });
+  await phone.locator('#files li.bad').filter({ hasText: 'Not a Quake file' }).waitFor({ timeout: 5000 });
+  await phone.close();
+  await appFrame().locator('#received li:not(.bad):not(.busy)').filter({ hasText: 'episode 1' }).waitFor({ timeout: 20000 });
+  await appFrame().getByRole('button', { name: 'Done' }).click();
+  await appFrame().locator('#mine .game').filter({ hasText: 'Quake (shareware)' }).waitFor({ timeout: 5000 });
+  await appFrame().getByRole('button', { name: 'Remove Quake (shareware)' }).click();
+  await appFrame().getByRole('button', { name: 'Remove Quake (shareware)' }).click();
+  await appFrame().locator('#mine .game').waitFor({ state: 'detached', timeout: 5000 });
+});
+
 await check('a place from the car\'s location follows the car', async () => {
   await openFromHub(/Star Map/);
   const appsOrigin = new URL(page.frames().find(f => f.url().includes('/stars/')).url()).origin;

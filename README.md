@@ -27,8 +27,8 @@ Both origins have a network-first service worker (`hub/sw.js`, `apps/sw.js`;
 the hub's also keeps the app icons). When a page doesn't arrive within 3
 seconds, as on a weak connection, the cached copy is shown and the files that
 page loads come from the cache too, so its code stays from one version.
-Freedoom's WADs and Adventure Games' free games are left out, because those
-apps keep them in IndexedDB, and an unchanged file (same ETag) isn't written
+Freedoom's WADs, Adventure Games' free games and LibreQuake's paks and
+music are left out, because those apps keep them in IndexedDB, and an unchanged file (same ETag) isn't written
 to the cache again.
 
 ## Sample apps
@@ -144,6 +144,51 @@ to the cache again.
   is the biggest cost, about 100 ms per second. The engine can't restart
   within a page, so leaving a game reloads the page. Not yet tried in the
   car.
+- `apps/quake`: LibreQuake. The Quake engine Chocolate Quake 2.1.0 (GPL-3.0,
+  a faithful port of Quake 1.09's software renderer) compiled to WebAssembly
+  by `npm run build:quake` (`tools/build-quake.mjs`: the
+  chocolate-quake-2.1.0 tag plus `tools/quake/chocolate-web.patch`, whose
+  `web/build.sh` builds it with Emscripten 4.0.10 in Docker; the patched
+  source ships next to the engine in `apps/quake/engine/`). The same script
+  fetches LibreQuake 0.09-beta's lite release (art BSD-3-Clause, game code
+  GPL-2.0; checked against its SHA-256), gzips its two paks (50 MB to about
+  25 MB) and copies its music, licenses and the game code's QuakeC source
+  to `apps/quake/librequake/`; the paks and music aren't in git, so run it
+  before deploying `apps`. The page downloads the paks the first time and
+  keeps them in IndexedDB (database `quake`), writes them to the engine's
+  memory file system and starts the start map (`+map start`), or the
+  autosave (`+load auto`) for Continue. Players add Quake files they own
+  from their phone or from files: PAK0.PAK and PAK1.PAK, the mission packs'
+  PAK0.PAK (Scourge of Armagon, `-hipnotic`; Dissolution of Eternity,
+  `-rogue`) and trackNN.ogg music, told apart by what's in them
+  (`quakePath` in `apps/_shared/roms.js`). The patch makes Quake run one
+  frame per refresh; takes the page's controls through `web_pad` (walk,
+  step, turn, look, fire, jump, weapons), `web_look` (a dragged finger, in
+  degrees) and `web_key` (menus); saves from the page (`web_autosave`, as
+  "auto"); hands music to the page (it plays the .ogg files, so the
+  browser decodes them away from the game); leaves out sockets and
+  full-screen modes, and doesn't take the mouse until the page asks (on a
+  computer, clicking the game locks the pointer for mouse look). It also
+  builds with `-fwrapv -fno-strict-aliasing -mno-nontrapping-fptoint` and a
+  4 MB stack: with Emscripten's 64 KB default the edge renderer's span
+  buffer overran it and the first frames hung or crashed. And it fixes an
+  upstream bug that LibreQuake's long episode texts set off: saving copied
+  strings into a 256-byte buffer. Saves and config.cfg (first written with
+  always-run and the usual screen size) are copied from the game folder
+  to IndexedDB when they change, every 10 seconds and on leaving; the game
+  is saved as "auto" when the page is hidden, when the hub's close
+  handshake asks (synchronously, like Freedoom) and when the player leaves
+  with Games. On the screen: a stick to walk, a finger anywhere else (or on
+  FIRE) to turn and look, FIRE, JUMP and weapon buttons, and an arrows pad
+  with OK and Back in menus; a button held while the game switches to or
+  from a menu does nothing more until it's let go. Controllers as in
+  Freedoom (the car's two copies of each, D-pad-only pads turn with left
+  and right). 320x240 by default, or 640x480 with Sharp graphics. Measured
+  with the CPU slowed 4.5x: 60 fps either way, with 110 to 200 ms of script
+  a second at 320x240 and 340 to 500 at 640x480 (the start map, then a busy
+  demo; drawing spans is most of it).
+  Mission packs and players' own paks are untested beyond the file checks
+  (no copies here). Not yet tried in the car.
 - `apps/adventure`: Adventure Games. ScummVM 2026.4.0 (GPL-3.0-or-later)
   compiled to WebAssembly by `npm run build:scummvm`
   (`tools/build-scummvm.mjs`: the v2026.4.0 tag plus
@@ -219,10 +264,10 @@ to the cache again.
   files (zipped or not) from their phone or from files. A move takes about
   15 ms with the CPU slowed 4.5x. Not yet tried in the car.
 - `apps/send` and `apps/api/transfer.js`: "Get games from phone", for Retro
-  Console, Freedoom, Adventure Games and Text Adventures (the car side is
-  `apps/_shared/phone.js`; Freedoom adds `?app=doom` so the phone page
-  checks for WADs, Adventure Games `?app=adventure`, Text Adventures
-  `?app=text` for story files). The car
+  Console, Freedoom, Adventure Games, Text Adventures and LibreQuake (the car
+  side is `apps/_shared/phone.js`; Freedoom adds `?app=doom` so the phone
+  page checks for WADs, Adventure Games `?app=adventure`, Text Adventures
+  `?app=text` for story files, LibreQuake `?app=quake` for paks and music). The car
   opens a session and shows a QR code with the session id and an AES-GCM key
   in the URL fragment, which never reaches the server. The phone page
   encrypts each game before upload; the function relays ciphertext through
@@ -253,6 +298,7 @@ npm install
 npm run build:wasm                      # after editing apps/fractal/fractal.wat
 npm run build:doom                      # Doom engine + Freedoom (needs Docker); run before deploying apps
 npm run build:scummvm                   # ScummVM engine + free adventures (needs Docker); run before deploying apps
+npm run build:quake                     # Quake engine + LibreQuake (needs Docker); run before deploying apps
 npm run dev                             # hub on localhost:5173, apps on 127.0.0.1:5174
 npm run test:e2e                        # checks against the dev server
 node tools/e2e.mjs https://frunk.store  # checks against production

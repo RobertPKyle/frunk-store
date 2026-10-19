@@ -8,3 +8,6 @@ tools/.scummvm-build
 apps/adventure/games/*.zip
 apps/adventure/engine/scummvm.js
 apps/adventure/engine/scummvm.wasm
+tools/.quake-build
+apps/quake/librequake/*.pak.gz
+apps/quake/librequake/music

@@ -1,7 +1,8 @@
 // Game file checks shared by Retro Console, Freedoom, Adventure Games, Text
-// Adventures and the phone page: which console a file is for (from its
-// header, not its name), Doom WADs, size limits, pulling the game out of a
-// .zip, adventure game files and Z-machine story files.
+// Adventures, LibreQuake and the phone page: which console a file is for
+// (from its header, not its name), Doom WADs, size limits, pulling the game
+// out of a .zip, adventure game files, Z-machine story files and Quake
+// paks.
 
 const MB = 1024 * 1024;
 
@@ -182,4 +183,49 @@ export async function findStory(name, bytes) {
   }
   const story = unblorb(bytes) || bytes;
   return isStory(story) ? { name: name.replace(/^.*\//, ''), bytes: story.slice() } : null;
+}
+
+// ---------- Quake ----------
+// A Quake game is pak files in game folders: id1/pak0.pak (shareware and
+// full game), id1/pak1.pak (full game), and the mission packs'
+// hipnotic/pak0.pak and rogue/pak0.pak; plus music as trackNN.ogg. Files
+// are told apart by what's inside, since a phone may rename them.
+export const MAX_QUAKE_FILE = 80e6;   // what one phone code carries
+
+// The names of the files in a pak, or null when it isn't one
+export function pakFiles(bytes) {
+  if (bytes.length < 12 || !at(bytes, 0, [0x50, 0x41, 0x43, 0x4b])) return null;   // PACK
+  const v = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const dir = v.getInt32(4, true), len = v.getInt32(8, true);
+  if (dir < 12 || len < 0 || len % 64 || dir + len > bytes.length) return null;
+  const names = [];
+  for (let p = dir; p < dir + len; p += 64) {
+    const raw = bytes.subarray(p, p + 56);
+    const end = raw.indexOf(0);
+    names.push(String.fromCharCode(...raw.subarray(0, end < 0 ? 56 : end)).toLowerCase());
+  }
+  return names;
+}
+
+// Where a file goes in the game ('id1/pak0.pak', 'hipnotic/pak0.pak',
+// 'music/track02.ogg'...), or null when it isn't one this knows
+export function quakePath(name, bytes) {
+  const file = name.replace(/^.*\//, '').toLowerCase();
+  const track = /track(\d\d)\.ogg$/.exec(file);
+  if (track && at(bytes, 0, [0x4f, 0x67, 0x67, 0x53])) return `music/track${track[1]}.ogg`;   // OggS
+  const names = pakFiles(bytes);
+  if (!names) return null;
+  const has = n => names.includes(n);
+  if (has('maps/hip1m1.bsp')) return 'hipnotic/pak0.pak';
+  if (has('maps/r1m1.bsp')) return 'rogue/pak0.pak';
+  if (has('gfx/palette.lmp') && has('progs.dat')) return 'id1/pak0.pak';
+  if (has('maps/e2m1.bsp') || file === 'pak1.pak') return 'id1/pak1.pak';
+  return null;
+}
+
+// Checks a file the player picked (zips are checked on the car):
+// { name } when it may be part of a Quake game, or null
+export async function findQuakeFile(name, bytes) {
+  if (isZip(bytes)) return { name };
+  return quakePath(name, bytes) ? { name } : null;
 }

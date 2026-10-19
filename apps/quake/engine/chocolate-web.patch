@@ -1,0 +1,698 @@
+diff --git a/src/input/include/in_web.h b/src/input/include/in_web.h
+new file mode 100644
+index 0000000..0bdb6fe
+--- /dev/null
++++ b/src/input/include/in_web.h
+@@ -0,0 +1,25 @@
++/*
++ * Copyright (C) 2026 frunk.store
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
++ *
++ * See the GNU General Public License for more details.
++ */
++// in_web.h -- calls for the browser page (frunk.store Quake)
++
++#ifndef CHOCOLATE_QUAKE_IN_WEB_H
++#define CHOCOLATE_QUAKE_IN_WEB_H
++
++#include "client.h"
++
++void IN_WebMove(usercmd_t* cmd);
++void IN_WebFrame(void);
++
++#endif
+diff --git a/src/input/src/in_main.c b/src/input/src/in_main.c
+index 2b2a119..5ec8341 100644
+--- a/src/input/src/in_main.c
++++ b/src/input/src/in_main.c
+@@ -23,6 +23,9 @@
+ #include "input.h"
+ #include "in_mouse.h"
+ #include "in_gamepad.h"
++#ifdef __EMSCRIPTEN__
++#include "in_web.h"
++#endif
+ 
+ 
+ void IN_Init(void) {
+@@ -37,4 +40,7 @@ void IN_Shutdown(void) {
+ void IN_Move(usercmd_t* cmd) {
+     IN_MouseMove(cmd);
+     IN_JoyMove(cmd);
++#ifdef __EMSCRIPTEN__
++    IN_WebMove(cmd);
++#endif
+ }
+diff --git a/src/input/src/in_mouse.c b/src/input/src/in_mouse.c
+index d104b22..69dc738 100644
+--- a/src/input/src/in_mouse.c
++++ b/src/input/src/in_mouse.c
+@@ -196,7 +196,13 @@ INITIALIZATION
+ void IN_InitMouse(void) {
+     // Use system mouse acceleration.
+     SDL_SetHint(SDL_HINT_MOUSE_RELATIVE_SYSTEM_SCALE, "1");
++#ifdef __EMSCRIPTEN__
++    // [frunk] The page takes the mouse when the game is clicked (and sets
++    // _windowed_mouse); on a touch screen, never.
++    mouse_active = false;
++#else
+     IN_HideMouse();
++#endif
+ }
+ 
+ //==============================================================================
+diff --git a/src/input/src/in_web.c b/src/input/src/in_web.c
+new file mode 100644
+index 0000000..f225b27
+--- /dev/null
++++ b/src/input/src/in_web.c
+@@ -0,0 +1,181 @@
++/*
++ * Copyright (C) 2026 frunk.store
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
++ *
++ * See the GNU General Public License for more details.
++ */
++// in_web.c -- calls for the browser page (frunk.store Quake). The page reads
++// controllers and its touch controls itself and hands Quake one state per
++// frame, so Quake never opens SDL's game controllers (the car shows each
++// controller twice).
++
++#ifdef __EMSCRIPTEN__
++
++#include <emscripten.h>
++#include "in_web.h"
++#include "client.h"
++#include "cmd.h"
++#include "host.h"
++#include "console.h"
++#include "keys.h"
++#include "server.h"
++#include "sys.h"
++
++// Key numbers for the page's buttons, above any real key, so KeyDown and
++// KeyUp can tell them apart from keys bound to the same action.
++#define WEB_KEY 1000
++
++enum {
++    WEB_ATTACK = 1,
++    WEB_JUMP = 2,
++    WEB_NEXT_WEAPON = 4,
++    WEB_PREV_WEAPON = 8,
++    WEB_SPEED = 16,
++};
++
++static i32 held;
++static float move_forward, move_side, turn, look;
++static float look_yaw, look_pitch;
++static i32 frames;
++
++static void IN_WebButton(const char* action, i32 bit, i32 now) {
++    char cmd[64];
++    if ((now & bit) == (held & bit)) {
++        return;
++    }
++    snprintf(cmd, sizeof(cmd), "%c%s %d\n", (now & bit) ? '+' : '-', action,
++             WEB_KEY + bit);
++    Cmd_ExecuteString(cmd, src_command);
++}
++
++// buttons: WEB_* bits; forward, side: -65536..65536, forward and right
++// positive; yaw, pitch: stick turning, -65536..65536, right and down
++// positive.
++EMSCRIPTEN_KEEPALIVE void web_pad(i32 buttons, i32 forward, i32 side, i32 yaw,
++                                  i32 pitch) {
++    if (key_dest != key_game) {
++        buttons = 0;
++        forward = side = yaw = pitch = 0;
++    }
++    IN_WebButton("attack", WEB_ATTACK, buttons);
++    IN_WebButton("jump", WEB_JUMP, buttons);
++    IN_WebButton("speed", WEB_SPEED, buttons);
++    if ((buttons & WEB_NEXT_WEAPON) && !(held & WEB_NEXT_WEAPON)) {
++        Cbuf_AddText("impulse 10\n");
++    }
++    if ((buttons & WEB_PREV_WEAPON) && !(held & WEB_PREV_WEAPON)) {
++        Cbuf_AddText("impulse 12\n");
++    }
++    held = buttons;
++    move_forward = forward / 65536.0f;
++    move_side = side / 65536.0f;
++    turn = yaw / 65536.0f;
++    look = pitch / 65536.0f;
++}
++
++// Turning from a finger dragged across the screen, in degrees, added to
++// the next frame's view.
++EMSCRIPTEN_KEEPALIVE void web_look(i32 yaw_millideg, i32 pitch_millideg) {
++    look_yaw += yaw_millideg / 1000.0f;
++    look_pitch += pitch_millideg / 1000.0f;
++}
++
++// A key press or release, for menus and the console (Quake's K_* numbers).
++EMSCRIPTEN_KEEPALIVE void web_key(i32 key, i32 down) {
++    Key_Event(key, down != 0);
++}
++
++// A console command from the page (a setting it changed), run on the next
++// frame.
++EMSCRIPTEN_KEEPALIVE void web_cmd(const char* text) {
++    Cbuf_AddText((char*) text);
++    Cbuf_AddText("\n");
++}
++
++void IN_WebMove(usercmd_t* cmd) {
++    if (cl.paused || key_dest != key_game) {
++        look_yaw = look_pitch = 0;
++        return;
++    }
++    float speed = cl_forwardspeed.value;
++    float side = cl_sidespeed.value;
++    if (in_speed.state & 1) {
++        speed *= cl_movespeedkey.value;
++        side *= cl_movespeedkey.value;
++    }
++    cmd->forwardmove += speed * move_forward;
++    cmd->sidemove += side * move_side;
++
++    const float time = (float) host_frametime;
++    cl.viewangles[YAW] -= turn * 200.0f * time + look_yaw;
++    cl.viewangles[PITCH] += look * 130.0f * time + look_pitch;
++    if (cl.viewangles[PITCH] > 80) {
++        cl.viewangles[PITCH] = 80;
++    }
++    if (cl.viewangles[PITCH] < -70) {
++        cl.viewangles[PITCH] = -70;
++    }
++    if (turn != 0 || look != 0 || look_yaw != 0 || look_pitch != 0) {
++        V_StopPitchDrift();
++    }
++    look_yaw = look_pitch = 0;
++}
++
++// Saves the game in progress as "auto" right away, for picking up where
++// the player left off. Returns 1 when it saved, 0 when there's nothing to
++// save (no game, a demo, the intermission, or the player is dead).
++EMSCRIPTEN_KEEPALIVE i32 web_autosave(void) {
++    if (!sv.active || cls.demoplayback || cl.intermission
++        || svs.maxclients != 1 || cl.stats[STAT_HEALTH] <= 0) {
++        return 0;
++    }
++    Cmd_ExecuteString("save auto", src_command);
++    Con_ClearNotify(); // the page saves quietly
++    return 1;
++}
++
++void Host_WriteConfiguration(void);
++
++// Writes config.cfg with the player's settings.
++EMSCRIPTEN_KEEPALIVE void web_save_config(void) {
++    Host_WriteConfiguration();
++}
++
++// Where input goes: 0 the game, 1 the console, 2 a chat message, 3 a
++// menu; +4 while a level is being played (not a demo), +8 in the
++// intermission or finale, +16 when the player is dead, +32 when paused.
++EMSCRIPTEN_KEEPALIVE i32 web_state(void) {
++    i32 state = key_dest;
++    if (sv.active && !cls.demoplayback && cls.state == ca_connected) {
++        state |= 4;
++    }
++    if (cl.intermission) {
++        state |= 8;
++    }
++    if (cls.state == ca_connected && cl.stats[STAT_HEALTH] <= 0) {
++        state |= 16;
++    }
++    if (cl.paused) {
++        state |= 32;
++    }
++    return state;
++}
++
++void IN_WebFrame(void) {
++    ++frames;
++}
++
++// Frames drawn so far, for the page's frame rate counter.
++EMSCRIPTEN_KEEPALIVE i32 web_frames(void) {
++    return frames;
++}
++
++#endif
+diff --git a/src/main.c b/src/main.c
+index a839f50..2864b92 100644
+--- a/src/main.c
++++ b/src/main.c
+@@ -22,6 +22,20 @@
+ #include "host.h"
+ #include "sys.h"
+ #include <SDL_main.h>
++#ifdef __EMSCRIPTEN__
++#include <emscripten.h>
++#include "in_web.h"
++
++static double old_time;
++
++// [frunk] The browser draws on its own refresh; one frame each time.
++static void Web_Frame(void) {
++    double new_time = Sys_FloatTime();
++    Host_Frame((float) (new_time - old_time));
++    old_time = new_time;
++    IN_WebFrame();
++}
++#endif
+ 
+ 
+ int main(int argc, char* argv[]) {
+@@ -29,6 +43,10 @@ int main(int argc, char* argv[]) {
+     quakeparms_t* parms = Sys_Init(argc, argv);
+     Host_Init(parms);
+ 
++#ifdef __EMSCRIPTEN__
++    old_time = Sys_FloatTime();
++    emscripten_set_main_loop(Web_Frame, 0, 1);
++#endif
+     double old_time = Sys_FloatTime();
+     while (true) {
+         double new_time = Sys_FloatTime();
+diff --git a/src/net/src/net_drivers.c b/src/net/src/net_drivers.c
+index f94482f..e3c6e50 100644
+--- a/src/net/src/net_drivers.c
++++ b/src/net/src/net_drivers.c
+@@ -41,6 +41,7 @@ net_driver_t net_drivers[MAX_NET_DRIVERS] = {
+         Loop_Close,
+         Loop_Shutdown
+     },
++#ifndef __EMSCRIPTEN__
+     {
+         "Datagram",
+         false,
+@@ -57,5 +58,11 @@ net_driver_t net_drivers[MAX_NET_DRIVERS] = {
+         Datagram_Close,
+         Datagram_Shutdown
+     },
++#endif
+ };
++#ifdef __EMSCRIPTEN__
++// [frunk] Single player only: there are no sockets in a browser.
++i32 net_numdrivers = 1;
++#else
+ i32 net_numdrivers = 2;
++#endif
+diff --git a/src/progs/src/pr_edict.c b/src/progs/src/pr_edict.c
+index a8c968b..5fc67c7 100644
+--- a/src/progs/src/pr_edict.c
++++ b/src/progs/src/pr_edict.c
+@@ -282,7 +282,10 @@ Returns a string describing *data in a type specific manner
+ =============
+ */
+ char* PR_ValueString(etype_t type, eval_t* val) {
+-    static char line[256];
++    // [frunk] Long enough for any string a save can load back (com_token
++    // is 1024), and never past the end: LibreQuake's episode texts are
++    // longer than 256 characters, and saving them overran this buffer.
++    static char line[1024];
+     ddef_t* def;
+     dfunction_t* f;
+ 
+@@ -290,7 +293,7 @@ char* PR_ValueString(etype_t type, eval_t* val) {
+ 
+     switch (type) {
+         case ev_string:
+-            sprintf(line, "%s", PR_GetString(val->string));
++            snprintf(line, sizeof(line), "%s", PR_GetString(val->string));
+             break;
+         case ev_entity:
+             sprintf(line, "entity %i",
+@@ -334,7 +337,10 @@ Easier to parse than PR_ValueString
+ =============
+ */
+ char* PR_UglyValueString(etype_t type, eval_t* val) {
+-    static char line[256];
++    // [frunk] Long enough for any string a save can load back (com_token
++    // is 1024), and never past the end: LibreQuake's episode texts are
++    // longer than 256 characters, and saving them overran this buffer.
++    static char line[1024];
+     ddef_t* def;
+     dfunction_t* f;
+ 
+@@ -342,7 +348,7 @@ char* PR_UglyValueString(etype_t type, eval_t* val) {
+ 
+     switch (type) {
+         case ev_string:
+-            sprintf(line, "%s", PR_GetString(val->string));
++            snprintf(line, sizeof(line), "%s", PR_GetString(val->string));
+             break;
+         case ev_entity:
+             sprintf(line, "%i", NUM_FOR_EDICT(PROG_TO_EDICT(val->edict)));
+diff --git a/src/sound/src/bgmusic_web.c b/src/sound/src/bgmusic_web.c
+new file mode 100644
+index 0000000..ebb2b75
+--- /dev/null
++++ b/src/sound/src/bgmusic_web.c
+@@ -0,0 +1,145 @@
++/*
++ * Copyright (C) 2026 frunk.store
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
++ *
++ * See the GNU General Public License for more details.
++ */
++// bgmusic_web.c -- background music in a browser (frunk.store Quake), in
++// place of bgmusic.c and the codecs. The page plays music/trackNN.ogg
++// itself, so the browser decodes it away from the game; Quake only says
++// which track, and when to stop, pause or change the volume.
++
++#include <emscripten.h>
++#include "bgmusic.h"
++#include "client.h"
++#include "cmd.h"
++#include "console.h"
++#include "sound.h"
++
++static qboolean enabled = true;
++static qboolean playing = false;
++static qboolean paused = false;
++static qboolean looping = false;
++static byte play_track;
++static float volume = -1;
++static byte remap[100];
++
++void BGMusic_Play(byte track, qboolean loop) {
++    track = remap[track];
++    if (!enabled || track < 1) {
++        return;
++    }
++    if (playing && play_track == track) {
++        return;
++    }
++    play_track = track;
++    looping = loop;
++    playing = true;
++    paused = false;
++    EM_ASM({ Module.onMusic && Module.onMusic($0, $1); }, track, loop);
++}
++
++void BGMusic_Stop(void) {
++    if (!playing) {
++        return;
++    }
++    playing = false;
++    paused = false;
++    EM_ASM({ Module.onMusic && Module.onMusic(0, 0); });
++}
++
++void BGMusic_Pause(void) {
++    if (!playing || paused) {
++        return;
++    }
++    paused = true;
++    EM_ASM({ Module.onMusicPause && Module.onMusicPause(1); });
++}
++
++void BGMusic_Resume(void) {
++    if (!playing || !paused) {
++        return;
++    }
++    paused = false;
++    EM_ASM({ Module.onMusicPause && Module.onMusicPause(0); });
++}
++
++static void CD_f(void) {
++    if (Cmd_Argc() < 2) {
++        return;
++    }
++    const char* command = Cmd_Argv(1);
++    if (Q_strcasecmp(command, "on") == 0) {
++        enabled = true;
++    } else if (Q_strcasecmp(command, "off") == 0) {
++        BGMusic_Stop();
++        enabled = false;
++    } else if (Q_strcasecmp(command, "reset") == 0) {
++        enabled = true;
++        BGMusic_Stop();
++        for (i32 n = 0; n < 100; n++) {
++            remap[n] = (byte) n;
++        }
++    } else if (Q_strcasecmp(command, "remap") == 0) {
++        for (i32 n = 1; n <= Cmd_Argc() - 2 && n < 100; n++) {
++            remap[n] = (byte) Q_atoi(Cmd_Argv(n + 1));
++        }
++    } else if (Q_strcasecmp(command, "play") == 0) {
++        BGMusic_Play((byte) Q_atoi(Cmd_Argv(2)), false);
++    } else if (Q_strcasecmp(command, "loop") == 0) {
++        BGMusic_Play((byte) Q_atoi(Cmd_Argv(2)), true);
++    } else if (Q_strcasecmp(command, "stop") == 0) {
++        BGMusic_Stop();
++    } else if (Q_strcasecmp(command, "pause") == 0) {
++        BGMusic_Pause();
++    } else if (Q_strcasecmp(command, "resume") == 0) {
++        BGMusic_Resume();
++    } else if (Q_strcasecmp(command, "info") == 0) {
++        if (playing) {
++            Con_Printf("%s track %u\n", looping ? "Looping" : "Playing",
++                       play_track);
++        }
++        Con_Printf("Volume is %f\n", volume);
++    }
++}
++
++i32 BGMusic_Init(void) {
++    if (COM_CheckParm("-nocdaudio")) {
++        enabled = false;
++        return -1;
++    }
++    for (i32 n = 0; n < 100; n++) {
++        remap[n] = (byte) n;
++    }
++    Cmd_AddCommand("cd", CD_f);
++    return 0;
++}
++
++void BGMusic_Shutdown(void) {
++    BGMusic_Stop();
++}
++
++void BGMusic_Update(void) {
++    if (bgmvolume.value != volume) {
++        if (bgmvolume.value < 0 || bgmvolume.value > 1) {
++            Cvar_SetValue("bgmvolume", bgmvolume.value < 0 ? 0 : 1);
++        }
++        volume = bgmvolume.value;
++        EM_ASM({ Module.onMusicVolume && Module.onMusicVolume($0); }, volume);
++    }
++}
++
++// snd_dma.c starts and stops the codecs, which aren't needed here.
++void S_CodecInit(void) {
++}
++
++void S_CodecShutdown(void) {
++}
+diff --git a/src/sound/src/snd_sdl.c b/src/sound/src/snd_sdl.c
+index 3ad0d5f..532c157 100644
+--- a/src/sound/src/snd_sdl.c
++++ b/src/sound/src/snd_sdl.c
+@@ -132,6 +132,12 @@ static void SNDDMA_SetupDevice(SDL_AudioSpec* device) {
+     device->channels = 2; // desired_channels
+     device->callback = paint_audio;
+     device->userdata = NULL;
++#ifdef __EMSCRIPTEN__
++    // [frunk] Bigger slices, mixed on the page's main thread: short ones
++    // crackled in the car.
++    device->samples = device->freq <= 22050 ? 1024 : 2048;
++    return;
++#endif
+     if (device->freq <= 11025) {
+         device->samples = 256;
+     } else if (device->freq <= 22050) {
+diff --git a/src/sys/src/sys.c b/src/sys/src/sys.c
+index 62152a3..21928e7 100644
+--- a/src/sys/src/sys.c
++++ b/src/sys/src/sys.c
+@@ -39,6 +39,9 @@
+ #ifdef HAVE_SIGNAL_H
+ #include <signal.h>
+ #endif
++#ifdef __EMSCRIPTEN__
++#include <emscripten.h>
++#endif
+ 
+ 
+ qboolean isDedicated;
+@@ -161,6 +164,17 @@ void Sys_Error(char* error, ...) {
+     va_end(argptr);
+     printf("\n");
+ 
++#ifdef __EMSCRIPTEN__
++    // [frunk] The page says what happened and goes back to its list.
++    {
++        char message[1024];
++        va_start(argptr, error);
++        vsnprintf(message, sizeof(message), error, argptr);
++        va_end(argptr);
++        EM_ASM({ Module.onError && Module.onError(UTF8ToString($0)); }, message);
++        emscripten_force_exit(1);
++    }
++#endif
+     Host_Shutdown();
+ 
+     exit(1);
+@@ -176,6 +190,12 @@ void Sys_Printf(char* fmt, ...) {
+ 
+ void Sys_Quit(void) {
+     Host_Shutdown();
++#ifdef __EMSCRIPTEN__
++    // [frunk] Quit from the menu: settings are written, and the page goes
++    // back to its list.
++    EM_ASM({ Module.onQuit && Module.onQuit(); });
++    emscripten_force_exit(0);
++#endif
+     ES_DisplayScreen();
+     exit(0);
+ }
+@@ -297,7 +317,12 @@ static void Sys_SigInit(void) {
+ //=============================================================================
+ 
+ 
++#ifdef __EMSCRIPTEN__
++// [frunk] Plenty for the free and the original games, on a car's computer.
++#define DEFAULT_MEMORY (64 * 1024 * 1024)
++#else
+ #define DEFAULT_MEMORY (256 * 1024 * 1024)
++#endif
+ 
+ static char* Sys_GetDefaultBaseDir(void) {
+ #ifdef _WIN32
+diff --git a/src/video/src/vid_modes.c b/src/video/src/vid_modes.c
+index c1b6050..a62c5ba 100644
+--- a/src/video/src/vid_modes.c
++++ b/src/video/src/vid_modes.c
+@@ -108,7 +108,15 @@ static void VID_SetInitialMode(void) {
+     } else {
+         init_mode = default_mode;
+     }
++#ifdef __EMSCRIPTEN__
++    // [frunk] Full screen modes become mode 0, which is also where
++    // current_mode starts: set it up anyway.
++    force_set_mode = true;
++#endif
+     VID_SetMode(init_mode);
++#ifdef __EMSCRIPTEN__
++    force_set_mode = false;
++#endif
+ }
+ 
+ static void VID_RegisterCommands(void) {
+@@ -203,6 +211,13 @@ void VID_SetMode(i32 mode_num) {
+     if (!VALID_MODE(mode_num)) {
+         return;
+     }
++#ifdef __EMSCRIPTEN__
++    // [frunk] A page can't switch the screen's mode: full screen modes
++    // become the classic 320x240 window, which the page scales up.
++    if (!IS_WINDOWED(mode_num)) {
++        mode_num = 0;
++    }
++#endif
+     if (!force_set_mode && mode_num == current_mode) {
+         return;
+     }
+diff --git a/src/video/src/vid_window.c b/src/video/src/vid_window.c
+index f1aadd1..fc87be0 100644
+--- a/src/video/src/vid_window.c
++++ b/src/video/src/vid_window.c
+@@ -69,7 +69,14 @@ static void VID_CreateWindow(void) {
+     int y = SDL_WINDOWPOS_CENTERED;
+     int w = 0;
+     int h = 0;
++#ifdef __EMSCRIPTEN__
++    // [frunk] The canvas is the game's own pixels; the page scales it.
++    w = 320;
++    h = 240;
++    u32 flags = 0;
++#else
+     u32 flags = SDL_WINDOW_ALLOW_HIGHDPI | SDL_WINDOW_FULLSCREEN_DESKTOP;
++#endif
+     window = SDL_CreateWindow(PACKAGE_STRING, x, y, w, h, flags);
+     if (window == NULL) {
+         const char* error = SDL_GetError();
+@@ -239,7 +246,12 @@ void VID_HandlePause(qboolean pause) {
+     }
+     if (pause) {
+         VID_ReleaseMouse();
++#ifdef __EMSCRIPTEN__
++    } else if (VID_WindowedMouse()) {
++        // [frunk] Only when the page has taken the mouse
++#else
+     } else {
++#endif
+         VID_GrabMouse();
+     }
+ }
+diff --git a/web/build.sh b/web/build.sh
+new file mode 100755
+index 0000000..9fc9bb3
+--- /dev/null
++++ b/web/build.sh
+@@ -0,0 +1,36 @@
++#!/bin/sh
++# [frunk] Builds Chocolate Quake for the browser with Emscripten (4.0.10),
++# from the top of the source tree: web/build.sh [extra link flags]
++# Output: build-web/chocolate-quake.js and .wasm, for frunk.store's Quake
++# page (apps/quake in github.com/RobertPKyle/frunk-store).
++#
++# Instead of CMake: the codec-based music player (bgmusic.c and the
++# snd_* codecs) is left out for bgmusic_web.c, where the page plays the
++# music files itself. -fwrapv and -fno-strict-aliasing because the 1990s
++# renderer relies on both; -mno-nontrapping-fptoint so out-of-range float
++# to int conversions give what an x86 gives.
++set -e
++cat > config.h <<'H'
++#define PACKAGE_NAME "Chocolate Quake"
++#define PACKAGE_TARNAME "chocolate-quake"
++#define PACKAGE_VERSION "2.1.0"
++#define PACKAGE_STRING "Chocolate Quake 2.1.0"
++H
++SRCS=$(find src -name '*.c' | grep -v -E 'sound/src/(bgmusic|snd_codec|snd_flac|snd_mp3|snd_mp3tag|snd_vorbis|snd_wave)\.c$' | sort)
++INC="-I. -Isrc $(for d in src/*/include; do printf -- '-I%s ' "$d"; done)"
++CFLAGS="-O3 -std=gnu99 -fwrapv -fno-strict-aliasing -mno-nontrapping-fptoint -DHAVE_STRCPY -DHAVE_STRNCPY -DHAVE_STRCAT -sUSE_SDL=2 -sUSE_SDL_NET=2 -Wno-everything"
++mkdir -p build-web/obj
++OBJS=""
++for f in $SRCS; do
++  OBJS="$OBJS build-web/obj/$(echo "$f" | tr / _ | sed 's/\.c$/.o/')"
++done
++export CFLAGS INC
++echo "$SRCS" | xargs -P 8 -I{} sh -c 'f={}; emcc $CFLAGS $INC -c "$f" -o "build-web/obj/$(echo "$f" | tr / _ | sed "s/\.c$/.o/")"'
++emcc -O3 $OBJS -o build-web/chocolate-quake.js -sUSE_SDL=2 -sUSE_SDL_NET=2 \
++  -sSTACK_SIZE=4194304 -sALLOW_MEMORY_GROWTH -sINITIAL_MEMORY=134217728 \
++  -sMODULARIZE -sEXPORT_ES6 -sEXPORT_NAME=createQuake -sENVIRONMENT=web \
++  -sINVOKE_RUN=0 -sEXIT_RUNTIME=0 \
++  -sEXPORTED_RUNTIME_METHODS=FS,callMain,UTF8ToString,stringToNewUTF8,ENV \
++  -sEXPORTED_FUNCTIONS=_main,_web_pad,_web_look,_web_key,_web_state,_web_frames,_web_autosave,_web_save_config,_web_cmd,_malloc,_free \
++  "$@"
++rm -f config.h

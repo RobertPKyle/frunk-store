@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>LibreQuake</title>
+<style>
+  :root { --bg: #0c0a08; --panel: #16130f; --card: #201b15; --line: rgba(230, 190, 140, .14); --text: #f1ebe3; --muted: #a39686;
+          --accent: #d27a32; --accent2: #e8b45a; --ok: #9bd88f; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 16px/1.4 system-ui, sans-serif; overflow: hidden;
+               -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; touch-action: none; }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  .btn { min-height: 44px; padding: 8px 16px; border-radius: 12px; background: var(--card); border: 1px solid var(--line); white-space: nowrap; }
+  .btn.primary { background: var(--accent); border-color: transparent; color: #1d0e02; font-weight: 700; }
+  .btn.on { background: var(--accent2); border-color: transparent; color: #241503; font-weight: 700; }
+  [hidden] { display: none !important; }
+
+  /* ---------- library ---------- */
+  #library { display: flex; flex-direction: column; height: 100%; }
+  /* left padding keeps clear of the hub's Apps button */
+  header { display: flex; align-items: center; gap: 10px; min-height: 60px; padding: 8px 12px 8px 110px; border-bottom: 1px solid var(--line); }
+  header h1 { margin: 0; font-size: 18px; font-weight: 600; flex: 1; }
+  #continue { max-width: 55%; overflow: hidden; text-overflow: ellipsis; }
+  .scroll { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 12px 16px 20px; touch-action: pan-y; }
+  h2 { margin: 10px 2px 8px; font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .games { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+  .game { position: relative; display: flex; flex-direction: column; gap: 4px; text-align: left; padding: 12px 14px; border-radius: 14px; background: var(--card); border: 1px solid var(--line); min-height: 96px; }
+  .game b { font-size: 17px; }
+  .game small { color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
+  .game p { margin: 2px 0 0; font-size: 14px; color: #d8cdbf; }
+  .wrap { position: relative; display: grid; }
+  .wrap .game { padding-right: 90px; }
+  .wrap .del { position: absolute; top: 6px; right: 6px; min-height: 36px; min-width: 36px; padding: 0 10px; border-radius: 10px; background: transparent; border: 1px solid var(--line); color: var(--muted); font-size: 13px; }
+  .add { display: flex; gap: 8px; flex-wrap: wrap; margin: 4px 0 6px; align-items: center; }
+  .note { font-size: 13px; color: var(--muted); margin: 6px 2px; max-width: 60em; }
+  #addMsg:empty, #status:empty { display: none; }
+  #status { margin: 0 2px 10px; color: var(--text); }
+  .game.busy, .btn.busy { opacity: .6; }
+  #mine:empty::before { content: 'None yet.'; color: var(--muted); font-size: 14px; padding: 2px; }
+  .legal { margin-top: 18px; font-size: 12px; color: var(--muted); user-select: text; -webkit-user-select: text; }
+  .legal p { margin: 4px 0; }
+  .owned { padding: 10px 12px; border-radius: 12px; background: #261a10; border: 1px solid rgba(210, 122, 50, .35); color: #e2d6c8; }
+  .owned b { color: var(--text); }
+
+  /* ---------- overlays: terms, phone, errors ---------- */
+  .overlay { position: fixed; inset: 0; z-index: 5; display: grid; place-items: center; padding: 64px 16px 16px; background: rgba(8, 6, 4, .9); }
+  .sheet { display: flex; gap: 22px; align-items: center; max-width: 680px; padding: 18px; border-radius: 18px; background: var(--panel); border: 1px solid var(--line); }
+  .sheet.terms { flex-direction: column; align-items: stretch; gap: 0; max-width: 560px; }
+  .terms h2 { margin: 0 0 8px; font-size: 19px; color: var(--text); letter-spacing: 0; text-transform: none; }
+  .terms p { margin: 0 0 10px; font-size: 15px; color: #d8cdbf; overflow-wrap: anywhere; }
+  .qr { flex: none; display: grid; place-items: center; width: 236px; height: 236px; border-radius: 12px; background: #fff; }
+  .qr a { display: block; }
+  .qr img, .qr canvas { display: block; width: 216px; height: 216px; image-rendering: pixelated; }
+  .steps h2 { margin: 0 0 6px; font-size: 19px; color: var(--text); letter-spacing: 0; text-transform: none; }
+  .steps ol { margin: 0 0 10px; padding-left: 20px; font-size: 15px; color: #d8cdbf; }
+  #transferStatus { margin: 0 0 6px; font-size: 14px; color: var(--muted); }
+  #received { list-style: none; margin: 0 0 10px; padding: 0; max-height: 110px; overflow-y: auto; font-size: 14px; }
+  #received li::before { content: '✓ '; color: var(--ok); }
+  #received li.bad::before { content: '✕ '; color: var(--accent); }
+  #received li.busy::before { content: '… '; color: var(--muted); }
+  @media (max-width: 640px) { .sheet { flex-direction: column; } }
+
+  /* ---------- loading ---------- */
+  #loading { position: fixed; inset: 0; z-index: 4; display: grid; place-content: center; gap: 14px; text-align: center; background: var(--bg); }
+  #loading b { font-size: 20px; }
+  #loadText { color: var(--muted); font-size: 15px; }
+  .meter { width: min(360px, 80vw); height: 8px; border-radius: 4px; background: var(--card); overflow: hidden; }
+  .meter i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .2s; }
+
+  /* ---------- player ---------- */
+  #player { position: fixed; inset: 0; display: grid; grid-template-rows: 60px minmax(0, 1fr); grid-template-columns: minmax(0, 1fr); background: #000; }
+  .bar { display: flex; align-items: center; gap: 8px; padding: 8px 10px 8px 110px; background: var(--panel); border-bottom: 1px solid var(--line); }
+  .bar b { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #fps { font: inherit; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; background: none; border: 0; padding: 12px 4px; }
+  .screen { position: relative; display: flex; align-items: center; justify-content: center; min-height: 0; min-width: 0; overflow: hidden; }
+  /* the game draws 320x240 (or 640x480) pixels; they're scaled up sharp */
+  #canvas { display: block; background: #000; image-rendering: pixelated; }
+  /* On-screen controls, over the game: a finger anywhere on it (but the
+     buttons) turns and looks, the stick walks, and the buttons fire, jump
+     and change weapons. In menus, a pad of arrows takes their place. */
+  #touch { position: absolute; inset: 0; }
+  #player.mouse #touch { display: none; }
+  .side { position: absolute; bottom: var(--above-status, 70px); display: flex; flex-direction: column; align-items: center; gap: 12px; }
+  .side.left { left: var(--inset, 12px); }
+  .side.right { right: var(--inset, 12px); }
+  .stick { position: relative; width: 140px; height: 140px; border-radius: 50%; background: rgba(40, 30, 20, .45); border: 1px solid rgba(230, 190, 140, .3); }
+  .stick i { position: absolute; left: 50%; top: 50%; width: 58px; height: 58px; margin: -29px 0 0 -29px; border-radius: 50%; background: rgba(120, 92, 62, .6); border: 1px solid rgba(230, 190, 140, .35); }
+  .stick.on i { background: rgba(170, 128, 84, .75); }
+  .acts { display: grid; grid-template-columns: 56px 84px; grid-template-rows: 56px 56px; gap: 10px; align-items: center; }
+  .acts button, .weap button, .mpad button { border: 0; font-weight: 800; color: #fff; }
+  .fire { grid-column: 2; grid-row: 1 / 3; width: 84px; height: 84px; border-radius: 50%; background: rgba(210, 122, 50, .6); font-size: 15px; }
+  .jump { grid-column: 1; grid-row: 2; width: 56px; height: 56px; border-radius: 50%; background: rgba(140, 110, 80, .55); font-size: 13px; }
+  .weap { display: flex; gap: 8px; }
+  .weap button { width: 62px; height: 42px; border-radius: 12px; background: rgba(40, 30, 20, .5); font-size: 14px; border: 1px solid rgba(230, 190, 140, .3); }
+  /* menus: arrows on the left, OK and Back on the right */
+  .mpad { position: absolute; bottom: 16px; display: grid; gap: 8px; }
+  .mpad.dirs { left: 16px; grid-template-columns: repeat(3, 58px); grid-template-rows: repeat(3, 52px); }
+  .mpad.keys { right: 16px; grid-template-columns: 96px; grid-template-rows: 64px 52px; }
+  .mpad button { border-radius: 12px; background: rgba(40, 30, 20, .7); border: 1px solid rgba(230, 190, 140, .35); font-size: 18px; }
+  .mpad .ok { background: rgba(210, 122, 50, .75); font-size: 16px; }
+  .mpad .back { font-size: 15px; }
+  .mpad [data-k="up"] { grid-column: 2; grid-row: 1; }
+  .mpad [data-k="left"] { grid-column: 1; grid-row: 2; }
+  .mpad [data-k="right"] { grid-column: 3; grid-row: 2; }
+  .mpad [data-k="down"] { grid-column: 2; grid-row: 3; }
+  #touch .menu, #player.menu #touch .play { display: none; }
+  #player.menu #touch .menu { display: grid; }
+  /* before a level (the title demos), only the bar's Menu button */
+  #player.title #touch .play { display: none; }
+  #hint { position: absolute; left: 50%; top: 12px; transform: translateX(-50%); padding: 6px 12px; border-radius: 10px; background: rgba(22, 19, 15, .85);
+          border: 1px solid var(--line); font-size: 14px; color: var(--text); pointer-events: none; white-space: nowrap; }
+  [data-b].on, [data-k].on { filter: brightness(1.5); transform: scale(.94); }
+  /* a controller is in use: no on-screen controls */
+  #player.pad #touch { display: none; }
+
+  @media (max-width: 640px) {
+    .bar .btn { padding: 8px 10px; }
+  }
+</style>
+</head>
+<body>
+<section id="library">
+  <header>
+    <h1>LibreQuake</h1>
+    <button class="btn" id="continue" type="button" hidden></button>
+  </header>
+  <div class="scroll">
+    <p class="note" id="status" aria-live="polite"></p>
+    <h2>Free game</h2>
+    <div class="games" id="free"></div>
+
+    <h2 style="margin-top:20px">Your Quake</h2>
+    <div class="add">
+      <button class="btn primary" id="fromPhone" type="button">Get files from phone</button>
+      <button class="btn" id="addFiles" type="button">Add Quake files</button>
+    </div>
+    <input id="fileInput" type="file" accept=".pak,.zip,.ogg" multiple hidden>
+    <p class="note" id="addMsg" aria-live="polite"></p>
+    <div class="games" id="mine"></div>
+    <p class="note">Send PAK0.PAK and PAK1.PAK from the id1 folder of a copy you own (in a Steam or GOG copy, the original id1 folder, not the "rerelease" one). PAK0.PAK alone is the shareware episode. The mission packs work too: PAK0.PAK from their hipnotic or rogue folder. Music files named track02.ogg to track11.ogg are played if you add them.</p>
+    <p class="note owned"><b>Only load games you legally own.</b> frunk.store doesn't provide, sell or share commercial games, and never keeps yours: they're stored only on this screen. You're responsible for the files you load.</p>
+
+    <h2 style="margin-top:20px">Settings</h2>
+    <div class="add">
+      <button class="btn" id="sharpBtn" type="button" aria-pressed="false">Sharp graphics</button>
+      <span class="note" style="margin:0">640×480 instead of 320×240: four times the pixels to draw, so it may run slower.</span>
+    </div>
+
+    <div class="legal">
+      <p>Controls: on the screen, the stick walks and steps sideways, a finger dragged anywhere else turns and looks, FIRE shoots (and turns too, if you drag it), JUMP jumps (and swims up), and ‹ › change weapons; in menus, arrows move and OK picks. On a controller: left stick or D-pad to walk (with no right stick, the D-pad and stick turn left and right), right stick to turn and look, L and R to step sideways, the right face button or right trigger to fire, the bottom face button or left trigger to jump, the other two face buttons to change weapons, Start for the menu and Select for the scores. A keyboard and mouse work too (click the game to look with the mouse). Games pick up where you left off: the game is saved as "auto" whenever you leave it, and Continue loads it. The game's own menu saves in its slots as well.</p>
+      <p>Engine: Chocolate Quake 2.1.0 by Henrique Barateli and others, based on id Software's Quake source (GNU GPL 3), compiled to WebAssembly with small changes for the browser. Source: /quake/engine/chocolate-quake-2.1.0-web-src.tar.gz, with the changes in /quake/engine/chocolate-web.patch, built by tools/build-quake.mjs in github.com/RobertPKyle/frunk-store; see /quake/NOTICE. Game: LibreQuake 0.09-beta (lite) by the LibreQuake project, art and sounds under the BSD 3-Clause license and game code under the GNU GPL 2 (source in /quake/librequake/librequake-0.09-beta-qcsrc.tar.gz); see /quake/librequake/COPYING and CREDITS.</p>
+      <p>LibreQuake and frunk.store are not affiliated with or endorsed by id Software, Bethesda, ZeniMax or Microsoft. QUAKE is a trademark of ZeniMax Media. Play only while parked.</p>
+    </div>
+  </div>
+</section>
+
+<section id="terms" class="overlay" hidden aria-labelledby="termsTitle">
+  <div class="sheet terms">
+    <h2 id="termsTitle">Your own games</h2>
+    <p>Only load Quake files you legally own, such as the pak files from a copy of Quake you bought. Downloading or sharing games you don't own can break copyright law.</p>
+    <p>frunk.store doesn't provide, sell or share commercial games. Files you load stay on this screen; when you send them from your phone they're encrypted and deleted from our server as soon as the car picks them up.</p>
+    <p>You're responsible for the files you load.</p>
+    <div class="add">
+      <button class="btn primary" id="termsOk" type="button">I own my games</button>
+      <button class="btn" id="termsCancel" type="button">Cancel</button>
+    </div>
+  </div>
+</section>
+
+<section id="transfer" class="overlay" hidden aria-labelledby="transferTitle">
+  <div class="sheet">
+    <div class="qr" id="qr" aria-hidden="true"></div>
+    <div class="steps">
+      <h2 id="transferTitle">Get files from phone</h2>
+      <ol>
+        <li>Scan this code with your phone's camera.</li>
+        <li>On the page that opens, choose PAK0.PAK, PAK1.PAK (and any mission pack or music files).</li>
+        <li>They show up here in a few seconds. Up to 80 MB per code.</li>
+      </ol>
+      <p id="transferStatus" aria-live="polite">Getting a code…</p>
+      <ul id="received"></ul>
+      <button class="btn primary" id="transferDone" type="button">Done</button>
+    </div>
+  </div>
+</section>
+
+<section id="loading" hidden aria-live="polite">
+  <b id="loadTitle"></b>
+  <div class="meter"><i id="loadBar"></i></div>
+  <span id="loadText"></span>
+</section>
+
+<section id="failed" class="overlay" hidden aria-labelledby="failedTitle">
+  <div class="sheet terms">
+    <h2 id="failedTitle">The game stopped</h2>
+    <p id="failedText"></p>
+    <div class="add"><button class="btn primary" id="failedOk" type="button">Back to games</button></div>
+  </div>
+</section>
+
+<section id="player" hidden>
+  <div class="bar">
+    <b id="title"></b>
+    <button id="fps" type="button" tabindex="-1"></button>
+    <button class="btn" id="menuBtn" type="button">Menu</button>
+    <button class="btn" id="soundBtn" type="button">Sound on</button>
+    <button class="btn" id="quitBtn" type="button">Games</button>
+  </div>
+  <div class="screen">
+    <canvas id="canvas" oncontextmenu="event.preventDefault()"></canvas>
+    <div id="touch">
+      <div class="side left play">
+        <div class="stick" id="stick"><i></i></div>
+      </div>
+      <div class="side right play">
+        <div class="weap"><button type="button" data-b="prev" aria-label="Previous weapon">‹ Gun</button><button type="button" data-b="next" aria-label="Next weapon">Gun ›</button></div>
+        <div class="acts">
+          <button class="fire" type="button" data-b="fire">FIRE</button>
+          <button class="jump" type="button" data-b="jump">JUMP</button>
+        </div>
+      </div>
+      <div class="mpad dirs menu">
+        <button type="button" data-k="up" aria-label="Up">▲</button>
+        <button type="button" data-k="left" aria-label="Left">◀</button>
+        <button type="button" data-k="right" aria-label="Right">▶</button>
+        <button type="button" data-k="down" aria-label="Down">▼</button>
+      </div>
+      <div class="mpad keys menu">
+        <button type="button" class="ok" data-k="enter">OK</button>
+        <button type="button" class="back" data-k="escape">Back</button>
+      </div>
+      <div id="hint" hidden></div>
+    </div>
+  </div>
+</section>
+
+<script src="/probe/qrcode.min.js"></script>
+<script type="module" src="quake.js"></script>
+<script src="/sw-register.js"></script>
+</body>
+</html>

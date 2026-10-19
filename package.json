@@ -6,6 +6,7 @@
     "build:wasm": "node tools/build-wasm.mjs",
     "build:doom": "node tools/build-doom.mjs",
     "build:scummvm": "node tools/build-scummvm.mjs",
+    "build:quake": "node tools/build-quake.mjs",
     "dev": "node tools/dev.mjs",
     "test:e2e": "node tools/e2e.mjs"
   },

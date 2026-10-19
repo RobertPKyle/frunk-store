@@ -1,0 +1,41 @@
+LibreQuake (apps/quake)
+
+Engine (engine/)
+  Chocolate Quake 2.1.0, by Henrique Barateli and contributors, based on
+  the Quake source code by id Software (1996-1997).
+  License: GNU General Public License, version 3 (engine/LICENSE).
+  Source: https://github.com/Henrique194/chocolate-quake, tag
+  chocolate-quake-2.1.0 (commit 8ee22175e3a5613e94ad2f9776aadc428b948cf3),
+  with frunk.store's changes for the browser in
+  engine/chocolate-web.patch (also tools/quake/chocolate-web.patch in
+  https://github.com/RobertPKyle/frunk-store, whose tools/build-quake.mjs
+  builds it). The complete patched source the build came from, with its
+  build script (web/build.sh), is engine/chocolate-quake-2.1.0-web-src.tar.gz.
+  The changes: one frame per screen refresh, controllers and touch handed
+  in by the page, saving from the page, music played by the page,
+  single player only (no sockets in a browser), windowed modes only, a
+  4 MB stack, and a fix for strings longer than 256 characters overrunning
+  a buffer when a game was saved.
+
+Game (librequake/)
+  LibreQuake 0.09-beta, the "lite" release, by the LibreQuake project and
+  its contributors (librequake/CREDITS).
+  https://github.com/lavenderdotpet/LibreQuake
+  Art, models, sounds and music: BSD 3-Clause license (librequake/COPYING).
+  Game code (progs.dat in the paks): GNU General Public License, version 2
+  (librequake/COPYING-GPL2); its QuakeC source at the release's tag
+  (commit d1515ca9bc01e590f2d54dc496f55c9a4ed72369) is
+  librequake/librequake-0.09-beta-qcsrc.tar.gz.
+  See librequake/README-IMPORTANT-LICENCE-INFO.
+  The paks are gzipped here for downloading and unpacked by the page; they
+  and the music are otherwise unchanged from the release's lite.zip
+  (SHA-256 428e736b2f01d953e09a08c60bee975bdc4a0ac2219e97fa095c8af41754da83).
+
+Trademarks
+  QUAKE is a trademark of ZeniMax Media. LibreQuake and frunk.store are not
+  affiliated with or endorsed by id Software, Bethesda, ZeniMax or
+  Microsoft.
+
+Players' own files
+  Quake files a player adds are kept in that screen's IndexedDB only.
+  frunk.store doesn't provide, sell or share commercial games.
