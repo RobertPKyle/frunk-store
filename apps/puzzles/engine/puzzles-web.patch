@@ -1,0 +1,134 @@
+diff --git a/cmake/platforms/emscripten.cmake b/cmake/platforms/emscripten.cmake
+index f168607..43af6b1 100644
+--- a/cmake/platforms/emscripten.cmake
++++ b/cmake/platforms/emscripten.cmake
+@@ -59,7 +59,12 @@ set(emcc_export_list
+   _malloc
+   _free
+   # Main program, run at initialisation time
+-  _main)
++  _main
++  # frunk.store: the page's key pad, controller and progress
++  _web_keys
++  _web_key
++  _web_cursor
++  _web_status)
+ 
+ list(TRANSFORM emcc_export_list PREPEND \")
+ list(TRANSFORM emcc_export_list APPEND \")
+@@ -68,7 +73,7 @@ set(CMAKE_C_LINK_FLAGS "\
+ -s ALLOW_MEMORY_GROWTH=1 \
+ -s ENVIRONMENT=web \
+ -s EXPORTED_FUNCTIONS='[${emcc_export_string}]' \
+--s EXPORTED_RUNTIME_METHODS='[cwrap]' \
++-s EXPORTED_RUNTIME_METHODS='[cwrap,UTF8ToString,writeArrayToMemory]' \
+ -s MIN_FIREFOX_VERSION=${MIN_FIREFOX_VERSION} \
+ -s MIN_SAFARI_VERSION=${MIN_SAFARI_VERSION} \
+ -s MIN_CHROME_VERSION=${MIN_CHROME_VERSION} \
+diff --git a/emcc.c b/emcc.c
+index ae90f3c..f7a23ab 100644
+--- a/emcc.c
++++ b/emcc.c
+@@ -44,6 +44,8 @@
+ 
+ #include "puzzles.h"
+ 
++#include <emscripten.h>
++
+ /*
+  * Extern references to Javascript functions provided in emcclib.js.
+  */
+@@ -309,6 +311,56 @@ static void post_move(void)
+     js_enable_undo_redo(midend_can_undo(me), midend_can_redo(me));
+     js_update_key_labels(midend_current_key_label(me, CURSOR_SELECT2),
+                          midend_current_key_label(me, CURSOR_SELECT));
++    /* frunk.store: tell the page, which saves the game and updates its keys */
++    EM_ASM({ if (typeof web_moved === 'function') web_moved(); });
++}
++
++/*
++ * frunk.store additions for the page's own controls.
++ */
++
++/* The keys the puzzle wants on screen (for its current size), as
++ * "label\x1fbutton\x1e..." for the page's key pad. Free with
++ * free_save_file. */
++char *web_keys(void)
++{
++    int n, i;
++    size_t len = 1;
++    char *out, *p;
++    key_label *keys = midend_request_keys(me, &n);
++    for (i = 0; i < n; i++)
++        len += strlen(keys[i].label) + 16;
++    out = p = snewn(len, char);
++    *p = '\0';
++    for (i = 0; i < n; i++)
++        p += sprintf(p, "%s\x1f%d\x1e", keys[i].label, keys[i].button);
++    free_keys(keys, n);
++    return out;
++}
++
++/* A key from the page's key pad */
++void web_key(int button)
++{
++    midend_process_key(me, 0, 0, button);
++    post_move();
++}
++
++/* Cursor keys, for controllers: 0 up, 1 down, 2 left, 3 right,
++ * 4 select, 5 select 2 */
++void web_cursor(int which)
++{
++    static const int buttons[] = { CURSOR_UP, CURSOR_DOWN, CURSOR_LEFT,
++                                   CURSOR_RIGHT, CURSOR_SELECT,
++                                   CURSOR_SELECT2 };
++    if (which < 0 || which > 5) return;
++    midend_process_key(me, 0, 0, buttons[which]);
++    post_move();
++}
++
++/* +1 solved, -1 lost (Mines), 0 still going */
++int web_status(void)
++{
++    return midend_status(me);
+ }
+ 
+ /*
+diff --git a/emcclib.js b/emcclib.js
+index c03283d..109ec39 100644
+--- a/emcclib.js
++++ b/emcclib.js
+@@ -823,7 +823,7 @@ mergeInto(LibraryManager.library, {
+     js_save_prefs: function(buf) {
+         var prefsdata = UTF8ToString(buf);
+         try {
+-            localStorage.setItem(location.pathname + " preferences", prefsdata);
++            localStorage.setItem((window.puzzle_prefs_key || location.pathname + " preferences"), prefsdata);
+         } catch (error) {
+             // Tell the user their preferences have not been saved.
+             console.error(error);
+@@ -856,7 +856,7 @@ mergeInto(LibraryManager.library, {
+         // Load saved preferences if they exist.
+         try {
+             load_prefs_from_string(
+-                localStorage.getItem(location.pathname + " preferences"));
++                localStorage.getItem((window.puzzle_prefs_key || location.pathname + " preferences")));
+         } catch (error) {
+             // Log the error but otherwise pretend the settings were
+             // absent.
+diff --git a/guess.c b/guess.c
+index ee187f7..b302de7 100644
+--- a/guess.c
++++ b/guess.c
+@@ -1411,7 +1411,9 @@ static void game_redraw(drawing *dr, game_drawstate *ds,
+     if (ds->drag_col != 0) {
+         debug(("Loading from blitter."));
+         blitter_load(dr, ds->blit_peg, ds->blit_ox, ds->blit_oy);
+-        draw_update(dr, ds->blit_ox, ds->blit_oy, PEGSZ, PEGSZ);
++        /* frunk.store: the whole blitter, which is a pixel bigger than
++         * the peg on every side, or the dragged peg leaves a trail */
++        draw_update(dr, ds->blit_ox, ds->blit_oy, PEGSZ+2, PEGSZ+2);
+     }
+ 
+     /* draw the colours */

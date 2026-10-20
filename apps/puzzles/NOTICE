@@ -1,0 +1,26 @@
+Logic Puzzles (apps/puzzles)
+
+Puzzles (engine/, help/, icons/)
+  Simon Tatham's Portable Puzzle Collection, by Simon Tatham, with portions
+  by Richard Boulton, James Harvey, Mike Pinna, Jonas Kölker, Dariusz
+  Olszewski, Michael Schierl, Lambros Lambrou, Bernd Schmidt, Steffen Bauer,
+  Lennard Sprong, Rogier Goossens, Michael Quevillon, Asher Gordon, Didi
+  Kohen, Ben Harris and Anders Höglund.
+  License: MIT (engine/LICENCE.txt).
+  Source: https://git.tartarus.org/simon/puzzles.git, commit
+  616da16f25da428ccda805536209095bd062676e, with frunk.store's changes for
+  this screen in engine/puzzles-web.patch (also tools/puzzles/puzzles-web.patch
+  in https://github.com/RobertPKyle/frunk-store, whose tools/build-puzzles.mjs
+  builds it).
+  The changes: the page is told after every move (to keep the game and
+  update its keys); web_keys() lists the keys a puzzle wants on screen,
+  web_key() and web_cursor() press them, and web_status() says whether the
+  puzzle is solved; each puzzle keeps its own preferences; and Guess
+  redraws all of the area under a dragged peg, so the peg leaves no trail.
+  The help pages are the collection's manual (puzzles.but), one chapter per
+  puzzle, made into HTML by Halibut. The icons are drawn by the puzzles
+  themselves from the collection's icon saves (icons/*.sav), cropped as
+  its icons/icons.cmake crops them.
+
+The rest of apps/puzzles (the page, its touch controls and the icon.svg)
+is part of frunk.store.

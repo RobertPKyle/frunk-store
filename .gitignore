@@ -30,3 +30,9 @@ apps/blocks/engine/ClassiCube.js
 apps/blocks/engine/ClassiCube.wasm
 apps/blocks/data/textures.zip
 apps/blocks/data/sounds
+tools/.puzzles-build
+apps/puzzles/engine/*.js
+apps/puzzles/engine/*.wasm
+apps/puzzles/help
+apps/puzzles/icons
+apps/puzzles/puzzles.json

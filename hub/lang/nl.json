@@ -98,6 +98,7 @@
     "blocks": { "name": "Blokkenbouwer", "tagline": "Bouw wat je wilt in een blokkenwereld in Minecraft Classic-stijl: creatieve modus, vliegen en werelden die opslaan terwijl je speelt." },
     "adventure": { "name": "Avonturengames", "tagline": "Klassieke point-and-click-avonturen op ScummVM: zeven gratis games, of games die je bezit, verstuurd vanaf je telefoon." },
     "text": { "name": "Tekstavonturen", "tagline": "Zork I, II en III, de Infocom-klassiekers, nu open source. Tik op woorden om opdrachten te maken, of typ." },
+    "puzzles": { "name": "Logische puzzels", "tagline": "Veertig klassieke logische puzzels van Simon Tatham, van Solo (sudoku) tot Mines en Net, met eindeloos nieuwe borden in elk formaat." },
     "chess": { "name": "Schaakpuzzel", "tagline": "Los de dagelijkse schaakpuzzel van Lichess op je scherm op." }
   }
 }

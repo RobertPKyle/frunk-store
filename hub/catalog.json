@@ -236,6 +236,18 @@
       ]
     },
     {
+      "id": "puzzles",
+      "name": "Logic Puzzles",
+      "tagline": "Forty classic logic puzzles by Simon Tatham, from Solo (sudoku) to Mines and Net, with endless new boards in every size.",
+      "path": "/puzzles/",
+      "icon": "/puzzles/icon.svg",
+      "tags": [
+        "Game",
+        "Puzzle",
+        "Offline"
+      ]
+    },
+    {
       "id": "chess",
       "name": "Chess Puzzle",
       "tagline": "Solve the Lichess daily chess puzzle on your screen.",

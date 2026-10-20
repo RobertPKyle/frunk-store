@@ -98,6 +98,7 @@
     "blocks": { "name": "블록 빌더", "tagline": "Minecraft Classic 스타일의 블록 세상에서 무엇이든 지어 보세요: 크리에이티브 모드, 비행, 플레이하는 동안 저장되는 월드." },
     "adventure": { "name": "어드벤처 게임", "tagline": "ScummVM으로 즐기는 고전 포인트 앤 클릭 어드벤처: 무료 게임 7개, 또는 휴대폰에서 보낸 직접 소유한 게임." },
     "text": { "name": "텍스트 어드벤처", "tagline": "Infocom의 고전 Zork I, II, III. 이제 오픈 소스입니다. 단어를 탭해서 명령을 만들거나 직접 입력하세요." },
+    "puzzles": { "name": "논리 퍼즐", "tagline": "Simon Tatham의 고전 논리 퍼즐 40종. Solo(스도쿠)부터 Mines, Net까지, 어떤 크기로든 새 판이 끝없이 나옵니다." },
     "chess": { "name": "체스 퍼즐", "tagline": "Lichess의 오늘의 체스 퍼즐을 화면에서 풀어 보세요." }
   }
 }

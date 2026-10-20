@@ -98,6 +98,7 @@
     "blocks": { "tagline": "Bau alles, was du willst, in einer Blockwelt im Stil von Minecraft Classic: Kreativmodus, Fliegen und Welten, die beim Spielen gespeichert werden." },
     "adventure": { "name": "Adventure-Spiele", "tagline": "Klassische Point-and-Click-Adventures mit ScummVM: sieben kostenlose Spiele oder eigene, die du vom Handy schickst." },
     "text": { "name": "Textadventures", "tagline": "Zork I, II und III, die Infocom-Klassiker, jetzt Open Source. Tippe auf Wörter, um Befehle zu bauen, oder schreib selbst." },
+    "puzzles": { "name": "Logikrätsel", "tagline": "Vierzig klassische Logikrätsel von Simon Tatham, von Solo (Sudoku) über Mines bis Net, mit endlos neuen Feldern in jeder Größe." },
     "chess": { "name": "Schachrätsel", "tagline": "Löse das tägliche Schachrätsel von Lichess auf deinem Bildschirm." }
   }
 }

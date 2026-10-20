@@ -441,8 +441,30 @@ to the cache again.
 - `apps/chess`: the Lichess daily chess puzzle, playable on the board. Tap a
   piece, then a highlighted square; the opponent's reply is played
   automatically and only the best move is accepted. Next puzzle fetches a
-  random one from Lichess. The last puzzle is cached for offline use. Rules come from chess.js (BSD-2-Clause); the piece art is
-  the cburnett set (CC BY-SA 3.0).
+  random one from Lichess. The last puzzle is cached for offline use. Rules
+  come from chess.js (BSD-2-Clause); the piece art is the cburnett set
+  (CC BY-SA 3.0).
+- `apps/puzzles`: Logic Puzzles. Simon Tatham's Portable Puzzle Collection
+  (MIT), all 40 puzzles, built by `npm run build:puzzles`
+  (`tools/build-puzzles.mjs`: a fixed upstream commit plus
+  `tools/puzzles/puzzles-web.patch`, compiled with upstream's own CMake
+  Emscripten build in Docker, `tools/puzzles/Dockerfile` = emsdk 4.0.10 plus
+  Halibut). Each puzzle is its own small `engine/<name>.{js,wasm}` (about
+  130 KB of wasm), so only the one being played downloads. The build also
+  makes each puzzle's chapter of the manual into `help/<name>.html` and draws
+  the icons from upstream's icon saves in Chrome, cropped as upstream crops
+  them. The engine, help, icons and `puzzles.json` are gitignored, so run the
+  build before deploying `apps`.
+  The puzzle runs upstream's web front end, which finds the page's elements
+  by id; `puzzles.js` adds the list, touch (tap = left click, long press =
+  right click, Right-click swaps them, two-finger tap = middle click), keys
+  at the side from the puzzle's own key list, a controller (D-pad = arrow
+  keys, A and B select, X undo, Y redo), Help, and the game kept after every
+  move as the puzzle's save file in localStorage (`puzzles.<id>.save`), so
+  Continue picks up where it was. The patch tells the page after each move,
+  adds `web_keys`, `web_key`, `web_cursor` and `web_status`, gives each
+  puzzle its own preferences key, and fixes a Guess redraw that left a trail
+  behind a dragged peg.
 - `apps/_shared/place.js`: the location picker. Star Map, Weather,
   Satellites, Sky Events, What's Around Me and Pit Stop share one saved place
   (`frunk.place` in localStorage). A place picked as the car's location
@@ -466,6 +488,7 @@ npm run build:quake                     # Quake engine + LibreQuake (needs Docke
 npm run build:openttd                   # OpenTTD engine + its free base sets (needs Docker); run before deploying apps
 npm run build:openarena                 # Quake III engine + OpenArena (needs Docker); run before deploying apps
 npm run build:blocks                    # ClassiCube engine + its textures, font and sounds (needs Docker); run before deploying apps
+npm run build:puzzles                   # Simon Tatham's Puzzles + their help and icons (needs Docker and Chrome); run before deploying apps
 npm run dev                             # hub on localhost:5173, apps on 127.0.0.1:5174
 npm run test:e2e                        # checks against the dev server
 node tools/e2e.mjs https://frunk.store  # checks against production

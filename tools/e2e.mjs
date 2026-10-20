@@ -1226,6 +1226,44 @@ await check('block builder makes a world, digs with touch, saves when left and r
   await appFrame().locator('.world').filter({ hasText: 'World 1' }).waitFor({ timeout: 5000 });
 });
 
+await check('logic puzzles lists every puzzle, plays solo by touch and keeps it when closed', async () => {
+  await openFromHub(/Logic Puzzles/);
+  const frame = () => page.frames().find(f => f.url().includes('/puzzles/'));
+  await appFrame().locator('.puzzle').first().waitFor();
+  const n = await appFrame().locator('.puzzle').count();
+  if (n !== 40) throw new Error(`expected 40 puzzles, got ${n}`);
+  await appFrame().locator('.puzzle').filter({ has: page.locator('b', { hasText: /^Solo$/ }) }).click();
+  await appFrame().locator('#loading').waitFor({ state: 'hidden', timeout: 20000 });
+  // Tap the empty cells along the top row until a key fills one in
+  const box = await appFrame().locator('#puzzlecanvas').boundingBox();
+  const cdp = await page.context().newCDPSession(page);
+  const touch = (type, points) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: points.map(([x, y], id) => ({ x, y, id })) });
+  const tap = async (x, y, ms = 40) => { await touch('touchStart', [[x, y]]); await page.waitForTimeout(ms); await touch('touchEnd', []); await page.waitForTimeout(80); };
+  const key = await appFrame().locator('#keys button', { hasText: /^5$/ }).boundingBox();
+  for (let col = 0; col < 9 && !(await appFrame().locator('#undo').isEnabled()); col++) {
+    await tap(box.x + box.width * (0.13 + col * 0.0925), box.y + box.height * 0.13);
+    await tap(key.x + key.width / 2, key.y + key.height / 2);
+  }
+  if (!(await appFrame().locator('#undo').isEnabled())) throw new Error('no move was made by touch');
+  // A long press is Solo's right click: a cell for pencil marks
+  await tap(box.x + box.width * 0.5, box.y + box.height * 0.87, 700);
+  await tap(key.x + key.width / 2, key.y + key.height / 2);
+  const before = await frame().evaluate(() => localStorage.getItem('puzzles.solo.save'));
+  await page.waitForTimeout(700);
+  // Closing from the hub keeps the game; Continue brings it back
+  await page.click('#home');
+  await page.waitForSelector('#runner', { state: 'hidden' });
+  await openFromHub(/Logic Puzzles/);
+  const kept = await frame().evaluate(() => localStorage.getItem('puzzles.solo.save'));
+  if (!kept || !/MOVE/.test(kept)) throw new Error(`the game wasn't kept: ${before ? 'saved before closing' : 'nothing saved'}`);
+  await appFrame().getByRole('button', { name: 'Continue Solo' }).click();
+  await appFrame().locator('#loading').waitFor({ state: 'hidden', timeout: 20000 });
+  if (!(await appFrame().locator('#undo').isEnabled())) throw new Error('the move wasn\'t there after Continue');
+  await page.screenshot({ path: shots + 'puzzles.png' });
+  await appFrame().getByRole('button', { name: 'Puzzles' }).click();
+  await appFrame().locator('.puzzle').first().waitFor();
+});
+
 await check('a place from the car\'s location follows the car', async () => {
   await openFromHub(/Star Map/);
   const appsOrigin = new URL(page.frames().find(f => f.url().includes('/stars/')).url()).origin;
