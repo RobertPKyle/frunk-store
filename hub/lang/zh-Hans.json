@@ -95,6 +95,7 @@
     "quake": { "tagline": "经典的 Quake 引擎，搭配免费的 LibreQuake，或从手机发送你拥有的 Quake，用手柄或屏幕操作。" },
     "openttd": { "tagline": "用火车、卡车、船和飞机打造运输帝国。开源版的 Transport Tycoon，专为触控设计。" },
     "openarena": { "tagline": "在 Quake III 引擎上与电脑对手进行快节奏的竞技场射击：免费游戏，包含十个竞技场，用屏幕或手柄操作。" },
+    "blocks": { "name": "方块建造家", "tagline": "在 Minecraft Classic 风格的方块世界里搭建任何东西：创造模式、飞行，世界会在游玩时自动保存。" },
     "adventure": { "name": "冒险游戏", "tagline": "ScummVM 上的经典点击式冒险游戏：七款免费游戏，或从手机发送你拥有的游戏。" },
     "text": { "name": "文字冒险", "tagline": "Infocom 的经典 Zork I、II、III，现已开源。点选单词组成指令，或直接输入。" },
     "chess": { "name": "国际象棋谜题", "tagline": "在屏幕上解 Lichess 每日国际象棋谜题。" }

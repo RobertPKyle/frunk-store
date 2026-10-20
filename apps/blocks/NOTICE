@@ -1,0 +1,52 @@
+Block Builder (apps/blocks)
+
+Game (engine/)
+  ClassiCube 1.3.8, by UnknownShadow200 and the ClassiCube contributors: a
+  custom Minecraft Classic compatible game written from scratch.
+  License: BSD 3-Clause (engine/LICENSE.txt, which also has the licenses of
+  the parts ClassiCube includes, such as Emscripten's).
+  Source: https://github.com/ClassiCube/ClassiCube, commit
+  33891a4e7e586941240261bc911312f228be57d3, with frunk.store's changes for
+  the browser in engine/classicube-web.patch (also
+  tools/blocks/classicube-web.patch in https://github.com/RobertPKyle/frunk-store,
+  whose tools/build-blocks.mjs builds it).
+  The changes: the page says where the texture pack and sounds are, whether
+  to show the touch controls and how many canvas pixels make a CSS pixel;
+  a world the page kept opens as a path, and a new one takes its size,
+  land and seed from the page; web_save() saves the world for the page and
+  web_escape() is its Menu button; a saved world remembers which way the
+  player faced; a controller listed twice (raw and standard) is read once;
+  no player skins are downloaded in single player; the frame rate isn't
+  shown unless asked for; and no "unsaved changes" prompt on leaving, as
+  the page saves the world itself.
+
+Textures (data/textures.zip)
+  The block, hotbar and player textures are from Mineclonia
+  (https://codeberg.org/mineclonia/mineclonia, commit
+  490f3c62e609e87f615703f4fe75b9ba7e05cfbc), whose textures are based on
+  the Pixel Perfection resource pack by XSSheep and Pixel Perfection Legacy
+  by Nova Wostra, with changes and additions by the Mineclonia and
+  MineClone2 contributors (data/MINECLONIA-LEGAL.md).
+  License: Creative Commons Attribution-ShareAlike 4.0 International,
+  https://creativecommons.org/licenses/by-sa/4.0/
+  frunk.store adapted them for this game with tools/blocks/pack.mjs: laid
+  out in ClassiCube's terrain atlas, grass and leaves tinted green, some
+  wool colours tinted from white wool, and the animated water, lava, fire
+  and magma frames moved into animations.png. The adapted textures are
+  shared under the same license.
+  The buttons, crosshair, clouds and touch stick are drawn by
+  tools/blocks/pack.mjs (frunk.store), under the same license.
+  The font (default.png) is drawn from Monocraft by Idrees Hassan
+  (https://github.com/IdreesInc/Monocraft, commit
+  e498bf70aeb25b4bdcff1e44d878fb2cb4f7c2a9), under the SIL Open Font
+  License 1.1 (data/MONOCRAFT-LICENSE.txt), by tools/blocks/font.mjs.
+
+Sounds (data/sounds/)
+  From Mineclonia's mcl_sounds, renamed to the sounds the game asks for.
+  Their authors and licenses (CC BY 3.0, CC BY-SA 3.0, CC BY-SA 4.0, CC0
+  and WTFPL) are listed in data/SOUNDS-CREDITS.txt.
+
+Trademarks
+  Minecraft is a trademark of Mojang Synergies AB. Block Builder and
+  frunk.store are not affiliated with or endorsed by Mojang, Microsoft or
+  the ClassiCube project.

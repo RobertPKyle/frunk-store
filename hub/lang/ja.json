@@ -95,6 +95,7 @@
     "quake": { "tagline": "定番の Quake エンジンで、無料の LibreQuake、またはスマホから送った手持ちの Quake を、コントローラーや画面操作で遊べます。" },
     "openttd": { "tagline": "列車、トラック、船、飛行機で輸送帝国を築こう。タッチ向けに作られたオープンソース版の Transport Tycoon。" },
     "openarena": { "tagline": "Quake III エンジンでボットと戦うスピーディーなアリーナシューター：10 のアリーナを収録した無料ゲーム。画面操作でもコントローラーでも。" },
+    "blocks": { "name": "ブロックビルダー", "tagline": "Minecraft Classic 風のブロックの世界で何でも作ろう：クリエイティブモード、飛行、プレイ中に自動保存されるワールド。" },
     "adventure": { "name": "アドベンチャーゲーム", "tagline": "ScummVM で遊ぶ名作ポイント＆クリックアドベンチャー：無料ゲーム 7 本、またはスマホから送った手持ちのゲーム。" },
     "text": { "name": "テキストアドベンチャー", "tagline": "Infocom の名作 Zork I・II・III。現在はオープンソースです。単語をタップしてコマンドを作るか、入力してください。" },
     "chess": { "name": "チェスパズル", "tagline": "Lichess のデイリーチェスパズルを画面で解こう。" }

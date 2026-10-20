@@ -95,6 +95,7 @@
     "quake": { "tagline": "Den klassiske Quake-motoren med gratis LibreQuake, eller Quake du eier, sendt fra telefonen, med kontroller eller på skjermen." },
     "openttd": { "tagline": "Bygg et transportimperium med tog, lastebiler, skip og fly. Transport Tycoon med åpen kildekode, laget for berøring." },
     "openarena": { "tagline": "Rask arenaskyting mot boter på Quake III-motoren: et gratis spill med ti arenaer, på skjermen eller med kontroller." },
+    "blocks": { "name": "Klossebygger", "tagline": "Bygg hva du vil i en klosseverden i Minecraft Classic-stil: kreativ modus, flyging og verdener som lagres mens du spiller." },
     "adventure": { "name": "Eventyrspill", "tagline": "Klassiske pek-og-klikk-eventyr på ScummVM: sju gratis spill, eller spill du eier, sendt fra telefonen." },
     "text": { "name": "Teksteventyr", "tagline": "Zork I, II og III, Infocom-klassikerne, nå med åpen kildekode. Trykk på ord for å lage kommandoer, eller skriv." },
     "chess": { "name": "Sjakkoppgave", "tagline": "Løs den daglige sjakkoppgaven fra Lichess på skjermen." }

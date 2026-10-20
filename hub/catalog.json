@@ -200,6 +200,18 @@
       ]
     },
     {
+      "id": "blocks",
+      "name": "Block Builder",
+      "tagline": "Build anything in a Minecraft Classic-style world of blocks: creative mode, flying, and worlds that save as you play.",
+      "path": "/blocks/",
+      "icon": "/blocks/icon.svg",
+      "tags": [
+        "Game",
+        "Controller",
+        "Touch"
+      ]
+    },
+    {
       "id": "adventure",
       "name": "Adventure Games",
       "tagline": "Classic point-and-click adventures on ScummVM: seven free games, or ones you own sent from your phone.",

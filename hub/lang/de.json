@@ -95,6 +95,7 @@
     "quake": { "tagline": "Die klassische Quake-Engine mit dem kostenlosen LibreQuake oder deinem eigenen Quake, vom Handy geschickt, mit Controller oder auf dem Bildschirm." },
     "openttd": { "tagline": "Bau ein Transportimperium mit Zügen, Lkw, Schiffen und Flugzeugen. Das Open-Source-Transport-Tycoon, für Touch gemacht." },
     "openarena": { "tagline": "Schnelle Arena-Gefechte gegen Bots auf der Quake-III-Engine: ein kostenloses Spiel mit zehn Arenen, auf dem Bildschirm oder mit Controller." },
+    "blocks": { "tagline": "Bau alles, was du willst, in einer Blockwelt im Stil von Minecraft Classic: Kreativmodus, Fliegen und Welten, die beim Spielen gespeichert werden." },
     "adventure": { "name": "Adventure-Spiele", "tagline": "Klassische Point-and-Click-Adventures mit ScummVM: sieben kostenlose Spiele oder eigene, die du vom Handy schickst." },
     "text": { "name": "Textadventures", "tagline": "Zork I, II und III, die Infocom-Klassiker, jetzt Open Source. Tippe auf Wörter, um Befehle zu bauen, oder schreib selbst." },
     "chess": { "name": "Schachrätsel", "tagline": "Löse das tägliche Schachrätsel von Lichess auf deinem Bildschirm." }

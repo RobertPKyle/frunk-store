@@ -25,3 +25,8 @@ apps/openarena/data/*.pk3
 apps/openarena/data/*-src.tar.xz
 apps/openarena/data/levelshots
 apps/openarena/data/maps.json
+tools/.blocks-build
+apps/blocks/engine/ClassiCube.js
+apps/blocks/engine/ClassiCube.wasm
+apps/blocks/data/textures.zip
+apps/blocks/data/sounds

@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Block Builder</title>
+<style>
+  :root { --bg: #0d120c; --panel: #151c13; --card: #1d271a; --line: rgba(170, 220, 140, .14); --text: #eef3e9; --muted: #9caf92;
+          --accent: #6fb43f; --accent2: #b6e07c; --danger: #d9694a; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 16px/1.4 system-ui, sans-serif; overflow: hidden;
+               -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; touch-action: none; }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  .btn { min-height: 44px; padding: 8px 16px; border-radius: 12px; background: var(--card); border: 1px solid var(--line); white-space: nowrap; }
+  .btn.primary { background: var(--accent); border-color: transparent; color: #0f1a08; font-weight: 700; }
+  [hidden] { display: none !important; }
+
+  /* ---------- library ---------- */
+  #library { display: flex; flex-direction: column; height: 100%; }
+  /* left padding keeps clear of the hub's Apps button */
+  header { display: flex; align-items: center; gap: 10px; min-height: 60px; padding: 8px 12px 8px 110px; border-bottom: 1px solid var(--line); }
+  header h1 { margin: 0; font-size: 18px; font-weight: 600; flex: 1; }
+  #continue { max-width: 55%; overflow: hidden; text-overflow: ellipsis; }
+  .scroll { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 12px 16px 20px; touch-action: pan-y; }
+  h2 { margin: 10px 2px 8px; font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .worlds { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+  .world { position: relative; display: grid; }
+  .world > button:first-child { display: flex; flex-direction: column; gap: 4px; text-align: left; padding: 12px 90px 12px 14px; border-radius: 14px;
+                                background: var(--card); border: 1px solid var(--line); min-height: 76px; }
+  .world b { font-size: 17px; overflow-wrap: anywhere; }
+  .world small { color: var(--muted); font-size: 13px; }
+  .world .del { position: absolute; top: 6px; right: 6px; min-height: 36px; min-width: 36px; padding: 0 10px; border-radius: 10px;
+                background: transparent; border: 1px solid var(--line); color: var(--muted); font-size: 13px; }
+  .world .del.armed { background: var(--danger); border-color: transparent; color: #fff; }
+  #worlds:empty::before { content: 'No worlds yet. Make one below.'; color: var(--muted); font-size: 14px; padding: 2px; }
+  .new { display: flex; flex-direction: column; gap: 12px; max-width: 560px; padding: 14px; border-radius: 14px; background: var(--panel); border: 1px solid var(--line); }
+  .row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .row > span { min-width: 64px; color: var(--muted); font-size: 14px; }
+  .seg { display: inline-flex; border-radius: 12px; border: 1px solid var(--line); overflow: hidden; }
+  .seg button { min-height: 44px; padding: 8px 16px; background: var(--card); border: 0; border-right: 1px solid var(--line); }
+  .seg button:last-child { border-right: 0; }
+  .seg button[aria-pressed="true"] { background: var(--accent2); color: #17240a; font-weight: 700; }
+  .note { font-size: 13px; color: var(--muted); margin: 6px 2px; max-width: 60em; }
+  #status:empty { display: none; }
+  #status { margin: 0 2px 10px; color: var(--text); }
+  .busy { opacity: .6; }
+  .legal { margin-top: 18px; font-size: 12px; color: var(--muted); user-select: text; -webkit-user-select: text; }
+  .legal p { margin: 4px 0; }
+
+  /* ---------- overlays ---------- */
+  .overlay { position: fixed; inset: 0; z-index: 5; display: grid; place-items: center; padding: 64px 16px 16px; background: rgba(6, 9, 5, .9); }
+  .sheet { display: flex; flex-direction: column; max-width: 560px; padding: 18px; border-radius: 18px; background: var(--panel); border: 1px solid var(--line); }
+  .sheet h2 { margin: 0 0 8px; font-size: 19px; color: var(--text); letter-spacing: 0; text-transform: none; }
+  .sheet p { margin: 0 0 10px; font-size: 15px; color: #d5dfcc; overflow-wrap: anywhere; }
+
+  /* ---------- loading ---------- */
+  #loading { position: fixed; inset: 0; z-index: 4; display: grid; place-content: center; gap: 14px; text-align: center; background: var(--bg); }
+  #loading b { font-size: 20px; }
+  #loadText { color: var(--muted); font-size: 15px; }
+
+  /* ---------- player ---------- */
+  #player { position: fixed; inset: 0; display: grid; grid-template-rows: 60px minmax(0, 1fr); grid-template-columns: minmax(0, 1fr); background: #000; }
+  .bar { display: flex; align-items: center; gap: 8px; padding: 8px 10px 8px 110px; background: var(--panel); border-bottom: 1px solid var(--line); }
+  .bar b { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #saved { font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .screen { position: relative; min-height: 0; min-width: 0; overflow: hidden; }
+  /* the canvas must have no border or padding, or the game's touches land off */
+  #canvas { display: block; width: 100%; height: 100%; border: 0; padding: 0; background: #000; outline: none; }
+  #hint { position: absolute; left: 50%; bottom: 84px; transform: translateX(-50%); padding: 6px 12px; border-radius: 10px; background: rgba(21, 28, 19, .88);
+          border: 1px solid var(--line); font-size: 14px; color: var(--text); pointer-events: none; white-space: nowrap; }
+
+  @media (max-width: 640px) {
+    .bar .btn { padding: 8px 10px; }
+  }
+</style>
+</head>
+<body>
+<section id="library">
+  <header>
+    <h1>Block Builder</h1>
+    <button class="btn primary" id="continue" type="button" hidden></button>
+  </header>
+  <div class="scroll">
+    <p class="note" id="status" aria-live="polite"></p>
+    <h2>Your worlds</h2>
+    <div class="worlds" id="worlds"></div>
+
+    <h2 style="margin-top:20px">New world</h2>
+    <div class="new">
+      <div class="row"><span>Size</span><div class="seg" id="sizeSeg"></div></div>
+      <div class="row"><span>Land</span><div class="seg" id="landSeg"></div></div>
+      <div class="row"><button class="btn primary" id="create" type="button">Make world</button><span class="note" id="newNote" style="margin:0"></span></div>
+    </div>
+
+    <h2 style="margin-top:20px">Settings</h2>
+    <div class="row">
+      <div class="seg" id="sharpSeg"></div>
+      <span class="note" style="margin:0">Sharp draws every pixel of the screen: crisper, but more work for the car.</span>
+    </div>
+
+    <div class="legal">
+      <p>Build anything from 65 kinds of blocks, in creative mode: blocks never run out and you can fly. Worlds are kept on this screen and saved as you play (and whenever you leave), so they pick up where you left off.</p>
+      <p>Controls on the screen: drag to look around, the arrows at the bottom left walk, the arrow at the bottom right jumps, tap to place a block and hold to break one. Tap a block in the bar at the bottom to pick it, or "…" at its end for all of them. Fly and Speed are at the top right; "…" at the top has more, and Menu opens the game's menu (options, saving a copy of the world, loading one, making a new one). On a controller with two sticks: left stick walks, right stick looks, the bottom face button jumps, the right trigger places and the left trigger breaks, the shoulder buttons change block, the left face button shows all blocks and Start opens the menu. A keyboard and mouse work too: click the game, then WASD walks, Space jumps, the left mouse button breaks and the right one places, B shows all blocks, Z flies and Escape opens the menu.</p>
+      <p>Game: ClassiCube by UnknownShadow200 and contributors (BSD 3-Clause license), compiled to WebAssembly with small changes for the browser: /blocks/engine/classicube-web.patch, built by tools/build-blocks.mjs in github.com/RobertPKyle/frunk-store; see /blocks/NOTICE. Textures: from Mineclonia, based on the Pixel Perfection packs by XSSheep and Nova Wostra (CC BY-SA 4.0), adapted for this game by frunk.store and shared under the same license. Sounds: from Mineclonia, by the artists listed in /blocks/data/SOUNDS-CREDITS.txt (CC BY 3.0, CC BY-SA 3.0 and 4.0, CC0).</p>
+      <p>Block Builder and frunk.store are not affiliated with or endorsed by Mojang, Microsoft or the ClassiCube project. Minecraft is a trademark of Mojang Synergies AB. Play only while parked.</p>
+    </div>
+  </div>
+</section>
+
+<section id="loading" hidden aria-live="polite">
+  <b id="loadTitle"></b>
+  <span id="loadText"></span>
+</section>
+
+<section id="failed" class="overlay" hidden aria-labelledby="failedTitle">
+  <div class="sheet">
+    <h2 id="failedTitle">The game stopped</h2>
+    <p id="failedText"></p>
+    <div class="row"><button class="btn primary" id="failedOk" type="button">Back to worlds</button></div>
+  </div>
+</section>
+
+<section id="player" hidden>
+  <div class="bar">
+    <b id="title"></b>
+    <span id="saved" aria-live="polite"></span>
+    <button class="btn" id="menuBtn" type="button">Menu</button>
+    <button class="btn" id="soundBtn" type="button">Sound on</button>
+    <button class="btn" id="quitBtn" type="button">Worlds</button>
+  </div>
+  <div class="screen">
+    <canvas id="canvas" tabindex="-1" oncontextmenu="event.preventDefault()"></canvas>
+    <div id="hint" hidden></div>
+  </div>
+</section>
+
+<script src="blocks.js"></script>
+<script src="/sw-register.js"></script>
+</body>
+</html>

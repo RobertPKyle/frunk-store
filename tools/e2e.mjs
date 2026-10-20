@@ -1166,6 +1166,56 @@ await check('openarena plays a bot match with touch and a controller, and keeps 
   }
 });
 
+await check('block builder makes a world, digs with touch, saves when left and reopens it', async () => {
+  await openFromHub(/Block Builder/);
+  const frame = () => page.frames().find(f => f.url().includes('/blocks/'));
+  // The world as the game keeps it in its IndexedDB: SHA-256 of the file
+  const stored = () => frame().evaluate(() => new Promise((resolve, reject) => {
+    const req = indexedDB.open('/classicube', 21);
+    req.onerror = () => reject(req.error);
+    req.onsuccess = () => {
+      const get = req.result.transaction('FILE_DATA').objectStore('FILE_DATA').get('/classicube/maps/World 1.cw');
+      get.onsuccess = async () => {
+        req.result.close();
+        const data = get.result?.contents;
+        resolve(data ? [...new Uint8Array(await crypto.subtle.digest('SHA-256', data))].map(b => b.toString(16).padStart(2, '0')).join('') : null);
+      };
+    };
+  }));
+  await appFrame().locator('#landSeg').getByRole('button', { name: 'Flat' }).click();
+  await appFrame().getByRole('button', { name: 'Make world' }).click();
+  await appFrame().locator('#loading').waitFor({ state: 'hidden', timeout: 60000 });
+  await appFrame().locator('#saved').filter({ hasText: 'Saved' }).waitFor({ timeout: 10000 });
+  const first = await stored();
+  if (!first) throw new Error('the new world wasn\'t saved');
+  // Look down, then hold a finger on the ground to break the block there
+  const box = await appFrame().locator('#canvas').boundingBox();
+  const cdp = await page.context().newCDPSession(page);
+  const touch = (type, points) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: points.map(([x, y], id) => ({ x, y, id })) });
+  const cx = box.x + box.width / 2, cy = box.y + box.height / 2;
+  for (let n = 0; n < 3; n++) {
+    await touch('touchStart', [[cx, cy - 120]]);
+    for (let i = 1; i <= 10; i++) { await touch('touchMove', [[cx, cy - 120 + 24 * i]]); await page.waitForTimeout(16); }
+    await touch('touchEnd', []);
+  }
+  await touch('touchStart', [[cx, cy]]);
+  await page.waitForTimeout(1200);
+  await touch('touchEnd', []);
+  await page.waitForTimeout(300);
+  await page.screenshot({ path: shots + 'blocks.png' });
+  // Closing the app from the hub saves the world, and it opens again
+  await page.click('#home');
+  await page.waitForSelector('#runner', { state: 'hidden' });
+  await openFromHub(/Block Builder/);
+  const left = await stored();
+  if (left === first) throw new Error('the dug world wasn\'t saved when the app closed');
+  await appFrame().getByRole('button', { name: 'Play World 1' }).click();
+  await appFrame().locator('#loading').waitFor({ state: 'hidden', timeout: 60000 });
+  await appFrame().getByRole('button', { name: 'Worlds' }).click();
+  await appFrame().locator('#library').waitFor({ state: 'visible', timeout: 15000 });
+  await appFrame().locator('.world').filter({ hasText: 'World 1' }).waitFor({ timeout: 5000 });
+});
+
 await check('a place from the car\'s location follows the car', async () => {
   await openFromHub(/Star Map/);
   const appsOrigin = new URL(page.frames().find(f => f.url().includes('/stars/')).url()).origin;

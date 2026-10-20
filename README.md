@@ -308,6 +308,46 @@ to the cache again.
   (the bots' game code runs in the qvm interpreter: 5 bots took 550, so the
   page offers up to 4), starting in about 8 seconds. Not yet tried in the
   car.
+- `apps/blocks`: Block Builder. ClassiCube 1.3.8 (BSD-3-Clause), a
+  clean-room Minecraft Classic compatible game, compiled to WebAssembly by
+  `npm run build:blocks` (`tools/build-blocks.mjs`: a fixed ClassiCube
+  commit plus `tools/blocks/classicube-web.patch`, its own `make web` in
+  Docker, emsdk 4.0.10; 0.5 MB of wasm). The game ships no art of its own
+  that's free to use, so `tools/blocks/pack.mjs` makes a texture pack from
+  Mineclonia's textures (based on the Pixel Perfection packs, CC BY-SA 4.0,
+  at a fixed Mineclonia commit): the block tiles laid out in ClassiCube's
+  terrain atlas (grass and leaves tinted, missing wool colours tinted from
+  white wool), the water, lava, fire and magma animations, the hotbar and
+  the player; it draws the buttons, crosshair, clouds and touch stick
+  itself, and `tools/blocks/font.mjs` draws the font from Monocraft (OFL,
+  checked against its SHA-256) by reading its TrueType outlines, whose
+  squares are its pixels. Dig and step sounds are Mineclonia's (CC BY,
+  CC BY-SA, CC0), copied under the names the game asks for; the page makes
+  the game's `window.AUDIO` itself in the tap that starts a world and
+  decodes them all then, because the game skips a sound the first time it
+  asks for it (that's when it downloads it). The wasm, the
+  texture pack and the sounds aren't in git, so run it before deploying
+  `apps`. The game keeps its options and worlds in its own IndexedDB
+  database (`/classicube`, store `FILE_DATA`, keys like
+  `/classicube/maps/World 1.cw`); the page lists and deletes the worlds
+  there and starts the game with a world's path, or with `Module.newWorld`
+  (size, height, flat) for a new one. The patch adds `web_save()` (saves
+  the world as `maps/<name>.cw`; the page saves it every minute, when it's
+  hidden, when the hub's close handshake asks and on Worlds, and waits for
+  the write by queueing a write transaction behind it) and `web_escape()`
+  (the Menu button), and takes the texture pack's and sounds' URLs, the
+  touch controls (on screens without a fine pointer) and the canvas scale
+  from the page. The game's own touch controls are used: a four-arrow
+  stick, jump, Fly and Speed, tap to place and hold to break, and the
+  hotbar. It sizes its buttons and text by the canvas scale, so they keep
+  their size when the canvas is drawn at CSS pixels (the default) or at
+  every device pixel (Sharp). Also patched: a controller the car lists
+  twice is read once (standard mapping only), no skin downloads in single
+  player, no frame rate on screen, and no "unsaved changes" prompt. A
+  world made in the game's own menu gets a fresh name from the page when
+  it's first saved. Measured with the CPU slowed 4.5x: a small world starts
+  in under a second, 60 fps and about 30 to 60 ms of script a second. Not
+  yet tried in the car.
 - `apps/adventure`: Adventure Games. ScummVM 2026.4.0 (GPL-3.0-or-later)
   compiled to WebAssembly by `npm run build:scummvm`
   (`tools/build-scummvm.mjs`: the v2026.4.0 tag plus
@@ -420,6 +460,8 @@ npm run build:doom                      # Doom and Heretic engines + Freedoom an
 npm run build:scummvm                   # ScummVM engine + free adventures (needs Docker); run before deploying apps
 npm run build:quake                     # Quake engine + LibreQuake (needs Docker); run before deploying apps
 npm run build:openttd                   # OpenTTD engine + its free base sets (needs Docker); run before deploying apps
+npm run build:openarena                 # Quake III engine + OpenArena (needs Docker); run before deploying apps
+npm run build:blocks                    # ClassiCube engine + its textures, font and sounds (needs Docker); run before deploying apps
 npm run dev                             # hub on localhost:5173, apps on 127.0.0.1:5174
 npm run test:e2e                        # checks against the dev server
 node tools/e2e.mjs https://frunk.store  # checks against production
