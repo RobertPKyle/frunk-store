@@ -28,7 +28,7 @@ the hub's also keeps the app icons). When a page doesn't arrive within 3
 seconds, as on a weak connection, the cached copy is shown and the files that
 page loads come from the cache too, so its code stays from one version.
 Freedoom's and Blasphemer's WADs, Adventure Games' free games,
-LibreQuake's paks and music and OpenTTD's base sets are left out, because those apps keep them in IndexedDB, and an unchanged file (same ETag) isn't written
+LibreQuake's paks and music, OpenTTD's base sets and OpenArena's pk3s are left out, because those apps keep them in IndexedDB, and an unchanged file (same ETag) isn't written
 to the cache again.
 
 ## Sample apps
@@ -244,6 +244,59 @@ to the cache again.
   WebSocket proxy. Measured with the CPU slowed 4.5x: 60 fps, about 180 ms of
   main-thread work a second in a new game and 270 while dragging the map,
   with sound and music on. Not yet tried in the car.
+- `apps/openarena`: OpenArena. The Quake III engine ioquake3 (GPL-2.0-or-later)
+  compiled to WebAssembly by `npm run build:openarena`
+  (`tools/build-openarena.mjs`: a fixed ioq3 commit plus
+  `tools/openarena/ioq3-web.patch`, built with ioq3's own Emscripten CMake
+  support in Docker, emsdk 4.0.10 with a newer CMake from
+  `tools/openarena/Dockerfile`; the patched source ships next to the engine
+  in `apps/openarena/engine/`). The same script fetches OpenArena 0.8.8
+  (GPL-2.0-or-later, checked against its SHA-256, 425 MB) and
+  `tools/openarena/pack.mjs` repacks it into `apps/openarena/data/`: a
+  54 MB `oa-core.pk3` (menus, weapons, items, effects, sounds, the game
+  code's qvms and six player models, with `scripts/bots.txt` cut down to
+  their ten bots) and one `oa-map-<map>.pk3` of 1 to 6 MB for each of ten
+  free-for-all arenas. Which files a map or model needs is worked out the
+  way the engine looks them up (bsp shader and fog lumps, md3 surfaces,
+  skins, shader stages, entity sounds, models and music, and paths in the
+  qvms and the engine); each arena was checked against the full game, with
+  the same warnings (OpenArena's own missing files). The "mature" player
+  models and the mission pack are left out. It also writes `maps.json`
+  (titles, sizes, hashes), the level shots (TGA turned into PNG by
+  `tools/openarena/tga.mjs`), the license and credits files, and the game
+  code's source (Debian's `openarena_0.8.8+dfsg.orig.tar.xz`, checked
+  against its SHA-256). None of the data, the wasm or the source tarball is
+  in git, so run it before deploying `apps`. The page downloads the core
+  and the chosen arena the first time and keeps them in IndexedDB
+  (database `openarena`; a new hash downloads again), writes them to
+  `/baseoa` in the engine's memory, and starts `+map <arena>` with
+  `+addbot` for 1 to 4 bots at the chosen skill. Everything else goes in an
+  `autoexec.cfg` the page writes, because the engine's command line holds
+  only 1024 characters: free for all to 15 frags or 10 minutes (then the
+  arena starts over), the newer renderer's effects off (HDR, post-process,
+  SSAO, sun shadows, normal and specular maps), sound through SDL at
+  44.1 kHz with the page's AudioContext (made in the tap; any later tap
+  resumes it if the browser held it back, and the Sound button says so), and voice chat and its microphone
+  capture off (the browser would ask for the microphone). The patch adds
+  `web_move` (walk, step, turn and look rates), `web_look` (a dragged
+  finger, in degrees), `web_cmd` (`+attack`, `weapnext`...), `web_key`,
+  `web_mouse`, `web_pointer` (puts the menus' pointer where a finger is; it
+  calls the menus directly, because the engine adds queued mouse moves
+  together), `web_state` and `web_writeconfig`; keeps SDL's keyboard to the
+  canvas; and builds the SSAO, depth blur and sun shadow shaders only when
+  those effects are on: in Chrome on ANGLE's Vulkan backend the GPU process
+  crashed right after linking them (on SwiftShader it still crashes at
+  random points, so check it with a real GPU). The game's q3config.cfg is
+  copied to IndexedDB when the page is hidden, when the hub's close
+  handshake asks and on leaving; leaving the arena from the game's menu
+  goes back to the list. On the screen: a stick, a finger anywhere else (or
+  on FIRE) to turn and look, FIRE, JUMP, ZOOM and weapon buttons, and taps
+  on the game's own menus; controllers as in LibreQuake. Drawn at CSS
+  pixels, or every device pixel with Sharp graphics. Measured with the CPU
+  slowed 4.5x: 60 fps with 3 bots and about 235 ms of script a second
+  (the bots' game code runs in the qvm interpreter: 5 bots took 550, so the
+  page offers up to 4), starting in about 8 seconds. Not yet tried in the
+  car.
 - `apps/adventure`: Adventure Games. ScummVM 2026.4.0 (GPL-3.0-or-later)
   compiled to WebAssembly by `npm run build:scummvm`
   (`tools/build-scummvm.mjs`: the v2026.4.0 tag plus

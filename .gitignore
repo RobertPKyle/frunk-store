@@ -18,3 +18,10 @@ apps/openttd/engine/openttd.data
 apps/openttd/engine/*-web-src.tar.gz
 apps/openttd/data/*.tar.gz
 apps/openttd/data/*.tar.xz
+tools/.openarena-build
+apps/openarena/engine/ioquake3.wasm
+apps/openarena/engine/*-web-src.tar.gz
+apps/openarena/data/*.pk3
+apps/openarena/data/*-src.tar.xz
+apps/openarena/data/levelshots
+apps/openarena/data/maps.json

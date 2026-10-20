@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>OpenArena</title>
+<style>
+  :root { --bg: #090a10; --panel: #12141e; --card: #1a1d2b; --line: rgba(150, 170, 230, .14); --text: #eef0f7; --muted: #959bb3;
+          --accent: #f0832c; --accent2: #ffd060; --ok: #9bd88f; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 16px/1.4 system-ui, sans-serif; overflow: hidden;
+               -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; touch-action: none; }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  .btn { min-height: 44px; padding: 8px 16px; border-radius: 12px; background: var(--card); border: 1px solid var(--line); white-space: nowrap; }
+  .btn.primary { background: var(--accent); border-color: transparent; color: #1e0d02; font-weight: 700; }
+  .btn.on { background: var(--accent2); border-color: transparent; color: #241a03; font-weight: 700; }
+  [hidden] { display: none !important; }
+
+  /* ---------- library ---------- */
+  #library { display: flex; flex-direction: column; height: 100%; }
+  /* left padding keeps clear of the hub's Apps button */
+  header { display: flex; align-items: center; gap: 10px; min-height: 60px; padding: 8px 12px 8px 110px; border-bottom: 1px solid var(--line); }
+  header h1 { margin: 0; font-size: 18px; font-weight: 600; flex: 1; }
+  #again { max-width: 55%; overflow: hidden; text-overflow: ellipsis; }
+  .scroll { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 12px 16px 20px; touch-action: pan-y; }
+  h2 { margin: 10px 2px 8px; font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .arenas { display: grid; grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); gap: 10px; }
+  .arena { display: flex; flex-direction: column; text-align: left; padding: 0; border-radius: 14px; background: var(--card); border: 1px solid var(--line); overflow: hidden; }
+  .arena img { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; background: #000; }
+  .arena span { display: flex; flex-direction: column; gap: 2px; padding: 8px 10px 10px; }
+  .arena b { font-size: 15px; }
+  .arena small { color: var(--muted); font-size: 12px; }
+  .arena.busy { opacity: .6; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 4px 0 10px; }
+  .row > span { min-width: 64px; font-size: 14px; color: var(--muted); }
+  .seg { display: inline-flex; border-radius: 12px; border: 1px solid var(--line); overflow: hidden; }
+  .seg button { min-height: 44px; min-width: 48px; padding: 8px 12px; background: var(--card); border: 0; border-left: 1px solid var(--line); }
+  .seg button:first-child { border-left: 0; }
+  .seg button[aria-pressed="true"] { background: var(--accent2); color: #241a03; font-weight: 700; }
+  .note { font-size: 13px; color: var(--muted); margin: 6px 2px; max-width: 60em; }
+  #status:empty { display: none; }
+  #status { margin: 0 2px 10px; color: var(--text); }
+  .legal { margin-top: 18px; font-size: 12px; color: var(--muted); user-select: text; -webkit-user-select: text; }
+  .legal p { margin: 4px 0; }
+
+  /* ---------- loading, errors ---------- */
+  #loading { position: fixed; inset: 0; z-index: 4; display: grid; place-content: center; gap: 14px; text-align: center; background: var(--bg); }
+  #loading b { font-size: 20px; }
+  #loadText { color: var(--muted); font-size: 15px; }
+  .meter { width: min(360px, 80vw); height: 8px; border-radius: 4px; background: var(--card); overflow: hidden; }
+  .meter i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .2s; }
+  .overlay { position: fixed; inset: 0; z-index: 5; display: grid; place-items: center; padding: 64px 16px 16px; background: rgba(6, 7, 12, .9); }
+  .sheet { display: flex; flex-direction: column; max-width: 560px; padding: 18px; border-radius: 18px; background: var(--panel); border: 1px solid var(--line); }
+  .sheet h2 { margin: 0 0 8px; font-size: 19px; color: var(--text); letter-spacing: 0; text-transform: none; }
+  .sheet p { margin: 0 0 10px; font-size: 15px; color: #d0d4e2; overflow-wrap: anywhere; }
+
+  /* ---------- player ---------- */
+  #player { position: fixed; inset: 0; display: grid; grid-template-rows: 60px minmax(0, 1fr); grid-template-columns: minmax(0, 1fr); background: #000; }
+  .bar { display: flex; align-items: center; gap: 8px; padding: 8px 10px 8px 110px; background: var(--panel); border-bottom: 1px solid var(--line); }
+  .bar b { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #fps { font: inherit; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; background: none; border: 0; padding: 12px 4px; }
+  .screen { position: relative; min-height: 0; min-width: 0; overflow: hidden; }
+  /* the game fills the space under the bar */
+  #canvas { position: absolute; inset: 0; display: block; width: 100% !important; height: 100% !important; background: #000; outline: none; }
+  /* On-screen controls, over the game: a finger anywhere on it (but the
+     buttons) turns and looks, the stick walks, and the buttons fire, jump,
+     zoom and change weapons. In menus, taps go to the game's own buttons. */
+  #touch { position: absolute; inset: 0; }
+  #player.mouse #touch, #player.pad #touch, #player.menu #touch .play, #player.wait #touch .play { display: none; }
+  .side { position: absolute; bottom: 84px; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+  .side.left { left: 14px; }
+  .side.right { right: 14px; }
+  .stick { position: relative; width: 140px; height: 140px; border-radius: 50%; background: rgba(20, 24, 40, .45); border: 1px solid rgba(160, 180, 240, .3); }
+  .stick i { position: absolute; left: 50%; top: 50%; width: 58px; height: 58px; margin: -29px 0 0 -29px; border-radius: 50%; background: rgba(80, 92, 140, .6); border: 1px solid rgba(160, 180, 240, .35); }
+  .stick.on i { background: rgba(120, 136, 200, .75); }
+  .acts { display: grid; grid-template-columns: 56px 84px; grid-template-rows: 56px 56px; gap: 10px; align-items: center; }
+  .acts button, .weap button { border: 0; font-weight: 800; color: #fff; }
+  .fire { grid-column: 2; grid-row: 1 / 3; width: 84px; height: 84px; border-radius: 50%; background: rgba(240, 131, 44, .6); font-size: 15px; }
+  .zoom { grid-column: 1; grid-row: 1; width: 56px; height: 56px; border-radius: 50%; background: rgba(70, 80, 120, .55); font-size: 12px; }
+  .jump { grid-column: 1; grid-row: 2; width: 56px; height: 56px; border-radius: 50%; background: rgba(90, 104, 160, .55); font-size: 13px; }
+  .weap { display: flex; gap: 8px; }
+  .weap button { width: 62px; height: 42px; border-radius: 12px; background: rgba(20, 24, 40, .5); font-size: 14px; border: 1px solid rgba(160, 180, 240, .3); }
+  #hint { position: absolute; left: 50%; top: 12px; transform: translateX(-50%); padding: 6px 12px; border-radius: 10px; background: rgba(18, 20, 30, .85);
+          border: 1px solid var(--line); font-size: 14px; color: var(--text); pointer-events: none; white-space: nowrap; }
+  [data-b].on { filter: brightness(1.5); transform: scale(.94); }
+
+  @media (max-width: 640px) {
+    .bar .btn { padding: 8px 10px; }
+  }
+</style>
+</head>
+<body>
+<section id="library">
+  <header>
+    <h1>OpenArena</h1>
+    <button class="btn" id="again" type="button" hidden></button>
+  </header>
+  <div class="scroll">
+    <p class="note" id="status" aria-live="polite"></p>
+    <h2>Arenas</h2>
+    <div class="arenas" id="arenas"></div>
+    <p class="note" id="sizes"></p>
+
+    <h2 style="margin-top:20px">Match</h2>
+    <div class="row"><span>Bots</span><div class="seg" id="botsSeg" role="group" aria-label="Bots"></div></div>
+    <div class="row"><span>Skill</span><div class="seg" id="skillSeg" role="group" aria-label="Bot skill"></div><span class="note" id="skillName" style="margin:0"></span></div>
+    <div class="row"><span>Graphics</span><button class="btn" id="sharpBtn" type="button" aria-pressed="false">Sharp graphics</button>
+      <span class="note" style="margin:0">Draws every screen pixel: sharper, but more for the car to draw.</span></div>
+    <p class="note">Free for all: the first to 15 frags, or the most after 10 minutes, wins, then the arena starts over.</p>
+
+    <div class="legal">
+      <p>Controls: on the screen, the stick walks and steps sideways, a finger dragged anywhere else turns and looks, FIRE shoots (and turns too, if you drag it; it also brings you back after you're fragged), JUMP jumps, ZOOM zooms while held, and ‹ › change weapons. Menu opens the game's menu, where you tap its buttons. On a controller: left stick to walk, right stick to turn and look (with no right stick, the D-pad and stick turn left and right), L and R to step sideways, the right face button or right trigger to fire, the bottom face button or left trigger to jump, the other two face buttons to change weapons, Start for the menu and Select for the scores. A keyboard and mouse work too (click the game to look with the mouse).</p>
+      <p>Engine: ioquake3 (GNU GPL 2 or later), compiled to WebAssembly with small changes for the browser. Source: /openarena/engine/ioq3-87a99d18206e-web-src.tar.gz, with the changes in /openarena/engine/ioq3-web.patch, built by tools/build-openarena.mjs in github.com/RobertPKyle/frunk-store; see /openarena/NOTICE. Game: OpenArena 0.8.8 by the OpenArena team and contributors (GNU GPL 2 or later; see /openarena/data/COPYING and CREDITS), repacked for downloading; the source of its game code is /openarena/data/openarena-0.8.8-gamecode-src.tar.xz.</p>
+      <p>OpenArena and frunk.store are not affiliated with or endorsed by id Software, Bethesda, ZeniMax or Microsoft. QUAKE is a trademark of ZeniMax Media. Cartoon violence. Play only while parked.</p>
+    </div>
+  </div>
+</section>
+
+<section id="loading" hidden aria-live="polite">
+  <b id="loadTitle"></b>
+  <div class="meter"><i id="loadBar"></i></div>
+  <span id="loadText"></span>
+</section>
+
+<section id="failed" class="overlay" hidden aria-labelledby="failedTitle">
+  <div class="sheet">
+    <h2 id="failedTitle">The game stopped</h2>
+    <p id="failedText"></p>
+    <div class="row"><button class="btn primary" id="failedOk" type="button">Back to arenas</button></div>
+  </div>
+</section>
+
+<section id="player" hidden>
+  <div class="bar">
+    <b id="title"></b>
+    <button id="fps" type="button" tabindex="-1"></button>
+    <button class="btn" id="menuBtn" type="button">Menu</button>
+    <button class="btn" id="soundBtn" type="button">Sound on</button>
+    <button class="btn" id="quitBtn" type="button">Arenas</button>
+  </div>
+  <div class="screen">
+    <canvas id="canvas" tabindex="-1" oncontextmenu="event.preventDefault()"></canvas>
+    <div id="touch">
+      <div class="side left play">
+        <div class="stick" id="stick"><i></i></div>
+      </div>
+      <div class="side right play">
+        <div class="weap"><button type="button" data-b="prev" aria-label="Previous weapon">‹ Gun</button><button type="button" data-b="next" aria-label="Next weapon">Gun ›</button></div>
+        <div class="acts">
+          <button class="zoom" type="button" data-b="zoom">ZOOM</button>
+          <button class="fire" type="button" data-b="fire">FIRE</button>
+          <button class="jump" type="button" data-b="jump">JUMP</button>
+        </div>
+      </div>
+      <div id="hint" hidden></div>
+    </div>
+  </div>
+</section>
+
+<script type="module" src="openarena.js"></script>
+<script src="/sw-register.js"></script>
+</body>
+</html>

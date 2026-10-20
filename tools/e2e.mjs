@@ -973,6 +973,147 @@ await check('openttd plays with touch, saves when left and continues', async () 
   await appFrame().locator('#library').waitFor({ state: 'visible', timeout: 15000 });
 });
 
+await check('openarena plays a bot match with touch and a controller, and keeps the game', async () => {
+  // The Quake III renderer crashes SwiftShader's graphics process, so this
+  // check has its own browser on the real GPU (ANGLE on OpenGL by default)
+  const gpu = await chromium.launch({
+    executablePath: process.env.CHROME || '/usr/bin/google-chrome',
+    args: ['--enable-gpu', `--use-angle=${process.env.OA_ANGLE || 'gl'}`, '--ignore-gpu-blocklist'],
+  });
+  try {
+    const p = await gpu.newPage({ viewport: { width: 773, height: 601 }, deviceScaleFactor: 1.53, hasTouch: true });
+    p.on('pageerror', e => errors.push(`openarena pageerror: ${e.message}`));
+    p.on('console', m => { if (m.type() === 'error') errors.push(`openarena console: ${m.text()}`); });
+    const app = () => p.frameLocator('#frame');
+    const frame = () => p.frames().find(f => f.url().includes('/openarena/'));
+    const open = async () => {
+      await p.goto(base + '/');
+      await p.locator('#grid').getByRole('button', { name: /OpenArena/ }).click();
+      await p.waitForSelector('#loading', { state: 'hidden' });
+    };
+    const cdp = await p.context().newCDPSession(p);
+    const touch = (type, points) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: points.map(([x, y], id) => ({ x, y, id })) });
+    const tapAt = async (x, y) => { await touch('touchStart', [[x, y]]); await p.waitForTimeout(120); await touch('touchEnd', []); };
+    const tap = async name => { const b = await app().getByRole('button', { name, exact: true }).boundingBox(); await tapAt(b.x + b.width / 2, b.y + b.height / 2); };
+    // A place in the game's menus (640x480, centred and scaled to the
+    // height) on the page
+    const menuAt = async (x, y) => {
+      const b = await app().locator('#canvas').boundingBox();
+      const s = b.height / 480;
+      await tapAt(b.x + b.width / 2 + (x - 320) * s, b.y + y * s);
+    };
+    await open();
+    await app().locator('.arena').filter({ hasText: 'Think Twice Or Die' }).click();
+    // First time: downloads the game (54 MB) and the arena, then the match
+    // starts with the bots
+    await app().locator('#player[data-mode="game"]').waitFor({ timeout: 120000 });
+    // The match's players, from the game's console (status lists them)
+    const players = async () => {
+      await frame().evaluate(() => document.getElementById('canvas').focus());
+      await p.keyboard.press('Shift+Escape');
+      await p.keyboard.type('/status');
+      await p.keyboard.press('Enter');
+      await p.keyboard.press('Shift+Escape');
+      await p.waitForTimeout(300);
+      const log = await frame().evaluate(() => openarenaLog.slice());
+      const at = log.lastIndexOf(']/status');
+      return log.slice(at).filter(l => /^\s*\d+\s+-?\d+\s+\d+\s+\S+\s+\S*(bot|loopback)\s/.test(l)).length;
+    };
+    // Menu opens the game's menu; tapping RESUME GAME closes it (taps first:
+    // after a screenshot, headless Chrome's taps miss their place)
+    await tap('Menu');
+    await app().locator('#player[data-mode="menu"]').waitFor({ timeout: 3000 });
+    await p.waitForTimeout(300);
+    await menuAt(320, 323);
+    await app().locator('#player[data-mode="game"]').waitFor({ timeout: 3000 });
+    // and LEAVE ARENA goes back to the arenas, keeping the settings
+    await tap('Menu');
+    await app().locator('#player[data-mode="menu"]').waitFor({ timeout: 3000 });
+    await p.waitForTimeout(300);
+    await menuAt(320, 350);
+    await app().locator('#library').waitFor({ state: 'visible', timeout: 10000 });
+    const config = await frame().evaluate(() => new Promise(r => {
+      const q = indexedDB.open('openarena');
+      q.onsuccess = () => { const g = q.result.transaction('config').objectStore('config').get('q3config'); g.onsuccess = () => r(g.result ? new TextDecoder().decode(g.result.data) : ''); };
+      q.onerror = () => r('');
+    }));
+    if (!/seta name "Player"/.test(config)) throw new Error('the settings weren\'t kept');
+    // Play again: from IndexedDB this time, no download
+    let downloads = 0;
+    p.on('request', r => { if (/\/openarena\/data\/.*\.pk3$/.test(r.url())) downloads++; });
+    await app().getByRole('button', { name: 'Play Think Twice Or Die' }).click();
+    await app().locator('#player[data-mode="game"]').waitFor({ timeout: 60000 });
+    if (downloads) throw new Error(`downloaded ${downloads} pk3s again`);
+    const joined = await players();
+    if (joined < 4) throw new Error(`${joined} players in the match, expected the player and 3 bots`);
+    // A finger dragged across the game turns the view, and the stick walks
+    // (once the player is back, if a bot got them first)
+    const canvas = app().locator('#canvas');
+    const box = await canvas.boundingBox();
+    const alive = async () => {
+      for (let i = 0; i < 10 && await app().locator('#player.dead').count(); i++) {
+        const f = await app().locator('[data-b="fire"]').boundingBox();
+        await tapAt(f.x + f.width / 2, f.y + f.height / 2);
+        await p.waitForTimeout(500);
+      }
+    };
+    await alive();
+    const sky = () => p.screenshot({ clip: { x: box.x + box.width * 0.2, y: box.y + 10, width: box.width * 0.6, height: box.height * 0.45 } });
+    const before = await sky();
+    await touch('touchStart', [[box.x + box.width * 0.6, box.y + box.height * 0.3]]);
+    for (let i = 1; i <= 10; i++) { await touch('touchMove', [[box.x + box.width * 0.6 + i * 12, box.y + box.height * 0.3]]); await p.waitForTimeout(30); }
+    await touch('touchEnd', []);
+    await p.waitForTimeout(300);
+    const turned = await sky();
+    if (turned.equals(before)) throw new Error('dragging didn\'t turn the view');
+    const stick = await app().locator('#stick').boundingBox();
+    const cx = stick.x + stick.width / 2, cy = stick.y + stick.height / 2;
+    await touch('touchStart', [[cx, cy]]);
+    await touch('touchMove', [[cx, cy - 60]]);
+    await p.waitForTimeout(800);
+    await touch('touchEnd', []);
+    await p.waitForTimeout(300);
+    if ((await sky()).equals(turned)) throw new Error('the stick didn\'t walk');
+    // Two pads like the car's. Start opens the menu, the bottom button
+    // closes it, and the right stick turns; the on-screen controls hide.
+    await frame().evaluate(() => {
+      const pad = (id, mapping, index) => ({ id, index, mapping, connected: true, timestamp: 0, axes: [0, 0, 0, 0], buttons: Array.from({ length: 17 }, () => ({ pressed: false, value: 0 })) });
+      const pads = [pad('raw', '', 0), pad('Tesla Virtual Gamepad', 'standard', 1)];
+      navigator.getGamepads = () => pads;
+      window.padHold = async (b, ms = 150) => {
+        Object.assign(pads[1].buttons[b], { pressed: true, value: 1 });
+        await new Promise(r => setTimeout(r, ms));
+        for (const x of pads[1].buttons) Object.assign(x, { pressed: false, value: 0 });
+        await new Promise(r => setTimeout(r, 300));
+      };
+      window.padTurn = async ms => {
+        pads[1].axes[2] = 1;
+        await new Promise(r => setTimeout(r, ms));
+        pads[1].axes[2] = 0;
+        await new Promise(r => setTimeout(r, 300));
+      };
+    });
+    await frame().evaluate(() => padHold(9));
+    await app().locator('#player[data-mode="menu"]').waitFor({ timeout: 3000 });
+    await frame().evaluate(() => padHold(0));
+    await app().locator('#player[data-mode="game"]').waitFor({ timeout: 3000 });
+    const still = await sky();
+    await frame().evaluate(() => padTurn(800));
+    if ((await sky()).equals(still)) throw new Error('the right stick didn\'t turn');
+    if (await app().locator('#stick').isVisible()) throw new Error('on-screen controls still showing with a controller');
+    const fps = parseInt(await app().locator('#fps').textContent());
+    if (!(fps >= 30)) throw new Error(`running at ${fps} fps`);
+    console.log(`     ${fps} fps`);
+    await p.screenshot({ path: shots + 'openarena.png' });
+    // Arenas leaves the match (clicked from the page: after the screenshot,
+    // real clicks miss)
+    await frame().evaluate(() => document.getElementById('quitBtn').click());
+    await app().locator('#library').waitFor({ state: 'visible', timeout: 10000 });
+  } finally {
+    await gpu.close();
+  }
+});
+
 await check('a place from the car\'s location follows the car', async () => {
   await openFromHub(/Star Map/);
   const appsOrigin = new URL(page.frames().find(f => f.url().includes('/stars/')).url()).origin;

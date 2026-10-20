@@ -11,8 +11,9 @@ const SLOW = 3000;   // ms to wait for a page before using the cached copy
 
 // Big downloads the apps keep in IndexedDB themselves (Freedoom's and
 // Blasphemer's WADs, Adventure Games' free games, LibreQuake's paks and music,
-// OpenTTD's base sets). A second copy here would only fill storage.
-const SKIP = /^\/(doom\/freedoom\/[^/]+\.wad\.gz|heretic\/blasphemer\/[^/]+\.wad\.gz|adventure\/games\/[^/]+\.zip|quake\/librequake\/([^/]+\.pak\.gz|music\/[^/]+\.ogg)|openttd\/data\/[^/]+\.tar\.gz)$/;
+// OpenTTD's base sets, OpenArena's pk3s). A second copy here would only fill
+// storage.
+const SKIP = /^\/(doom\/freedoom\/[^/]+\.wad\.gz|heretic\/blasphemer\/[^/]+\.wad\.gz|adventure\/games\/[^/]+\.zip|quake\/librequake\/([^/]+\.pak\.gz|music\/[^/]+\.ogg)|openttd\/data\/[^/]+\.tar\.gz|openarena\/data\/[^/]+\.pk3)$/;
 
 // Pages shown from the cache: their files come from the cache first. Lost
 // when the worker stops, which only means going back to network-first.

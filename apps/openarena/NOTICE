@@ -1,0 +1,53 @@
+OpenArena (apps/openarena)
+
+Engine (engine/)
+  ioquake3, by the ioquake3 contributors, based on the Quake III Arena
+  source code by id Software (1999-2005).
+  License: GNU General Public License, version 2 or (at your option) any
+  later version (engine/COPYING.txt).
+  Source: https://github.com/ioquake/ioq3, commit
+  87a99d18206e878a20289f05ac3c16005dcae5c3, with frunk.store's changes for
+  the browser in engine/ioq3-web.patch (also tools/openarena/ioq3-web.patch
+  in https://github.com/RobertPKyle/frunk-store, whose
+  tools/build-openarena.mjs builds it). The complete patched source the
+  build came from is engine/ioq3-87a99d18206e-web-src.tar.gz.
+  The changes: walking, turning and looking handed in by the page, its
+  console commands, keys and menu pointer, the game's state for the page,
+  saving the settings from the page, keys only while the game has the
+  focus, and the screen-space ambient occlusion, depth blur and sun shadow
+  shaders built only when those effects are on (in Chrome on ANGLE's Vulkan
+  backend the graphics process crashed after linking them).
+
+Game (data/)
+  OpenArena 0.8.8, by the OpenArena team and contributors (data/CREDITS,
+  data/README, data/readme_085.txt, data/readme_088.txt).
+  https://openarena.ws
+  License: GNU General Public License, version 2 or (at your option) any
+  later version (data/COPYING).
+  The files are OpenArena 0.8.8's, from the release's openarena-0.8.8.zip
+  (SHA-256 5a8faf7f5b51f351b0a1618c06b6b98a5f1a6758f1d39818de2c87df2a0bac4a),
+  unchanged but repacked by tools/openarena/pack.mjs: data/oa-core.pk3
+  holds the menus, weapons, items, effects, sounds, game code and six
+  player models, and each data/oa-map-<map>.pk3 holds what one arena adds.
+  The one file changed is scripts/bots.txt, which lists only the bots whose
+  player models are included. Left out: the "mature" player models
+  (pak2-players-mature.pk3 and the models in it), the mission pack, the
+  demos, and the arenas and textures not played here. The level shots in
+  data/levelshots/ are the arenas' own, converted from TGA to PNG where
+  needed.
+  The game code (the qvm files in data/oa-core.pk3) was compiled by the
+  OpenArena team from the source in
+  data/openarena-0.8.8-gamecode-src.tar.xz (OpenArena 0.8.8's game code
+  release, as Debian distributes it: openarena_0.8.8+dfsg.orig.tar.xz,
+  SHA-256 321c7811d78ffbec66dd7e2d61ce885d4199658c68a6b00c921d30a8cbef311e).
+  The source of the art, maps and sounds, where the files in the pk3s
+  aren't themselves the form for changing them, is in OpenArena's
+  repository (https://openarena.ws/svn/source/assets/) and in Debian's
+  OpenArena data source packages (the openarena-data, openarena-085-data,
+  openarena-088-data, openarena-maps, openarena-misc, openarena-players and
+  openarena-textures packages at https://deb.debian.org/debian/pool/main/o/).
+
+Trademarks
+  QUAKE is a trademark of ZeniMax Media. OpenArena and frunk.store are not
+  affiliated with or endorsed by id Software, Bethesda, ZeniMax or
+  Microsoft.

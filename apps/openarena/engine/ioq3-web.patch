@@ -1,0 +1,180 @@
+diff --git a/cmake/platforms/emscripten.cmake b/cmake/platforms/emscripten.cmake
+index 6948845c..7b2e3fcf 100644
+--- a/cmake/platforms/emscripten.cmake
++++ b/cmake/platforms/emscripten.cmake
+@@ -23,7 +23,7 @@ list(APPEND CLIENT_LINK_OPTIONS
+     -sSTACK_SIZE=5MB
+     -sMIN_WEBGL_VERSION=1
+     -sMAX_WEBGL_VERSION=2
+-    -sEXPORTED_RUNTIME_METHODS=FS,addRunDependency,removeRunDependency
++    -sEXPORTED_RUNTIME_METHODS=FS,addRunDependency,removeRunDependency,ccall
+     -sEXIT_RUNTIME=1
+     -sEXPORT_ES6
+     -sEXPORT_NAME=${CLIENT_NAME}
+diff --git a/code/client/cl_input.c b/code/client/cl_input.c
+index cfdaa1d1..8b51c1e4 100644
+--- a/code/client/cl_input.c
++++ b/code/client/cl_input.c
+@@ -575,6 +575,38 @@ void CL_FinishMove( usercmd_t *cmd ) {
+ CL_CreateCmd
+ =================
+ */
++#ifdef __EMSCRIPTEN__
++#include <emscripten/emscripten.h>
++
++// Walking and turning from the page's on-screen controls and controllers
++// (apps/openarena/openarena.js): forward and side from -1 to 1, yaw and
++// pitch in degrees per second (sticks), and turns in degrees to add once
++// (a finger dragged on the screen)
++static float web_forward, web_side, web_yaw, web_pitch, web_turnYaw, web_turnPitch;
++
++EMSCRIPTEN_KEEPALIVE void web_move( float forward, float side, float yaw, float pitch ) {
++	web_forward = forward;
++	web_side = side;
++	web_yaw = yaw;
++	web_pitch = pitch;
++}
++
++EMSCRIPTEN_KEEPALIVE void web_look( float yaw, float pitch ) {
++	web_turnYaw += yaw;
++	web_turnPitch += pitch;
++}
++
++static void CL_WebMove( usercmd_t *cmd ) {
++	float frame = cls.frametime * 0.001f;
++
++	cl.viewangles[YAW] -= web_yaw * frame + web_turnYaw;
++	cl.viewangles[PITCH] += web_pitch * frame + web_turnPitch;
++	web_turnYaw = web_turnPitch = 0;
++	cmd->forwardmove = ClampChar( cmd->forwardmove + (int)( web_forward * 127 ) );
++	cmd->rightmove = ClampChar( cmd->rightmove + (int)( web_side * 127 ) );
++}
++#endif
++
+ usercmd_t CL_CreateCmd( void ) {
+ 	usercmd_t	cmd;
+ 	vec3_t		oldAngles;
+@@ -597,6 +629,10 @@ usercmd_t CL_CreateCmd( void ) {
+ 	// get basic movement from joystick
+ 	CL_JoystickMove( &cmd );
+ 
++#ifdef __EMSCRIPTEN__
++	CL_WebMove( &cmd );
++#endif
++
+ 	// check to make sure the angles haven't wrapped
+ 	if ( cl.viewangles[PITCH] - oldAngles[PITCH] > 90 ) {
+ 		cl.viewangles[PITCH] = oldAngles[PITCH] + 90;
+diff --git a/code/client/cl_main.c b/code/client/cl_main.c
+index d8c8c669..5b143269 100644
+--- a/code/client/cl_main.c
++++ b/code/client/cl_main.c
+@@ -125,6 +125,56 @@ cvar_t	*cl_rate;
+ clientActive_t		cl;
+ clientConnection_t	clc;
+ clientStatic_t		cls;
++
++#ifdef __EMSCRIPTEN__
++#include <emscripten/emscripten.h>
++
++// Called by the page (apps/openarena/openarena.js)
++
++// Runs console commands, as if typed
++EMSCRIPTEN_KEEPALIVE void web_cmd( const char *text ) {
++	Cbuf_AddText( text );
++	Cbuf_AddText( "\n" );
++}
++
++// A key (K_* in keycodes.h) going down or up
++EMSCRIPTEN_KEEPALIVE void web_key( int key, int down ) {
++	Com_QueueEvent( Sys_Milliseconds(), SE_KEY, key, down, 0, NULL );
++}
++
++// The mouse moving: turning in the game, the pointer in the menus
++EMSCRIPTEN_KEEPALIVE void web_mouse( int dx, int dy ) {
++	Com_QueueEvent( Sys_Milliseconds(), SE_MOUSE, dx, dy, 0, NULL );
++}
++
++// Puts the menus' pointer where the player tapped. It moves by how far the
++// mouse moved, so it goes to the top left corner first and then dx, dy from
++// there; called straight away, since queued mouse moves are added together.
++EMSCRIPTEN_KEEPALIVE void web_pointer( int dx, int dy ) {
++	if ( !uivm || !( Key_GetCatcher() & KEYCATCH_UI ) ) {
++		return;
++	}
++	VM_Call( uivm, UI_MOUSE_EVENT, -100000, -100000 );
++	VM_Call( uivm, UI_MOUSE_EVENT, dx, dy );
++}
++
++// What's on screen: the connection state (connstate_t) in the low byte, the
++// key catchers (KEYCATCH_*) in the next, then the player's pm_type
++// (PM_DEAD, PM_INTERMISSION...) once a snapshot has arrived, plus one
++EMSCRIPTEN_KEEPALIVE int web_state( void ) {
++	int pm = ( clc.state == CA_ACTIVE && cl.snap.valid ) ? cl.snap.ps.pm_type + 1 : 0;
++	return clc.state | ( Key_GetCatcher() & 0xff ) << 8 | pm << 16;
++}
++
++void Com_WriteConfigToFile( const char *filename );
++
++// Saves the settings now (q3config.cfg), for the page to keep
++EMSCRIPTEN_KEEPALIVE void web_writeconfig( void ) {
++	if ( com_fullyInitialized ) {
++		Com_WriteConfigToFile( Q3CONFIG_CFG );
++	}
++}
++#endif
+ vm_t				*cgvm;
+ 
+ char				cl_reconnectArgs[MAX_OSPATH];
+diff --git a/code/renderergl2/tr_glsl.c b/code/renderergl2/tr_glsl.c
+index 27271f0e..22d06e1c 100644
+--- a/code/renderergl2/tr_glsl.c
++++ b/code/renderergl2/tr_glsl.c
+@@ -1414,6 +1414,9 @@ void GLSL_InitGPUShaders(void)
+ 	// GLSL 1.10+ or GL_EXT_shadow_samplers extension are required for sampler2DShadow type
+ 	if (glRefConfig.glslMajorVersion > 1 || (glRefConfig.glslMajorVersion == 1 && glRefConfig.glslMinorVersion >= 10)
+ 	    || glRefConfig.shadowSamplers)
++#ifdef __EMSCRIPTEN__
++	if (r_sunlightMode->integer)
++#endif
+ 	{
+ 		attribs = ATTR_POSITION | ATTR_TEXCOORD;
+ 		extradefines[0] = '\0';
+@@ -1469,6 +1472,11 @@ void GLSL_InitGPUShaders(void)
+ 	// GLSL 1.10+ or GL_OES_standard_derivatives extension are required for dFdx() and dFdy() GLSL functions
+ 	if (glRefConfig.glslMajorVersion > 1 || (glRefConfig.glslMajorVersion == 1 && glRefConfig.glslMinorVersion >= 10)
+ 	    || glRefConfig.standardDerivatives)
++#ifdef __EMSCRIPTEN__
++	// Only built when used: in Chrome on ANGLE's Vulkan backend (and
++	// SwiftShader), the GPU process crashed after these shaders were linked
++	if (r_ssao->integer)
++#endif
+ 	{
+ 		attribs = ATTR_POSITION | ATTR_TEXCOORD;
+ 		extradefines[0] = '\0';
+@@ -1492,6 +1500,9 @@ void GLSL_InitGPUShaders(void)
+ 		numEtcShaders++;
+ 
+ 
++#ifdef __EMSCRIPTEN__
++		if (r_ssao->integer || r_shadowBlur->integer)
++#endif
+ 		for (i = 0; i < 4; i++)
+ 		{
+ 			attribs = ATTR_POSITION | ATTR_TEXCOORD;
+diff --git a/code/sdl/sdl_glimp.c b/code/sdl/sdl_glimp.c
+index d5c38f61..8ca19eab 100644
+--- a/code/sdl/sdl_glimp.c
++++ b/code/sdl/sdl_glimp.c
+@@ -845,6 +845,11 @@ static qboolean GLimp_StartDriverAndSetMode(int mode, qboolean fullscreen, qbool
+ 
+ 	if (!SDL_WasInit(SDL_INIT_VIDEO))
+ 	{
++#ifdef __EMSCRIPTEN__
++		// Keys only while the game has the focus, so the page's buttons and
++		// the hub keep theirs
++		SDL_SetHint( SDL_HINT_EMSCRIPTEN_KEYBOARD_ELEMENT, "#canvas" );
++#endif
+ 		const char *driverName;
+ 
+ 		if (SDL_Init(SDL_INIT_VIDEO) != 0)

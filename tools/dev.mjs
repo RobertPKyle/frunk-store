@@ -11,7 +11,7 @@ const root = fileURLToPath(new URL('..', import.meta.url));
 process.env.FRUNK_DEV = '1';
 const TYPES = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css',
-  '.json': 'application/json', '.svg': 'image/svg+xml', '.wasm': 'application/wasm', '.png': 'image/png', '.woff2': 'font/woff2',
+  '.json': 'application/json', '.svg': 'image/svg+xml', '.wasm': 'application/wasm', '.png': 'image/png', '.jpg': 'image/jpeg', '.woff2': 'font/woff2',
 };
 
 async function serve(dir, port, host) {
