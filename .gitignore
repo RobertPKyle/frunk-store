@@ -12,3 +12,9 @@ tools/.quake-build
 apps/quake/librequake/*.pak.gz
 apps/quake/librequake/music
 apps/heretic/blasphemer/*.wad.gz
+tools/.openttd-build
+apps/openttd/engine/openttd.wasm
+apps/openttd/engine/openttd.data
+apps/openttd/engine/*-web-src.tar.gz
+apps/openttd/data/*.tar.gz
+apps/openttd/data/*.tar.xz

@@ -1,0 +1,495 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 2891bee..c7d4aea 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -366,7 +366,11 @@ if(EMSCRIPTEN)
+     add_definitions(-s DISABLE_EXCEPTION_CATCHING=0)
+ 
+     # Export functions to Javascript.
+-    target_link_libraries(WASM::WASM INTERFACE "-s EXPORTED_FUNCTIONS='[\"_main\", \"_em_openttd_add_server\"]' -s EXPORTED_RUNTIME_METHODS='[\"cwrap\"]'")
++    target_link_libraries(WASM::WASM INTERFACE "-s EXPORTED_FUNCTIONS='[\"_main\", \"_em_openttd_add_server\", \"_malloc\", \"_free\"]' -s EXPORTED_RUNTIME_METHODS='[\"cwrap\", \"FS\", \"callMain\", \"stringToNewUTF8\"]'")
++
++    # frunk.store: an ES module the page imports and starts itself, with a
++    # bigger stack than Emscripten's 64 KB.
++    target_link_libraries(WASM::WASM INTERFACE "-s MODULARIZE=1 -s EXPORT_ES6=1 -s EXPORT_NAME=createOpenTTD -s INVOKE_RUN=0 -s ENVIRONMENT=web -s STACK_SIZE=1048576")
+ 
+     # Preload all the files we generate during build.
+     # As we do not compile with FreeType / FontConfig, we also have no way to
+@@ -400,12 +404,11 @@ if(EMSCRIPTEN)
+     # We use IDBFS for persistent storage.
+     target_link_libraries(WASM::WASM INTERFACE "-lidbfs.js")
+ 
+-    # Use custom pre-js and shell.html.
++    # Use custom pre-js.
+     target_link_libraries(WASM::WASM INTERFACE "--pre-js ${CMAKE_SOURCE_DIR}/os/emscripten/pre.js")
+-    target_link_libraries(WASM::WASM INTERFACE "--shell-file ${CMAKE_SOURCE_DIR}/os/emscripten/shell.html")
+ 
+-    # Build the .html (which builds the .js, .wasm, and .data too).
+-    set_target_properties(openttd PROPERTIES SUFFIX ".html")
++    # Build the .js (which builds the .wasm and .data too).
++    set_target_properties(openttd PROPERTIES SUFFIX ".js")
+     target_link_libraries(openttd WASM::WASM)
+ endif()
+ 
+diff --git a/os/emscripten/pre.js b/os/emscripten/pre.js
+index 8e46ae3..295b772 100644
+--- a/os/emscripten/pre.js
++++ b/os/emscripten/pre.js
+@@ -1,4 +1,6 @@
+-Module.arguments.push('-mnull', '-snull', '-vsdl');
++/* frunk.store: the page (apps/openttd/openttd.js) creates this module with
++ * createOpenTTD({ canvas, onSync, onExit, onAbort, ... }), fills the file
++ * system and calls callMain() itself. */
+ Module['websocket'] = { url: function(host, port, proto) {
+     /* openttd.org hosts a WebSocket proxy for the content service. */
+     if (host == "content.openttd.org" && port == 3978 && proto == "tcp") {
+@@ -20,12 +22,12 @@ Module['websocket'] = { url: function(host, port, proto) {
+     }
+ } };
+ 
++Module.preRun = Module.preRun || [];
+ Module.preRun.push(function() {
+-    personal_dir = '/home/web_user/.openttd';
+-    content_download_dir = personal_dir + '/content_download'
++    var personal_dir = '/home/web_user/.openttd';
+ 
+-    /* Because of the "-c" above, all user-data is stored in /user_data. */
+-    FS.mkdir(personal_dir);
++    /* Saves, settings and downloaded content live in IndexedDB. */
++    FS.mkdirTree(personal_dir);
+     FS.mount(IDBFS, {}, personal_dir);
+ 
+     Module.addRunDependency('syncfs');
+@@ -33,19 +35,20 @@ Module.preRun.push(function() {
+         Module.removeRunDependency('syncfs');
+     });
+ 
+-    window.openttd_syncfs_shown_warning = false;
+-    window.openttd_syncfs = function(callback) {
+-        /* Copy the virtual FS to the persistent storage. */
+-        FS.syncfs(false, function (err) {
+-            /* On first time, warn the user about the volatile behaviour of
+-             * persistent storage. */
+-            if (!window.openttd_syncfs_shown_warning) {
+-                window.openttd_syncfs_shown_warning = true;
+-                Module.onWarningFs();
+-            }
+-
+-            if (callback) callback();
++    /* Copies the file system to IndexedDB; the page waits for the last copy
++     * to finish before it lets the page go. */
++    var syncing = Promise.resolve();
++    Module.syncfs = window.openttd_syncfs = function(callback) {
++        syncing = syncing.then(function() {
++            return new Promise(function(resolve) {
++                FS.syncfs(false, function(err) {
++                    if (Module.onSync) Module.onSync(err);
++                    resolve();
++                });
++            });
+         });
++        syncing.then(function() { if (callback) callback(); });
++        return syncing;
+     }
+ 
+     window.openttd_exit = function() {
+@@ -56,60 +59,16 @@ Module.preRun.push(function() {
+         window.openttd_syncfs(Module.onAbort);
+     }
+ 
+-    window.openttd_bootstrap = function(current, total) {
+-        Module.onBootstrap(current, total);
+-    }
+-
+-    window.openttd_bootstrap_failed = function() {
+-        Module.onBootstrapFailed();
+-    }
++    window.openttd_bootstrap = function(current, total) {}
++    window.openttd_bootstrap_failed = function() { if (Module.onAbort) Module.onAbort(); }
++    window.openttd_bootstrap_reload = function() { window.openttd_syncfs(Module.onExit); }
+ 
+-    window.openttd_bootstrap_reload = function() {
+-        window.openttd_syncfs(function() {
+-            Module.onBootstrapReload();
+-            setTimeout(function() {
+-                location.reload();
+-            }, 1000);
+-        });
+-    }
++    window.openttd_server_list = function() {}
+ 
+-    window.openttd_server_list = function() {
+-        add_server = Module.cwrap("em_openttd_add_server", null, ["string"]);
+-
+-        /* Add servers that support WebSocket here. Examples:
+-         *  add_server("localhost");
+-         *  add_server("localhost:3979");
+-         *  add_server("127.0.0.1:3979");
+-         *  add_server("[::1]:3979");
+-         */
+-    }
+-
+-    var leftButtonDown = false;
+-    document.addEventListener("mousedown", e => {
+-        if (e.button == 0) {
+-            leftButtonDown = true;
+-        }
+-    });
+-    document.addEventListener("mouseup", e => {
+-        if (e.button == 0) {
+-            leftButtonDown = false;
+-        }
+-    });
++    /* Links in the game are handed to the page. */
+     window.openttd_open_url = function(url, url_len) {
+-        const url_string = UTF8ToString(url, url_len);
+-        function openWindow() {
+-            document.removeEventListener("mouseup", openWindow);
+-            window.open(url_string, '_blank');
+-        }
+-        /* Trying to open the URL while the mouse is down results in the button getting stuck, so wait for the
+-         * mouse to be released before opening it. However, when OpenTTD is lagging, the mouse can get released
+-         * before the button click even registers, so check for that, and open the URL immediately if that's the
+-         * case. */
+-        if (leftButtonDown) {
+-            document.addEventListener("mouseup", openWindow);
+-        } else {
+-            openWindow();
+-        }
++        var url_string = UTF8ToString(url, url_len);
++        if (Module.onOpenUrl) Module.onOpenUrl(url_string);
+     }
+ 
+     /* https://github.com/emscripten-core/emscripten/pull/12995 implements this
+diff --git a/src/music/CMakeLists.txt b/src/music/CMakeLists.txt
+index cf60e78..056e8cc 100644
+--- a/src/music/CMakeLists.txt
++++ b/src/music/CMakeLists.txt
+@@ -37,6 +37,12 @@ if(NOT OPTION_DEDICATED)
+         CONDITION HAIKU
+     )
+ 
++    add_files(
++        web_m.cpp
++        web_m.h
++        CONDITION EMSCRIPTEN
++    )
++
+     add_files(
+         midi.h
+         midifile.cpp
+diff --git a/src/music/web_m.cpp b/src/music/web_m.cpp
+new file mode 100644
+index 0000000..7b1eb3b
+--- /dev/null
++++ b/src/music/web_m.cpp
+@@ -0,0 +1,58 @@
++/*
++ * This file is part of OpenTTD.
++ * OpenTTD is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, version 2.
++ * OpenTTD is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
++ * See the GNU General Public License for more details. You should have received a copy of the GNU General Public License along with OpenTTD. If not, see <https://www.gnu.org/licenses/old-licenses/gpl-2.0>.
++ */
++
++/** @file web_m.cpp Music playback by the web page (Emscripten): the page
++ * reads the song's standard MIDI file from the file system and plays it
++ * (Module.onMusic, Module.onMusicStop, Module.onMusicVolume,
++ * Module.musicPlaying). */
++
++#include "../stdafx.h"
++#include "../base_media_base.h"
++#include "../base_media_music.h"
++#include "midifile.hpp"
++#include "web_m.h"
++#include <emscripten.h>
++
++#include "../safeguards.h"
++
++/** Factory for the web music driver. */
++static FMusicDriver_Web iFMusicDriver_Web;
++
++std::optional<std::string_view> MusicDriver_Web::Start(const StringList &)
++{
++	return std::nullopt;
++}
++
++void MusicDriver_Web::Stop()
++{
++	this->StopSong();
++}
++
++void MusicDriver_Web::PlaySong(const MusicSongInfo &song)
++{
++	std::string filename = MidiFile::GetSMFFile(song);
++	if (filename.empty()) {
++		this->StopSong();
++		return;
++	}
++	EM_ASM({ if (Module.onMusic) Module.onMusic(UTF8ToString($0), $1, $2, $3); }, filename.c_str(), song.loop ? 1 : 0, song.override_start, song.override_end);
++}
++
++void MusicDriver_Web::StopSong()
++{
++	EM_ASM({ if (Module.onMusicStop) Module.onMusicStop(); });
++}
++
++bool MusicDriver_Web::IsSongPlaying()
++{
++	return EM_ASM_INT({ return Module.musicPlaying ? Module.musicPlaying() : 0; }) != 0;
++}
++
++void MusicDriver_Web::SetVolume(uint8_t vol)
++{
++	EM_ASM({ if (Module.onMusicVolume) Module.onMusicVolume($0 / 127); }, vol);
++}
+diff --git a/src/music/web_m.h b/src/music/web_m.h
+new file mode 100644
+index 0000000..d87a15a
+--- /dev/null
++++ b/src/music/web_m.h
+@@ -0,0 +1,39 @@
++/*
++ * This file is part of OpenTTD.
++ * OpenTTD is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, version 2.
++ * OpenTTD is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
++ * See the GNU General Public License for more details. You should have received a copy of the GNU General Public License along with OpenTTD. If not, see <https://www.gnu.org/licenses/old-licenses/gpl-2.0>.
++ */
++
++/** @file web_m.h Base for music playback by the web page (Emscripten). */
++
++#ifndef MUSIC_WEB_H
++#define MUSIC_WEB_H
++
++#include "music_driver.hpp"
++
++/** Music driver handing standard MIDI files to the page, which plays them. */
++class MusicDriver_Web : public MusicDriver {
++public:
++	std::optional<std::string_view> Start(const StringList &param) override;
++
++	void Stop() override;
++
++	void PlaySong(const MusicSongInfo &song) override;
++
++	void StopSong() override;
++
++	bool IsSongPlaying() override;
++
++	void SetVolume(uint8_t vol) override;
++	std::string_view GetName() const override { return "web"; }
++};
++
++/** Factory for the web music driver. */
++class FMusicDriver_Web : public DriverFactoryBase {
++public:
++	FMusicDriver_Web() : DriverFactoryBase(Driver::DT_MUSIC, 5, "web", "Web Page MIDI Driver") {}
++	std::unique_ptr<Driver> CreateInstance() const override { return std::make_unique<MusicDriver_Web>(); }
++};
++
++#endif /* MUSIC_WEB_H */
+diff --git a/src/video/sdl2_default_v.cpp b/src/video/sdl2_default_v.cpp
+index 2c37fe1..ea41637 100644
+--- a/src/video/sdl2_default_v.cpp
++++ b/src/video/sdl2_default_v.cpp
+@@ -91,6 +91,10 @@ void VideoDriver_SDL_Default::MakePalette()
+ void VideoDriver_SDL_Default::Paint()
+ {
+ 	PerformanceMeasurer framerate(PFE_VIDEO);
++#ifdef __EMSCRIPTEN__
++	extern uint32_t _web_frames;
++	_web_frames++;
++#endif
+ 
+ 	if (IsEmptyRect(this->dirty_rect) && this->local_palette.count_dirty == 0) return;
+ 
+diff --git a/src/video/sdl2_v.cpp b/src/video/sdl2_v.cpp
+index e31afce..8b0db81 100644
+--- a/src/video/sdl2_v.cpp
++++ b/src/video/sdl2_v.cpp
+@@ -19,6 +19,10 @@
+ #include "../fileio_func.h"
+ #include "../framerate_type.h"
+ #include "../window_func.h"
++#include "../window_gui.h"
++#include "../viewport_func.h"
++#include "../saveload/saveload.h"
++#include "../console_func.h"
+ #include "sdl2_v.h"
+ #include <SDL.h>
+ #ifdef __EMSCRIPTEN__
+@@ -28,6 +32,128 @@
+ 
+ #include "../safeguards.h"
+ 
++#ifdef __EMSCRIPTEN__
++/* frunk.store: the page reads touches, and the mouse, over the canvas
++ * itself and hands them in here as SDL events, so taps, drags and pinches
++ * can be told apart before the game sees them. A drag with two fingers
++ * moves the map (web_scroll); the page's Ctrl and Shift buttons hold those
++ * keys down (web_modifiers). */
++static bool _web_ctrl = false;
++static bool _web_shift = false;
++static Point _web_scroll = {0, 0};
++uint32_t _web_frames = 0; ///< Draw ticks so far, counted by Paint().
++static bool _web_editing = false;
++static SDL_Window *_web_window = nullptr;
++
++extern "C" {
++
++/** A mouse event in the game's pixels: 0 move, 1 button down, 2 button up
++ * (button 1 left, 3 right), 3 wheel (button = steps, + toward the player),
++ * 4 the pointer entered the game, 5 the pointer left it. */
++EMSCRIPTEN_KEEPALIVE void web_mouse(int type, int x, int y, int button)
++{
++	SDL_Event ev = {};
++	switch (type) {
++		case 0:
++			ev.type = SDL_MOUSEMOTION;
++			ev.motion.x = x;
++			ev.motion.y = y;
++			break;
++		case 1:
++		case 2:
++			ev.type = type == 1 ? SDL_MOUSEBUTTONDOWN : SDL_MOUSEBUTTONUP;
++			ev.button.button = button;
++			ev.button.x = x;
++			ev.button.y = y;
++			break;
++		case 3:
++			ev.type = SDL_MOUSEWHEEL;
++			ev.wheel.y = -button;
++			ev.wheel.preciseY = static_cast<float>(-button);
++			break;
++		case 4:
++		case 5:
++			ev.type = SDL_WINDOWEVENT;
++			ev.window.event = type == 4 ? SDL_WINDOWEVENT_ENTER : SDL_WINDOWEVENT_LEAVE;
++			break;
++		default: return;
++	}
++	SDL_PushEvent(&ev);
++}
++
++/** The page's room for the game changed size, in the game's pixels. */
++EMSCRIPTEN_KEEPALIVE void web_resize(int w, int h)
++{
++	if (_web_window != nullptr) SDL_SetWindowSize(_web_window, w, h);
++}
++
++/** Moves the main view by this many of the game's pixels. */
++EMSCRIPTEN_KEEPALIVE void web_scroll(int dx, int dy)
++{
++	_web_scroll.x += dx;
++	_web_scroll.y += dy;
++}
++
++EMSCRIPTEN_KEEPALIVE void web_modifiers(int ctrl, int shift)
++{
++	_web_ctrl = ctrl != 0;
++	_web_shift = shift != 0;
++}
++
++/** What the game is doing, for the page: bits 0-1 the game mode (0 the
++ * title screen, 1 a game, 2 the scenario editor, 3 starting up), bit 2 a
++ * modal progress (making a world, saving), bit 3 a text box has the
++ * focus. */
++EMSCRIPTEN_KEEPALIVE int web_state()
++{
++	int mode = _game_mode == GM_MENU ? 0 : _game_mode == GM_NORMAL ? 1 : _game_mode == GM_EDITOR ? 2 : 3;
++	return mode | (HasModalProgress() ? 4 : 0) | (_web_editing ? 8 : 0);
++}
++
++/** Whether a window other than the main view is at this point. */
++EMSCRIPTEN_KEEPALIVE int web_window_at(int x, int y)
++{
++	Window *w = FindWindowFromPt(x, y);
++	return w != nullptr && w->window_class != WC_MAIN_WINDOW;
++}
++
++/** Where the main view is, for checks: 0 its x, 1 its y, 2 its zoom level. */
++EMSCRIPTEN_KEEPALIVE int web_view(int what)
++{
++	Window *w = FindWindowById(WC_MAIN_WINDOW, 0);
++	if (w == nullptr || w->viewport == nullptr) return 0;
++	switch (what) {
++		case 0: return w->viewport->scrollpos_x;
++		case 1: return w->viewport->scrollpos_y;
++		case 2: return to_underlying(w->viewport->zoom);
++		default: return 0;
++	}
++}
++
++/** Runs a console command, such as "saveconfig". */
++EMSCRIPTEN_KEEPALIVE void web_cmd(const char *command)
++{
++	IConsoleCmdExec(command);
++}
++
++/** Frames drawn so far. */
++EMSCRIPTEN_KEEPALIVE uint32_t web_frames()
++{
++	return _web_frames;
++}
++
++/** Saves the game in progress as autosave/exit.sav (as the game does when
++ * it's left with "save on exit"), for the page's Continue. */
++EMSCRIPTEN_KEEPALIVE int web_autosave()
++{
++	if (_game_mode != GM_NORMAL || HasModalProgress()) return 0;
++	DoExitSave();
++	return 1;
++}
++
++}
++#endif /* __EMSCRIPTEN__ */
++
+ void VideoDriver_SDL_Base::MakeDirty(int left, int top, int width, int height)
+ {
+ 	Rect r = {left, top, left + width, top + height};
+@@ -160,6 +286,9 @@ bool VideoDriver_SDL_Base::CreateMainWindow(uint w, uint h, uint flags)
+ 		Debug(driver, 0, "SDL2: Couldn't allocate a window to draw on: {}", SDL_GetError());
+ 		return false;
+ 	}
++#ifdef __EMSCRIPTEN__
++	_web_window = this->sdl_window;
++#endif
+ 
+ 	std::string icon_path = FioFindFullPath(BASESET_DIR, "openttd.32.bmp");
+ 	if (!icon_path.empty()) {
+@@ -212,6 +341,9 @@ void VideoDriver_SDL_Base::EditBoxGainedFocus()
+ 	if (!this->edit_box_focused) {
+ 		SDL_StartTextInput();
+ 		this->edit_box_focused = true;
++#ifdef __EMSCRIPTEN__
++		_web_editing = true;
++#endif
+ 	}
+ }
+ 
+@@ -223,6 +355,9 @@ void VideoDriver_SDL_Base::EditBoxLostFocus()
+ 	if (this->edit_box_focused) {
+ 		SDL_StopTextInput();
+ 		this->edit_box_focused = false;
++#ifdef __EMSCRIPTEN__
++		_web_editing = false;
++#endif
+ 	}
+ }
+ 
+@@ -615,6 +750,16 @@ void VideoDriver_SDL_Base::InputLoop()
+ 
+ 	_ctrl_pressed  = !!(mod & KMOD_CTRL);
+ 	_shift_pressed = !!(mod & KMOD_SHIFT);
++#ifdef __EMSCRIPTEN__
++	_ctrl_pressed |= _web_ctrl;
++	_shift_pressed |= _web_shift;
++
++	if (_web_scroll.x != 0 || _web_scroll.y != 0) {
++		Window *w = FindWindowById(WC_MAIN_WINDOW, 0);
++		if (w != nullptr && w->viewport != nullptr && _game_mode != GM_MENU && !w->flags.Test(WindowFlag::DisableVpScroll)) w->OnScroll(_web_scroll);
++		_web_scroll = {0, 0};
++	}
++#endif
+ 
+ 	/* Speedup when pressing tab, except when using ALT+TAB
+ 	 * to switch to another application. */

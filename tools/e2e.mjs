@@ -908,6 +908,71 @@ await check('librequake takes quake files from a phone', async () => {
   await appFrame().locator('#mine .game').waitFor({ state: 'detached', timeout: 5000 });
 });
 
+await check('openttd plays with touch, saves when left and continues', async () => {
+  await openFromHub(/OpenTTD/);
+  const frame = () => page.frames().find(f => f.url().includes('/openttd/'));
+  await appFrame().locator('#free .game').click();
+  // First time: downloads the base sets (15 MB), then the title screen
+  await appFrame().locator('#player[data-mode="menu"]').waitFor({ timeout: 90000 });
+  // the title music, OpenMSX's MIDI played by the page's synthesizer
+  await appFrame().locator('#player[data-music]').waitFor({ timeout: 10000 });
+  await page.waitForTimeout(1500);
+  const box = await appFrame().locator('#canvas').boundingBox();
+  const cdp = await page.context().newCDPSession(page);
+  const touch = (type, points) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: points.map(([x, y], id) => ({ x, y, id })) });
+  const tap = async (x, y) => {
+    await touch('touchStart', [[x, y]]);
+    await page.waitForTimeout(60);
+    await touch('touchEnd', []);
+    await page.waitForTimeout(600);
+  };
+  // Taps reach the game's own menus: New Game, then Generate (at 150%
+  // interface size on a touch screen, in the middle of the 773x541 game)
+  await tap(box.x + box.width / 2, box.y + 90);
+  await tap(box.x + box.width / 2, box.y + 444);
+  await appFrame().locator('#player[data-mode="game"]').waitFor({ timeout: 60000 });
+  await page.waitForTimeout(1000);
+  const view = () => frame().evaluate(() => [0, 1, 2].map(i => ottd._web_view(i)));
+  const cx = box.x + box.width / 2, cy = box.y + box.height / 2;
+  const move = async (from, by, steps = 10) => {
+    await touch('touchStart', from);
+    for (let i = 1; i <= steps; i++) {
+      await touch('touchMove', from.map(([x, y], n) => [x + by[n][0] * i / steps, y + by[n][1] * i / steps]));
+      await page.waitForTimeout(30);
+    }
+    await touch('touchEnd', []);
+    await page.waitForTimeout(400);
+  };
+  // One finger drags the map
+  const v0 = await view();
+  await move([[cx, cy]], [[-150, -80]]);
+  const v1 = await view();
+  if (v1[0] === v0[0] && v1[1] === v0[1]) throw new Error('dragging didn\'t move the map');
+  // Pinching out zooms in
+  await move([[cx - 30, cy], [cx + 30, cy]], [[-60, 0], [60, 0]]);
+  const v2 = await view();
+  if (!(v2[2] < v1[2])) throw new Error(`pinching didn't zoom in: zoom ${v1[2]} to ${v2[2]}`);
+  // Two fingers move the map too
+  await move([[cx - 40, cy], [cx + 40, cy]], [[100, 60], [100, 60]]);
+  const v3 = await view();
+  if (v3[0] === v2[0] && v3[1] === v2[1]) throw new Error('a two-finger drag didn\'t move the map');
+  const fps = parseInt(await appFrame().locator('#fps').textContent());
+  if (!(fps >= 30)) throw new Error(`running at ${fps} fps`);
+  console.log(`     ${fps} fps`);
+  await page.screenshot({ path: shots + 'openttd.png' });
+  // Closing the app from the hub saves the game as autosave/exit.sav, and
+  // Continue loads it, the view where it was
+  await page.click('#home');
+  await page.waitForSelector('#runner', { state: 'hidden' });
+  await openFromHub(/OpenTTD/);
+  await appFrame().getByRole('button', { name: 'Continue' }).click();
+  await appFrame().locator('#player[data-mode="game"]').waitFor({ timeout: 60000 });
+  const v4 = await view();
+  if (v4.join() !== v3.join()) throw new Error(`continued at ${v4.join()}, left at ${v3.join()}`);
+  await appFrame().getByRole('button', { name: 'Quit' }).click();
+  await appFrame().locator('#library').waitFor({ state: 'visible', timeout: 15000 });
+});
+
 await check('a place from the car\'s location follows the car', async () => {
   await openFromHub(/Star Map/);
   const appsOrigin = new URL(page.frames().find(f => f.url().includes('/stars/')).url()).origin;

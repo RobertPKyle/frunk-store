@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>OpenTTD</title>
+<style>
+  :root { --bg: #0b0d09; --panel: #15180f; --card: #1e2216; --line: rgba(214, 196, 140, .14); --text: #f0ede2; --muted: #a29d86;
+          --accent: #e0a630; --accent2: #8fc46a; --ok: #9bd88f; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 16px/1.4 system-ui, sans-serif; overflow: hidden;
+               -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; touch-action: none; }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  .btn { min-height: 44px; padding: 8px 16px; border-radius: 12px; background: var(--card); border: 1px solid var(--line); white-space: nowrap; }
+  .btn.primary { background: var(--accent); border-color: transparent; color: #1f1502; font-weight: 700; }
+  .btn.on { background: var(--accent2); border-color: transparent; color: #112005; font-weight: 700; }
+  [hidden] { display: none !important; }
+
+  /* ---------- library ---------- */
+  #library { display: flex; flex-direction: column; height: 100%; }
+  /* left padding keeps clear of the hub's Apps button */
+  header { display: flex; align-items: center; gap: 10px; min-height: 60px; padding: 8px 12px 8px 110px; border-bottom: 1px solid var(--line); }
+  header h1 { margin: 0; font-size: 18px; font-weight: 600; flex: 1; }
+  .scroll { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 12px 16px 20px; touch-action: pan-y; }
+  h2 { margin: 10px 2px 8px; font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .games { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+  .game { position: relative; display: flex; flex-direction: column; gap: 4px; text-align: left; padding: 12px 14px; border-radius: 14px; background: var(--card); border: 1px solid var(--line); min-height: 96px; }
+  .game b { font-size: 17px; }
+  .game small { color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
+  .game p { margin: 2px 0 0; font-size: 14px; color: #d6d1bf; }
+  .game.busy { opacity: .6; }
+  .note { font-size: 13px; color: var(--muted); margin: 6px 2px; max-width: 60em; }
+  #status:empty { display: none; }
+  #status { margin: 0 2px 10px; color: var(--text); }
+  .legal { margin-top: 18px; font-size: 12px; color: var(--muted); user-select: text; -webkit-user-select: text; }
+  .legal p { margin: 4px 0; }
+
+  /* ---------- overlays ---------- */
+  .overlay { position: fixed; inset: 0; z-index: 5; display: grid; place-items: center; padding: 64px 16px 16px; background: rgba(8, 9, 6, .9); }
+  .sheet { display: flex; flex-direction: column; max-width: 560px; padding: 18px; border-radius: 18px; background: var(--panel); border: 1px solid var(--line); }
+  .sheet h2 { margin: 0 0 8px; font-size: 19px; color: var(--text); letter-spacing: 0; text-transform: none; }
+  .sheet p { margin: 0 0 10px; font-size: 15px; color: #d6d1bf; overflow-wrap: anywhere; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  /* ---------- loading ---------- */
+  #loading { position: fixed; inset: 0; z-index: 4; display: grid; place-content: center; gap: 14px; text-align: center; background: var(--bg); }
+  #loading b { font-size: 20px; }
+  #loadText { color: var(--muted); font-size: 15px; }
+  .meter { width: min(360px, 80vw); height: 8px; border-radius: 4px; background: var(--card); overflow: hidden; }
+  .meter i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .2s; }
+
+  /* ---------- player ---------- */
+  #player { position: fixed; inset: 0; display: grid; grid-template-rows: 60px minmax(0, 1fr); grid-template-columns: minmax(0, 1fr); background: #000; }
+  .bar { display: flex; align-items: center; gap: 8px; padding: 8px 10px 8px 110px; background: var(--panel); border-bottom: 1px solid var(--line); }
+  .bar b { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #fps { font: inherit; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; background: none; border: 0; padding: 12px 4px; }
+  .screen { position: relative; min-height: 0; min-width: 0; overflow: hidden; }
+  /* The game draws one pixel per CSS pixel; the page reads touches and the
+     mouse over it (#touch) and hands them to the game. */
+  #canvas, #touch { position: absolute; left: 0; top: 0; }
+  #canvas { display: block; background: #000; }
+  #touch { inset: 0; cursor: none; }
+  #hint { position: absolute; left: 50%; top: 40px; transform: translateX(-50%); padding: 6px 12px; border-radius: 10px; background: rgba(21, 24, 15, .88);
+          border: 1px solid var(--line); font-size: 14px; color: var(--text); pointer-events: none; width: max-content; max-width: calc(100% - 32px); text-align: center; overflow-wrap: anywhere; }
+
+  @media (max-width: 640px) {
+    .bar .btn { padding: 8px 10px; }
+  }
+</style>
+</head>
+<body>
+<section id="library">
+  <header>
+    <h1>OpenTTD</h1>
+    <button class="btn" id="continue" type="button" hidden>Continue</button>
+  </header>
+  <div class="scroll">
+    <p class="note" id="status" aria-live="polite"></p>
+    <h2>Free game</h2>
+    <div class="games" id="free"></div>
+
+    <div class="legal">
+      <p>Controls: tap to click, and drag the map with one finger (or, while building, drag to lay track, roads and more). Drag with two fingers to move the map while a building tool is picked, or to scroll a list; pinch to zoom. Press and hold a button to see what it does. The Ctrl button in the bar holds Ctrl down for the next taps, as the game's Ctrl+click needs. Text boxes bring up the game's own keyboard. A mouse and keyboard work as on a computer. The game in progress is saved whenever you leave it, and Continue picks it up; the game also saves itself every 10 minutes, and its Load Game menu has every save. Saves and settings stay on this screen.</p>
+      <p>OpenTTD 15.3 by the OpenTTD team, an open-source remake of Transport Tycoon Deluxe (GNU GPL 2), compiled to WebAssembly with small changes for the browser. Source: /openttd/engine/openttd-15.3-web-src.tar.gz, with the changes in /openttd/engine/openttd-web.patch, built by tools/build-openttd.mjs in github.com/RobertPKyle/frunk-store; see /openttd/NOTICE. Graphics: OpenGFX 8.0 (GNU GPL 2). Sounds: OpenSFX 1.0.3 (CC BY-SA 3.0). Music: OpenMSX 0.4.2 (GNU GPL 2), played by this page's own simple synthesizer. Their source is in /openttd/data/. Online Content downloads add-ons from OpenTTD's BaNaNaS service, made by their own authors under their own licenses.</p>
+      <p>frunk.store is not affiliated with or endorsed by the OpenTTD team. Transport Tycoon is a trademark of Chris Sawyer. Play only while parked.</p>
+    </div>
+  </div>
+</section>
+
+<section id="loading" hidden aria-live="polite">
+  <b id="loadTitle"></b>
+  <div class="meter"><i id="loadBar"></i></div>
+  <span id="loadText"></span>
+</section>
+
+<section id="failed" class="overlay" hidden aria-labelledby="failedTitle">
+  <div class="sheet">
+    <h2 id="failedTitle">The game stopped</h2>
+    <p id="failedText"></p>
+    <div class="row"><button class="btn primary" id="failedOk" type="button">Back</button></div>
+  </div>
+</section>
+
+<section id="player" hidden>
+  <div class="bar">
+    <b id="title">OpenTTD</b>
+    <button id="fps" type="button" tabindex="-1"></button>
+    <button class="btn" id="ctrlBtn" type="button" aria-pressed="false">Ctrl</button>
+    <button class="btn" id="soundBtn" type="button">Sound on</button>
+    <button class="btn" id="quitBtn" type="button">Quit</button>
+  </div>
+  <div class="screen">
+    <canvas id="canvas" oncontextmenu="event.preventDefault()"></canvas>
+    <div id="touch" oncontextmenu="event.preventDefault()"></div>
+    <div id="hint" hidden></div>
+  </div>
+</section>
+
+<script type="module" src="openttd.js"></script>
+<script src="/sw-register.js"></script>
+</body>
+</html>

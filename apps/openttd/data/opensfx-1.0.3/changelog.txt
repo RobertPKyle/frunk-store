@@ -1,0 +1,58 @@
+1.0.3 (2021-10-24)
+------------------------------------------------------------------------
+-Fix: Issue preventing BaNaNaS upload due to a lack of any checksum changes
+
+
+1.0.2 (2021-10-16)
+------------------------------------------------------------------------
+-Update: Lots of translations
+-Fix: Install location of 'make install'
+
+
+1.0.1 (2021-03-23)
+------------------------------------------------------------------------
+-Fix: Old and modern bus sounds were swapped
+
+
+1.0.0 (2021-03-12)
+------------------------------------------------------------------------
+-Change: Many sounds were replaced and reworked
+-Change: License: CC BY-SA 3.0, GPLv2+, CDDL 1.1 (was: CC Sampling Plus)
+-Change: Build system updated to support Git
+
+
+0.2.3 (2010-03-31)
+------------------------------------------------------------------------
+-Fix: Do not rebuild the md5sums file which one wants to check against
+
+
+0.2.2 (2010-03-24)
+------------------------------------------------------------------------
+-Add: Translations of the description of this set to about 30 languages
+-Change: Improvements to the build system
+
+
+0.2.1 (2009-12-23)
+------------------------------------------------------------------------
+-Change: Improve sample for the level crossing
+-Change: Improvements to the build system
+
+
+0.2.0 (2009-12-09)
+------------------------------------------------------------------------
+-Add: Missing toyland samples, resulting in 73 completed sounds
+
+
+0.1.0 (2009-11-14)
+------------------------------------------------------------------------
+-Add: several sounds, resulting in 59 completed sounds
+
+
+0.1.0-alpha2 (2009-08-14)
+------------------------------------------------------------------------
+-Add: several sounds, resulting in 50 completed sounds
+
+
+0.1.0-alpha1 (2009-08-11)
+------------------------------------------------------------------------
+-Add: initial 31 completed sounds

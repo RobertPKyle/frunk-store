@@ -178,6 +178,17 @@
       ]
     },
     {
+      "id": "openttd",
+      "name": "OpenTTD",
+      "tagline": "Build a transport empire with trains, trucks, ships and planes. The open-source Transport Tycoon, made for touch.",
+      "path": "/openttd/",
+      "icon": "/openttd/icon.svg",
+      "tags": [
+        "Game",
+        "Offline"
+      ]
+    },
+    {
       "id": "adventure",
       "name": "Adventure Games",
       "tagline": "Classic point-and-click adventures on ScummVM: seven free games, or ones you own sent from your phone.",

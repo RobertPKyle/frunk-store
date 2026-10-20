@@ -1,0 +1,46 @@
+OpenTTD (apps/openttd)
+
+Engine (engine/)
+  OpenTTD 15.3, by the OpenTTD team and contributors.
+  License: GNU General Public License, version 2 (engine/COPYING.md).
+  Source: https://github.com/OpenTTD/OpenTTD, tag 15.3 (commit
+  14ec60f248547d4d062a1160f0fc26d742319888), with frunk.store's changes
+  for the browser in engine/openttd-web.patch (also
+  tools/openttd/openttd-web.patch in https://github.com/RobertPKyle/frunk-store,
+  whose tools/build-openttd.mjs builds it with OpenTTD's own Emscripten
+  Docker image, os/emscripten/Dockerfile). The complete patched source the
+  build came from is engine/openttd-15.3-web-src.tar.gz.
+  The changes: an ES module the page starts itself, a 1 MB stack, touches
+  and the mouse handed in by the page (mouse events, moving the map, Ctrl
+  and Shift held down), the size of the game set by the page, saving the
+  game in progress from the page, and a music driver that hands each
+  song's MIDI file to the page (midi.js plays it).
+
+Base sets (data/)
+  OpenGFX 8.0, by the OpenGFX team: base graphics.
+    License: GNU General Public License, version 2 (data/opengfx-8.0/license.txt).
+    Source: https://github.com/OpenTTD/OpenGFX, tag 8.0 (commit
+    e68bd9b7cb60305aa98c687b6836e0e0b08e2847), as data/opengfx-8.0-source.tar.gz.
+  OpenSFX 1.0.3, by the OpenSFX team: base sounds.
+    License: the sounds under Creative Commons Attribution-ShareAlike 3.0
+    Unported, the other files under the GNU GPL 2 or later and the CDDL 1.1
+    (data/opensfx-1.0.3/license.txt; credits in data/opensfx-1.0.3/readme.txt).
+    Source: data/opensfx-1.0.3-source.tar.xz.
+  OpenMSX 0.4.2, by the OpenMSX team: base music.
+    License: GNU General Public License, version 2 (data/openmsx-0.4.2/license.txt).
+    Source: data/openmsx-0.4.2-source.tar.xz.
+  Each set's tar is gzipped here for downloading and unpacked by the page;
+  it's otherwise unchanged from its release on cdn.openttd.org.
+
+Online content
+  The game's Online Content window downloads add-ons straight from
+  OpenTTD's BaNaNaS service. They're made by their own authors under their
+  own licenses; frunk.store doesn't host them.
+
+Trademarks
+  Transport Tycoon is a trademark of Chris Sawyer. frunk.store is not
+  affiliated with or endorsed by the OpenTTD team or Chris Sawyer.
+
+Saves
+  Saves, settings and downloaded content are kept in that screen's
+  IndexedDB only.

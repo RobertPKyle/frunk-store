@@ -27,8 +27,8 @@ Both origins have a network-first service worker (`hub/sw.js`, `apps/sw.js`;
 the hub's also keeps the app icons). When a page doesn't arrive within 3
 seconds, as on a weak connection, the cached copy is shown and the files that
 page loads come from the cache too, so its code stays from one version.
-Freedoom's and Blasphemer's WADs, Adventure Games' free games and
-LibreQuake's paks and music are left out, because those apps keep them in IndexedDB, and an unchanged file (same ETag) isn't written
+Freedoom's and Blasphemer's WADs, Adventure Games' free games,
+LibreQuake's paks and music and OpenTTD's base sets are left out, because those apps keep them in IndexedDB, and an unchanged file (same ETag) isn't written
 to the cache again.
 
 ## Sample apps
@@ -208,6 +208,42 @@ to the cache again.
   demo; drawing spans is most of it).
   Mission packs and players' own paks are untested beyond the file checks
   (no copies here). Not yet tried in the car.
+- `apps/openttd`: OpenTTD 15.3 (GPL-2.0), compiled to WebAssembly by
+  `npm run build:openttd` (`tools/build-openttd.mjs`: the 15.3 tag plus
+  `tools/openttd/openttd-web.patch`, built with upstream's own Emscripten
+  Docker image from `os/emscripten`; the patched source ships next to the
+  engine in `apps/openttd/engine/`). The same script fetches the free base
+  sets from cdn.openttd.org, checked against their SHA-256: OpenGFX 8.0
+  (GPL-2.0), OpenSFX 1.0.3 (CC BY-SA 3.0) and OpenMSX 0.4.2 (GPL-2.0), each
+  tar gzipped to `apps/openttd/data/` (15 MB in all) with its readme,
+  license and source. The engine's wasm and data file, its source tarball
+  and the sets aren't in git, so run it before deploying `apps`. The page
+  downloads the sets the first time and keeps them in IndexedDB (database
+  `openttd`), unpacks them to `/baseset/` in the engine's memory, and starts
+  OpenTTD's own title screen, or `-g autosave/exit.sav` for Continue. The
+  game's folder (`/home/web_user/.openttd`: settings, saves, online content)
+  is Emscripten's IDBFS, copied to IndexedDB whenever the game saves
+  something; the first openttd.cfg turns on saving on exit and, on touch
+  screens, 150% interface size, dragging the map with the left button,
+  tooltips on the right button and the game's own on-screen keyboard
+  (private.cfg turns off the survey question; this build can't send it
+  anyway). The patch builds an ES module the page starts itself
+  (`createOpenTTD`, `callMain`) and adds `web_*` calls: `web_mouse` (SDL
+  mouse events from the page), `web_scroll` (moves the main view),
+  `web_modifiers` (the page's Ctrl button), `web_resize`, `web_autosave`
+  (`DoExitSave`), `web_state`, `web_view` and `web_frames` for the page and
+  checks; and a `web` music driver that hands each song's MIDI file to the
+  page, where `midi.js` plays it with Web Audio oscillators and noise (a
+  sound per General MIDI family, not a sound font). Touch is read by the
+  page over the canvas: a tap clicks when the finger lifts, a finger that
+  moves drags (the map, or a building tool's line), a long press holds the
+  right button (tooltips), and two fingers move the map (or scroll the list
+  under them) and pinch to zoom. The game is drawn at one game pixel per
+  CSS pixel. The game is saved when the page is hidden, when the hub's close
+  handshake asks and with Quit. Online Content works over OpenTTD's
+  WebSocket proxy. Measured with the CPU slowed 4.5x: 60 fps, about 180 ms of
+  main-thread work a second in a new game and 270 while dragging the map,
+  with sound and music on. Not yet tried in the car.
 - `apps/adventure`: Adventure Games. ScummVM 2026.4.0 (GPL-3.0-or-later)
   compiled to WebAssembly by `npm run build:scummvm`
   (`tools/build-scummvm.mjs`: the v2026.4.0 tag plus
@@ -319,6 +355,7 @@ npm run build:wasm                      # after editing apps/fractal/fractal.wat
 npm run build:doom                      # Doom and Heretic engines + Freedoom and Blasphemer (needs Docker); run before deploying apps
 npm run build:scummvm                   # ScummVM engine + free adventures (needs Docker); run before deploying apps
 npm run build:quake                     # Quake engine + LibreQuake (needs Docker); run before deploying apps
+npm run build:openttd                   # OpenTTD engine + its free base sets (needs Docker); run before deploying apps
 npm run dev                             # hub on localhost:5173, apps on 127.0.0.1:5174
 npm run test:e2e                        # checks against the dev server
 node tools/e2e.mjs https://frunk.store  # checks against production
