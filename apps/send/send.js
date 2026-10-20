@@ -3,6 +3,7 @@
 // game is checked, encrypted here with AES-GCM and uploaded to the session,
 // in pieces when it's big. Zipped games are sent zipped; the car unzips them.
 import { sealPieces } from '../_shared/transfer.js';
+import { keepAwake } from '../_shared/awake.js';
 import { MAX_ADVENTURE_FILE, MAX_FILE, MAX_QUAKE_FILE, MAX_STORY_FILE, MAX_WAD_FILE, findAdventureFile, findGame, findQuakeFile, findStory, findWad } from '../_shared/roms.js';
 
 const $ = id => document.getElementById(id);
@@ -96,10 +97,13 @@ $('input').onchange = async () => {
   $('choose').disabled = true;
   const files = [...$('input').files];
   const rows = files.map(f => row(f.name));
+  // A phone that locks its screen stops the upload
+  keepAwake(true);
   for (let i = 0; i < files.length; i++) {
     try { await send(files[i], rows[i]); }
     catch { rows[i]('Not sent', 'bad'); $('msg').textContent = 'Couldn\'t reach frunk.store. Check this phone\'s connection.'; }
   }
+  keepAwake(false);
   if (!$('msg').textContent.includes('expired')) $('choose').disabled = false;
 };
 

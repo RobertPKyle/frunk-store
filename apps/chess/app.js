@@ -1,10 +1,12 @@
-// Daily chess puzzle from Lichess, playable in the car's browser.
-// The puzzle is fetched from the public Lichess API (CORS is open), replayed
-// with the vendored chess.js, and cached in localStorage so the last puzzle
-// still works offline. You play the winning side; the opponent's replies are
-// played automatically. Only the best move is accepted.
+// Daily chess puzzle from Lichess, playable in the car's browser, and more
+// puzzles after it (Next puzzle). Puzzles are fetched from the public
+// Lichess API (CORS is open), replayed with the vendored chess.js, and
+// cached in localStorage so the last puzzle still works offline. You play
+// the winning side; the opponent's replies are played automatically. Only
+// the best move is accepted.
 
 const LICHESS_DAILY_URL = 'https://lichess.org/api/puzzle/daily';
+const LICHESS_NEXT_URL = 'https://lichess.org/api/puzzle/next';   // a random one
 const CACHE_KEY = 'frunk.chess.puzzle';
 const FILES = 'abcdefgh';
 
@@ -13,6 +15,7 @@ const statusEl = document.getElementById('status');
 const subEl = document.getElementById('sub');
 const resetBtn = document.getElementById('reset');
 const hintBtn = document.getElementById('hint');
+const nextBtn = document.getElementById('next');
 
 let game = null;       // chess.js instance at the puzzle position
 let puzzle = null;     // { id, rating, fen, solution[] }
@@ -84,6 +87,7 @@ function finish() {
   targets.clear();
   const yourMoves = Math.ceil(step / 2);
   setSub(`Puzzle #${puzzle.id} · ${puzzle.rating} elo · solved in ${yourMoves} move${yourMoves === 1 ? '' : 's'}`);
+  nextBtn.classList.add('primary');
   render();
 }
 
@@ -147,6 +151,7 @@ function start() {
   busy = false;
   solved = false;
   hintLevel = 0;
+  nextBtn.classList.remove('primary');
   setSub(`Puzzle #${puzzle.id} · ${puzzle.rating} elo`);
   render();
 }
@@ -159,19 +164,24 @@ hintBtn.addEventListener('click', () => {
   render();
 });
 
+async function fetchPuzzle(url) {
+  const r = await fetch(url, { headers: { Accept: 'application/json' }, cache: 'no-store' });
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  const d = await r.json();
+  const p = {
+    id: d.puzzle.id,
+    rating: d.puzzle.rating,
+    fen: d.puzzle.fen || positionFromPgn(d.game.pgn, d.puzzle.initialPly),
+    solution: d.puzzle.solution,
+  };
+  try { localStorage.setItem(CACHE_KEY, JSON.stringify(p)); } catch {}
+  return p;
+}
+
 async function load() {
   let p = null;
   try {
-    const r = await fetch(LICHESS_DAILY_URL, { headers: { Accept: 'application/json' } });
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    const d = await r.json();
-    p = {
-      id: d.puzzle.id,
-      rating: d.puzzle.rating,
-      fen: d.puzzle.fen || positionFromPgn(d.game.pgn, d.puzzle.initialPly),
-      solution: d.puzzle.solution,
-    };
-    try { localStorage.setItem(CACHE_KEY, JSON.stringify(p)); } catch {}
+    p = await fetchPuzzle(LICHESS_DAILY_URL);
   } catch {
     try { p = JSON.parse(localStorage.getItem(CACHE_KEY)); } catch { p = null; }
   }
@@ -184,6 +194,27 @@ async function load() {
   }
   puzzle = p;
   start();
+  nextBtn.hidden = false;
 }
+
+// Another puzzle; the one on the board stays if none comes
+let fetching = false;
+nextBtn.addEventListener('click', async () => {
+  if (fetching || busy) return;
+  fetching = true;
+  nextBtn.disabled = true;
+  statusEl.textContent = 'Loading a puzzle…';
+  try {
+    puzzle = await fetchPuzzle(LICHESS_NEXT_URL);
+    document.querySelector('h1').textContent = 'Chess puzzle';
+    start();
+  } catch {
+    render();
+    statusEl.textContent = "Couldn't load another puzzle. Check the connection.";
+  } finally {
+    fetching = false;
+    nextBtn.disabled = false;
+  }
+});
 
 load();

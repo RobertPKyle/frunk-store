@@ -268,7 +268,7 @@ function waitForStart(since) {
     ready = true;
     $('loading').hidden = true;
     $('canvas').focus();
-    if (touchFirst) hint('Drag to look around, use the stick to walk', 5000);
+    if (touchFirst) hint('Drag to look around, use the arrows to walk', 5000);
     setInterval(save, AUTOSAVE_MS);
     return;
   }

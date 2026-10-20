@@ -300,6 +300,9 @@ async function play(btn, resume) {
     await downloadSets();
     await boot(resume);
   } catch (e) {
+    // The engine is up and can't start again within this page, so the
+    // library's buttons would do nothing: back to it by reloading
+    if (ottd) { failed(`Couldn't start OpenTTD: ${e && e.message ? e.message : 'something went wrong'}.`); return; }
     $('loading').hidden = true;
     $('player').hidden = true;
     $('library').hidden = false;

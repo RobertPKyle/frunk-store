@@ -1,6 +1,7 @@
 // Sleep Sounds: mix generated nature sounds, a dim night clock, and a sleep
 // timer that fades everything out. Settings persist per browser.
 import { Ambient, SOUNDS } from '/_shared/ambient.js';
+import { keepAwake } from '/_shared/awake.js';
 
 const STORE_KEY = 'sleep.settings';
 const TIMER_CHOICES = [0, 15, 30, 60, 90]; // minutes; 0 = off
@@ -28,7 +29,7 @@ const ICONS = {
 const $ = id => document.getElementById(id);
 const amb = new Ambient();
 const state = load();
-let timerEnd = 0, fading = false, lastInput = Date.now(), wakeLock = null;
+let timerEnd = 0, fading = false, lastInput = Date.now();
 
 function load() {
   const fallback = { levels: {}, timer: 0, h24: false };
@@ -185,16 +186,8 @@ $('dimBtn').onclick = () => setDim(true);
 $('dim').onclick = () => { setDim(false); lastInput = Date.now(); };
 addEventListener('pointerdown', () => { lastInput = Date.now(); }, true);
 
-async function updateWakeLock() {
-  try {
-    if (amb.playing && !wakeLock && navigator.wakeLock) {
-      wakeLock = await navigator.wakeLock.request('screen');
-      wakeLock.addEventListener('release', () => { wakeLock = null; });
-    } else if (!amb.playing && wakeLock) {
-      await wakeLock.release();
-    }
-  } catch { /* not allowed here; the car's own screen settings apply */ }
-}
+// The screen stays on while sounds play
+function updateWakeLock() { keepAwake(amb.playing); }
 
 setInterval(() => {
   tickClock();

@@ -440,8 +440,8 @@ to the cache again.
   session, rate limits per IP. `npm run dev` serves `/api/*` locally with an in-memory store.
 - `apps/chess`: the Lichess daily chess puzzle, playable on the board. Tap a
   piece, then a highlighted square; the opponent's reply is played
-  automatically and only the best move is accepted. The last puzzle is cached
-  for offline use. Rules come from chess.js (BSD-2-Clause); the piece art is
+  automatically and only the best move is accepted. Next puzzle fetches a
+  random one from Lichess. The last puzzle is cached for offline use. Rules come from chess.js (BSD-2-Clause); the piece art is
   the cburnett set (CC BY-SA 3.0).
 - `apps/_shared/place.js`: the location picker. Star Map, Weather,
   Satellites, Sky Events, What's Around Me and Pit Stop share one saved place
@@ -450,6 +450,10 @@ to the cache again.
   checks it on start and moves the place once the car is more than 5 km
   away. What's Around Me and Pit Stop always use the car's location when
   they're allowed to.
+- `apps/_shared/awake.js`: keeps the screen on (Screen Wake Lock) while Sleep
+  Sounds plays, while Campfire shows, and on the phone page while it sends
+  games. The browser drops the lock when the page is hidden, so it's taken
+  again when the page shows.
 
 ## Commands
 

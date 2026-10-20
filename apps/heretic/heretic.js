@@ -407,6 +407,9 @@ async function play(entry, btn, resume) {
     settings.set('last', { id: entry.id });
     await boot(entry, data, resume);
   } catch (e) {
+    // The engine is up and can't start again within this page, so the
+    // library's buttons would do nothing: back to it by reloading
+    if (engine) { failed(`Couldn't start ${entry.title}: ${e && e.message ? e.message : 'something went wrong'}.`); return; }
     $('loading').hidden = true;
     status(`Couldn't start ${entry.title}: ${e && e.message ? e.message : 'check the connection and try again'}.`);
     audio?.close().catch(() => {});

@@ -2,6 +2,7 @@
 // crickets from the shared ambient engine. The fire renders at a reduced,
 // self-adjusting resolution so it stays smooth on the slowest cars.
 import { Ambient } from '/_shared/ambient.js';
+import { keepAwake } from '/_shared/awake.js';
 
 const canvas = document.getElementById('c');
 const gl = canvas.getContext('webgl2', { antialias: false, alpha: false, premultipliedAlpha: false });
@@ -277,3 +278,6 @@ function showControls() {
 }
 addEventListener('pointerdown', showControls, true);
 showControls();
+
+// A fire to look at, so the screen stays on
+keepAwake(true);

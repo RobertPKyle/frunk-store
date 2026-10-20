@@ -442,6 +442,9 @@ async function play(game, btn, resume) {
     settings.set('last', game.key);
     await boot(game, resume);
   } catch (e) {
+    // The engine is up and can't start again within this page, so the
+    // library's buttons would do nothing: back to it by reloading
+    if (quake) { failed(`Couldn't start ${game.title}: ${e && e.message ? e.message : 'something went wrong'}.`); return; }
     $('loading').hidden = true;
     $('player').hidden = true;
     $('library').hidden = false;

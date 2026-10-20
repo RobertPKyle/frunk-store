@@ -317,6 +317,16 @@ await check('chess puzzle renders a board', async () => {
     return n === 64 || s.includes("Couldn't");
   }, null, { timeout: 15000 });
   console.log(`     ${await frame.locator('#status').textContent()}`);
+  // Next puzzle brings a different one
+  const first = await frame.locator('#sub').textContent();
+  await appFrame().getByRole('button', { name: 'Next puzzle' }).click();
+  await frame.waitForFunction(was => {
+    const sub = document.getElementById('sub').textContent;
+    return (sub !== was && /Puzzle #/.test(sub)) || document.getElementById('status').textContent.includes("Couldn't");
+  }, first, { timeout: 15000 });
+  const status = await frame.locator('#status').textContent();
+  if (status.includes("Couldn't")) throw new Error(status);
+  console.log(`     next: ${await frame.locator('#sub').textContent()}`);
   await page.screenshot({ path: shots + 'chess.png' });
 });
 
