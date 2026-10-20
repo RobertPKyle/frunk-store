@@ -24,13 +24,33 @@ html, body { margin: 0; background: var(--bg); color: var(--text); }
 body { font: 17px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; min-height: 100vh; display: flex; flex-direction: column; }
 button { font: inherit; color: inherit; cursor: pointer; }
 
-.top { display: flex; align-items: center; justify-content: space-between; padding: 16px 24px; }
+.top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; padding: 16px 24px; }
+.top-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+/* While the language's file loads, so English doesn't flash first */
+.i18n-wait .top, .i18n-wait main, .i18n-wait .foot { visibility: hidden; }
 .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--text); font: 700 24px/1 "Unbounded", system-ui, sans-serif; letter-spacing: -0.02em; }
 .brand img { display: block; }
 .brand .tld { color: var(--accent); font-weight: 500; }
 
 .ghost { background: transparent; border: 1px solid var(--line); border-radius: 12px; padding: 10px 18px; min-height: 48px; }
 .ghost:active { background: var(--card); }
+
+.lang { position: relative; }
+.lang-btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 14px; }
+.lang-btn svg { flex: none; color: var(--muted); }
+.lang-menu {
+  position: absolute; top: calc(100% + 6px); right: 0; z-index: 5; min-width: 180px; padding: 6px;
+  display: flex; flex-direction: column; background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, .5);
+}
+.lang-menu[hidden] { display: none; }
+.lang-menu button {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 48px; padding: 8px 14px;
+  background: transparent; border: 0; border-radius: 10px; text-align: left; font-size: 16px;
+}
+.lang-menu button:active { background: var(--card-hover); }
+.lang-menu [aria-checked="true"] { color: var(--accent); font-weight: 600; }
+.lang-menu [aria-checked="true"]::after { content: "✓"; }
 
 main { flex: 1; padding: 4px 24px 24px; max-width: 1100px; width: 100%; margin: 0 auto; }
 h1 { font-size: 30px; line-height: 1.15; margin: 8px 0 4px; letter-spacing: -0.02em; }
@@ -130,8 +150,13 @@ h1 { font-size: 30px; line-height: 1.15; margin: 8px 0 4px; letter-spacing: -0.0
 
 @media (max-width: 480px) {
   .top, main { padding-left: 16px; padding-right: 16px; }
+  /* the globe alone, so the header still fits on one line */
+  #langName { display: none; }
   h1 { font-size: 24px; }
-  .grid { grid-template-columns: 1fr 1fr; }
+  /* minmax(0, …) and the word breaks keep long German and Dutch words
+     ("Fractalverkenner") from widening a column past the screen */
+  .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .card h2, .card p { overflow-wrap: break-word; hyphens: auto; }
   /* one row of chips that scrolls sideways, rather than two */
   .filters { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin: 0 -16px 16px; padding: 0 16px; }
   .chip { flex: none; }

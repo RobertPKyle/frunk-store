@@ -23,6 +23,17 @@ its lede, and chips that filter the grid by tag (Game, Camp Mode, Road Trip,
 Tool); both are kept in the hub's localStorage, along with whether full
 screen was on, so the next tap on an app turns it back on.
 
+The hub's own text comes in English, Traditional and Simplified Chinese,
+German, Norwegian, Dutch, Japanese and Korean (the apps stay in English). The
+language button in the header switches it; until someone picks one, the hub
+follows the browser's language. English is written once, in `hub/index.html`
+(elements marked `data-i18n`) and `hub/i18n.js`; each other language is one
+file in `hub/lang/` with the page text, tag names and app names and taglines
+by app id. To add a language, add its file, then its code to `LANGS` in
+`hub/i18n.js` and to the list in the inline script in `index.html`'s head.
+The e2e check "every language has every string" fails on a missing string,
+app or tag, or on a string whose links or markup differ from the English.
+
 Both origins have a network-first service worker (`hub/sw.js`, `apps/sw.js`;
 the hub's also keeps the app icons). When a page doesn't arrive within 3
 seconds, as on a weak connection, the cached copy is shown and the files that

@@ -2,6 +2,8 @@
 // sandboxed iframe on a separate origin, so an app cannot touch the hub's
 // storage or navigate the top page.
 
+import { LANGS, EN_UI } from './i18n.js';
+
 const grid = document.getElementById('grid');
 const recentRow = document.getElementById('recent');
 const filterRow = document.getElementById('filters');
@@ -23,8 +25,9 @@ const store = {
   set(key, value) { try { localStorage.setItem('hub.' + key, JSON.stringify(value)); } catch {} },
 };
 
-// Categories come from the apps' tags; an app can be in more than one
-const FILTERS = [['all', 'All'], ['Game', 'Games'], ['Camp Mode', 'Camp Mode'], ['Road Trip', 'Road Trip'], ['Tool', 'Tools']];
+// Categories come from the apps' tags; an app can be in more than one.
+// The second item is the label's string key.
+const FILTERS = [['all', 'filterAll'], ['Game', 'filterGames'], ['Camp Mode', 'filterCamp'], ['Road Trip', 'filterRoad'], ['Tool', 'filterTools']];
 let filter = store.get('filter', 'all');
 const RECENT = 3;          // apps in the Recent row: as many as fit across the car's screen
 
@@ -33,6 +36,45 @@ const RECENT = 3;          // apps in the Recent row: as many as fit across the 
 function resolveAppsOrigin(configured) {
   if (location.hostname === 'localhost') return `http://127.0.0.1:${Number(location.port) + 1}`;
   return configured;
+}
+
+// Language. English is read from the page itself, so index.html stays the
+// one place it's written; other languages come from /lang/<code>.json.
+const root = document.documentElement;
+const en = { ui: { ...EN_UI }, tags: {}, apps: {} };
+for (const node of document.querySelectorAll('[data-i18n]')) en.ui[node.dataset.i18n] = node.innerHTML;
+for (const node of document.querySelectorAll('[data-i18n-label]')) en.ui[node.dataset.i18nLabel] = node.getAttribute('aria-label');
+for (const node of document.querySelectorAll('[data-i18n-title]')) en.ui[node.dataset.i18nTitle] = node.title;
+// the inline script in the head already chose it, from the saved choice or the browser's
+let lang = LANGS.some(([code]) => code === root.lang) ? root.lang : 'en';
+let dict = en;
+
+const t = key => dict.ui[key] ?? en.ui[key];
+const appName = app => dict.apps[app.id]?.name ?? app.name;
+const appTagline = app => dict.apps[app.id]?.tagline ?? app.tagline;
+const tagName = tag => dict.tags[tag] ?? tag;
+
+async function loadLang(code) {
+  if (code === 'en') return en;
+  const res = await fetch(`/lang/${code}.json`);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const file = await res.json();
+  return { ui: file.ui ?? {}, tags: file.tags ?? {}, apps: file.apps ?? {} };
+}
+
+// The strings are the hub's own files, so they may carry markup (links, code)
+function applyLang() {
+  root.lang = lang;
+  for (const node of document.querySelectorAll('[data-i18n]')) node.innerHTML = t(node.dataset.i18n);
+  for (const node of document.querySelectorAll('[data-i18n-label]')) node.setAttribute('aria-label', t(node.dataset.i18nLabel));
+  for (const node of document.querySelectorAll('[data-i18n-title]')) node.title = t(node.dataset.i18nTitle);
+  document.getElementById('langName').textContent = LANGS.find(([code]) => code === lang)[1];
+  fsLabel();
+  if (catalog) {
+    renderRecent();
+    renderFilters();
+    renderGrid();
+  }
 }
 
 function el(tag, attrs = {}, ...children) {
@@ -47,9 +89,9 @@ function renderGrid() {
   grid.replaceChildren(...shown.map(app => {
     const card = el('button', { class: 'card', type: 'button' },
       el('img', { src: appsOrigin + app.icon, alt: '', width: 64, height: 64 }),
-      el('h2', {}, app.name),
-      el('p', {}, app.tagline),
-      el('div', { class: 'tags' }, ...app.tags.map(t => el('span', { class: 'tag' }, t))),
+      el('h2', {}, appName(app)),
+      el('p', {}, appTagline(app)),
+      el('div', { class: 'tags' }, ...app.tags.map(tag => el('span', { class: 'tag' }, tagName(tag)))),
     );
     card.addEventListener('click', () => launch(app.id));
     return card;
@@ -61,7 +103,7 @@ function renderFilters() {
   filterRow.replaceChildren(...FILTERS
     .filter(([tag]) => tag === 'all' || catalog.apps.some(app => app.tags.includes(tag)))
     .map(([tag, label]) => {
-      const chip = el('button', { class: 'chip', type: 'button', 'aria-pressed': String(tag === filter) }, label);
+      const chip = el('button', { class: 'chip', type: 'button', 'aria-pressed': String(tag === filter) }, t(label));
       chip.addEventListener('click', () => {
         filter = tag;
         store.set('filter', tag);
@@ -80,7 +122,7 @@ function renderRecent() {
   const apps = store.get('recent', []).map(id => catalog.apps.find(a => a.id === id)).filter(Boolean).slice(0, RECENT);
   recentRow.replaceChildren(...apps.map(app => {
     const b = el('button', { class: 'recent-app', type: 'button' },
-      el('img', { src: appsOrigin + app.icon, alt: '', width: 28, height: 28 }), el('span', {}, app.name));
+      el('img', { src: appsOrigin + app.icon, alt: '', width: 28, height: 28 }), el('span', {}, appName(app)));
     b.addEventListener('click', () => launch(app.id));
     return b;
   }));
@@ -128,7 +170,7 @@ function openApp(id, { push }) {
   freshFrame();
   frame.src = appsOrigin + app.path;
   runner.hidden = false;
-  document.title = `${app.name} · frunk.store`;
+  document.title = `${appName(app)} · frunk.store`;
 }
 
 function closeApp() {
@@ -172,19 +214,59 @@ addEventListener('popstate', e => {
 
 // Full screen gains a lot of room on the car's small browser viewport.
 const fsBtn = document.getElementById('fullscreen');
+function fsLabel() {
+  fsBtn.textContent = t(document.fullscreenElement ? 'fullscreenExit' : 'fullscreen');
+}
 if (document.documentElement.requestFullscreen) {
   fsBtn.hidden = false;
   fsBtn.addEventListener('click', () => {
     if (document.fullscreenElement) document.exitFullscreen();
-    else document.documentElement.requestFullscreen().catch(() => { fsBtn.textContent = 'Full screen blocked'; });
+    else document.documentElement.requestFullscreen().catch(() => { fsBtn.textContent = t('fullscreenBlocked'); });
   });
   // Leaving the page ends full screen without an event, so the choice is
   // kept until it's turned off
   document.addEventListener('fullscreenchange', () => {
-    fsBtn.textContent = document.fullscreenElement ? 'Exit full screen' : 'Full screen';
+    fsLabel();
     store.set('fullscreen', !!document.fullscreenElement);
   });
 }
+
+// The language menu: each language listed in its own name
+const langBtn = document.getElementById('langBtn');
+const langMenu = document.getElementById('langMenu');
+let picking = 0;           // counts picks, so a slow file can't undo a newer pick
+
+function showLangMenu(open) {
+  langMenu.hidden = !open;
+  langBtn.setAttribute('aria-expanded', String(open));
+  if (!open) return;
+  langMenu.replaceChildren(...LANGS.map(([code, name]) => {
+    const item = el('button', { type: 'button', role: 'menuitemradio', 'aria-checked': String(code === lang), lang: code }, name);
+    item.addEventListener('click', () => pickLang(code));
+    return item;
+  }));
+  langMenu.querySelector('[aria-checked="true"]').focus();
+}
+
+async function pickLang(code) {
+  showLangMenu(false);
+  const which = ++picking;
+  let next;
+  try { next = await loadLang(code); } catch { return; }   // offline and never loaded: stay as is
+  if (which !== picking) return;
+  store.set('lang', code);
+  lang = code;
+  dict = next;
+  applyLang();
+}
+
+langBtn.addEventListener('click', () => showLangMenu(langMenu.hidden));
+document.addEventListener('pointerdown', e => {
+  if (!langMenu.hidden && !e.target.closest('.lang')) showLangMenu(false);
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && !langMenu.hidden) { showLangMenu(false); langBtn.focus(); }
+});
 
 async function init() {
   grid.replaceChildren(...Array.from({ length: 3 }, () => el('div', { class: 'skeleton' })));
@@ -196,7 +278,7 @@ async function init() {
     grid.replaceChildren();
     const err = document.getElementById('catalogError');
     err.hidden = false;
-    err.textContent = `Could not load the app list (${e.message}). Check the connection and reload.`;
+    err.textContent = t('catalogError').replace('{error}', e.message);
     return;
   }
   appsOrigin = resolveAppsOrigin(catalog.appsOrigin);
@@ -223,13 +305,17 @@ document.getElementById('copyToken').addEventListener('click', async e => {
   const code = document.getElementById('tokenAddress');
   try {
     await navigator.clipboard.writeText(code.textContent);
-    btn.textContent = 'Copied';
+    btn.textContent = t('copied');
   } catch {
     getSelection().selectAllChildren(code);
-    btn.textContent = 'Selected';
+    btn.textContent = t('selected');
   }
-  setTimeout(() => { btn.textContent = 'Copy'; }, 2000);
+  setTimeout(() => { btn.textContent = t('copy'); }, 2000);
 });
 
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
+// The page stays hidden (the head's i18n-wait) until its language is in
+loadLang(lang)
+  .then(next => { dict = next; }, () => { lang = 'en'; })
+  .finally(() => { applyLang(); root.classList.remove('i18n-wait'); });
 init();

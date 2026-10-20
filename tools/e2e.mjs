@@ -116,6 +116,58 @@ await check('hub shows recent apps and filters by category', async () => {
   await page.waitForSelector('#runner', { state: 'hidden' });
 });
 
+await check('hub switches language and remembers it', async () => {
+  const zh = await (await fetch(base + '/lang/zh-Hant.json')).json();
+  await page.goto(base + '/');
+  await page.waitForSelector('#grid .card');
+  await page.click('#langBtn');
+  await page.getByRole('menuitemradio', { name: '繁體中文' }).click();
+  await page.locator('h1', { hasText: zh.ui.title }).waitFor({ timeout: 3000 });
+  const names = await page.locator('#grid .card h2').allTextContents();
+  if (!names.includes(zh.apps.breakout.name)) throw new Error(`cards not translated: ${names.join(', ')}`);
+  await page.reload();
+  await page.locator('h1', { hasText: zh.ui.title }).waitFor({ timeout: 3000 });
+  const state = await page.evaluate(() => ({ lang: document.documentElement.lang, waiting: document.documentElement.classList.contains('i18n-wait') }));
+  if (state.lang !== 'zh-Hant' || state.waiting) throw new Error(`after reload: ${JSON.stringify(state)}`);
+  await page.click('#langBtn');
+  await page.getByRole('menuitemradio', { name: 'English' }).click();
+  await page.locator('h1', { hasText: "Apps for your car's browser" }).waitFor({ timeout: 3000 });
+  if (!(await page.locator('#grid .card h2').allTextContents()).includes('Brick Breaker')) throw new Error('cards not back in English');
+});
+
+await check('every language has every string', async () => {
+  // compares each language's file with the English on the page: every key,
+  // the same links and markup, the same {placeholders}, every app and tag
+  const problems = await page.evaluate(async () => {
+    const { LANGS, EN_UI } = await import('/i18n.js');
+    const catalog = await (await fetch('/catalog.json')).json();
+    const en = { ...EN_UI };
+    for (const node of document.querySelectorAll('[data-i18n]')) en[node.dataset.i18n] = node.innerHTML;
+    for (const node of document.querySelectorAll('[data-i18n-label]')) en[node.dataset.i18nLabel] = node.getAttribute('aria-label');
+    for (const node of document.querySelectorAll('[data-i18n-title]')) en[node.dataset.i18nTitle] = node.title;
+    const shape = html => {
+      const tpl = document.createElement('template');
+      tpl.innerHTML = html;
+      const tags = [...tpl.content.querySelectorAll('*')].map(n => n.tagName + ' ' + (n.getAttribute('href') ?? ''));
+      return [...tags, ...(html.match(/\{\w+\}/g) ?? [])].sort().join(', ');
+    };
+    const tags = new Set(catalog.apps.flatMap(app => app.tags));
+    const problems = [];
+    for (const [code] of LANGS.slice(1)) {
+      const file = await (await fetch(`/lang/${code}.json`)).json();
+      for (const key of Object.keys(en)) {
+        if (!(key in file.ui)) problems.push(`${code}: no ${key}`);
+        else if (shape(file.ui[key]) !== shape(en[key])) problems.push(`${code}: ${key} has "${shape(file.ui[key])}", English has "${shape(en[key])}"`);
+      }
+      for (const key of Object.keys(file.ui)) if (!(key in en)) problems.push(`${code}: unused ${key}`);
+      for (const app of catalog.apps) if (!file.apps[app.id]?.tagline) problems.push(`${code}: no tagline for ${app.id}`);
+      for (const tag of tags) if (!file.tags[tag]) problems.push(`${code}: no tag ${tag}`);
+    }
+    return problems;
+  });
+  if (problems.length) throw new Error(problems.join('\n'));
+});
+
 await check('breakout runs and launches', async () => {
   await openFromHub(/Brick Breaker/);
   const frame = page.frames().find(f => f.url().includes('/breakout/'));

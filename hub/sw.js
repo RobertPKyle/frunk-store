@@ -2,8 +2,8 @@
 // the hub still opens when the car has a weak or no connection. A page that
 // doesn't arrive within a few seconds comes from the cache, and so do the
 // files it loads, so the shell and catalog stay from one version.
-const CACHE = 'frunk-hub-v13';
-const SHELL = ['/', '/hub.css', '/hub.js', '/catalog.json', '/icon.svg', '/brand/frunk-mark-on-dark.svg', '/fonts/unbounded-latin.woff2'];
+const CACHE = 'frunk-hub-v14';
+const SHELL = ['/', '/hub.css', '/hub.js', '/i18n.js', '/catalog.json', '/icon.svg', '/brand/frunk-mark-on-dark.svg', '/fonts/unbounded-latin.woff2'];
 const SLOW = 3000;   // ms to wait for the page before using the cached copy
 
 // Pages shown from the cache: their files come from the cache first
