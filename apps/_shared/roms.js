@@ -13,6 +13,7 @@ export const SYSTEMS = {
   sms: { name: 'Master System', exts: ['sms'], max: 4 * MB },
   gg: { name: 'Game Gear', exts: ['gg'], max: 4 * MB },
   sg: { name: 'SG-1000', exts: ['sg'], max: MB },
+  pce: { name: 'PC Engine', exts: ['pce'], max: 2560 * 1024 + 512 },   // Street Fighter II' is the biggest HuCard
 };
 
 export const GAME_EXTS = Object.values(SYSTEMS).flatMap(s => s.exts);
@@ -40,9 +41,10 @@ function segaHeader(bytes) {
   return null;
 }
 
-// The console a game is for, or null. Sega games are known by their name
-// (.sms, .gg, .sg), as Sega's consoles don't mark every game; the header
-// settles Master System against Game Gear when it's there.
+// The console a game is for, or null. Sega and PC Engine games are known by
+// their name (.sms, .gg, .sg, .pce), as those consoles don't mark every
+// game (PC Engine HuCards carry no header at all); the header settles
+// Master System against Game Gear when it's there.
 export function systemOf(bytes, name = '') {
   if (at(bytes, 0, [0x4e, 0x45, 0x53, 0x1a])) return 'nes';
   // GBA: start of the Nintendo logo at 0x04 and the fixed byte at 0xB2
@@ -54,6 +56,8 @@ export function systemOf(bytes, name = '') {
   if (sega && bytes.length >= 8192 && [0, 512].includes(bytes.length % 1024)) {
     return sega === 'sg' ? 'sg' : segaHeader(bytes.length % 1024 ? bytes.subarray(512) : bytes) || sega;
   }
+  // HuCards are whole multiples of 8 KB, some dumps with a 512-byte header
+  if (ext(name) === 'pce' && bytes.length >= 8192 && [0, 512].includes(bytes.length % 8192)) return 'pce';
   return null;
 }
 

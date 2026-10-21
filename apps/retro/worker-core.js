@@ -1,5 +1,6 @@
 // A core whose emulator runs on its own thread (nes-worker.js for NES,
-// sms-worker.js for Master System, Game Gear and SG-1000). The worker draws
+// sms-worker.js for Master System, Game Gear and SG-1000, pce-worker.js for
+// PC Engine). The worker draws
 // to this core's canvas (handed over as an OffscreenCanvas), keeps the
 // game's saves, and sends sound straight to the AudioWorklet made here. This
 // side passes on controller input, pause and reset. On the page's main

@@ -1,18 +1,19 @@
-// Retro Console: NES (jsnes), Game Boy / Color / Advance (mGBA) and Master
-// System / Game Gear / SG-1000 (Gearsystem) emulators with free homebrew
-// games built in, plus games the player loads from their
-// own files. Loaded files are kept in this screen's IndexedDB and never leave
+// Retro Console: NES (jsnes), Game Boy / Color / Advance (mGBA), Master
+// System / Game Gear / SG-1000 (Gearsystem) and PC Engine / TurboGrafx-16
+// (Geargrafx) emulators with free homebrew games built in, plus games the
+// player loads from their own files. Loaded files are kept in this screen's IndexedDB and never leave
 // it.
 //
 // Input comes from up to two gamepads, the on-screen buttons and the
 // keyboard; each frame they're merged and handed to the running core
-// (nes.js, gba.js or sms.js) as sets of button names.
+// (nes.js, gba.js, sms.js or pce.js) as sets of button names.
 
 import { phonePanel } from '../_shared/phone.js';
 import { MAX_FILE, SYSTEMS, cleanName, findGame, isColor, maybeGame } from '../_shared/roms.js';
 import { createNes } from './nes.js';
 import { createGba } from './gba.js';
 import { createSms } from './sms.js';
+import { createPce } from './pce.js';
 
 const GAMES = [
   {
@@ -54,6 +55,11 @@ const GAMES = [
     id: 'cheril', title: 'Cheril Perils Classic', by: 'The Mojon Twins, 2018', file: 'games/cheril.sg', system: 'sg',
     about: 'Guide Cheril from screen to screen, jumping on the creatures in her way. Button 1 starts, 2 jumps.',
     license: 'GNU LGPL 3', source: 'games/cheril-perils-sg1000-src.tar.gz',
+  },
+  {
+    id: 'blox', title: 'Blox', by: 'David Shadoff, 1999', file: 'games/blox.pce', system: 'pce',
+    about: 'Steer the falling blocks into full rows to clear them. I and II turn the block, down drops it faster, Run pauses.',
+    license: 'MIT', source: 'games/blox-src.tar.gz',
   },
 ];
 
@@ -113,7 +119,7 @@ async function addFiles(files) {
   }
   msg.textContent = added
     ? `Added ${added} game${added === 1 ? '' : 's'}.${skipped ? ` Skipped ${skipped} file${skipped === 1 ? '' : 's'} that weren't games.` : ''}`
-    : files.length ? 'No game files (.nes, .gb, .gbc, .gba, .sms, .gg, .sg or .zip) found there.' : '';
+    : files.length ? 'No game files (.nes, .gb, .gbc, .gba, .sms, .gg, .sg, .pce or .zip) found there.' : '';
   renderMine();
 }
 
@@ -395,14 +401,14 @@ addEventListener('blur', () => keyboard.clear());
 
 // ---------- running ----------
 
-const cores = { nes: createNes($('screen')), gba: createGba($('gbaScreen')), sms: createSms($('smsScreen')) };
-const CORE = { nes: 'nes', gb: 'gba', gba: 'gba', sms: 'sms', gg: 'sms', sg: 'sms' };
+const cores = { nes: createNes($('screen')), gba: createGba($('gbaScreen')), sms: createSms($('smsScreen')), pce: createPce($('pceScreen')) };
+const CORE = { nes: 'nes', gb: 'gba', gba: 'gba', sms: 'sms', gg: 'sms', sg: 'sms', pce: 'pce' };
 
 // Sega's pads have buttons 1 and 2 where B and A are, and Start is the
-// Master System's Pause button
-const SEGA = { sms: ['1', '2', 'Pause'], gg: ['1', '2', 'Start'], sg: ['1', '2', 'Pause'] };
+// Master System's Pause button; the PC Engine's have II and I there, and Run
+const LABELS = { sms: ['1', '2', 'Pause'], gg: ['1', '2', 'Start'], sg: ['1', '2', 'Pause'], pce: ['II', 'I', 'Run'] };
 function labelButtons(system) {
-  const [b, a, start] = SEGA[system] || ['B', 'A', 'Start'];
+  const [b, a, start] = LABELS[system] || ['B', 'A', 'Start'];
   document.querySelector('#player [data-b=b]').textContent = b;
   document.querySelector('#player [data-b=a]').textContent = a;
   document.querySelector('#player [data-b=start]').textContent = start;
@@ -447,7 +453,7 @@ function loop(t) {
     }
     // A core with its own refresh rate (NES, in a worker) decides for itself
     if ('refresh' in core) { hz = core.refresh; steady = core.isSteady; }
-    // Master System games can change their picture's size while they run
+    // Master System and PC Engine games can change their picture's size while they run
     if (core.width !== fitted.width || core.height !== fitted.height) fit();
     $('fps').textContent = `${Math.round((core.frames - frames) * 1000 / (t - fpsSince))} fps` +
       (details ? ` · ${hz} Hz${steady ? ' · steady' : ''}` : '');

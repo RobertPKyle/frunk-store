@@ -123,17 +123,17 @@
       <button class="btn" id="addFiles" type="button">Add game files</button>
       <button class="btn" id="addFolder" type="button">Add a folder</button>
     </div>
-    <input id="fileInput" type="file" accept=".nes,.gb,.gbc,.gba,.sms,.gg,.sg,.zip" multiple hidden>
+    <input id="fileInput" type="file" accept=".nes,.gb,.gbc,.gba,.sms,.gg,.sg,.pce,.zip" multiple hidden>
     <input id="folderInput" type="file" webkitdirectory multiple hidden>
     <p class="note" id="addMsg" aria-live="polite"></p>
     <div class="games" id="mine"></div>
     <p class="note owned"><b>Only load games you legally own</b>, such as copies you made from your own cartridges. frunk.store doesn't provide, sell or share commercial games, and never keeps yours: they're stored only on this screen. You're responsible for the files you load.</p>
 
     <div class="legal">
-      <p>Plays NES, Game Boy, Game Boy Color, Game Boy Advance, Master System, Game Gear and SG-1000 games (.nes, .gb, .gbc, .gba, .sms, .gg, .sg, also zipped). Games remember your progress: they pick up where you left off, and Reset starts over (keeping in-game saves).</p>
-      <p>Controls: a USB or Bluetooth controller, the on-screen buttons, or a keyboard (arrows, Z = B, X = A, Q = L, W = R, Enter = Start, Shift = Select). On Sega's consoles, B is button 1, A is button 2, and Start is the Master System's Pause button. With a controller, the on-screen buttons hide to make the game bigger; touch the screen to bring them back. Switching the controller off pauses the game, and Start resumes it.</p>
-      <p>Emulators: jsnes (Apache License 2.0) for NES, mGBA (Mozilla Public License 2.0, source at github.com/thenick775/mgba) for Game Boy, Gearsystem (GNU GPL 3 or later, source at frunk-apps.vercel.app/retro/sms/gearsystem-web-src.tar.gz) for Sega's consoles. The free games are by their authors, under the licenses shown on each card; source code is kept next to each game.</p>
-      <p>Not affiliated with or endorsed by Nintendo or Sega. Play only while parked.</p>
+      <p>Plays NES, Game Boy, Game Boy Color, Game Boy Advance, Master System, Game Gear, SG-1000 and PC Engine / TurboGrafx-16 games (.nes, .gb, .gbc, .gba, .sms, .gg, .sg, .pce, also zipped; PC Engine CD games aren't supported). Games remember your progress: they pick up where you left off, and Reset starts over (keeping in-game saves).</p>
+      <p>Controls: a USB or Bluetooth controller, the on-screen buttons, or a keyboard (arrows, Z = B, X = A, Q = L, W = R, Enter = Start, Shift = Select). On Sega's consoles, B is button 1, A is button 2, and Start is the Master System's Pause button. On the PC Engine, B is II, A is I, and Start is Run. With a controller, the on-screen buttons hide to make the game bigger; touch the screen to bring them back. Switching the controller off pauses the game, and Start resumes it.</p>
+      <p>Emulators: jsnes (Apache License 2.0) for NES, mGBA (Mozilla Public License 2.0, source at github.com/thenick775/mgba) for Game Boy, Gearsystem (GNU GPL 3 or later, source at frunk-apps.vercel.app/retro/sms/gearsystem-web-src.tar.gz) for Sega's consoles, Geargrafx (GNU GPL 3 or later, source at frunk-apps.vercel.app/retro/pce/geargrafx-web-src.tar.gz) for the PC Engine. The free games are by their authors, under the licenses shown on each card; source code is kept next to each game.</p>
+      <p>Not affiliated with or endorsed by Nintendo, Sega, NEC or Konami. Play only while parked.</p>
     </div>
   </div>
 </section>
@@ -186,6 +186,7 @@
     <canvas id="screen" width="256" height="240"></canvas>
     <canvas id="gbaScreen" width="240" height="160" hidden></canvas>
     <canvas id="smsScreen" width="256" height="192" hidden></canvas>
+    <canvas id="pceScreen" width="256" height="224" hidden></canvas>
     <div id="paused" hidden>Paused<small>Tap here or press Start to resume</small></div>
   </div>
   <div class="side right">

@@ -2,7 +2,7 @@
 // (GPL-3.0-or-later, https://github.com/drhelius/Gearsystem) at a fixed
 // release, unmodified, plus tools/gearsystem/web.cpp, compiled with
 // Emscripten in Docker to apps/retro/sms/gearsystem.{js,wasm}. It runs in a
-// worker (apps/retro/sms-worker.js).
+// worker (apps/retro/sms-worker.js, with apps/retro/gear-worker.js).
 //
 // Gearsystem's license asks for the source to go with the program, so the
 // build also writes apps/retro/sms/gearsystem-web-src.tar.gz: the

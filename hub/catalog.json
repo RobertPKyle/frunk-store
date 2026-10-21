@@ -136,7 +136,7 @@
     {
       "id": "retro",
       "name": "Retro Console",
-      "tagline": "Play homebrew games, or NES, Game Boy, GBA, Master System and Game Gear games you own sent from your phone, with a controller or on screen.",
+      "tagline": "Play homebrew games, or NES, Game Boy, GBA, Master System, Game Gear and TurboGrafx-16 games you own sent from your phone, with a controller or on screen.",
       "path": "/retro/",
       "icon": "/retro/icon.svg",
       "tags": [

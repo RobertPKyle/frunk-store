@@ -19,6 +19,16 @@ Third-party components
   and Sms_Snd_Emu by Shay Green (GNU LGPL 2.1 or later), emu2413 by Mitsutaka
   Okazaki (MIT) and miniz (MIT).
 
+- Geargrafx 1.8.4, copyright 2024 Ignacio Sanchez, GNU GPL version 3 or
+  later (pce/geargrafx.js and pce/geargrafx.wasm, compiled unmodified with a
+  small front end, web.cpp, under the same license; license text in
+  pce/LICENSE; the complete source, with the build script, in
+  pce/geargrafx-web-src.tar.gz). From https://github.com/drhelius/Geargrafx
+  at commit 1c62a549328241518101f5be5bf3e6840b96ea5d. It includes miniz
+  (MIT), libchdr (BSD 3-Clause), the LZMA SDK (public domain), Zstandard
+  (BSD), minivorbis (BSD 3-Clause), JSON for Modern C++ (MIT) and qon (MIT),
+  with their license texts in pce/THIRD-PARTY.txt.
+
 - Attack on Voxelburg (jam version), copyright 2022 John Tsiombikas, GNU GPL
   version 3 or later (games/voxelburg.gba; complete source in
   games/voxelburg-jam-src.tar.gz, license text in games/gpl-3.0.txt). From
@@ -63,5 +73,11 @@ Third-party components
   a25be2647792f3ce03f4af26e124ca8cbefde7ac; the game's source, with the
   license text, in games/cheril-perils-sg1000-src.tar.gz; license texts also
   in games/lgpl-3.0.txt and games/gpl-3.0.txt)
+
+- Blox 0.04, copyright 1998, 1999, 2022 David Shadoff, with the MagicKit
+  library, copyright 1998, 1999 David Michel, MIT License (games/blox.pce,
+  build/20220408.zip of https://github.com/dshadoff/PCE_Blox at commit
+  48ce57974ef482d7ac4f7c20a656eb1bae22f753; the repository, with the license
+  text in LICENSE, in games/blox-src.tar.gz)
 
 All games are distributed exactly as published by their authors.

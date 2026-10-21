@@ -89,7 +89,7 @@
     "pitstop": { "name": "Pitstopp", "tagline": "Toaletter, kaffe, mat og butikker i gangavstand fra laderen, med det som er åpent nå." },
     "speedtest": { "name": "Hastighetstest", "tagline": "Hvor raskt er internett i bilen akkurat nå? Nedlasting, opplasting og ping, på Wi-Fi eller LTE." },
     "probe": { "name": "Bil-benchmark", "tagline": "Se hva nettleseren i denne bilen kan." },
-    "retro": { "name": "Retrokonsoll", "tagline": "Spill homebrew-spill, eller NES-, Game Boy-, GBA-, Master System- og Game Gear-spill du eier, sendt fra telefonen, med kontroller eller på skjermen." },
+    "retro": { "name": "Retrokonsoll", "tagline": "Spill homebrew-spill, eller NES-, Game Boy-, GBA-, Master System-, Game Gear- og TurboGrafx-16-spill du eier, sendt fra telefonen, med kontroller eller på skjermen." },
     "doom": { "tagline": "Den klassiske Doom-motoren med de gratis Freedoom-spillene, eller Doom-spill du eier, sendt fra telefonen, med kontroller eller på skjermen." },
     "heretic": { "tagline": "Heretic-motoren med det gratis mørke fantasyspillet Blasphemer, eller Heretic du eier, sendt fra telefonen. Trylleformler, relikvier og flyging." },
     "quake": { "tagline": "Den klassiske Quake-motoren med gratis LibreQuake, eller Quake du eier, sendt fra telefonen, med kontroller eller på skjermen." },

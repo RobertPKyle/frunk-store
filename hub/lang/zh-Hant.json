@@ -89,7 +89,7 @@
     "pitstop": { "name": "充電歇腳", "tagline": "充電站步行範圍內的廁所、咖啡、餐飲與商店，並標示目前是否營業。" },
     "speedtest": { "name": "網速測試", "tagline": "車上的網路現在有多快？測量下載、上傳與延遲，Wi-Fi 或 LTE 都可以。" },
     "probe": { "name": "車機效能測試", "tagline": "看看這台車的瀏覽器能做到什麼。" },
-    "retro": { "name": "復古遊戲機", "tagline": "玩自製遊戲，或從手機傳送你擁有的 NES、Game Boy、GBA、Master System 與 Game Gear 遊戲，用控制器或螢幕操作。" },
+    "retro": { "name": "復古遊戲機", "tagline": "玩自製遊戲，或從手機傳送你擁有的 NES、Game Boy、GBA、Master System、Game Gear 與 PC Engine 遊戲，用控制器或螢幕操作。" },
     "doom": { "tagline": "經典的 Doom 引擎，搭配免費的 Freedoom 遊戲，或從手機傳送你擁有的 Doom 遊戲，用控制器或螢幕操作。" },
     "heretic": { "tagline": "Heretic 引擎，搭配免費的黑暗奇幻遊戲 Blasphemer，或從手機傳送你擁有的 Heretic。法術、聖物與飛行。" },
     "quake": { "tagline": "經典的 Quake 引擎，搭配免費的 LibreQuake，或從手機傳送你擁有的 Quake，用控制器或螢幕操作。" },

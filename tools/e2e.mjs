@@ -539,6 +539,51 @@ await check('retro console plays Game Gear, Master System and SG-1000 games', as
   await page.screenshot({ path: shots + 'retro-sms.png' });
 });
 
+await check('retro console plays PC Engine games', async () => {
+  await openFromHub(/Retro Console/);
+  const frame = () => page.frames().find(f => f.url().includes('/retro/'));
+  const screen = appFrame().locator('#pceScreen');
+  await appFrame().locator('#free .game').filter({ hasText: 'Blox' }).click();
+  await appFrame().locator('#fps').filter({ hasText: /fps/ }).waitFor({ timeout: 15000 });
+  await page.waitForTimeout(3000);
+  const fps = parseInt(await appFrame().locator('#fps').textContent());
+  if (!(fps >= 50)) throw new Error(`Blox running at ${fps} fps`);
+  // 256 pixels of 8/7 their height, 224 lines
+  const box = await screen.boundingBox();
+  if (Math.abs(box.width / box.height - 293 / 224) > 0.03) throw new Error(`screen is ${box.width}x${box.height}`);
+  const shown = (await appFrame().locator('[data-b=b], [data-b=a], .pill[data-b=start]').allTextContents()).join(' ');
+  if (shown !== 'II I Run') throw new Error(`buttons read "${shown}"`);
+  // Run pauses the game
+  const running = await screen.screenshot();
+  await appFrame().locator('.pill[data-b=start]').click();
+  await page.waitForTimeout(1500);
+  const paused = await screen.screenshot();
+  if (paused.equals(running)) throw new Error('Run did nothing in Blox');
+  // Leaving saves a resume snapshot
+  await appFrame().getByRole('button', { name: 'Games' }).click();
+  const saved = await frame().evaluate(() => new Promise(r => {
+    const q = indexedDB.open('pce', 1);
+    q.onsuccess = () => { const g = q.result.transaction('saves').objectStore('saves').get('free-blox.pce'); g.onsuccess = () => r(g.result?.state?.length || 0); };
+    q.onerror = () => r(0);
+  }));
+  if (!saved) throw new Error('no resume snapshot saved for Blox');
+  // A player's own HuCard is known by its name
+  const picker = page.waitForEvent('filechooser');
+  await appFrame().getByRole('button', { name: 'Add game files' }).click();
+  const terms = appFrame().getByRole('button', { name: 'I own my games' });
+  if (await terms.isVisible()) await terms.click();
+  await (await picker).setFiles([
+    { name: 'falling.pce', mimeType: 'application/octet-stream', buffer: readFileSync(new URL('../apps/retro/games/blox.pce', import.meta.url)) },
+  ]);
+  await appFrame().locator('#mine .game').filter({ hasText: 'falling' }).waitFor({ timeout: 5000 });
+  const kind = (await appFrame().locator('#mine .game small').first().textContent()).split(' · ')[0];
+  if (kind !== 'PC Engine') throw new Error(`own game read as ${kind}`);
+  await appFrame().getByRole('button', { name: 'Remove falling' }).click();
+  await appFrame().getByRole('button', { name: 'Remove falling' }).click();
+  console.log(`     Blox ${fps} fps, snapshot ${saved} bytes`);
+  await page.screenshot({ path: shots + 'retro-pce.png' });
+});
+
 await check('freedoom takes WADs from a phone', async () => {
   await openFromHub(/Freedoom/);
   // Tiny stand-ins for a player's files: a whole game (IWAD) and an add-on (PWAD)
