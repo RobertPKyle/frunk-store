@@ -1,16 +1,18 @@
-// Retro Console: NES (jsnes) and Game Boy / Color / Advance (mGBA) emulators
-// with free homebrew games built in, plus games the player loads from their
+// Retro Console: NES (jsnes), Game Boy / Color / Advance (mGBA) and Master
+// System / Game Gear / SG-1000 (Gearsystem) emulators with free homebrew
+// games built in, plus games the player loads from their
 // own files. Loaded files are kept in this screen's IndexedDB and never leave
 // it.
 //
 // Input comes from up to two gamepads, the on-screen buttons and the
 // keyboard; each frame they're merged and handed to the running core
-// (nes.js or gba.js) as sets of button names.
+// (nes.js, gba.js or sms.js) as sets of button names.
 
 import { phonePanel } from '../_shared/phone.js';
 import { MAX_FILE, SYSTEMS, cleanName, findGame, isColor, maybeGame } from '../_shared/roms.js';
 import { createNes } from './nes.js';
 import { createGba } from './gba.js';
+import { createSms } from './sms.js';
 
 const GAMES = [
   {
@@ -37,6 +39,21 @@ const GAMES = [
     id: 'croom', title: 'Concentration Room', by: 'Damian Yerrick, 2010', file: 'games/croom.nes', system: 'nes',
     about: 'Flip cards and find the matching pairs, alone, against the console or with a friend.',
     license: 'GNU GPL 3 or later (exact copies allowed without source)', source: 'games/ConcentrationRoom-0.02.zip',
+  },
+  {
+    id: 'waternet', title: 'Waternet', by: 'Willems Davy, 2022', file: 'games/waternet.gg', system: 'gg',
+    about: 'Turn and slide pipes until water flows through all of them, in three game modes. Button 1 turns or slides, 2 goes back.',
+    license: 'MIT', source: 'games/waternet-1.0-src.tar.gz',
+  },
+  {
+    id: 'subrescue', title: 'Sub Rescue', by: 'Haroldo de Oliveira Pinheiro, 2021', file: 'games/subrescue.sms', system: 'sms',
+    about: 'Steer your submarine, pick up six divers and fight off sharks and enemy subs. Surface before the air runs out. Button 1 or 2 fires.',
+    license: 'MIT', source: 'games/sub-rescue-0.3-src.tar.gz',
+  },
+  {
+    id: 'cheril', title: 'Cheril Perils Classic', by: 'The Mojon Twins, 2018', file: 'games/cheril.sg', system: 'sg',
+    about: 'Guide Cheril from screen to screen, jumping on the creatures in her way. Button 1 starts, 2 jumps.',
+    license: 'GNU LGPL 3', source: 'games/cheril-perils-sg1000-src.tar.gz',
   },
 ];
 
@@ -96,7 +113,7 @@ async function addFiles(files) {
   }
   msg.textContent = added
     ? `Added ${added} game${added === 1 ? '' : 's'}.${skipped ? ` Skipped ${skipped} file${skipped === 1 ? '' : 's'} that weren't games.` : ''}`
-    : files.length ? 'No game files (.nes, .gb, .gbc, .gba or .zip) found there.' : '';
+    : files.length ? 'No game files (.nes, .gb, .gbc, .gba, .sms, .gg, .sg or .zip) found there.' : '';
   renderMine();
 }
 
@@ -378,8 +395,18 @@ addEventListener('blur', () => keyboard.clear());
 
 // ---------- running ----------
 
-const cores = { nes: createNes($('screen')), gba: createGba($('gbaScreen')) };
-const CORE = { nes: 'nes', gb: 'gba', gba: 'gba' };
+const cores = { nes: createNes($('screen')), gba: createGba($('gbaScreen')), sms: createSms($('smsScreen')) };
+const CORE = { nes: 'nes', gb: 'gba', gba: 'gba', sms: 'sms', gg: 'sms', sg: 'sms' };
+
+// Sega's pads have buttons 1 and 2 where B and A are, and Start is the
+// Master System's Pause button
+const SEGA = { sms: ['1', '2', 'Pause'], gg: ['1', '2', 'Start'], sg: ['1', '2', 'Pause'] };
+function labelButtons(system) {
+  const [b, a, start] = SEGA[system] || ['B', 'A', 'Start'];
+  document.querySelector('#player [data-b=b]').textContent = b;
+  document.querySelector('#player [data-b=a]').textContent = a;
+  document.querySelector('#player [data-b=start]').textContent = start;
+}
 let core = null, raf = 0, paused = false, frames = 0, fpsSince = 0, refreshes = 0;
 
 // Steady mode: when the browser can't refresh the screen about 60 times a
@@ -420,6 +447,8 @@ function loop(t) {
     }
     // A core with its own refresh rate (NES, in a worker) decides for itself
     if ('refresh' in core) { hz = core.refresh; steady = core.isSteady; }
+    // Master System games can change their picture's size while they run
+    if (core.width !== fitted.width || core.height !== fitted.height) fit();
     $('fps').textContent = `${Math.round((core.frames - frames) * 1000 / (t - fpsSince))} fps` +
       (details ? ` · ${hz} Hz${steady ? ' · steady' : ''}` : '');
     frames = core.frames;
@@ -428,9 +457,11 @@ function loop(t) {
   }
 }
 
+let fitted = {};
 function fit() {
   if (!core) return;
   const { width: w, height: h } = core;
+  fitted = { width: w, height: h };
   const wide = innerWidth > 640;
   const sides = wide && !padMode ? 2 * 128 : 0;
   const room = innerHeight - 60 - (wide || padMode ? 8 : 230);
@@ -495,6 +526,7 @@ async function play(title, system, bytes, fileName) {
   $('title').textContent = title;
   for (const c of Object.values(cores)) c.canvas.hidden = c !== core;
   $('player').dataset.system = system;
+  labelButtons(system);
   $('library').hidden = true;
   $('player').hidden = false;
   showSound();
@@ -522,6 +554,7 @@ async function startGame(btn, title, run) {
 
 // A file name for mGBA's saves: the same for the same game every time
 function saveName(id, system, bytes) {
+  // Gearsystem tells the Game Gear and SG-1000 apart from the name, too
   const ext = system === 'gba' ? 'gba' : system === 'gb' ? (isColor(bytes) ? 'gbc' : 'gb') : system;
   return `${id.replace(/[^\w .|-]/g, '').replace('|', '-').slice(0, 80)}.${ext}`;
 }

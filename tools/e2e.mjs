@@ -464,6 +464,81 @@ await check('retro console plays a Game Boy Color game', async () => {
   await appFrame().getByRole('button', { name: 'Games' }).click();
 });
 
+await check('retro console plays Game Gear, Master System and SG-1000 games', async () => {
+  await openFromHub(/Retro Console/);
+  const frame = () => page.frames().find(f => f.url().includes('/retro/'));
+  const screen = appFrame().locator('#smsScreen');
+  // Share of the screen that isn't black, from a screenshot (the worker draws it)
+  const lit = async () => page.evaluate(async png => {
+    const img = await createImageBitmap(new Blob([new Uint8Array(png)], { type: 'image/png' }));
+    const c = new OffscreenCanvas(img.width, img.height).getContext('2d');
+    c.drawImage(img, 0, 0);
+    const d = c.getImageData(0, 0, img.width, img.height).data;
+    let n = 0;
+    for (let i = 0; i < d.length; i += 4) if (d[i] + d[i + 1] + d[i + 2] > 60) n++;
+    return Math.round(n / (img.width * img.height) * 100);
+  }, [...await screen.screenshot()]);
+  const results = [];
+  // Cheril Perils opens with a few dark seconds
+  for (const [title, ratio, labels, wait] of [['Waternet', 160 / 144, '1 2 Start', 3000], ['Sub Rescue', 256 / 192, '1 2 Pause', 3000], ['Cheril Perils Classic', 256 / 192, '1 2 Pause', 8000]]) {
+    await appFrame().locator('#free .game').filter({ hasText: title }).click();
+    await appFrame().locator('#fps').filter({ hasText: /fps/ }).waitFor({ timeout: 15000 });
+    await page.waitForTimeout(wait);
+    const fps = parseInt(await appFrame().locator('#fps').textContent());
+    if (!(fps >= 50)) throw new Error(`${title} running at ${fps} fps`);
+    const box = await screen.boundingBox();
+    if (Math.abs(box.width / box.height - ratio) > 0.03) throw new Error(`${title} screen is ${box.width}x${box.height}`);
+    const shown = (await appFrame().locator('[data-b=b], [data-b=a], .pill[data-b=start]').allTextContents()).join(' ');
+    if (shown !== labels) throw new Error(`${title} buttons read "${shown}"`);
+    const before = await lit();
+    if (before < 5) throw new Error(`${title} screen mostly black (${before}% lit)`);
+    results.push(`${title} ${fps} fps, ${before}% lit`);
+    await appFrame().getByRole('button', { name: 'Games' }).click();
+  }
+  // Input reaches the game: Start on Waternet's title opens its menu
+  await appFrame().locator('#free .game').filter({ hasText: 'Waternet' }).click();
+  await appFrame().locator('#fps').filter({ hasText: /fps/ }).waitFor({ timeout: 15000 });
+  await page.waitForTimeout(1500);
+  const title = await screen.screenshot();
+  await appFrame().locator('.pill[data-b=start]').click();
+  await page.waitForTimeout(1500);
+  const menu = await screen.screenshot();
+  if (menu.equals(title)) throw new Error('Start did nothing in Waternet');
+  // Leaving saves a resume snapshot, and the game picks up there
+  await appFrame().getByRole('button', { name: 'Games' }).click();
+  const saved = await frame().evaluate(() => new Promise(r => {
+    const q = indexedDB.open('sms', 1);
+    q.onsuccess = () => { const g = q.result.transaction('saves').objectStore('saves').get('free-waternet.gg'); g.onsuccess = () => r(g.result?.state?.length || 0); };
+    q.onerror = () => r(0);
+  }));
+  if (!saved) throw new Error('no resume snapshot saved for Waternet');
+  await appFrame().getByRole('button', { name: 'Continue Waternet' }).click();
+  await appFrame().locator('#player').waitFor({ state: 'visible', timeout: 10000 });
+  await page.waitForTimeout(1000);
+  if ((await screen.screenshot()).equals(title)) throw new Error('Waternet did not resume where it left off');
+  // A player's own file is known by its name: the Game Gear game sent as a .sms is still a Game Gear game (its header says so)
+  await appFrame().getByRole('button', { name: 'Games' }).click();
+  const picker = page.waitForEvent('filechooser');
+  await appFrame().getByRole('button', { name: 'Add game files' }).click();
+  // asked only the first time on this screen
+  const terms = appFrame().getByRole('button', { name: 'I own my games' });
+  if (await terms.isVisible()) await terms.click();
+  const chooser = await picker;
+  await chooser.setFiles([
+    { name: 'pipes.sms', mimeType: 'application/octet-stream', buffer: readFileSync(new URL('../apps/retro/games/waternet.gg', import.meta.url)) },
+    { name: 'cheril.sg', mimeType: 'application/octet-stream', buffer: readFileSync(new URL('../apps/retro/games/cheril.sg', import.meta.url)) },
+  ]);
+  await appFrame().locator('#mine .game').filter({ hasText: 'cheril' }).waitFor({ timeout: 5000 });
+  const kinds = (await appFrame().locator('#mine .game small').allTextContents()).map(t => t.split(' · ')[0]).sort().join(', ');
+  if (kinds !== 'Game Gear, SG-1000') throw new Error(`own games read as ${kinds}`);
+  for (const name of ['pipes', 'cheril']) {
+    await appFrame().getByRole('button', { name: `Remove ${name}` }).click();
+    await appFrame().getByRole('button', { name: `Remove ${name}` }).click();
+  }
+  console.log(`     ${results.join('; ')}`);
+  await page.screenshot({ path: shots + 'retro-sms.png' });
+});
+
 await check('freedoom takes WADs from a phone', async () => {
   await openFromHub(/Freedoom/);
   // Tiny stand-ins for a player's files: a whole game (IWAD) and an add-on (PWAD)

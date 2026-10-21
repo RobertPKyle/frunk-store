@@ -36,3 +36,4 @@ apps/puzzles/engine/*.wasm
 apps/puzzles/help
 apps/puzzles/icons
 apps/puzzles/puzzles.json
+tools/.gearsystem-build

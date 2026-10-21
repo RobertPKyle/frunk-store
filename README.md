@@ -98,10 +98,20 @@ to the cache again.
   page's main thread stays free (about 5 ms of it a second on a desktop,
   down from 90); Game Boy, Game Boy Color and Game Boy Advance games run on mGBA
   2.5.1 compiled to WebAssembly (MPL-2.0, `gba.js`, threaded, so it needs the
-  COOP/COEP headers); both are vendored unmodified. The console is picked
-  from the file's header, and zipped games are unzipped in the browser
+  COOP/COEP headers); both are vendored unmodified. Master System, Game
+  Gear and SG-1000 games run on Gearsystem 3.9.22 (GPL-3.0-or-later,
+  unmodified) compiled to WebAssembly by `npm run build:sms`
+  (`tools/build-gearsystem.mjs` with `tools/gearsystem/web.cpp`, in Docker;
+  the output in `apps/retro/sms/` is committed, with its source as
+  `gearsystem-web-src.tar.gz`). It runs in `sms-worker.js` the way jsnes runs
+  in its worker (the shared side is `worker-core.js`), at about 0.5 ms a
+  frame on a desktop (2.2 ms with the CPU slowed 4.5x). The console is picked
+  from the file's header (Sega's by name, .sms, .gg or .sg, since SG-1000
+  games carry no header; the "TMR SEGA" header settles Master System against
+  Game Gear), and zipped games are unzipped in the browser
   (`apps/_shared/roms.js`). Every game keeps its battery save and a resume
-  snapshot in IndexedDB (mGBA's files for Game Boy, database "nes" for NES),
+  snapshot in IndexedDB (mGBA's files for Game Boy, databases "nes" and
+  "sms" for the worker cores),
   so it picks up where it left off; Reset starts over and keeps the battery
   save. Snapshots are taken on pause, when the page is hidden, and when the
   hub closes the app: the hub posts `{ frunk: 'close' }` to apps that
@@ -122,7 +132,9 @@ to the cache again.
   3dfae87). Ships only homebrew games whose licenses allow redistribution
   (Attack on Voxelburg by John Tsiombikas, Thwaite and Concentration Room by
   Damian Yerrick, GPL; Libbet and the Magic Floor by Damian Yerrick, zlib;
-  Tobu Tobu Girl Deluxe by Tangram Games, MIT and CC BY 4.0), with their
+  Tobu Tobu Girl Deluxe by Tangram Games, MIT and CC BY 4.0; Waternet by
+  Willems Davy and Sub Rescue by Haroldo de Oliveira Pinheiro, MIT; Cheril
+  Perils Classic by the Mojon Twins, LGPL-3), with their
   source next to them; see `apps/retro/NOTICE`.
   Players add games they own with "Get games from phone" (or from files on a
   computer); those are stored in the screen's IndexedDB only. A one-time
@@ -489,6 +501,7 @@ npm run build:openttd                   # OpenTTD engine + its free base sets (n
 npm run build:openarena                 # Quake III engine + OpenArena (needs Docker); run before deploying apps
 npm run build:blocks                    # ClassiCube engine + its textures, font and sounds (needs Docker); run before deploying apps
 npm run build:puzzles                   # Simon Tatham's Puzzles + their help and icons (needs Docker and Chrome); run before deploying apps
+npm run build:sms                       # Gearsystem for Retro Console (needs Docker); output is committed, rerun only to update it
 npm run dev                             # hub on localhost:5173, apps on 127.0.0.1:5174
 npm run test:e2e                        # checks against the dev server
 node tools/e2e.mjs https://frunk.store  # checks against production

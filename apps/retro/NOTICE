@@ -10,6 +10,15 @@ Third-party components
   https://github.com/thenick775/mgba/tree/v2.5.1 (a fork of
   https://github.com/mgba-emu/mgba with the WebAssembly port)
 
+- Gearsystem 3.9.22, copyright 2013 Ignacio Sanchez, GNU GPL version 3 or
+  later (sms/gearsystem.js and sms/gearsystem.wasm, compiled unmodified with
+  a small front end, web.cpp, under the same license; license text in
+  sms/LICENSE; the complete source, with the build script, in
+  sms/gearsystem-web-src.tar.gz). From https://github.com/drhelius/Gearsystem
+  at commit 517ddaaafbab1af7a312c2b6b6f6043275f58500. It includes Blip_Buffer
+  and Sms_Snd_Emu by Shay Green (GNU LGPL 2.1 or later), emu2413 by Mitsutaka
+  Okazaki (MIT) and miniz (MIT).
+
 - Attack on Voxelburg (jam version), copyright 2022 John Tsiombikas, GNU GPL
   version 3 or later (games/voxelburg.gba; complete source in
   games/voxelburg-jam-src.tar.gz, license text in games/gpl-3.0.txt). From
@@ -36,5 +45,23 @@ Third-party components
   source, with the MIT license text in LICENSE, in
   games/tobutobugirl-dx-src.tar.gz, from https://github.com/SimonLarsen/tobutobugirl-dx
   at commit 4985d4d)
+
+- Waternet 1.0 (Game Gear version), copyright 2022 Willems Davy, MIT License
+  (games/waternet.gg, from the Game Gear zip of
+  https://github.com/joyrider3774/waternet/releases/tag/v1.0; source, with
+  the license text in LICENSE, in games/waternet-1.0-src.tar.gz, without the
+  repository's prebuilt compilers and its cartridge label pictures)
+
+- Sub Rescue 0.3, copyright 2021 Haroldo de Oliveira Pinheiro, MIT License
+  (games/subrescue.sms, from
+  https://github.com/haroldo-ok/sub-rescue/releases/tag/v0.3; source, with
+  the license text in LICENSE, in games/sub-rescue-0.3-src.tar.gz)
+
+- Cheril Perils Classic (SG-1000 version), copyleft 2018 The Mojon Twins, GNU
+  LGPL version 3 (games/cheril.sg, examples/cheril_perils_ntsc.sg from
+  https://github.com/mojontwins/loves_the_sg1000 at commit
+  a25be2647792f3ce03f4af26e124ca8cbefde7ac; the game's source, with the
+  license text, in games/cheril-perils-sg1000-src.tar.gz; license texts also
+  in games/lgpl-3.0.txt and games/gpl-3.0.txt)
 
 All games are distributed exactly as published by their authors.

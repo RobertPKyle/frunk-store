@@ -10,6 +10,9 @@ export const SYSTEMS = {
   nes: { name: 'NES', exts: ['nes'], max: 2 * MB },
   gb: { name: 'Game Boy', exts: ['gb', 'gbc'], max: 8 * MB },
   gba: { name: 'Game Boy Advance', exts: ['gba'], max: 32 * MB },
+  sms: { name: 'Master System', exts: ['sms'], max: 4 * MB },
+  gg: { name: 'Game Gear', exts: ['gg'], max: 4 * MB },
+  sg: { name: 'SG-1000', exts: ['sg'], max: MB },
 };
 
 export const GAME_EXTS = Object.values(SYSTEMS).flatMap(s => s.exts);
@@ -24,13 +27,33 @@ export const isZip = bytes => at(bytes, 0, [0x50, 0x4b, 0x03, 0x04]);
 // Worth opening: a game, or a zip that may hold one
 export const maybeGame = name => GAME_EXTS.includes(ext(name)) || ext(name) === 'zip';
 
-// The console a game is for, or null
+// Master System and Game Gear games carry "TMR SEGA" near the end of their
+// first 8, 16 or 32 KB, and its region nibble says which of the two; returns
+// 'sms', 'gg' or null when there's no header (SG-1000 games have none, nor
+// do some Master System ones)
+function segaHeader(bytes) {
+  for (const at of [0x7ff0, 0x3ff0, 0x1ff0]) {
+    if (bytes.length < at + 16 || String.fromCharCode(...bytes.subarray(at, at + 8)) !== 'TMR SEGA') continue;
+    const region = bytes[at + 15] >> 4;
+    return region >= 5 && region <= 7 ? 'gg' : region === 3 || region === 4 ? 'sms' : null;
+  }
+  return null;
+}
+
+// The console a game is for, or null. Sega games are known by their name
+// (.sms, .gg, .sg), as Sega's consoles don't mark every game; the header
+// settles Master System against Game Gear when it's there.
 export function systemOf(bytes, name = '') {
   if (at(bytes, 0, [0x4e, 0x45, 0x53, 0x1a])) return 'nes';
   // GBA: start of the Nintendo logo at 0x04 and the fixed byte at 0xB2
   if (bytes.length >= 0xc0 && at(bytes, 4, [0x24, 0xff, 0xae, 0x51]) && bytes[0xb2] === 0x96) return 'gba';
   // Game Boy and Game Boy Color: start of the Nintendo logo at 0x104
   if (bytes.length >= 0x150 && at(bytes, 0x104, [0xce, 0xed, 0x66, 0x66])) return 'gb';
+  // Sega cartridges are whole kilobytes, some dumps with a 512-byte header
+  const sega = { sms: 'sms', gg: 'gg', sg: 'sg' }[ext(name)];
+  if (sega && bytes.length >= 8192 && [0, 512].includes(bytes.length % 1024)) {
+    return sega === 'sg' ? 'sg' : segaHeader(bytes.length % 1024 ? bytes.subarray(512) : bytes) || sega;
+  }
   return null;
 }
 
