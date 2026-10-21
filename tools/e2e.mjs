@@ -1431,6 +1431,100 @@ await check('hub and a cached app open offline and on a slow connection', async 
   }
 });
 
+await check('holders vote from a phone', async () => {
+  const apps = base.includes('localhost') ? 'http://127.0.0.1:5174' : 'https://frunk-apps.vercel.app';
+  const phone = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, hasTouch: true, isMobile: true });
+  phone.on('pageerror', e => errors.push(`vote pageerror: ${e.message}`));
+  try {
+    // An ordinary phone browser has no wallet: the page offers the wallet apps
+    await phone.goto(apps + '/vote/');
+    await phone.locator('#ideas .idea').first().waitFor();
+    const href = await phone.getByRole('link', { name: 'Open in Phantom' }).getAttribute('href');
+    if (href !== `https://phantom.app/ul/browse/${encodeURIComponent(apps + '/vote/')}?ref=${encodeURIComponent(apps)}`) throw new Error(`Phantom link is ${href}`);
+    if (!(await phone.locator('#ideas input').first().isDisabled())) throw new Error('ideas can be picked before signing in');
+    if (!base.includes('localhost')) return;   // made-up balances only exist on the dev server
+
+    // A Wallet Standard wallet with a real ed25519 key, as a wallet app's browser has
+    await phone.addInitScript(() => {
+      const ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+      const b58 = bytes => {
+        let n = 0n, out = '';
+        for (const b of bytes) n = n * 256n + BigInt(b);
+        for (; n > 0n; n /= 58n) out = ALPHABET[Number(n % 58n)] + out;
+        for (const b of bytes) { if (b) break; out = '1' + out; }
+        return out;
+      };
+      const ready = crypto.subtle.generateKey({ name: 'Ed25519' }, false, ['sign']).then(async k => {
+        const address = b58(new Uint8Array(await crypto.subtle.exportKey('raw', k.publicKey)));
+        window.__testWallet = { address };
+        return { key: k.privateKey, account: { address, chains: ['solana:mainnet'], features: ['solana:signMessage'] } };
+      });
+      const wallet = {
+        version: '1.0.0', name: 'Test Wallet', icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg"/>', chains: ['solana:mainnet'], accounts: [],
+        features: {
+          'standard:connect': { version: '1.0.0', connect: async () => ({ accounts: [(await ready).account] }) },
+          'solana:signMessage': { version: '1.0.0', signMessage: async ({ message }) => {
+            window.__testWallet.message = new TextDecoder().decode(message);
+            const signature = new Uint8Array(await crypto.subtle.sign('Ed25519', (await ready).key, message));
+            return [{ signedMessage: message, signature }];
+          } },
+        },
+      };
+      const register = api => api.register(wallet);
+      addEventListener('wallet-standard:app-ready', e => register(e.detail));
+      dispatchEvent(new CustomEvent('wallet-standard:register-wallet', { detail: register }));
+    });
+    await phone.goto(apps + '/vote/');
+    await phone.getByRole('button', { name: 'Sign in with Test Wallet' }).waitFor();
+    const address = await phone.evaluate(async () => { while (!window.__testWallet) await new Promise(r => setTimeout(r, 20)); return window.__testWallet.address; });
+    const balance = tokens => phone.evaluate(([address, tokens]) => fetch('/api/vote?op=dev-balance', { method: 'POST', body: JSON.stringify({ address, tokens }) }), [address, tokens]);
+
+    // Too few tokens, no vote
+    await balance(99999);
+    await phone.getByRole('button', { name: 'Sign in with Test Wallet' }).click();
+    await phone.locator('#msg').filter({ hasText: 'holds 99,999 FrunkStore tokens; voting needs 100,000' }).waitFor({ timeout: 5000 });
+    const message = await phone.evaluate(() => window.__testWallet.message);
+    if (!message.startsWith('127.0.0.1:5174 wants you to sign in with your Solana account:\n' + address)) throw new Error(`signed "${message.slice(0, 80)}"`);
+
+    // With tokens: pick up to three, save, and the counts follow
+    await balance(150000);
+    await phone.getByRole('button', { name: 'Sign in with Test Wallet' }).click();
+    await phone.locator('#who').filter({ hasText: '150,000 FrunkStore' }).waitFor({ timeout: 5000 });
+    const boxes = phone.locator('#ideas .idea');
+    for (const i of [1, 2, 3, 4]) await boxes.nth(i).click();
+    if ((await phone.locator('#ideas input:checked').count()) !== 3) throw new Error('a fourth pick was allowed');
+    const picks = await phone.locator('#ideas input:checked').evaluateAll(els => els.map(e => e.value));
+    await phone.getByRole('button', { name: 'Save my votes' }).click();
+    await phone.locator('#msg').filter({ hasText: 'Votes saved' }).waitFor({ timeout: 5000 });
+    const results = await (await fetch(apps + '/api/vote?op=results')).json();
+    if (results.wallets < 1 || !picks.every(p => results.ideas[p] >= 1)) throw new Error(`results ${JSON.stringify(results)}`);
+
+    // Coming back keeps the session and the picks; the list is sorted by votes
+    await phone.reload();
+    await phone.locator('#who').filter({ hasText: 'Signed in as' }).waitFor();
+    const kept = await phone.locator('#ideas input:checked').evaluateAll(els => els.map(e => e.value).sort());
+    if (kept.join() !== [...picks].sort().join()) throw new Error(`picks after reload: ${kept}`);
+    const total = await phone.locator('#total').textContent();
+    if (total.startsWith('0 ')) throw new Error(`after reload: "${total}"`);
+    const first = await boxes.first().locator('input').getAttribute('value');
+    if (!picks.includes(first)) throw new Error(`list not sorted by votes: ${first} first`);
+
+    // Selling the tokens stops the next vote
+    await balance(0);
+    await boxes.nth(0).click();
+    await phone.getByRole('button', { name: 'Save my votes' }).click();
+    await phone.locator('#msg').filter({ hasText: 'holds 0 FrunkStore tokens now' }).waitFor({ timeout: 5000 });
+
+    await phone.getByRole('textbox').fill('A racing game, please');
+    await phone.getByRole('button', { name: 'Send suggestion' }).click();
+    await phone.locator('#msg').filter({ hasText: 'suggestion was sent' }).waitFor({ timeout: 5000 });
+    await phone.screenshot({ path: shots + 'vote.png', fullPage: true });
+    console.log(`     ${results.wallets} wallet(s) voted`);
+  } finally {
+    await phone.close();
+  }
+});
+
 await check('no console or page errors', async () => {
   // headless Chrome may log a GPU stall warning for readPixels; ignore those
   const real = errors.filter(e => !/GPU stall|swiftshader/i.test(e));

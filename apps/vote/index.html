@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vote on what's next · frunk.store</title>
+<meta name="description" content="FrunkStore token holders pick what frunk.store builds next.">
+<style>
+  :root { --bg: #0b0b12; --card: #1b1b28; --line: rgba(190, 180, 255, .15); --text: #ecebf5; --muted: #9592ab; --accent: #ff5d73; --ok: #8fe0a0; --bad: #ff9f8a; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); font: 17px/1.45 system-ui, -apple-system, sans-serif; }
+  main { max-width: 560px; margin: 0 auto; padding: 28px 16px 40px; }
+  h1 { font-size: 24px; margin: 0 0 6px; }
+  h2 { font-size: 13px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin: 26px 2px 10px; }
+  .lede { color: var(--muted); margin: 0 0 20px; }
+  button, .btn { font: inherit; color: inherit; cursor: pointer; }
+  .btn { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 54px; margin-bottom: 10px; padding: 8px 16px;
+         border-radius: 14px; border: 1px solid var(--line); background: var(--card); text-decoration: none; font-weight: 600; }
+  .btn.primary { background: var(--accent); border-color: transparent; color: #1a0508; font-size: 18px; }
+  .btn:disabled { opacity: .5; cursor: default; }
+  #who { padding: 12px 14px; border-radius: 12px; background: var(--card); border: 1px solid var(--line); margin-bottom: 10px; }
+  #who b { overflow-wrap: anywhere; }
+  .note { font-size: 14px; color: var(--muted); margin: 6px 2px 12px; }
+  #msg { margin: 0 0 12px; color: var(--bad); }
+  #msg.ok { color: var(--ok); }
+  #msg:empty { display: none; }
+  #ideas { list-style: none; margin: 0; padding: 0; }
+  .idea { position: relative; display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; margin-bottom: 8px; padding: 12px 14px;
+          border-radius: 14px; background: var(--card); border: 1px solid var(--line); }
+  .idea input { position: absolute; opacity: 0; pointer-events: none; }
+  .idea b { font-size: 17px; }
+  .idea p { grid-column: 1 / -1; margin: 0; font-size: 14px; color: #c9c6dc; }
+  .idea .count { color: var(--muted); font-size: 14px; font-variant-numeric: tabular-nums; align-self: center; }
+  .idea .bar { grid-column: 1 / -1; height: 4px; margin-top: 8px; border-radius: 2px; background: rgba(255, 255, 255, .06); overflow: hidden; }
+  .idea .bar i { display: block; height: 100%; background: var(--accent); }
+  .voting .idea { cursor: pointer; }
+  .idea:has(input:checked) { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+  .idea:has(input:checked) b::after { content: ' · your pick'; font-weight: 400; color: var(--accent); font-size: 14px; }
+  .idea:has(input:focus-visible) { outline: 2px solid var(--text); outline-offset: 2px; }
+  textarea { width: 100%; min-height: 90px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--card);
+             color: var(--text); font: inherit; resize: vertical; }
+  .fine { margin-top: 30px; font-size: 14px; color: var(--muted); }
+  .fine p { margin: 0 0 8px; }
+  .fine code { overflow-wrap: anywhere; color: var(--text); }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Vote on what's next</h1>
+  <p class="lede">Holders of the FrunkStore token pick what frunk.store builds next. Sign in with your wallet and choose up to three ideas.</p>
+
+  <section id="signin" aria-labelledby="signinTitle">
+    <h2 id="signinTitle">Sign in</h2>
+    <div id="wallets"></div>
+    <div id="noWallet" hidden>
+      <p class="note">Open this page in your wallet app to sign in:</p>
+      <a class="btn" id="phantom" href="#">Open in Phantom</a>
+      <a class="btn" id="solflare" href="#">Open in Solflare</a>
+      <p class="note">On a computer, a wallet browser extension works too.</p>
+    </div>
+    <p class="note">Signing in asks your wallet to sign a message. That only proves the wallet is yours: it costs nothing, sends no transaction and can't move anything.</p>
+  </section>
+
+  <section id="account" hidden aria-label="Your wallet">
+    <div id="who"></div>
+  </section>
+
+  <p id="msg" role="status"></p>
+
+  <h2 id="ideasTitle">Ideas</h2>
+  <p class="note" id="total" aria-live="polite"></p>
+  <ul id="ideas" aria-labelledby="ideasTitle"></ul>
+  <button class="btn primary" id="save" type="button" hidden>Save my votes</button>
+
+  <section id="suggest" hidden aria-labelledby="suggestTitle">
+    <h2 id="suggestTitle">Suggest something else</h2>
+    <textarea id="idea" maxlength="280" placeholder="A game, a console, an app for the car…" aria-labelledby="suggestTitle"></textarea>
+    <p class="note">Suggestions go to the site's owner and aren't shown here.</p>
+    <button class="btn" id="send" type="button">Send suggestion</button>
+  </section>
+
+  <div class="fine">
+    <p>Voting needs at least <span id="min">100,000</span> FrunkStore tokens, the Solana token with mint address <code>9T1DbbiKfhfubEabDj5SWSMzBuyU4tJHkpSgR51Tpump</code>. Balances are checked on Solana each time you vote.</p>
+    <p>frunk.store will never ask for your recovery phrase or ask you to approve a transaction here. If anything does, it isn't us.</p>
+    <p>The token isn't an investment, and holding it gives no right to any income from frunk.store. Votes guide what gets built; they aren't promises. Not affiliated with Tesla, pump.fun or any wallet.</p>
+    <p><a href="https://frunk.store/" style="color: inherit">frunk.store</a></p>
+  </div>
+</main>
+<script type="module" src="vote.js"></script>
+</body>
+</html>

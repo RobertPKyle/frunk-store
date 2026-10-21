@@ -458,6 +458,25 @@ to the cache again.
   connection drops or the server has a problem, and the car ignores a piece
   it has already used. Limits: 2 MB per piece, 200 pieces and 80 MB per
   session, rate limits per IP. `npm run dev` serves `/api/*` locally with an in-memory store.
+- `apps/vote` and `apps/api/vote.js`: the holders' vote, a phone page
+  (frunk-apps.vercel.app/vote/) where holders of the FrunkStore token
+  (Solana mint `9T1DbbiKfhfubEabDj5SWSMzBuyU4tJHkpSgR51Tpump`, Token-2022)
+  pick up to three of the ideas in `apps/vote/ideas.json` and can send a
+  suggestion. Wallets are found through the Wallet Standard (Phantom,
+  Solflare, Backpack, as extensions or inside their apps' browsers); an
+  ordinary phone browser gets links that open the page in Phantom or
+  Solflare. Signing in is a Sign In With Solana message: no transaction.
+  The function checks the ed25519 signature against a one-time nonce
+  (10 minutes), reads the wallet's balance with `getTokenAccountsByOwner`
+  from `SOLANA_RPC_URL` (default: Solana's public RPC, which rate-limits, so
+  set a Helius or similar URL in production), and gives out a 24-hour
+  session. Balances are checked again on every vote, and voting needs
+  `VOTE_MIN_TOKENS` tokens (default 100,000). Ballots are one Redis hash, wallet to
+  picks, so results are always counted fresh; suggestions are a list that
+  only the owner reads, with `node tools/votes.mjs` (after
+  `vercel env pull` in `apps/`), which also shows the tokens behind each
+  idea. On the dev server without `SOLANA_RPC_URL`, balances are made up
+  (`op=dev-balance`) so the e2e check can vote with a test wallet.
 - `apps/chess`: the Lichess daily chess puzzle, playable on the board. Tap a
   piece, then a highlighted square; the opponent's reply is played
   automatically and only the best move is accepted. Next puzzle fetches a

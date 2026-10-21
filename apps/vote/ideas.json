@@ -1,0 +1,18 @@
+{
+  "ideas": [
+    { "id": "chess-engine", "title": "Chess against the computer", "about": "Play full games against Stockfish, at any strength, next to Chess Puzzle." },
+    { "id": "city-builder", "title": "City builder", "about": "Micropolis, the open-source release of the 1989 city-building classic." },
+    { "id": "tyrian", "title": "Space shooter", "about": "OpenTyrian, the vertical shooter Tyrian 2.1, freeware since 2004." },
+    { "id": "supertux", "title": "SuperTux", "about": "A side-scrolling platformer starring Tux, made for controllers." },
+    { "id": "neverball", "title": "Neverball and Neverputt", "about": "Tilt the floor to roll a ball through the level, plus mini golf." },
+    { "id": "brogue", "title": "Roguelike", "about": "Brogue: dive into a dungeon that's new every time. Turn-based, good for short stops." },
+    { "id": "fighting", "title": "Two-player fighting game", "about": "OpenOMF, robot fighting for two players on one screen with two controllers." },
+    { "id": "endless-sky", "title": "Space trading and exploring", "about": "Endless Sky: trade, take missions and fight your way across the galaxy." },
+    { "id": "pingus", "title": "Lead the penguins", "about": "Pingus: give penguins jobs so they reach the exit, in the style of a 1991 classic." },
+    { "id": "genesis", "title": "Sega Genesis / Mega Drive", "about": "Another console in Retro Console, for games you own and free homebrew." },
+    { "id": "handhelds", "title": "More handhelds", "about": "Neo Geo Pocket, WonderSwan and Atari Lynx in Retro Console." },
+    { "id": "home-computers", "title": "ZX Spectrum and MSX", "about": "Thousands of free games from the 1980s home computers." },
+    { "id": "more-maps", "title": "More free maps", "about": "Extra free levels and episodes for Freedoom, Blasphemer and LibreQuake." },
+    { "id": "more-adventures", "title": "More adventure games", "about": "More freeware point-and-click games in Adventure Games." }
+  ]
+}
