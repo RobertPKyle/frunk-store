@@ -15,6 +15,12 @@
 // The game's settings (q3config.cfg) are copied to IndexedDB whenever the
 // page is hidden or left. One match per page: leaving it reloads the page.
 
+import { holdersGate } from '../_shared/holders.js';
+
+// Early access for FrunkStore token holders: nothing starts until this
+// screen is unlocked from a holder's phone
+await holdersGate('OpenArena');
+
 const $ = id => document.getElementById(id);
 const settings = {
   get(key, fallback) { try { const v = JSON.parse(localStorage.getItem('openarena.' + key)); return v ?? fallback; } catch { return fallback; } },

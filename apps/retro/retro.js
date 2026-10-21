@@ -4,15 +4,16 @@
 // player loads from their own files. Loaded files are kept in this screen's IndexedDB and never leave
 // it.
 //
-// The hub's Holders card opens this page as ?edition=holders: early access
-// for FrunkStore token holders, for now the PC Engine, which the ordinary
-// edition leaves out. A holder unlocks the screen from their phone (see
-// apps/api/vote.js); the pass it gets is checked each time the page opens.
+// The Holders menu opens this page as ?edition=holders: early access for
+// FrunkStore token holders, for now the PC Engine, which the ordinary
+// edition leaves out. It waits behind the holders' wall
+// (../_shared/holders.js) until a holder's phone unlocks the screen.
 //
 // Input comes from up to two gamepads, the on-screen buttons and the
 // keyboard; each frame they're merged and handed to the running core
 // (nes.js, gba.js, sms.js or pce.js) as sets of button names.
 
+import { holdersGate } from '../_shared/holders.js';
 import { phonePanel } from '../_shared/phone.js';
 import { MAX_FILE, SYSTEMS, cleanName, findGame, isColor, maybeGame } from '../_shared/roms.js';
 import { createNes } from './nes.js';
@@ -618,7 +619,6 @@ function quit() {
   core = null;
   $('player').hidden = true;
   $('library').hidden = false;
-  if (quitThenLock) { lock(quitThenLock); quitThenLock = null; return; }
   renderContinue();
 }
 
@@ -636,86 +636,16 @@ $('addFiles').onclick = () => ownGames(() => pick('fileInput'));
 $('fromPhone').onclick = () => ownGames(phone.show);
 $('addFolder').onclick = () => ownGames(() => pick('folderInput'));
 
-// ---------- holders: unlocking this screen ----------
+// ---------- holders ----------
 
-const passKey = {
-  get() { try { return localStorage.getItem('holders.pass'); } catch { return null; } },
-  set(v) { try { v ? localStorage.setItem('holders.pass', v) : localStorage.removeItem('holders.pass'); } catch {} },
-};
-
-async function voteApi(op, data) {
-  const res = await fetch(`/api/vote?op=${op}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data || {}), cache: 'no-store' });
-  return { status: res.status, ...(await res.json().catch(() => ({}))) };
-}
-
-function qr(el, link, size) {
-  // The code is also a link, so the phone page can be tried on a computer
-  const a = Object.assign(document.createElement('a'), { href: link, target: '_blank', rel: 'noopener' });
-  el.replaceChildren(a);
-  new QRCode(a, { text: link, width: size, height: size, correctLevel: QRCode.CorrectLevel.M });
-}
-
-function showShelf(unlocked) {
-  $('lock').hidden = unlocked;
-  $('shelf').hidden = !unlocked;
-  if (!unlocked) return;
-  clearInterval(lockTimer);
-  qr($('voteQr'), `${location.origin}/vote/`, 136);
+function showShelf() {
   renderFree();
   renderMine();
   renderContinue();
 }
 
-// Shows a code for the phone and waits for it to link this screen
-let lockTimer = 0, lockGen = 0;
-async function lock(reason) {
-  showShelf(false);
-  $('continue').hidden = true;
-  const gen = ++lockGen, status = $('lockStatus');
-  $('lockQr').replaceChildren();
-  status.textContent = reason || 'Getting a code…';
-  const code = await voteApi('link-open').catch(() => null);
-  if (gen !== lockGen) return;
-  if (!code?.lid) {
-    status.textContent = code?.error || 'Unlocking isn\'t available right now. Check the connection and try again.';
-    setTimeout(() => gen === lockGen && lock(reason), 15000);
-    return;
-  }
-  qr($('lockQr'), `${location.origin}/vote/?link=${code.lid}`, 216);
-  for (const el of document.querySelectorAll('#lock .min')) el.textContent = code.min.toLocaleString('en-US');
-  if (!reason) status.textContent = 'Waiting for your phone…';
-  clearInterval(lockTimer);
-  lockTimer = setInterval(async () => {
-    if (document.hidden) return;
-    const r = await voteApi('link-poll', { lid: code.lid, secret: code.secret }).catch(() => null);
-    if (gen !== lockGen || !r) return;
-    if (r.expired) { clearInterval(lockTimer); lock(reason); return; }   // a fresh code
-    if (r.pass) {
-      passKey.set(r.pass);
-      showShelf(true);
-    }
-  }, 2500);
-}
-
-async function holders() {
-  document.title = 'Holders · frunk.store';
-  $('forget').onclick = () => confirmTap($('forget'), () => { passKey.set(null); lock(); });
-  const pass = passKey.get();
-  if (!pass) return lock();
-  showShelf(true);
-  // Checked again each time: a wallet that sold its tokens locks the screen.
-  // Without a connection the screen stays as it was.
-  const r = await voteApi('pass', { pass }).catch(() => null);
-  if (r?.ok === false) {
-    passKey.set(null);
-    const why = r.error ? `${r.error} Scan to unlock with another wallet.` : null;
-    if ($('player').hidden) lock(why);
-    else quitThenLock = why || 'This screen needs unlocking again.';
-  }
-}
-// Locking while a game plays waits until the player leaves it
-let quitThenLock = null;
-
 $('fileInput').accept = HOLDERS ? '.pce,.zip' : '.nes,.gb,.gbc,.gba,.sms,.gg,.sg,.zip';
-if (HOLDERS) holders();
-else showShelf(true);
+if (HOLDERS) {
+  document.title = 'PC Engine · frunk.store';
+  holdersGate('PC Engine / TurboGrafx-16 games').then(showShelf);
+} else showShelf();

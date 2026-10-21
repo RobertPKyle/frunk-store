@@ -478,21 +478,26 @@ to the cache again.
   `vercel env pull` in `apps/`), which also shows the tokens behind each
   idea. On the dev server without `SOLANA_RPC_URL`, balances are made up
   (`op=dev-balance`) so the e2e check can vote with a test wallet.
-- Holders (hub card `holders`): early access for wallets holding at least
-  `VOTE_MIN_TOKENS` FrunkStore tokens, for now the PC Engine. It's Retro
-  Console opened as `/retro/?edition=holders`, which shows only the consoles
-  in `EARLY` (`retro.js`); the ordinary edition leaves those out, and each
-  edition lists only its own consoles' games and continues its own last
-  game. The car has no wallet, so it shows a QR code to
-  `/vote/?link=<id>` (`op=link-open`, 15 minutes); the phone signs in there
-  and links the car (`op=link`), and the car's poll (`op=link-poll`) gets a
-  30-day pass, kept in localStorage. Each time Holders opens, the pass is
-  checked (`op=pass`) against the wallet's balance then; a wallet that sold
-  locks the screen again (after the game in progress), and without a
-  connection the screen stays as it was. The car-side answers are always
-  200, so the car's console stays clean. This gates the page, not the
-  files: the emulator and games are ordinary static files, and the source
-  is public.
+- `apps/holders` and `apps/_shared/holders.js`: Holders, early access for
+  wallets holding at least `VOTE_MIN_TOKENS` FrunkStore tokens: Freedoom,
+  LibreQuake, OpenArena, OpenTTD and the PC Engine (Retro Console opened as
+  `/retro/?edition=holders`, which shows only the consoles in `EARLY` in
+  `retro.js`; the ordinary edition leaves those out, and each edition lists
+  only its own consoles' games and continues its own last game). Those
+  apps are marked `"holders": true` in the hub's catalog, so they're off
+  the grid; the Holders menu lists them and posts `{ frunk: 'open', app }`,
+  and the hub opens the app in the menu's place, so its Apps button and
+  save-on-close work as usual. Each app awaits `holdersGate()` before it
+  starts, so a direct link is locked too. The car has no wallet, so the gate
+  shows a QR code to `/vote/?link=<id>` (`op=link-open`, 15 minutes); the
+  phone signs in there and links the car (`op=link`), and the car's poll
+  (`op=link-poll`) gets a 30-day pass, kept in localStorage and shared by
+  every app. With a pass, an app starts at once and the pass is checked in
+  the background (`op=pass`, at most every 10 minutes per tab); a wallet that
+  sold reloads into the locked screen, and without a connection the screen
+  stays unlocked. The car-side answers are always 200, so the car's console
+  stays clean. This gates the pages, not the files: the engines and games
+  are ordinary static files, and the source is public.
 - `apps/chess`: the Lichess daily chess puzzle, playable on the board. Tap a
   piece, then a highlighted square; the opponent's reply is played
   automatically and only the best move is accepted. Next puzzle fetches a

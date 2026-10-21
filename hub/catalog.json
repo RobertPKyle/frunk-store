@@ -147,13 +147,25 @@
     {
       "id": "holders",
       "name": "Holders",
-      "tagline": "Early access for FrunkStore token holders: TurboGrafx-16 games first, and a vote on what's next. Unlock with your phone's wallet.",
-      "path": "/retro/?edition=holders",
-      "icon": "/vote/icon.svg",
+      "tagline": "Early access for FrunkStore token holders: Freedoom, LibreQuake, OpenArena, OpenTTD and TurboGrafx-16 games, plus a vote on what's next. Unlock with your phone's wallet.",
+      "path": "/holders/",
+      "icon": "/holders/icon.svg",
       "tags": [
         "Game",
         "Controller"
       ]
+    },
+    {
+      "id": "pce",
+      "name": "PC Engine",
+      "tagline": "TurboGrafx-16 games for FrunkStore token holders: the free Blox, or HuCards you own.",
+      "path": "/retro/?edition=holders",
+      "icon": "/retro/icon.svg",
+      "tags": [
+        "Game",
+        "Controller"
+      ],
+      "holders": true
     },
     {
       "id": "doom",
@@ -164,7 +176,8 @@
       "tags": [
         "Game",
         "Controller"
-      ]
+      ],
+      "holders": true
     },
     {
       "id": "heretic",
@@ -186,7 +199,8 @@
       "tags": [
         "Game",
         "Controller"
-      ]
+      ],
+      "holders": true
     },
     {
       "id": "openttd",
@@ -197,7 +211,8 @@
       "tags": [
         "Game",
         "Offline"
-      ]
+      ],
+      "holders": true
     },
     {
       "id": "openarena",
@@ -208,7 +223,8 @@
       "tags": [
         "Game",
         "Controller"
-      ]
+      ],
+      "holders": true
     },
     {
       "id": "blocks",

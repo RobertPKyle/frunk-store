@@ -84,8 +84,12 @@ function el(tag, attrs = {}, ...children) {
   return node;
 }
 
+// Apps marked holders (early access for FrunkStore token holders) aren't on
+// the grid: the Holders app lists them and asks the hub to open one
+const listed = () => catalog.apps.filter(app => !app.holders);
+
 function renderGrid() {
-  const shown = catalog.apps.filter(app => filter === 'all' || app.tags.includes(filter));
+  const shown = listed().filter(app => filter === 'all' || app.tags.includes(filter));
   grid.replaceChildren(...shown.map(app => {
     const card = el('button', { class: 'card', type: 'button' },
       el('img', { src: appsOrigin + app.icon, alt: '', width: 64, height: 64 }),
@@ -101,7 +105,7 @@ function renderGrid() {
 function renderFilters() {
   if (!FILTERS.some(([tag]) => tag === filter)) filter = 'all';
   filterRow.replaceChildren(...FILTERS
-    .filter(([tag]) => tag === 'all' || catalog.apps.some(app => app.tags.includes(tag)))
+    .filter(([tag]) => tag === 'all' || listed().some(app => app.tags.includes(tag)))
     .map(([tag, label]) => {
       const chip = el('button', { class: 'chip', type: 'button', 'aria-pressed': String(tag === filter) }, t(label));
       chip.addEventListener('click', () => {
@@ -194,7 +198,14 @@ function closeApp() {
 }
 
 addEventListener('message', e => {
-  if (e.source === frame.contentWindow && e.origin === appsOrigin && e.data?.frunk === 'save-on-close') saveOnClose = true;
+  if (e.source !== frame.contentWindow || e.origin !== appsOrigin) return;
+  if (e.data?.frunk === 'save-on-close') saveOnClose = true;
+  // The Holders app opens an early-access app in its place, so the Apps
+  // button goes back to the grid and closes that app the usual way
+  if (e.data?.frunk === 'open' && catalog.apps.find(a => a.id === e.data.app)?.holders) {
+    history.replaceState({ app: e.data.app }, '', `/app/${encodeURIComponent(e.data.app)}`);
+    openApp(e.data.app, { push: false });
+  }
 });
 
 document.getElementById('home').addEventListener('click', () => {

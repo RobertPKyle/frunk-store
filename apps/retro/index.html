@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
 <title>Retro Console</title>
 <script>
-  // The Holders card opens this page as ?edition=holders (see retro.js)
+  // The Holders menu opens this page as ?edition=holders (see retro.js)
   document.documentElement.dataset.edition = new URLSearchParams(location.search).get('edition') === 'holders' ? 'holders' : 'retro';
 </script>
 <style>
@@ -20,15 +20,6 @@
   [hidden] { display: none !important; }
   html[data-edition=retro] [data-only=holders], html[data-edition=holders] [data-only=retro] { display: none !important; }
 
-  /* ---------- holders: unlocking from a phone, voting ---------- */
-  #lock { flex: 1; display: grid; place-items: center; padding: 16px; overflow-y: auto; }
-  #lock .sheet { max-width: 720px; }
-  #lockStatus { margin: 0 0 6px; font-size: 14px; color: var(--muted); }
-  .holders { display: flex; gap: 18px; align-items: center; margin: 18px 0 6px; padding: 14px; border-radius: 14px; background: var(--card); border: 1px solid var(--line); }
-  .holders .qr { width: 156px; height: 156px; }
-  .holders .qr img, .holders .qr canvas { width: 136px; height: 136px; }
-  .holders p { margin: 0 0 8px; font-size: 14px; color: #c9c6dc; }
-  .holders b { font-size: 17px; color: var(--text); }
 
   /* ---------- library ---------- */
   #library { display: flex; flex-direction: column; height: 100%; }
@@ -125,25 +116,10 @@
 <section id="library">
   <header>
     <h1 data-only="retro">Retro Console</h1>
-    <h1 data-only="holders">Holders · Early access</h1>
+    <h1 data-only="holders">PC Engine · Holders</h1>
     <button class="btn" id="continue" type="button" hidden></button>
   </header>
-  <div id="lock" hidden>
-    <div class="sheet">
-      <div class="qr" id="lockQr" aria-hidden="true"></div>
-      <div class="steps">
-        <h2>Early access for FrunkStore holders</h2>
-        <p class="note">PC Engine / TurboGrafx-16 games are in early access for wallets holding at least <span class="min">100,000</span> FrunkStore tokens.</p>
-        <ol>
-          <li>Scan this code with your phone's camera.</li>
-          <li>Open the page in your wallet app (Phantom or Solflare) and sign in. That only signs a message: no transaction.</li>
-          <li>This screen unlocks for 30 days, as long as the wallet keeps its tokens.</li>
-        </ol>
-        <p id="lockStatus" aria-live="polite">Getting a code…</p>
-      </div>
-    </div>
-  </div>
-  <div class="scroll" id="shelf">
+  <div class="scroll">
     <p class="note" id="status" aria-live="polite"></p>
     <h2>Free games</h2>
     <div class="games" id="free"></div>
@@ -159,15 +135,6 @@
     <p class="note" id="addMsg" aria-live="polite"></p>
     <div class="games" id="mine"></div>
     <p class="note owned"><b>Only load games you legally own</b>, such as copies you made from your own cartridges. frunk.store doesn't provide, sell or share commercial games, and never keeps yours: they're stored only on this screen. You're responsible for the files you load.</p>
-
-    <div class="holders" data-only="holders">
-      <div class="qr" id="voteQr" aria-hidden="true"></div>
-      <div>
-        <p><b>Vote on what's next</b></p>
-        <p>Scan with your phone to pick what frunk.store builds next. Early access gets it first.</p>
-        <button class="btn" id="forget" type="button">Lock this screen</button>
-      </div>
-    </div>
 
     <div class="legal">
       <p data-only="retro">Plays NES, Game Boy, Game Boy Color, Game Boy Advance, Master System, Game Gear and SG-1000 games (.nes, .gb, .gbc, .gba, .sms, .gg, .sg, also zipped). PC Engine / TurboGrafx-16 games are in early access for FrunkStore token holders, on the Holders card. Games remember your progress: they pick up where you left off, and Reset starts over (keeping in-game saves).</p>

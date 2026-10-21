@@ -22,6 +22,11 @@
 
 import { phonePanel } from '../_shared/phone.js';
 import { MAX_QUAKE_FILE, isZip, quakePath, unzipAll } from '../_shared/roms.js';
+import { holdersGate } from '../_shared/holders.js';
+
+// Early access for FrunkStore token holders: nothing starts until this
+// screen is unlocked from a holder's phone
+await holdersGate('LibreQuake');
 
 const LIBREQUAKE = '0.09-beta';
 const FREE_PAKS = [['id1/pak0.pak', 43948916, 23124584], ['id1/pak1.pak', 5856792, 2698332]];

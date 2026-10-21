@@ -21,6 +21,11 @@
 // The engine can't be restarted within a page, so leaving a game reloads it.
 
 import { MidiPlayer } from './midi.js';
+import { holdersGate } from '../_shared/holders.js';
+
+// Early access for FrunkStore token holders: nothing starts until this
+// screen is unlocked from a holder's phone
+await holdersGate('OpenTTD');
 
 // The base sets: [name, tar size, gzipped size]
 const SETS = [['opengfx-8.0', 5396480, 3578953], ['opensfx-1.0.3', 13291520, 11596681], ['openmsx-0.4.2', 798720, 150332]];

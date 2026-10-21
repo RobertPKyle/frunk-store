@@ -46,19 +46,36 @@ const only = process.env.ONLY;
 async function check(name, fn) {
   if (only && !name.includes(only) && name !== 'no console or page errors') return;
   try { await fn(); console.log(`ok   ${name}`); }
-  catch (e) { failed++; console.log(`FAIL ${name}\n     ${process.env.VERBOSE ? e.message : e.message.split('\n')[0]}`); }
+  catch (e) {
+    if (e.message.startsWith('SKIP: ')) { console.log(`skip ${name}\n     ${e.message.slice(6)}`); return; }
+    failed++; console.log(`FAIL ${name}\n     ${process.env.VERBOSE ? e.message : e.message.split('\n')[0]}`); }
 }
 const appFrame = () => page.frameLocator('#frame');
+const dev = base.includes('localhost');
+const appsBase = dev ? 'http://127.0.0.1:5174' : 'https://frunk-apps.vercel.app';
+// Apps for FrunkStore token holders aren't on the grid: they open from the
+// Holders menu, once this browser is unlocked (see the holders checks). The
+// made-up balances that unlock it exist only on the dev server.
 async function openFromHub(name) {
   await page.goto(base + '/');
-  await page.locator('#grid').getByRole('button', { name }).click();
+  await page.waitForSelector('.card');
+  // by title: the Holders card's tagline names the apps inside it
+  const card = page.locator('#grid .card').filter({ has: page.locator('h2', { hasText: name }) });
+  if (await card.count()) {
+    await card.click();
+  } else {
+    if (!dev) throw new Error('SKIP: early access for holders, which only the dev server can unlock');
+    await page.locator('#grid').getByRole('button', { name: /Holders/ }).click();
+    await appFrame().locator('#apps .app').filter({ hasText: name }).click();
+    await page.waitForURL(/\/app\/(?!holders)[\w-]+$/);
+  }
   await page.waitForSelector('#loading', { state: 'hidden' });
 }
 
 await check('hub lists every catalog app', async () => {
   await page.goto(base + '/');
   await page.waitForSelector('.card');
-  const expected = (await (await fetch(base + '/catalog.json')).json()).apps.length;
+  const expected = (await (await fetch(base + '/catalog.json')).json()).apps.filter(app => !app.holders).length;
   const n = await page.locator('.card').count();
   if (n !== expected) throw new Error(`expected ${expected} cards, got ${n}`);
   if (!(await page.evaluate(() => crossOriginIsolated))) throw new Error('hub not cross-origin isolated');
@@ -160,7 +177,8 @@ await check('every language has every string', async () => {
         else if (shape(file.ui[key]) !== shape(en[key])) problems.push(`${code}: ${key} has "${shape(file.ui[key])}", English has "${shape(en[key])}"`);
       }
       for (const key of Object.keys(file.ui)) if (!(key in en)) problems.push(`${code}: unused ${key}`);
-      for (const app of catalog.apps) if (!file.apps[app.id]?.tagline) problems.push(`${code}: no tagline for ${app.id}`);
+      // early-access apps show only in the Holders menu, in English
+      for (const app of catalog.apps) if (!app.holders && !file.apps[app.id]?.tagline) problems.push(`${code}: no tagline for ${app.id}`);
       for (const tag of tags) if (!file.tags[tag]) problems.push(`${code}: no tag ${tag}`);
     }
     return problems;
@@ -558,27 +576,38 @@ async function holderPhone(apps, tokens) {
   return { link: lid => post('link', { token: session.token, lid }), setTokens };
 }
 
+// The holder's phone that unlocks the test browsers, made when first needed
+let holder = null;
+const holderNow = async () => holder || (holder = await holderPhone(appsBase, 150000));
 await check('holders unlock with a phone and play PC Engine games', async () => {
-  const apps = base.includes('localhost') ? 'http://127.0.0.1:5174' : 'https://frunk-apps.vercel.app';
-  // The ordinary Retro Console leaves the PC Engine out
+  // The ordinary Retro Console leaves the PC Engine out, and the hub's grid the early-access apps
   await openFromHub(/Retro Console/);
   if (await appFrame().locator('#free .game').filter({ hasText: 'Blox' }).count()) throw new Error('Blox is in the ordinary Retro Console');
+  await page.goto(base + '/');
+  await page.waitForSelector('.card');
+  for (const name of ['Freedoom', 'LibreQuake', 'OpenTTD', 'OpenArena', 'PC Engine']) {
+    if (await page.locator('#grid .card h2').filter({ hasText: new RegExp(`^${name}$`) }).count()) throw new Error(`${name} is on the grid`);
+  }
 
-  // Holders is locked until a phone links it
-  await openFromHub(/Holders/);
-  await appFrame().locator('#lockQr a').waitFor({ timeout: 10000 });
-  const link = new URL(await appFrame().locator('#lockQr a').getAttribute('href'));
+  // Holders is locked until a phone links it; so is an early-access app opened directly
+  for (const path of ['/app/doom', '/app/holders']) {
+    await page.goto(base + path);
+    await appFrame().locator('#holdersLock .code a').waitFor({ timeout: 10000 });
+  }
+  if (await appFrame().locator('#apps .app').count()) throw new Error('the menu shows while locked');
+  const link = new URL(await appFrame().locator('#holdersLock .code a').getAttribute('href'));
   if (link.pathname !== '/vote/' || !link.searchParams.get('link')) throw new Error(`lock code is ${link}`);
-  if (await appFrame().locator('#shelf').isVisible()) throw new Error('games show while locked');
-  if (!base.includes('localhost')) return;   // made-up balances only exist on the dev server
+  if (!dev) return;
 
-  const phone = await holderPhone(apps, 150000);
-  const linked = await phone.link(link.searchParams.get('link'));
+  const linked = await (await holderNow()).link(link.searchParams.get('link'));
   if (!linked.ok) throw new Error(`link: ${linked.error}`);
-  await appFrame().locator('#free .game').filter({ hasText: 'Blox' }).waitFor({ timeout: 10000 });
-  if (await appFrame().locator('#free .game').filter({ hasText: 'Thwaite' }).count()) throw new Error('NES games show in Holders');
+  await appFrame().locator('#apps .app').first().waitFor({ timeout: 10000 });
+  const tiles = (await appFrame().locator('#apps .app b').allTextContents()).join(', ');
+  if (tiles !== 'Freedoom, LibreQuake, OpenArena, OpenTTD, PC Engine') throw new Error(`menu lists ${tiles}`);
   await appFrame().locator('#voteQr a[href$="/vote/"]').waitFor();
 
+  await openFromHub(/PC Engine/);
+  if (await appFrame().locator('#free .game').filter({ hasText: 'Thwaite' }).count()) throw new Error('NES games show with the PC Engine');
   const frame = () => page.frames().find(f => f.url().includes('/retro/'));
   const screen = appFrame().locator('#pceScreen');
   await appFrame().locator('#free .game').filter({ hasText: 'Blox' }).click();
@@ -617,19 +646,10 @@ await check('holders unlock with a phone and play PC Engine games', async () => 
   const kind = (await appFrame().locator('#mine .game small').first().textContent()).split(' · ')[0];
   if (kind !== 'PC Engine') throw new Error(`own game read as ${kind}`);
   await page.screenshot({ path: shots + 'holders.png' });
-
-  // Opening again checks the wallet: still holding, still open
-  await openFromHub(/Holders/);
-  await appFrame().locator('#free .game').filter({ hasText: 'Blox' }).waitFor({ timeout: 10000 });
   // The ordinary Retro Console doesn't list the HuCard
   await openFromHub(/Retro Console/);
   await appFrame().locator('#free .game').first().waitFor();
   if (await appFrame().locator('#mine .game').filter({ hasText: 'falling' }).count()) throw new Error('the HuCard shows in the ordinary Retro Console');
-  // A wallet that sold its tokens locks the screen again
-  await phone.setTokens(10);
-  await openFromHub(/Holders/);
-  await appFrame().locator('#lockStatus').filter({ hasText: 'holds 10 FrunkStore tokens' }).waitFor({ timeout: 10000 });
-  await appFrame().locator('#lockQr a').waitFor({ timeout: 10000 });
   console.log(`     Blox ${fps} fps, snapshot ${saved} bytes`);
 });
 
@@ -1217,9 +1237,19 @@ await check('openarena plays a bot match with touch and a controller, and keeps 
     p.on('console', m => { if (m.type() === 'error') errors.push(`openarena console: ${m.text()}`); });
     const app = () => p.frameLocator('#frame');
     const frame = () => p.frames().find(f => f.url().includes('/openarena/'));
+    // OpenArena is early access for holders, and this browser keeps its own
+    // storage: the holder's phone unlocks it once, like a second car
+    let unlocked = false;
     const open = async () => {
-      await p.goto(base + '/');
-      await p.locator('#grid').getByRole('button', { name: /OpenArena/ }).click();
+      if (!dev) throw new Error('SKIP: early access for holders, which only the dev server can unlock');
+      await p.goto(base + '/app/openarena');
+      if (!unlocked) {
+        const code = app().locator('#holdersLock .code a');
+        await code.waitFor({ timeout: 10000 });
+        await (await holderNow()).link(new URL(await code.getAttribute('href')).searchParams.get('link'));
+        await code.waitFor({ state: 'detached', timeout: 10000 });
+        unlocked = true;
+      }
       await p.waitForSelector('#loading', { state: 'hidden' });
     };
     const cdp = await p.context().newCDPSession(p);
@@ -1480,8 +1510,19 @@ await check('hub and a cached app open offline and on a slow connection', async 
   }
 });
 
+await check('holders lock again when the wallet sells', async () => {
+  if (!dev) throw new Error('SKIP: needs the dev server\'s made-up balances');
+  if (!holder) throw new Error('the holders unlock check failed');
+  await holder.setTokens(10);
+  // the pass is checked at most every 10 minutes; start that clock over
+  await openFromHub(/Holders/);
+  await page.frames().find(f => f.url().includes('/holders/')).evaluate(() => sessionStorage.removeItem('holders.checked'));
+  await openFromHub(/Holders/);
+  await appFrame().locator('#holdersLock .status').filter({ hasText: 'holds 10 FrunkStore tokens' }).waitFor({ timeout: 10000 });
+});
+
 await check('holders vote from a phone', async () => {
-  const apps = base.includes('localhost') ? 'http://127.0.0.1:5174' : 'https://frunk-apps.vercel.app';
+  const apps = appsBase;
   const phone = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, hasTouch: true, isMobile: true });
   phone.on('pageerror', e => errors.push(`vote pageerror: ${e.message}`));
   try {
