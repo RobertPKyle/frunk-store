@@ -90,7 +90,7 @@
     "speedtest": { "name": "속도 테스트", "tagline": "지금 차량 인터넷은 얼마나 빠를까요? Wi-Fi나 LTE에서 다운로드, 업로드, 핑을 측정합니다." },
     "probe": { "name": "차량 벤치마크", "tagline": "이 차량의 브라우저가 무엇을 할 수 있는지 확인하세요." },
     "retro": { "name": "레트로 콘솔", "tagline": "홈브루 게임, 또는 휴대폰에서 보낸 직접 소유한 NES, 게임보이, GBA, 마스터 시스템, 게임 기어 게임을 컨트롤러나 화면으로 즐기세요." },
-    "holders": { "name": "홀더", "tagline": "FrunkStore 토큰 보유자를 위한 얼리 액세스: Freedoom, LibreQuake, OpenArena, OpenTTD, PC 엔진 게임, 그리고 다음에 만들 것을 투표하세요. 휴대폰 지갑으로 잠금 해제." },
+    "holders": { "name": "홀더", "tagline": "FrunkStore 토큰 보유자를 위한 얼리 액세스: Craft 4K, Freedoom, LibreQuake, OpenArena, OpenTTD, PC 엔진 게임, 그리고 다음에 만들 것을 투표하세요. 휴대폰 지갑으로 잠금 해제." },
     "doom": { "tagline": "고전 Doom 엔진으로 무료 Freedoom 게임, 또는 휴대폰에서 보낸 직접 소유한 Doom 게임을 컨트롤러나 화면으로 즐기세요." },
     "heretic": { "tagline": "Heretic 엔진과 무료 다크 판타지 게임 Blasphemer, 또는 휴대폰에서 보낸 직접 소유한 Heretic. 주문, 유물, 그리고 비행." },
     "quake": { "tagline": "고전 Quake 엔진으로 무료 LibreQuake, 또는 휴대폰에서 보낸 직접 소유한 Quake를 컨트롤러나 화면으로 즐기세요." },

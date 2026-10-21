@@ -10,6 +10,7 @@
 import { holdersGate, lockHolders, qr, voteLink } from '../_shared/holders.js';
 
 const APPS = [
+  { id: 'craft4k', title: 'Craft 4K', path: '/craft4k/', about: 'Notch\'s Minecraft4k rebuilt in C++: break, build and watch the sun set.' },
   { id: 'doom', title: 'Freedoom', path: '/doom/', about: 'The classic Doom engine with the free Freedoom games, or Doom games you own.' },
   { id: 'quake', title: 'LibreQuake', path: '/quake/', about: 'The classic Quake engine with the free LibreQuake, or Quake you own.' },
   { id: 'openarena', title: 'OpenArena', path: '/openarena/', about: 'Fast arena shooting against bots on the Quake III engine.' },

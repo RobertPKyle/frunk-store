@@ -585,7 +585,7 @@ await check('holders unlock with a phone and play PC Engine games', async () => 
   if (await appFrame().locator('#free .game').filter({ hasText: 'Blox' }).count()) throw new Error('Blox is in the ordinary Retro Console');
   await page.goto(base + '/');
   await page.waitForSelector('.card');
-  for (const name of ['Freedoom', 'LibreQuake', 'OpenTTD', 'OpenArena', 'PC Engine']) {
+  for (const name of ['Craft 4K', 'Freedoom', 'LibreQuake', 'OpenTTD', 'OpenArena', 'PC Engine']) {
     if (await page.locator('#grid .card h2').filter({ hasText: new RegExp(`^${name}$`) }).count()) throw new Error(`${name} is on the grid`);
   }
 
@@ -603,7 +603,7 @@ await check('holders unlock with a phone and play PC Engine games', async () => 
   if (!linked.ok) throw new Error(`link: ${linked.error}`);
   await appFrame().locator('#apps .app').first().waitFor({ timeout: 10000 });
   const tiles = (await appFrame().locator('#apps .app b').allTextContents()).join(', ');
-  if (tiles !== 'Freedoom, LibreQuake, OpenArena, OpenTTD, PC Engine') throw new Error(`menu lists ${tiles}`);
+  if (tiles !== 'Craft 4K, Freedoom, LibreQuake, OpenArena, OpenTTD, PC Engine') throw new Error(`menu lists ${tiles}`);
   await appFrame().locator('#voteQr a[href$="/vote/"]').waitFor();
 
   await openFromHub(/PC Engine/);
@@ -1423,6 +1423,65 @@ await check('block builder makes a world, digs with touch, saves when left and r
   await appFrame().getByRole('button', { name: 'Worlds' }).click();
   await appFrame().locator('#library').waitFor({ state: 'visible', timeout: 15000 });
   await appFrame().locator('.world').filter({ hasText: 'World 1' }).waitFor({ timeout: 5000 });
+});
+
+await check('craft 4k breaks and places with touch, saves when left and keeps the world', async () => {
+  await openFromHub(/Craft 4K/);
+  const frame = () => page.frames().find(f => f.url().includes('/craft4k/'));
+  const stored = () => frame().evaluate(() => new Promise(resolve => {
+    const req = indexedDB.open('craft4k', 1);
+    req.onupgradeneeded = () => req.result.createObjectStore('world');
+    req.onsuccess = () => {
+      const get = req.result.transaction('world').objectStore('world').get('world');
+      get.onsuccess = () => { req.result.close(); resolve(get.result ? { seed: get.result.seed.join(), edits: [...get.result.edits], player: get.result.player } : null); };
+    };
+  }));
+  // The help shows over the game the first time
+  await appFrame().locator('#fps').filter({ hasText: /fps/ }).waitFor({ timeout: 15000 });
+  const help = appFrame().getByRole('button', { name: 'Play' });
+  if (await help.isVisible()) await help.click();
+  // Look down at the ground, break the block there and put bricks in its place
+  const box = await appFrame().locator('#canvas').boundingBox();
+  const cdp = await page.context().newCDPSession(page);
+  const touch = (type, points) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: points.map(([x, y], id) => ({ x, y, id })) });
+  const tapOn = async name => {
+    const b = await appFrame().getByRole('button', { name, exact: true }).boundingBox();
+    await touch('touchStart', [[b.x + b.width / 2, b.y + b.height / 2]]);
+    await page.waitForTimeout(120);
+    await touch('touchEnd', []);
+    await page.waitForTimeout(300);
+  };
+  const cx = box.x + box.width / 2, cy = box.y + box.height / 2;
+  await touch('touchStart', [[cx, cy - 150]]);
+  for (let i = 1; i <= 10; i++) { await touch('touchMove', [[cx, cy - 150 + 30 * i]]); await page.waitForTimeout(16); }
+  await touch('touchEnd', []);
+  await page.waitForTimeout(300);
+  // (no screenshots before the taps: taking one stops the touches that follow)
+  await tapOn('Break');
+  await tapOn('Bricks');
+  await tapOn('Place');
+  if (await appFrame().getByRole('button', { name: 'Bricks' }).getAttribute('aria-pressed') !== 'true') throw new Error('tapping Bricks didn\'t pick it');
+  const fps = parseInt(await appFrame().locator('#fps').textContent());
+  await page.screenshot({ path: shots + 'craft4k.png' });
+  // Closing the app from the hub saves the world (the bricks, where the
+  // broken block was), and the hub unloads it once it has
+  const close = async () => {
+    await page.click('#home');
+    await page.waitForSelector('#runner', { state: 'hidden' });
+    await page.waitForFunction(() => !document.querySelector('#frame').src.includes('/craft4k/'), null, { timeout: 5000 });
+  };
+  await close();
+  await openFromHub(/Craft 4K/);
+  const kept = await stored();
+  if (!kept) throw new Error('the world wasn\'t saved when the app closed');
+  if (!kept.edits.some(e => (e & 0xff) === 5)) throw new Error(`no bricks among the ${kept.edits.length} saved changes`);
+  // and opening it again keeps the same world
+  await appFrame().locator('#fps').filter({ hasText: /fps/ }).waitFor({ timeout: 15000 });
+  await close();
+  await openFromHub(/Craft 4K/);
+  const again = await stored();
+  if (again.seed !== kept.seed || again.edits.length < kept.edits.length) throw new Error('reopening changed the world');
+  console.log(`     ${fps} fps, ${kept.edits.length} changes saved`);
 });
 
 await check('logic puzzles lists every puzzle, plays solo by touch and keeps it when closed', async () => {

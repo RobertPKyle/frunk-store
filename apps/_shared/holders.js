@@ -1,7 +1,7 @@
 // The holders' wall: apps in early access for wallets holding FrunkStore
 // tokens (the Holders menu, the PC Engine edition of Retro Console,
-// Freedoom, LibreQuake, OpenTTD and OpenArena). An app awaits holdersGate()
-// before it starts.
+// Craft 4K, Freedoom, LibreQuake, OpenTTD and OpenArena). An app awaits
+// holdersGate() before it starts.
 //
 // The car has no wallet, so a phone vouches for it (apps/api/vote.js): this
 // screen shows a QR code to the vote page, the phone signs in there and

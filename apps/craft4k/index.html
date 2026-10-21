@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Craft 4K</title>
+<style>
+  :root { --bg: #0b0f14; --panel: #131a22; --card: #1b2530; --line: rgba(150, 200, 240, .15); --text: #eaf2f8; --muted: #93a6b6;
+          --accent: #6aaa40; --accent2: #f3c969; --danger: #d9694a; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 16px/1.4 system-ui, sans-serif; overflow: hidden;
+               -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; touch-action: none; }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  .btn { min-height: 44px; padding: 8px 14px; border-radius: 12px; background: var(--card); border: 1px solid var(--line); white-space: nowrap; }
+  .btn.primary { background: var(--accent); border-color: transparent; color: #0d1a06; font-weight: 700; }
+  .btn.armed { background: var(--danger); border-color: transparent; color: #fff; }
+  [hidden] { display: none !important; }
+
+  #player { position: fixed; inset: 0; display: grid; grid-template-rows: 60px minmax(0, 1fr); grid-template-columns: minmax(0, 1fr); background: #000; }
+  /* left padding keeps clear of the hub's Apps button */
+  .bar { display: flex; align-items: center; gap: 8px; padding: 8px 10px 8px 110px; background: var(--panel); border-bottom: 1px solid var(--line); }
+  .bar b { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #fps { font-size: 12px; color: var(--muted); white-space: nowrap; min-width: 44px; text-align: right; }
+  .screen { position: relative; min-height: 0; min-width: 0; overflow: hidden; }
+  /* the canvas is the game's screen texture, drawn large with sharp pixels */
+  #canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; background: #000; outline: none; }
+  #cross { position: absolute; left: 50%; top: 50%; width: 22px; height: 22px; margin: -11px 0 0 -11px; pointer-events: none; opacity: .85;
+           background: linear-gradient(#fff, #fff) center / 2px 100% no-repeat, linear-gradient(#fff, #fff) center / 100% 2px no-repeat;
+           mix-blend-mode: difference; }
+
+  /* touch controls */
+  .touch { position: absolute; pointer-events: none; inset: 0; }
+  .touch > * { pointer-events: auto; }
+  #stick { position: absolute; left: 18px; bottom: 76px; width: 150px; height: 150px; border-radius: 50%;
+           background: rgba(255, 255, 255, .08); border: 2px solid rgba(255, 255, 255, .22); }
+  #knob { position: absolute; left: 50%; top: 50%; width: 62px; height: 62px; margin: -31px 0 0 -31px; border-radius: 50%;
+          background: rgba(255, 255, 255, .3); border: 2px solid rgba(255, 255, 255, .5); pointer-events: none; }
+  .act { position: absolute; display: grid; place-items: center; width: 76px; height: 76px; border-radius: 50%; font-size: 14px; font-weight: 700;
+         background: rgba(19, 26, 34, .6); border: 2px solid rgba(255, 255, 255, .3); color: #fff; }
+  .act.down { background: rgba(255, 255, 255, .35); }
+  #jump { right: 18px; bottom: 80px; }
+  #place { right: 104px; bottom: 120px; }
+  #break { right: 40px; bottom: 166px; }
+  #hotbar { position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); display: flex; gap: 4px; padding: 4px; border-radius: 12px;
+            background: rgba(10, 14, 18, .7); border: 1px solid var(--line); }
+  #hotbar button { width: 48px; height: 48px; padding: 4px; border-radius: 9px; border: 2px solid transparent; background: transparent; }
+  #hotbar button[aria-pressed="true"] { border-color: #fff; background: rgba(255, 255, 255, .12); }
+  #hotbar i { display: block; width: 100%; height: 100%; border-radius: 4px; box-shadow: inset 0 -6px rgba(0, 0, 0, .25); }
+  #hint { position: absolute; left: 50%; top: 14px; transform: translateX(-50%); padding: 6px 12px; border-radius: 10px; background: rgba(19, 26, 34, .88);
+          border: 1px solid var(--line); font-size: 14px; pointer-events: none; white-space: nowrap; }
+
+  .overlay { position: fixed; inset: 0; z-index: 5; display: grid; place-items: center; padding: 64px 16px 16px; background: rgba(5, 8, 11, .9); }
+  .sheet { display: flex; flex-direction: column; max-width: 620px; max-height: 100%; padding: 18px; border-radius: 18px; background: var(--panel); border: 1px solid var(--line); }
+  .sheet h2 { margin: 0 0 8px; font-size: 19px; }
+  .sheet .text { overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; user-select: text; -webkit-user-select: text; }
+  .sheet p { margin: 0 0 10px; font-size: 14px; color: #cbd6df; overflow-wrap: anywhere; }
+  .sheet .legal { font-size: 12px; color: var(--muted); }
+  .row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 6px; }
+
+  #loading { position: fixed; inset: 0; z-index: 4; display: grid; place-content: center; gap: 14px; text-align: center; background: var(--bg); }
+  #loading b { font-size: 20px; }
+  #loadText { color: var(--muted); font-size: 15px; }
+
+  @media (max-width: 640px) {
+    .bar .btn { padding: 8px 10px; }
+    #hotbar button { width: 40px; height: 40px; }
+  }
+</style>
+</head>
+<body>
+<section id="loading" aria-live="polite">
+  <b>Craft 4K</b>
+  <span id="loadText">Making the world…</span>
+</section>
+
+<section id="player" hidden>
+  <div class="bar">
+    <b>Craft 4K</b>
+    <span id="fps" aria-live="off"></span>
+    <button class="btn" id="detailBtn" type="button"></button>
+    <button class="btn" id="newBtn" type="button">New world</button>
+    <button class="btn" id="aboutBtn" type="button">Help</button>
+  </div>
+  <div class="screen" id="screen">
+    <canvas id="canvas" tabindex="-1" oncontextmenu="event.preventDefault()"></canvas>
+    <div id="cross"></div>
+    <div class="touch" id="touch">
+      <div id="stick" aria-label="Walk"><div id="knob"></div></div>
+      <button class="act" id="break" type="button">Break</button>
+      <button class="act" id="place" type="button">Place</button>
+      <button class="act" id="jump" type="button">Jump</button>
+    </div>
+    <div id="hotbar" role="toolbar" aria-label="Blocks"></div>
+    <div id="hint" hidden></div>
+  </div>
+</section>
+
+<section id="about" class="overlay" hidden aria-labelledby="aboutTitle">
+  <div class="sheet">
+    <h2 id="aboutTitle">Craft 4K</h2>
+    <div class="text">
+      <p>Notch's Minecraft4k, the tiny Java game he wrote for a 4 KB contest in 2010, rebuilt in C++ by TheSunCat with the whole world ray-marched on the graphics chip: a 512 × 512 block world with trees, sun shadows and a day that lasts about a minute. Break blocks and build with seven kinds, mirrors included. The world is kept on this screen, edits and all, so it picks up where you left off.</p>
+      <p>On the screen: drag anywhere to look around, the circle at the bottom left walks, Jump jumps, and Break and Place work on the block in the middle of the screen (outlined in white); hold them to keep going. Pick a block in the bar at the bottom. Detail trades sharpness for speed. On a controller: left stick walks, right stick looks, the bottom face button jumps, the right trigger places and the left trigger breaks, the shoulder buttons change block. A keyboard and mouse work too: click the game, then WASD walks, Space jumps, the left mouse button breaks and the right one places, the wheel or 1 to 7 picks a block.</p>
+      <p class="legal">Game: Minecraft4k-CPP by TheSunCat and contributors (GNU GPL 3), based on Minecraft4k-Reversed and Notch's Minecraft4k, compiled to WebAssembly with frunk.store's changes for the browser: the compute shader redone as a WebGL 2 fragment shader, plus breaking and placing blocks, touch and controller input and saving. Source: /craft4k/engine/craft4k-web-src.tar.gz, built by tools/build-craft4k.mjs in github.com/RobertPKyle/frunk-store; see /craft4k/NOTICE. It includes GLM (MIT).</p>
+      <p class="legal">Craft 4K and frunk.store are not affiliated with or endorsed by Mojang, Microsoft or TheSunCat. Minecraft is a trademark of Mojang Synergies AB. Play only while parked.</p>
+    </div>
+    <div class="row"><button class="btn primary" id="aboutOk" type="button">Play</button></div>
+  </div>
+</section>
+
+<section id="failed" class="overlay" hidden aria-labelledby="failedTitle">
+  <div class="sheet">
+    <h2 id="failedTitle">Craft 4K can't start</h2>
+    <p id="failedText"></p>
+  </div>
+</section>
+
+<script type="module" src="craft4k.js"></script>
+<script src="/sw-register.js"></script>
+</body>
+</html>

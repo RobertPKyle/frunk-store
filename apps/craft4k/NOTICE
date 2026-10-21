@@ -1,0 +1,30 @@
+Craft 4K (apps/craft4k)
+
+Game (engine/)
+  Minecraft4k-CPP, by TheSunCat (RealTheSunCat) and contributors: a C++
+  remake of Minecraft4k-Reversed, the decompiled and expanded version of
+  Notch's Minecraft4k (2010), that ray-marches the world on the GPU.
+  License: GNU General Public License version 3 (engine/LICENSE).
+  Source: https://github.com/TheSunCat/Minecraft4k-CPP, commit
+  cfb537a35c85ee18b01b4305fd975740f67f0380, with frunk.store's changes for
+  the browser. The complete source of what's compiled, with the changes and
+  the build script, is engine/craft4k-web-src.tar.gz; the changes are also
+  tools/craft4k/ in https://github.com/RobertPKyle/frunk-store, whose
+  tools/build-craft4k.mjs builds it.
+  The changes: craft4k-web.patch uses the GLES 3 headers in place of glad,
+  drops the GL debug callback, packs the texture atlas as RGBA and keeps the
+  world generator inside the world; web.cpp replaces Minecraft4k.cpp and
+  Shader.cpp with a front end for the page: the compute shader as a WebGL 2
+  fragment shader (with a step limit, the pointed-at block outlined and
+  square pixels on any screen), breaking and placing blocks, input, and the
+  player's state and changes handed to the page to save.
+
+  It includes GLM (OpenGL Mathematics) by G-Truc Creation, under the MIT
+  license (engine/GLM-LICENSE.txt; include/glm/ in the source archive), and is compiled with Emscripten, whose runtime parts are under the
+  MIT and University of Illinois/NCSA licenses.
+
+Page (index.html, craft4k.js, icon.svg)
+  By frunk.store.
+
+Craft 4K and frunk.store are not affiliated with or endorsed by Mojang,
+Microsoft or TheSunCat. Minecraft is a trademark of Mojang Synergies AB.

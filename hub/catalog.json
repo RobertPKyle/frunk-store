@@ -147,7 +147,7 @@
     {
       "id": "holders",
       "name": "Holders",
-      "tagline": "Early access for FrunkStore token holders: Freedoom, LibreQuake, OpenArena, OpenTTD and TurboGrafx-16 games, plus a vote on what's next. Unlock with your phone's wallet.",
+      "tagline": "Early access for FrunkStore token holders: Craft 4K, Freedoom, LibreQuake, OpenArena, OpenTTD and TurboGrafx-16 games, plus a vote on what's next. Unlock with your phone's wallet.",
       "path": "/holders/",
       "icon": "/holders/icon.svg",
       "tags": [
@@ -164,6 +164,19 @@
       "tags": [
         "Game",
         "Controller"
+      ],
+      "holders": true
+    },
+    {
+      "id": "craft4k",
+      "name": "Craft 4K",
+      "tagline": "Notch's tiny Minecraft4k rebuilt in C++ and ray-marched on the graphics chip: a big block world with sun shadows, day and night, and mirrors to build with.",
+      "path": "/craft4k/",
+      "icon": "/craft4k/icon.svg",
+      "tags": [
+        "Game",
+        "Controller",
+        "Touch"
       ],
       "holders": true
     },

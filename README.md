@@ -369,6 +369,29 @@ to the cache again.
   it's first saved. Measured with the CPU slowed 4.5x: a small world starts
   in under a second, 60 fps and about 30 to 60 ms of script a second. Not
   yet tried in the car.
+- `apps/craft4k`: Craft 4K (holders only). Minecraft4k-CPP by TheSunCat
+  (GPL-3.0), a C++ remake of Notch's 2010 Minecraft4k that ray-marches a
+  512x64x512 block world on the GPU, compiled to WebAssembly by
+  `npm run build:craft4k` (`tools/build-craft4k.mjs`: the commit that
+  added the license, cfb537a, the last before the code was squeezed into a
+  4 KB binary, plus `tools/craft4k/craft4k-web.patch`, emsdk 4.0.10 in
+  Docker; 160 KB of wasm). The original needs OpenGL 4.3 compute shaders,
+  which WebGL 2 lacks, so `tools/craft4k/web.cpp` replaces its main file
+  and draws `res/raytrace.comp` as a fragment shader over a canvas of
+  Detail's rows (120, 240 or 480; as many columns as the screen's shape
+  needs), which CSS scales up with sharp pixels. The world is an R8UI 3D
+  texture read with `texelFetch`, and a changed block is sent to it alone.
+  Also added: a step limit (facing mirrors would reflect forever and lose
+  the GPU), the pointed-at block's outline, breaking and placing blocks
+  (the original never finished them) and the day starting at sunrise. The
+  page has a walk stick, Jump, Break and Place (held, they repeat), drag to
+  look, and the seven blocks, mirrors among them; a controller and
+  keyboard and mouse (pointer lock) work too. The world is made from a
+  seed, so only the seed and the changed blocks are saved, with the player
+  and the time of day (IndexedDB `craft4k`): 20 seconds after a change,
+  when hidden and on the hub's close handshake. Until Detail is picked, it
+  steps down by itself after two seconds under 24 fps. The engine's output
+  is committed. 60 fps on a desktop GPU; not yet tried in the car.
 - `apps/adventure`: Adventure Games. ScummVM 2026.4.0 (GPL-3.0-or-later)
   compiled to WebAssembly by `npm run build:scummvm`
   (`tools/build-scummvm.mjs`: the v2026.4.0 tag plus
@@ -479,8 +502,8 @@ to the cache again.
   idea. On the dev server without `SOLANA_RPC_URL`, balances are made up
   (`op=dev-balance`) so the e2e check can vote with a test wallet.
 - `apps/holders` and `apps/_shared/holders.js`: Holders, early access for
-  wallets holding at least `VOTE_MIN_TOKENS` FrunkStore tokens: Freedoom,
-  LibreQuake, OpenArena, OpenTTD and the PC Engine (Retro Console opened as
+  wallets holding at least `VOTE_MIN_TOKENS` FrunkStore tokens: Craft 4K,
+  Freedoom, LibreQuake, OpenArena, OpenTTD and the PC Engine (Retro Console opened as
   `/retro/?edition=holders`, which shows only the consoles in `EARLY` in
   `retro.js`; the ordinary edition leaves those out, and each edition lists
   only its own consoles' games and continues its own last game). Those
@@ -548,6 +571,7 @@ npm run build:quake                     # Quake engine + LibreQuake (needs Docke
 npm run build:openttd                   # OpenTTD engine + its free base sets (needs Docker); run before deploying apps
 npm run build:openarena                 # Quake III engine + OpenArena (needs Docker); run before deploying apps
 npm run build:blocks                    # ClassiCube engine + its textures, font and sounds (needs Docker); run before deploying apps
+npm run build:craft4k                   # Minecraft4k-CPP for Craft 4K (needs Docker); output is committed, rerun only to update it
 npm run build:puzzles                   # Simon Tatham's Puzzles + their help and icons (needs Docker and Chrome); run before deploying apps
 npm run build:sms                       # Gearsystem for Retro Console (needs Docker); output is committed, rerun only to update it
 npm run build:pce                       # Geargrafx for Retro Console (needs Docker); output is committed, rerun only to update it

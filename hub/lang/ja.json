@@ -90,7 +90,7 @@
     "speedtest": { "name": "スピードテスト", "tagline": "今、クルマのネット回線はどれくらい速い？ Wi-Fi でも LTE でも、ダウンロード、アップロード、ping を測定。" },
     "probe": { "name": "車載ベンチマーク", "tagline": "このクルマのブラウザで何ができるかを確認。" },
     "retro": { "name": "レトロコンソール", "tagline": "自作ゲーム、またはスマホから送った手持ちの NES、ゲームボーイ、GBA、マスターシステム、ゲームギアのゲームを、コントローラーや画面操作で遊べます。" },
-    "holders": { "name": "ホルダー", "tagline": "FrunkStore トークン保有者向けの先行アクセス：Freedoom、LibreQuake、OpenArena、OpenTTD、PCエンジンのゲームと、次に作るものへの投票。スマホのウォレットで解除。" },
+    "holders": { "name": "ホルダー", "tagline": "FrunkStore トークン保有者向けの先行アクセス：Craft 4K、Freedoom、LibreQuake、OpenArena、OpenTTD、PCエンジンのゲームと、次に作るものへの投票。スマホのウォレットで解除。" },
     "doom": { "tagline": "定番の Doom エンジンで、無料の Freedoom、またはスマホから送った手持ちの Doom を、コントローラーや画面操作で遊べます。" },
     "heretic": { "tagline": "Heretic エンジンで、無料のダークファンタジーゲーム Blasphemer、またはスマホから送った手持ちの Heretic を。呪文、聖遺物、そして飛行。" },
     "quake": { "tagline": "定番の Quake エンジンで、無料の LibreQuake、またはスマホから送った手持ちの Quake を、コントローラーや画面操作で遊べます。" },

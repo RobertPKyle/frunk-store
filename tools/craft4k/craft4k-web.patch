@@ -1,0 +1,110 @@
+Minecraft4k-CPP for the browser (tools/build-craft4k.mjs applies this to
+commit cfb537a): GLES 3 headers in place of glad, no GL debug callback,
+the texture atlas packed as RGBA (WebGL can't upload BGRA), and the world
+generator no longer writes one column past the end of the world.
+
+diff --git a/TextureGenerator.cpp b/TextureGenerator.cpp
+index 53f4802..70cf85b 100644
+--- a/TextureGenerator.cpp
++++ b/TextureGenerator.cpp
+@@ -98,9 +98,9 @@ GLuint generateTextures(long long seed)
+ 
+                 // multiply tint by the grayscale detail
+                 const int col = ((tint & 0xFFFFFF) == 0 ? 0 : 0xFF) << 24 |
+-                    (tint >> 16 & 0xFF) * gsd_constexpr / 0xFF << 16 |
++                    (tint >> 16 & 0xFF) * gsd_constexpr / 0xFF << 0 |
+                     (tint >> 8 & 0xFF) * gsd_constexpr / 0xFF << 8 |
+-                    (tint & 0xFF) * gsd_constexpr / 0xFF << 0;
++                    (tint & 0xFF) * gsd_constexpr / 0xFF << 16; // RGBA in memory
+ 
+                 // write pixel to the texture atlas
+                 textureAtlas[x + (TEXTURE_RES * blockID) + y * (TEXTURE_RES * 16)] = col;
+@@ -120,7 +120,7 @@ GLuint generateTextures(long long seed)
+     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+ 
+     glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA8, TEXTURE_RES * 16, TEXTURE_RES * 3);
+-    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, TEXTURE_RES * 16, TEXTURE_RES * 3, GL_BGRA, GL_UNSIGNED_BYTE, textureAtlas);
++    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, TEXTURE_RES * 16, TEXTURE_RES * 3, GL_RGBA, GL_UNSIGNED_BYTE, textureAtlas);
+     glGenerateMipmap(GL_TEXTURE_2D);
+     glBindTexture(GL_TEXTURE_2D, 0);
+ 
+diff --git a/TextureGenerator.h b/TextureGenerator.h
+index 6dd97d0..1057e79 100644
+--- a/TextureGenerator.h
++++ b/TextureGenerator.h
+@@ -1,4 +1,9 @@
+ #pragma once
++#ifdef __EMSCRIPTEN__
++#include <GLES3/gl3.h>
++#define GLAPIENTRY
++#else
+ #include <glad/glad.h>
++#endif
+ 
+ GLuint generateTextures(long long seed);
+diff --git a/Util.cpp b/Util.cpp
+index 113174e..8e4196a 100644
+--- a/Util.cpp
++++ b/Util.cpp
+@@ -216,6 +216,7 @@ bool glError()
+     return false;
+ }
+ 
++#ifndef __EMSCRIPTEN__
+ void GLAPIENTRY error_callback(GLenum source,
+                 const GLenum type,
+                 GLuint id,
+@@ -229,6 +230,7 @@ void GLAPIENTRY error_callback(GLenum source,
+     
+     //__debugbreak();
+ }
++#endif
+ 
+ std::ostream& operator<<(std::ostream& os, const glm::vec3& vec3)
+ {
+diff --git a/Util.h b/Util.h
+index 0bd2e64..5f5a9ba 100644
+--- a/Util.h
++++ b/Util.h
+@@ -2,7 +2,12 @@
+ 
+ #include <cstdint>
+ #include <iostream>
++#ifdef __EMSCRIPTEN__
++#include <GLES3/gl3.h>
++#define GLAPIENTRY
++#else
+ #include <glad/glad.h>
++#endif
+ #include <glm/glm.hpp>
+ 
+ constexpr float PI = 3.14159265359f;
+@@ -59,6 +64,7 @@ float clamp(float val, float min, float max);
+ 
+ bool glError();
+ 
++#ifndef __EMSCRIPTEN__ // no debug output in WebGL
+ void GLAPIENTRY error_callback(GLenum source,
+     GLenum type,
+     GLuint id,
+@@ -66,6 +72,7 @@ void GLAPIENTRY error_callback(GLenum source,
+     GLsizei length,
+     const GLchar* message,
+     const void* userParam);
++#endif
+ 
+ std::ostream& operator<<(std::ostream& os, const glm::vec3& vec3);
+ 
+diff --git a/World.cpp b/World.cpp
+index ba4bd96..bb574ca 100644
+--- a/World.cpp
++++ b/World.cpp
+@@ -174,7 +174,7 @@ void World::generateWorld(uint64_t seed)
+ {
+     Random rand = Random(seed);
+ 
+-    for (int x = WORLD_SIZE; x >= 0; x--) {
++    for (int x = WORLD_SIZE - 1; x >= 0; x--) {
+         for (int z = 0; z < WORLD_SIZE; z++) {
+             const int terrainHeight = round(maxTerrainHeight + Perlin::noise(x / 32.f, z / 32.f) * 10.0f);
+ 
