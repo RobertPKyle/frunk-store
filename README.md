@@ -103,7 +103,8 @@ to the cache again.
   unmodified) compiled to WebAssembly by `npm run build:sms`
   (`tools/build-gearsystem.mjs` with `tools/gearsystem/web.cpp`, in Docker;
   the output in `apps/retro/sms/` is committed, with its source as
-  `gearsystem-web-src.tar.gz`). PC Engine / TurboGrafx-16 HuCard games run
+  `gearsystem-web-src.tar.gz`). PC Engine / TurboGrafx-16 HuCard games (in
+  the holders edition only, see Holders below) run
   the same way on Geargrafx 1.8.4 (GPL-3.0-or-later, unmodified), built by
   `npm run build:pce` (`tools/build-geargrafx.mjs` with
   `tools/geargrafx/web.cpp`; output and source in `apps/retro/pce/`, with
@@ -477,6 +478,21 @@ to the cache again.
   `vercel env pull` in `apps/`), which also shows the tokens behind each
   idea. On the dev server without `SOLANA_RPC_URL`, balances are made up
   (`op=dev-balance`) so the e2e check can vote with a test wallet.
+- Holders (hub card `holders`): early access for wallets holding at least
+  `VOTE_MIN_TOKENS` FrunkStore tokens, for now the PC Engine. It's Retro
+  Console opened as `/retro/?edition=holders`, which shows only the consoles
+  in `EARLY` (`retro.js`); the ordinary edition leaves those out, and each
+  edition lists only its own consoles' games and continues its own last
+  game. The car has no wallet, so it shows a QR code to
+  `/vote/?link=<id>` (`op=link-open`, 15 minutes); the phone signs in there
+  and links the car (`op=link`), and the car's poll (`op=link-poll`) gets a
+  30-day pass, kept in localStorage. Each time Holders opens, the pass is
+  checked (`op=pass`) against the wallet's balance then; a wallet that sold
+  locks the screen again (after the game in progress), and without a
+  connection the screen stays as it was. The car-side answers are always
+  200, so the car's console stays clean. This gates the page, not the
+  files: the emulator and games are ordinary static files, and the source
+  is public.
 - `apps/chess`: the Lichess daily chess puzzle, playable on the board. Tap a
   piece, then a highlighted square; the opponent's reply is played
   automatically and only the best move is accepted. Next puzzle fetches a

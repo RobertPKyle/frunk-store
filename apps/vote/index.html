@@ -24,6 +24,9 @@
   #msg { margin: 0 0 12px; color: var(--bad); }
   #msg.ok { color: var(--ok); }
   #msg:empty { display: none; }
+  #car { padding: 12px 14px; margin: 0 0 16px; border-radius: 12px; background: #24182a; border: 1px solid rgba(255, 93, 115, .35); }
+  #car.ok { background: #14251a; border-color: rgba(143, 224, 160, .4); color: var(--ok); }
+  #car.bad { color: var(--bad); }
   #ideas { list-style: none; margin: 0; padding: 0; }
   .idea { position: relative; display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; margin-bottom: 8px; padding: 12px 14px;
           border-radius: 14px; background: var(--card); border: 1px solid var(--line); }
@@ -49,6 +52,7 @@
 <main>
   <h1>Vote on what's next</h1>
   <p class="lede">Holders of the FrunkStore token pick what frunk.store builds next. Sign in with your wallet and choose up to three ideas.</p>
+  <p id="car" role="status" hidden>Sign in to unlock Holders early access on your car.</p>
 
   <section id="signin" aria-labelledby="signinTitle">
     <h2 id="signinTitle">Sign in</h2>

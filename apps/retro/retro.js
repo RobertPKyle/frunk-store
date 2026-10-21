@@ -4,6 +4,11 @@
 // player loads from their own files. Loaded files are kept in this screen's IndexedDB and never leave
 // it.
 //
+// The hub's Holders card opens this page as ?edition=holders: early access
+// for FrunkStore token holders, for now the PC Engine, which the ordinary
+// edition leaves out. A holder unlocks the screen from their phone (see
+// apps/api/vote.js); the pass it gets is checked each time the page opens.
+//
 // Input comes from up to two gamepads, the on-screen buttons and the
 // keyboard; each frame they're merged and handed to the running core
 // (nes.js, gba.js, sms.js or pce.js) as sets of button names.
@@ -69,6 +74,11 @@ const settings = {
   set(key, value) { try { localStorage.setItem('retro.' + key, JSON.stringify(value)); } catch {} },
 };
 
+const HOLDERS = document.documentElement.dataset.edition === 'holders';
+const EARLY = new Set(['pce']);                 // consoles only in the holders edition
+const inEdition = system => EARLY.has(system) === HOLDERS;
+const LAST = HOLDERS ? 'holdersLast' : 'last';  // each edition continues its own game
+
 // ---------- your games (IndexedDB) ----------
 
 function db() {
@@ -96,10 +106,10 @@ const putRom = rom => store('readwrite', s => s.put(rom));
 const deleteRom = id => store('readwrite', s => s.delete(id));
 
 // Checks and saves one game (unzipping it if needed); returns its title, or
-// null when it isn't a game this app plays
+// null when it isn't a game this edition plays
 async function saveGame(name, file) {
   const game = await findGame(name, file);
-  if (!game) return null;
+  if (!game || !inEdition(game.system)) return null;
   const { system, bytes: data } = game;
   const title = cleanName(name);
   await putRom({ id: `${title}|${data.length}`, title, system, size: data.length, added: Date.now(), data });
@@ -119,7 +129,7 @@ async function addFiles(files) {
   }
   msg.textContent = added
     ? `Added ${added} game${added === 1 ? '' : 's'}.${skipped ? ` Skipped ${skipped} file${skipped === 1 ? '' : 's'} that weren't games.` : ''}`
-    : files.length ? 'No game files (.nes, .gb, .gbc, .gba, .sms, .gg, .sg, .pce or .zip) found there.' : '';
+    : files.length ? `No game files (${HOLDERS ? '.pce' : '.nes, .gb, .gbc, .gba, .sms, .gg, .sg'} or .zip) found there.` : '';
   renderMine();
 }
 
@@ -137,7 +147,10 @@ function ownGames(then) {
 
 // ---------- get games from phone ----------
 
-const phone = phonePanel({ app: 'retro', save: saveGame, onSaved: renderMine });
+const phone = phonePanel({
+  app: 'retro', save: saveGame, onSaved: renderMine,
+  notPlayable: () => HOLDERS ? 'only PC Engine games play here' : 'not a game this plays (PC Engine games play on the Holders card)',
+});
 
 function pick(inputId) {
   const input = $(inputId);
@@ -180,7 +193,7 @@ function card(title, lines, onPlay) {
 }
 
 function renderFree() {
-  $('free').replaceChildren(...GAMES.map(g => card(g.title, [
+  $('free').replaceChildren(...GAMES.filter(g => inEdition(g.system)).map(g => card(g.title, [
     ['small', `${SYSTEMS[g.system].name} · ${g.by}`],
     ['p', g.about],
     ['small', `License: ${g.license}. Source: frunk-apps.vercel.app/retro/${g.source}`],
@@ -188,7 +201,7 @@ function renderFree() {
 }
 
 async function renderMine() {
-  const roms = (await listRoms()).sort((a, b) => a.title.localeCompare(b.title));
+  const roms = (await listRoms()).filter(r => inEdition(r.system || 'nes')).sort((a, b) => a.title.localeCompare(b.title));
   $('mine').replaceChildren(...roms.map(r => {
     const wrap = document.createElement('div');
     wrap.className = 'wrap';
@@ -212,12 +225,13 @@ async function renderMine() {
 
 // The last game played, to pick up from the top of the library
 async function renderContinue() {
-  const last = settings.get('last', null);
+  const last = settings.get(LAST, null);
   const btn = $('continue');
   btn.hidden = true;
   if (!last) return;
-  const free = last.free && GAMES.find(g => g.id === last.free);
-  const mine = last.mine && await getRom(last.mine).catch(() => null);
+  const free = last.free && GAMES.find(g => g.id === last.free && inEdition(g.system));
+  const found = last.mine && await getRom(last.mine).catch(() => null);
+  const mine = found && inEdition(found.system || 'nes') ? found : null;
   if (!free && !mine) return;
   btn.textContent = `Continue ${free ? free.title : mine.title}`;
   btn.onclick = () => free ? playUrl(free, btn) : playStored(mine.id, btn, mine.title);
@@ -577,7 +591,7 @@ function playUrl(game, btn) {
       return;
     }
     if (await play(game.title, game.system, bytes, saveName(`free-${game.id}`, game.system, bytes))) {
-      settings.set('last', { free: game.id });
+      settings.set(LAST, { free: game.id });
     }
   });
 }
@@ -586,14 +600,14 @@ function playStored(id, btn, title) {
   return startGame(btn, title, async () => {
     const rom = await getRom(id).catch(() => null);
     const system = rom && (rom.system || 'nes');
-    if (!rom || !SYSTEMS[system]) {
+    if (!rom || !SYSTEMS[system] || !inEdition(system)) {
       status('');
       renderMine();
       renderContinue();
       return;
     }
     if (await play(rom.title, system, rom.data, saveName(rom.id, system, rom.data))) {
-      settings.set('last', { mine: rom.id });
+      settings.set(LAST, { mine: rom.id });
     }
   });
 }
@@ -604,6 +618,7 @@ function quit() {
   core = null;
   $('player').hidden = true;
   $('library').hidden = false;
+  if (quitThenLock) { lock(quitThenLock); quitThenLock = null; return; }
   renderContinue();
 }
 
@@ -621,6 +636,86 @@ $('addFiles').onclick = () => ownGames(() => pick('fileInput'));
 $('fromPhone').onclick = () => ownGames(phone.show);
 $('addFolder').onclick = () => ownGames(() => pick('folderInput'));
 
-renderFree();
-renderMine();
-renderContinue();
+// ---------- holders: unlocking this screen ----------
+
+const passKey = {
+  get() { try { return localStorage.getItem('holders.pass'); } catch { return null; } },
+  set(v) { try { v ? localStorage.setItem('holders.pass', v) : localStorage.removeItem('holders.pass'); } catch {} },
+};
+
+async function voteApi(op, data) {
+  const res = await fetch(`/api/vote?op=${op}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data || {}), cache: 'no-store' });
+  return { status: res.status, ...(await res.json().catch(() => ({}))) };
+}
+
+function qr(el, link, size) {
+  // The code is also a link, so the phone page can be tried on a computer
+  const a = Object.assign(document.createElement('a'), { href: link, target: '_blank', rel: 'noopener' });
+  el.replaceChildren(a);
+  new QRCode(a, { text: link, width: size, height: size, correctLevel: QRCode.CorrectLevel.M });
+}
+
+function showShelf(unlocked) {
+  $('lock').hidden = unlocked;
+  $('shelf').hidden = !unlocked;
+  if (!unlocked) return;
+  clearInterval(lockTimer);
+  qr($('voteQr'), `${location.origin}/vote/`, 136);
+  renderFree();
+  renderMine();
+  renderContinue();
+}
+
+// Shows a code for the phone and waits for it to link this screen
+let lockTimer = 0, lockGen = 0;
+async function lock(reason) {
+  showShelf(false);
+  $('continue').hidden = true;
+  const gen = ++lockGen, status = $('lockStatus');
+  $('lockQr').replaceChildren();
+  status.textContent = reason || 'Getting a code…';
+  const code = await voteApi('link-open').catch(() => null);
+  if (gen !== lockGen) return;
+  if (!code?.lid) {
+    status.textContent = code?.error || 'Unlocking isn\'t available right now. Check the connection and try again.';
+    setTimeout(() => gen === lockGen && lock(reason), 15000);
+    return;
+  }
+  qr($('lockQr'), `${location.origin}/vote/?link=${code.lid}`, 216);
+  for (const el of document.querySelectorAll('#lock .min')) el.textContent = code.min.toLocaleString('en-US');
+  if (!reason) status.textContent = 'Waiting for your phone…';
+  clearInterval(lockTimer);
+  lockTimer = setInterval(async () => {
+    if (document.hidden) return;
+    const r = await voteApi('link-poll', { lid: code.lid, secret: code.secret }).catch(() => null);
+    if (gen !== lockGen || !r) return;
+    if (r.expired) { clearInterval(lockTimer); lock(reason); return; }   // a fresh code
+    if (r.pass) {
+      passKey.set(r.pass);
+      showShelf(true);
+    }
+  }, 2500);
+}
+
+async function holders() {
+  document.title = 'Holders · frunk.store';
+  $('forget').onclick = () => confirmTap($('forget'), () => { passKey.set(null); lock(); });
+  const pass = passKey.get();
+  if (!pass) return lock();
+  showShelf(true);
+  // Checked again each time: a wallet that sold its tokens locks the screen.
+  // Without a connection the screen stays as it was.
+  const r = await voteApi('pass', { pass }).catch(() => null);
+  if (r?.ok === false) {
+    passKey.set(null);
+    const why = r.error ? `${r.error} Scan to unlock with another wallet.` : null;
+    if ($('player').hidden) lock(why);
+    else quitThenLock = why || 'This screen needs unlocking again.';
+  }
+}
+// Locking while a game plays waits until the player leaves it
+let quitThenLock = null;
+
+$('fileInput').accept = HOLDERS ? '.pce,.zip' : '.nes,.gb,.gbc,.gba,.sms,.gg,.sg,.zip';
+if (HOLDERS) holders();
+else showShelf(true);

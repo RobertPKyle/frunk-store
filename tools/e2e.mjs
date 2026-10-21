@@ -539,8 +539,46 @@ await check('retro console plays Game Gear, Master System and SG-1000 games', as
   await page.screenshot({ path: shots + 'retro-sms.png' });
 });
 
-await check('retro console plays PC Engine games', async () => {
+// Plays a holder's phone without a browser: signs in to the vote with an
+// ed25519 key of its own, holding the given made-up balance (dev server only)
+async function holderPhone(apps, tokens) {
+  const { generateKeyPairSync, sign } = await import('node:crypto');
+  const { publicKey, privateKey } = generateKeyPairSync('ed25519');
+  const raw = publicKey.export({ format: 'der', type: 'spki' }).subarray(-32);
+  const ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+  let n = BigInt('0x' + raw.toString('hex')), address = '';
+  for (; n > 0n; n /= 58n) address = ALPHABET[Number(n % 58n)] + address;
+  for (const b of raw) { if (b) break; address = '1' + address; }
+  const post = async (op, data) => (await fetch(`${apps}/api/vote?op=${op}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) })).json();
+  const setTokens = t => post('dev-balance', { address, tokens: t });
+  await setTokens(tokens);
+  const { message } = await post('nonce', { address });
+  const session = await post('login', { message, signature: sign(null, Buffer.from(message), privateKey).toString('base64') });
+  if (!session.token) throw new Error(`phone sign-in: ${session.error}`);
+  return { link: lid => post('link', { token: session.token, lid }), setTokens };
+}
+
+await check('holders unlock with a phone and play PC Engine games', async () => {
+  const apps = base.includes('localhost') ? 'http://127.0.0.1:5174' : 'https://frunk-apps.vercel.app';
+  // The ordinary Retro Console leaves the PC Engine out
   await openFromHub(/Retro Console/);
+  if (await appFrame().locator('#free .game').filter({ hasText: 'Blox' }).count()) throw new Error('Blox is in the ordinary Retro Console');
+
+  // Holders is locked until a phone links it
+  await openFromHub(/Holders/);
+  await appFrame().locator('#lockQr a').waitFor({ timeout: 10000 });
+  const link = new URL(await appFrame().locator('#lockQr a').getAttribute('href'));
+  if (link.pathname !== '/vote/' || !link.searchParams.get('link')) throw new Error(`lock code is ${link}`);
+  if (await appFrame().locator('#shelf').isVisible()) throw new Error('games show while locked');
+  if (!base.includes('localhost')) return;   // made-up balances only exist on the dev server
+
+  const phone = await holderPhone(apps, 150000);
+  const linked = await phone.link(link.searchParams.get('link'));
+  if (!linked.ok) throw new Error(`link: ${linked.error}`);
+  await appFrame().locator('#free .game').filter({ hasText: 'Blox' }).waitFor({ timeout: 10000 });
+  if (await appFrame().locator('#free .game').filter({ hasText: 'Thwaite' }).count()) throw new Error('NES games show in Holders');
+  await appFrame().locator('#voteQr a[href$="/vote/"]').waitFor();
+
   const frame = () => page.frames().find(f => f.url().includes('/retro/'));
   const screen = appFrame().locator('#pceScreen');
   await appFrame().locator('#free .game').filter({ hasText: 'Blox' }).click();
@@ -578,10 +616,21 @@ await check('retro console plays PC Engine games', async () => {
   await appFrame().locator('#mine .game').filter({ hasText: 'falling' }).waitFor({ timeout: 5000 });
   const kind = (await appFrame().locator('#mine .game small').first().textContent()).split(' · ')[0];
   if (kind !== 'PC Engine') throw new Error(`own game read as ${kind}`);
-  await appFrame().getByRole('button', { name: 'Remove falling' }).click();
-  await appFrame().getByRole('button', { name: 'Remove falling' }).click();
+  await page.screenshot({ path: shots + 'holders.png' });
+
+  // Opening again checks the wallet: still holding, still open
+  await openFromHub(/Holders/);
+  await appFrame().locator('#free .game').filter({ hasText: 'Blox' }).waitFor({ timeout: 10000 });
+  // The ordinary Retro Console doesn't list the HuCard
+  await openFromHub(/Retro Console/);
+  await appFrame().locator('#free .game').first().waitFor();
+  if (await appFrame().locator('#mine .game').filter({ hasText: 'falling' }).count()) throw new Error('the HuCard shows in the ordinary Retro Console');
+  // A wallet that sold its tokens locks the screen again
+  await phone.setTokens(10);
+  await openFromHub(/Holders/);
+  await appFrame().locator('#lockStatus').filter({ hasText: 'holds 10 FrunkStore tokens' }).waitFor({ timeout: 10000 });
+  await appFrame().locator('#lockQr a').waitFor({ timeout: 10000 });
   console.log(`     Blox ${fps} fps, snapshot ${saved} bytes`);
-  await page.screenshot({ path: shots + 'retro-pce.png' });
 });
 
 await check('freedoom takes WADs from a phone', async () => {
@@ -1508,6 +1557,16 @@ await check('holders vote from a phone', async () => {
     if (total.startsWith('0 ')) throw new Error(`after reload: "${total}"`);
     const first = await boxes.first().locator('input').getAttribute('value');
     if (!picks.includes(first)) throw new Error(`list not sorted by votes: ${first} first`);
+
+    // Opened from a car's code, the signed-in phone unlocks that car
+    const post = async (op, data) => (await fetch(`${apps}/api/vote?op=${op}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) })).json();
+    const car = await post('link-open', {});
+    await phone.goto(`${apps}/vote/?link=${car.lid}`);
+    await phone.locator('#car').filter({ hasText: 'Your car is unlocked' }).waitFor({ timeout: 5000 });
+    const { pass } = await post('link-poll', { lid: car.lid, secret: car.secret });
+    if (!pass || !(await post('pass', { pass })).ok) throw new Error('the car got no working pass');
+    // The wallet apps' links keep the car's code
+    if (!(await phone.getByRole('link', { name: 'Open in Phantom', includeHidden: true }).getAttribute('href')).includes(encodeURIComponent(`?link=${car.lid}`))) throw new Error('Phantom link drops the car code');
 
     // Selling the tokens stops the next vote
     await balance(0);

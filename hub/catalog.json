@@ -136,9 +136,20 @@
     {
       "id": "retro",
       "name": "Retro Console",
-      "tagline": "Play homebrew games, or NES, Game Boy, GBA, Master System, Game Gear and TurboGrafx-16 games you own sent from your phone, with a controller or on screen.",
+      "tagline": "Play homebrew games, or NES, Game Boy, GBA, Master System and Game Gear games you own sent from your phone, with a controller or on screen.",
       "path": "/retro/",
       "icon": "/retro/icon.svg",
+      "tags": [
+        "Game",
+        "Controller"
+      ]
+    },
+    {
+      "id": "holders",
+      "name": "Holders",
+      "tagline": "Early access for FrunkStore token holders: TurboGrafx-16 games first, and a vote on what's next. Unlock with your phone's wallet.",
+      "path": "/retro/?edition=holders",
+      "icon": "/vote/icon.svg",
       "tags": [
         "Game",
         "Controller"

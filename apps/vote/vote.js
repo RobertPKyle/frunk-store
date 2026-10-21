@@ -1,6 +1,9 @@
 // FrunkStore token holders vote on what frunk.store builds next (see
 // apps/api/vote.js). The wallet signs a sign-in message, nothing more.
 //
+// Opened from a car's QR code (?link=…), signing in also unlocks early
+// access on that car.
+//
 // Wallets are found through the Wallet Standard, which Phantom, Solflare,
 // Backpack and others use, both as browser extensions and inside their
 // apps' own browsers. A phone's ordinary browser has none, so the page
@@ -16,6 +19,7 @@ const stored = {
 };
 
 let ideas = [], counts = {}, voters = 0, session = stored.get(), busy = false;
+const carLink = new URLSearchParams(location.search).get('link');
 
 function say(text, ok = false) {
   $('msg').textContent = text;
@@ -95,7 +99,7 @@ function legacySigner(p) {
 }
 
 // Links that open this page inside a wallet app's own browser
-const here = encodeURIComponent(location.origin + location.pathname);
+const here = encodeURIComponent(location.origin + location.pathname + location.search);
 const origin = encodeURIComponent(location.origin);
 $('phantom').href = `https://phantom.app/ul/browse/${here}?ref=${origin}`;
 $('solflare').href = `https://solflare.com/ul/v1/browse/${here}?ref=${origin}`;
@@ -114,11 +118,27 @@ async function signIn(signer) {
     stored.set(session);
     say('Signed in. Pick up to three ideas, then save.', true);
     render();
+    await unlockCar();
   } catch (e) {
     // a wallet's "rejected" errors are the person saying no
     say(/reject|denied|cancel/i.test(e.message) ? 'Sign-in cancelled.' : e.message);
   } finally {
     busy = false;
+  }
+}
+
+// Links the car that showed this page's code; once per page load
+let linked = false;
+async function unlockCar() {
+  if (!carLink || !session || linked) return;
+  try {
+    await call('link', { token: session.token, lid: carLink });
+    linked = true;
+    $('car').textContent = 'Your car is unlocked. Holders opens on its screen in a few seconds.';
+    $('car').classList.add('ok');
+  } catch (e) {
+    $('car').textContent = e.message;
+    $('car').classList.add('bad');
   }
 }
 
@@ -226,5 +246,6 @@ $('send').onclick = async () => {
   }
 };
 
+if (carLink) $('car').hidden = false;
 showWallets();
-load();
+load().then(unlockCar);
