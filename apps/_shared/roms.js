@@ -14,6 +14,8 @@ export const SYSTEMS = {
   gg: { name: 'Game Gear', exts: ['gg'], max: 4 * MB },
   sg: { name: 'SG-1000', exts: ['sg'], max: MB },
   pce: { name: 'PC Engine', exts: ['pce'], max: 2560 * 1024 + 512 },   // Street Fighter II' is the biggest HuCard
+  // clownmdemu has no bank switching, so the 5 MB Super Street Fighter II is out
+  md: { name: 'Mega Drive / Genesis', exts: ['md', 'gen', 'bin', 'smd'], max: 4 * MB },
 };
 
 export const GAME_EXTS = Object.values(SYSTEMS).flatMap(s => s.exts);
@@ -44,7 +46,8 @@ function segaHeader(bytes) {
 // The console a game is for, or null. Sega and PC Engine games are known by
 // their name (.sms, .gg, .sg, .pce), as those consoles don't mark every
 // game (PC Engine HuCards carry no header at all); the header settles
-// Master System against Game Gear when it's there.
+// Master System against Game Gear when it's there. Mega Drive games need
+// their header too, since .bin is a common name for any dump.
 export function systemOf(bytes, name = '') {
   if (at(bytes, 0, [0x4e, 0x45, 0x53, 0x1a])) return 'nes';
   // GBA: start of the Nintendo logo at 0x04 and the fixed byte at 0xB2
@@ -58,7 +61,32 @@ export function systemOf(bytes, name = '') {
   }
   // HuCards are whole multiples of 8 KB, some dumps with a 512-byte header
   if (ext(name) === 'pce' && bytes.length >= 8192 && [0, 512].includes(bytes.length % 8192)) return 'pce';
+  if (SYSTEMS.md.exts.includes(ext(name)) && mdHeader(unSmd(bytes))) return 'md';
   return null;
+}
+
+// Mega Drive dumps from Super Magic Drive copiers (.smd) have a 512-byte
+// header, then the game in 16 KB blocks, each with its odd bytes first and
+// its even bytes after; returns the plain game, or the bytes as they are
+function unSmd(bytes) {
+  if (bytes.length % 16384 !== 512 || bytes[8] !== 0xaa || bytes[9] !== 0xbb) return bytes;
+  const out = new Uint8Array(bytes.length - 512);
+  for (let block = 0; block < out.length; block += 16384) {
+    const from = 512 + block;
+    for (let i = 0; i < 8192; i++) {
+      out[block + i * 2 + 1] = bytes[from + i];
+      out[block + i * 2] = bytes[from + 8192 + i];
+    }
+  }
+  return out;
+}
+
+// Mega Drive games carry "SEGA" at the start of their header at 0x100 (the
+// console's TMSS chip checks it); the 32X's carry "SEGA 32X"
+function mdHeader(bytes) {
+  if (bytes.length < 0x200) return false;
+  const name = String.fromCharCode(...bytes.subarray(0x100, 0x110));
+  return name.includes('SEGA') && !name.includes('32X');
 }
 
 export const isColor = bytes => (bytes[0x143] & 0x80) !== 0;
@@ -130,6 +158,7 @@ export async function findGame(name, bytes) {
     ({ name, bytes } = inner);
   }
   const system = systemOf(bytes, name);
+  if (system === 'md') bytes = unSmd(bytes);
   if (!system || bytes.length > SYSTEMS[system].max) return null;
   return { name, system, bytes };
 }

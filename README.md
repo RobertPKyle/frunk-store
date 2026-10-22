@@ -109,18 +109,31 @@ to the cache again.
   `npm run build:pce` (`tools/build-geargrafx.mjs` with
   `tools/geargrafx/web.cpp`; output and source in `apps/retro/pce/`, with
   the bundled libraries' licenses in `THIRD-PARTY.txt`); CD games are left
-  out, as they need Hudson's System Card. Both run in workers
-  (`sms-worker.js`, `pce-worker.js`, sharing `gear-worker.js`) the way jsnes
-  runs in its own (the page side is `worker-core.js`). Gearsystem takes
-  about 0.5 ms a frame on a desktop (2.2 ms with the CPU slowed 4.5x),
-  Geargrafx 1.5 ms (6.7 ms slowed). The console is picked from the file's
-  header (Sega's and the PC Engine's by name, .sms, .gg, .sg or .pce, since
-  SG-1000 games and HuCards carry no header; the "TMR SEGA" header settles
-  Master System against Game Gear), and zipped games are unzipped in the
-  browser (`apps/_shared/roms.js`). Every game keeps its battery save and a
+  out, as they need Hudson's System Card. Mega Drive / Genesis cartridges
+  (holders edition only, too) run on clownmdemu's emulation core
+  (AGPL-3.0-or-later, unmodified, commit 88ef45a6), built by `npm run
+  build:md` (`tools/build-clownmdemu.mjs` with `tools/clownmdemu/web.c`,
+  which turns the core's palette-index lines into RGBA and mixes its FM and
+  PSG sound into one 44100 Hz stream; output and source in
+  `apps/retro/md/`). Genesis Plus GX and PicoDrive were ruled out: their
+  licenses forbid use in a commercial activity, which a token-gated section
+  is. clownmdemu has no EEPROM saves and no bank switching (so nothing over
+  4 MB), and leaves out the Mega CD here. All three run in workers
+  (`sms-worker.js`, `pce-worker.js`, `md-worker.js`, sharing
+  `gear-worker.js`) the way jsnes runs in its own (the page side is
+  `worker-core.js`). Gearsystem takes about 0.5 ms a frame on a desktop
+  (2.2 ms with the CPU slowed 4.5x), Geargrafx 1.5 ms (6.7 ms slowed),
+  clownmdemu 1.4 ms (7.7 ms slowed). The console is picked from the file's
+  header (Sega's 8-bit consoles' and the PC Engine's by name, .sms, .gg, .sg
+  or .pce, since SG-1000 games and HuCards carry no header; the "TMR SEGA"
+  header settles Master System against Game Gear; Mega Drive games need
+  "SEGA" at 0x100 and a .md, .gen, .bin or .smd name, and .smd copier dumps
+  are unscrambled), and zipped games are unzipped in the browser
+  (`apps/_shared/roms.js`). Every game keeps its battery save and a
   resume snapshot in IndexedDB (mGBA's files for Game Boy, databases "nes",
-  "sms" and "pce" for the worker cores; a PC Engine game's battery save is
-  its 2 KB of backup RAM),
+  "sms", "pce" and "md" for the worker cores; a PC Engine game's battery save is
+  its 2 KB of backup RAM, and a Mega Drive snapshot is about 1.1 MB, as the
+  core's state includes the Mega CD's memory),
   so it picks up where it left off; Reset starts over and keeps the battery
   save. Snapshots are taken on pause, when the page is hidden, and when the
   hub closes the app: the hub posts `{ frunk: 'close' }` to apps that
@@ -503,7 +516,7 @@ to the cache again.
   (`op=dev-balance`) so the e2e check can vote with a test wallet.
 - `apps/holders` and `apps/_shared/holders.js`: Holders, early access for
   wallets holding at least `VOTE_MIN_TOKENS` FrunkStore tokens: Craft 4K,
-  Freedoom, LibreQuake, OpenArena, OpenTTD and the PC Engine (Retro Console opened as
+  Freedoom, LibreQuake, OpenArena, OpenTTD, and the Mega Drive / Genesis and PC Engine (Retro Console opened as
   `/retro/?edition=holders`, which shows only the consoles in `EARLY` in
   `retro.js`; the ordinary edition leaves those out, and each edition lists
   only its own consoles' games and continues its own last game). Those
@@ -575,6 +588,7 @@ npm run build:craft4k                   # Minecraft4k-CPP for Craft 4K (needs Do
 npm run build:puzzles                   # Simon Tatham's Puzzles + their help and icons (needs Docker and Chrome); run before deploying apps
 npm run build:sms                       # Gearsystem for Retro Console (needs Docker); output is committed, rerun only to update it
 npm run build:pce                       # Geargrafx for Retro Console (needs Docker); output is committed, rerun only to update it
+npm run build:md                        # clownmdemu for Retro Console (needs Docker); output is committed, rerun only to update it
 npm run dev                             # hub on localhost:5173, apps on 127.0.0.1:5174
 npm run test:e2e                        # checks against the dev server
 node tools/e2e.mjs https://frunk.store  # checks against production

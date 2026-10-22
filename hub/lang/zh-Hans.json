@@ -90,7 +90,7 @@
     "speedtest": { "name": "网速测试", "tagline": "车上的网络现在有多快？测量下载、上传和延迟，Wi-Fi 或 LTE 都可以。" },
     "probe": { "name": "车机性能测试", "tagline": "看看这辆车的浏览器能做到什么。" },
     "retro": { "name": "复古游戏机", "tagline": "玩自制游戏，或从手机发送你拥有的 NES、Game Boy、GBA、Master System 和 Game Gear 游戏，用手柄或屏幕操作。" },
-    "holders": { "name": "持有者专区", "tagline": "FrunkStore 代币持有者抢先体验：Craft 4K、Freedoom、LibreQuake、OpenArena、OpenTTD 和 PC Engine 游戏，还能投票决定下一步。用手机钱包解锁。" },
+    "holders": { "name": "持有者专区", "tagline": "FrunkStore 代币持有者抢先体验：Craft 4K、Freedoom、LibreQuake、OpenArena、OpenTTD、Mega Drive 和 PC Engine 游戏，还能投票决定下一步。用手机钱包解锁。" },
     "doom": { "tagline": "经典的 Doom 引擎，搭配免费的 Freedoom 游戏，或从手机发送你拥有的 Doom 游戏，用手柄或屏幕操作。" },
     "heretic": { "tagline": "Heretic 引擎，搭配免费的黑暗奇幻游戏 Blasphemer，或从手机发送你拥有的 Heretic。法术、圣物和飞行。" },
     "quake": { "tagline": "经典的 Quake 引擎，搭配免费的 LibreQuake，或从手机发送你拥有的 Quake，用手柄或屏幕操作。" },

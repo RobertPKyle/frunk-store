@@ -1,5 +1,5 @@
 // The holders' wall: apps in early access for wallets holding FrunkStore
-// tokens (the Holders menu, the PC Engine edition of Retro Console,
+// tokens (the Holders menu, the holders edition of Retro Console,
 // Craft 4K, Freedoom, LibreQuake, OpenTTD and OpenArena). An app awaits
 // holdersGate() before it starts.
 //

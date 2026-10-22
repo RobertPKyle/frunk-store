@@ -579,13 +579,15 @@ async function holderPhone(apps, tokens) {
 // The holder's phone that unlocks the test browsers, made when first needed
 let holder = null;
 const holderNow = async () => holder || (holder = await holderPhone(appsBase, 150000));
-await check('holders unlock with a phone and play PC Engine games', async () => {
-  // The ordinary Retro Console leaves the PC Engine out, and the hub's grid the early-access apps
+await check('holders unlock with a phone and play Genesis and PC Engine games', async () => {
+  // The ordinary Retro Console leaves the PC Engine and Mega Drive out, and the hub's grid the early-access apps
   await openFromHub(/Retro Console/);
-  if (await appFrame().locator('#free .game').filter({ hasText: 'Blox' }).count()) throw new Error('Blox is in the ordinary Retro Console');
+  for (const game of ['Blox', 'KłełeAtoms']) {
+    if (await appFrame().locator('#free .game').filter({ hasText: game }).count()) throw new Error(`${game} is in the ordinary Retro Console`);
+  }
   await page.goto(base + '/');
   await page.waitForSelector('.card');
-  for (const name of ['Craft 4K', 'Freedoom', 'LibreQuake', 'OpenTTD', 'OpenArena', 'PC Engine']) {
+  for (const name of ['Craft 4K', 'Freedoom', 'LibreQuake', 'OpenTTD', 'OpenArena', 'Genesis & PC Engine']) {
     if (await page.locator('#grid .card h2').filter({ hasText: new RegExp(`^${name}$`) }).count()) throw new Error(`${name} is on the grid`);
   }
 
@@ -603,7 +605,7 @@ await check('holders unlock with a phone and play PC Engine games', async () => 
   if (!linked.ok) throw new Error(`link: ${linked.error}`);
   await appFrame().locator('#apps .app').first().waitFor({ timeout: 10000 });
   const tiles = (await appFrame().locator('#apps .app b').allTextContents()).join(', ');
-  if (tiles !== 'Craft 4K, Freedoom, LibreQuake, OpenArena, OpenTTD, PC Engine') throw new Error(`menu lists ${tiles}`);
+  if (tiles !== 'Genesis & PC Engine, Craft 4K, Freedoom, LibreQuake, OpenArena, OpenTTD') throw new Error(`menu lists ${tiles}`);
   await appFrame().locator('#voteQr a[href$="/vote/"]').waitFor();
 
   await openFromHub(/PC Engine/);
@@ -634,23 +636,79 @@ await check('holders unlock with a phone and play PC Engine games', async () => 
     q.onerror = () => r(0);
   }));
   if (!saved) throw new Error('no resume snapshot saved for Blox');
+
+  // KłełeAtoms MD on the Mega Drive core
+  const mdScreen = appFrame().locator('#mdScreen');
+  await appFrame().locator('#free .game').filter({ hasText: 'KłełeAtoms' }).click();
+  await appFrame().locator('#fps').filter({ hasText: /fps/ }).waitFor({ timeout: 15000 });
+  await page.waitForTimeout(3000);
+  const mdFps = parseInt(await appFrame().locator('#fps').textContent());
+  if (!(mdFps >= 50)) throw new Error(`KłełeAtoms running at ${mdFps} fps`);
+  const mdBox = await mdScreen.boundingBox();
+  if (Math.abs(mdBox.width / mdBox.height - 320 / 224) > 0.03) throw new Error(`Mega Drive screen is ${mdBox.width}x${mdBox.height}`);
+  const mdButtons = (await appFrame().locator('.ab [data-b], .pill[data-b=start]').allTextContents()).join(' ');
+  if (mdButtons !== 'A B C Start') throw new Error(`Mega Drive buttons read "${mdButtons}"`);
+  // Start leaves the title screen
+  const title = await mdScreen.screenshot();
+  await appFrame().locator('.pill[data-b=start]').click();
+  await page.waitForTimeout(1500);
+  if ((await mdScreen.screenshot()).equals(title)) throw new Error('Start did nothing in KłełeAtoms');
+  await appFrame().locator('#player').screenshot({ path: shots + 'genesis.png' });
+  await appFrame().getByRole('button', { name: 'Games' }).click();
+  // the worker writes its snapshot (about 1 MB) after Games is tapped
+  let mdSaved = 0;
+  for (let tries = 0; tries < 20 && !mdSaved; tries++) {
+    if (tries) await page.waitForTimeout(250);
+    mdSaved = await frame().evaluate(() => new Promise(r => {
+      const q = indexedDB.open('md', 1);
+      q.onsuccess = () => { const g = q.result.transaction('saves').objectStore('saves').get('free-kleleatoms.md'); g.onsuccess = () => r(g.result?.state?.length || 0); };
+      q.onerror = () => r(0);
+    }));
+  }
+  if (!mdSaved) throw new Error('no resume snapshot saved for KłełeAtoms');
   // A player's own HuCard is known by its name
   const picker = page.waitForEvent('filechooser');
   await appFrame().getByRole('button', { name: 'Add game files' }).click();
   const terms = appFrame().getByRole('button', { name: 'I own my games' });
   if (await terms.isVisible()) await terms.click();
+  // and a Mega Drive game by its header, also as a Super Magic Drive dump
+  // (a 512-byte header, then 16 KB blocks of odd bytes before even ones)
+  const atoms = readFileSync(new URL('../apps/retro/games/kleleatoms.gen', import.meta.url));
+  const smd = Buffer.alloc(512 + atoms.length);
+  smd[8] = 0xaa; smd[9] = 0xbb;
+  for (let block = 0; block < atoms.length; block += 16384) {
+    for (let i = 0; i < 8192; i++) {
+      smd[512 + block + i] = atoms[block + i * 2 + 1];
+      smd[512 + block + 8192 + i] = atoms[block + i * 2];
+    }
+  }
   await (await picker).setFiles([
     { name: 'falling.pce', mimeType: 'application/octet-stream', buffer: readFileSync(new URL('../apps/retro/games/blox.pce', import.meta.url)) },
+    { name: 'atoms.bin', mimeType: 'application/octet-stream', buffer: atoms },
+    { name: 'copier.smd', mimeType: 'application/octet-stream', buffer: smd },
   ]);
-  await appFrame().locator('#mine .game').filter({ hasText: 'falling' }).waitFor({ timeout: 5000 });
-  const kind = (await appFrame().locator('#mine .game small').first().textContent()).split(' · ')[0];
-  if (kind !== 'PC Engine') throw new Error(`own game read as ${kind}`);
+  for (const name of ['falling', 'atoms', 'copier']) await appFrame().locator('#mine .game').filter({ hasText: name }).waitFor({ timeout: 5000 });
+  const kinds = {};
+  for (const card of await appFrame().locator('#mine .game').all()) {
+    kinds[await card.locator('b').textContent()] = (await card.locator('small').textContent()).split(' · ')[0];
+  }
+  if (kinds.falling !== 'PC Engine' || kinds.atoms !== 'Mega Drive / Genesis' || kinds.copier !== 'Mega Drive / Genesis') {
+    throw new Error(`own games read as ${JSON.stringify(kinds)}`);
+  }
+  // The copier dump plays once unscrambled
+  await appFrame().locator('#mine .game').filter({ hasText: 'copier' }).click();
+  await appFrame().locator('#fps').filter({ hasText: /fps/ }).waitFor({ timeout: 15000 });
+  await page.waitForTimeout(1500);
+  if (!(parseInt(await appFrame().locator('#fps').textContent()) >= 50)) throw new Error('the .smd game isn\'t running');
+  await appFrame().getByRole('button', { name: 'Games' }).click();
   await page.screenshot({ path: shots + 'holders.png' });
   // The ordinary Retro Console doesn't list the HuCard
   await openFromHub(/Retro Console/);
   await appFrame().locator('#free .game').first().waitFor();
-  if (await appFrame().locator('#mine .game').filter({ hasText: 'falling' }).count()) throw new Error('the HuCard shows in the ordinary Retro Console');
-  console.log(`     Blox ${fps} fps, snapshot ${saved} bytes`);
+  for (const name of ['falling', 'atoms']) {
+    if (await appFrame().locator('#mine .game').filter({ hasText: name }).count()) throw new Error(`${name} shows in the ordinary Retro Console`);
+  }
+  console.log(`     Blox ${fps} fps, snapshot ${saved} bytes; KłełeAtoms ${mdFps} fps, snapshot ${mdSaved} bytes`);
 });
 
 await check('freedoom takes WADs from a phone', async () => {

@@ -135,8 +135,15 @@ function snapshot() {
   return state;
 }
 
+// Saves run one at a time: each reads the game's record and writes it back,
+// so one running alongside another (the battery save every few seconds and
+// the snapshot when the game is left) could undo the other's change
+let saving = Promise.resolve();
+const queue = job => (saving = saving.then(job).catch(() => {}));
+
 // Writes the battery save when it changed, and the resume snapshot when asked
-async function persist(withSnapshot) {
+const persist = withSnapshot => queue(() => persistNow(withSnapshot));
+async function persistNow(withSnapshot) {
   if (!gs || !game) return;
   const name = game, changed = newBattery();
   if (!changed && !withSnapshot) return;
@@ -253,7 +260,7 @@ onmessage = async ({ data: msg }) => {
       if (!game) break;
       const name = game;
       fn.reset();
-      readSave(name).then(old => old && writeSave(name, { ...old, state: null }));
+      queue(() => readSave(name).then(old => old && writeSave(name, { ...old, state: null })));
       break;
     }
     case 'save':

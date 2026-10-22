@@ -91,6 +91,13 @@
   .ab button { position: absolute; width: 56px; height: 56px; border-radius: 50%; border: 0; background: var(--accent); color: #1a0508; font-size: 20px; font-weight: 800; }
   .ab [data-b=b] { left: 0; bottom: 6px; }
   .ab [data-b=a] { right: 0; top: 6px; }
+  .ab [data-b=y] { display: none; }
+  /* the Mega Drive's A, B and C, in a rising row */
+  #player[data-system=md] .ab { width: 132px; }
+  #player[data-system=md] .ab button { width: 44px; height: 44px; font-size: 18px; }
+  #player[data-system=md] .ab [data-b=y] { display: block; left: 0; top: 70px; }
+  #player[data-system=md] .ab [data-b=b] { left: 44px; top: 38px; bottom: auto; }
+  #player[data-system=md] .ab [data-b=a] { left: 88px; top: 6px; right: auto; }
   .ab button.on, .pill.on { filter: brightness(1.4); transform: scale(.94); }
   .pills { display: flex; gap: 8px; }
   .pill { min-height: 40px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--line); background: #1d1d29; font-size: 13px; color: var(--muted); }
@@ -101,6 +108,8 @@
   #player:not([data-system=gba]) .shoulder { display: none; }
   /* Sega's consoles have no Select */
   #player:is([data-system=sms], [data-system=gg], [data-system=sg]) [data-b=select] { visibility: hidden; }
+  /* the Mega Drive's Mode button is only on the six-button pad, so it stays on controllers */
+  #player[data-system=md] [data-b=select] { visibility: hidden; }
 
   @media (max-width: 640px) {
     html, body { overflow: auto; }
@@ -116,7 +125,7 @@
 <section id="library">
   <header>
     <h1 data-only="retro">Retro Console</h1>
-    <h1 data-only="holders">PC Engine · Holders</h1>
+    <h1 data-only="holders">Genesis &amp; PC Engine · Holders</h1>
     <button class="btn" id="continue" type="button" hidden></button>
   </header>
   <div class="scroll">
@@ -130,17 +139,17 @@
       <button class="btn" id="addFiles" type="button">Add game files</button>
       <button class="btn" id="addFolder" type="button">Add a folder</button>
     </div>
-    <input id="fileInput" type="file" accept=".nes,.gb,.gbc,.gba,.sms,.gg,.sg,.pce,.zip" multiple hidden>
+    <input id="fileInput" type="file" accept=".nes,.gb,.gbc,.gba,.sms,.gg,.sg,.pce,.md,.gen,.bin,.smd,.zip" multiple hidden>
     <input id="folderInput" type="file" webkitdirectory multiple hidden>
     <p class="note" id="addMsg" aria-live="polite"></p>
     <div class="games" id="mine"></div>
     <p class="note owned"><b>Only load games you legally own</b>, such as copies you made from your own cartridges. frunk.store doesn't provide, sell or share commercial games, and never keeps yours: they're stored only on this screen. You're responsible for the files you load.</p>
 
     <div class="legal">
-      <p data-only="retro">Plays NES, Game Boy, Game Boy Color, Game Boy Advance, Master System, Game Gear and SG-1000 games (.nes, .gb, .gbc, .gba, .sms, .gg, .sg, also zipped). PC Engine / TurboGrafx-16 games are in early access for FrunkStore token holders, on the Holders card. Games remember your progress: they pick up where you left off, and Reset starts over (keeping in-game saves).</p>
-      <p data-only="holders">Plays PC Engine / TurboGrafx-16 HuCard games (.pce, also zipped; CD games aren't supported). Games remember your progress: they pick up where you left off, and Reset starts over (keeping in-game saves). The FrunkStore token isn't an investment; frunk.store will never ask for your recovery phrase or a transaction.</p>
-      <p>Controls: a USB or Bluetooth controller, the on-screen buttons, or a keyboard (arrows, Z = B, X = A, Q = L, W = R, Enter = Start, Shift = Select). On Sega's consoles, B is button 1, A is button 2, and Start is the Master System's Pause button. On the PC Engine, B is II, A is I, and Start is Run. With a controller, the on-screen buttons hide to make the game bigger; touch the screen to bring them back. Switching the controller off pauses the game, and Start resumes it.</p>
-      <p>Emulators: jsnes (Apache License 2.0) for NES, mGBA (Mozilla Public License 2.0, source at github.com/thenick775/mgba) for Game Boy, Gearsystem (GNU GPL 3 or later, source at frunk-apps.vercel.app/retro/sms/gearsystem-web-src.tar.gz) for Sega's consoles, Geargrafx (GNU GPL 3 or later, source at frunk-apps.vercel.app/retro/pce/geargrafx-web-src.tar.gz) for the PC Engine. The free games are by their authors, under the licenses shown on each card; source code is kept next to each game.</p>
+      <p data-only="retro">Plays NES, Game Boy, Game Boy Color, Game Boy Advance, Master System, Game Gear and SG-1000 games (.nes, .gb, .gbc, .gba, .sms, .gg, .sg, also zipped). Mega Drive / Genesis and PC Engine / TurboGrafx-16 games are in early access for FrunkStore token holders, on the Holders card. Games remember your progress: they pick up where you left off, and Reset starts over (keeping in-game saves).</p>
+      <p data-only="holders">Plays Mega Drive / Genesis cartridges (.md, .gen, .bin, .smd) and PC Engine / TurboGrafx-16 HuCard games (.pce), also zipped. Mega CD, 32X and PC Engine CD games aren't supported, nor are the few Mega Drive games that save to EEPROM chips or are bigger than 4 MB (Super Street Fighter II). Games remember your progress: they pick up where you left off, and Reset starts over (keeping in-game saves). The FrunkStore token isn't an investment; frunk.store will never ask for your recovery phrase or a transaction.</p>
+      <p>Controls: a USB or Bluetooth controller, the on-screen buttons, or a keyboard (arrows, Z = B, X = A, Q = L, W = R, Enter = Start, Shift = Select). On Sega's consoles, B is button 1, A is button 2, and Start is the Master System's Pause button. On the PC Engine, B is II, A is I, and Start is Run. On the Mega Drive, a controller's left, bottom and right buttons are A, B and C (keys A, Z and X); the six-button pad's X, Y and Z are L, the top button and R, and Mode is Select. With a controller, the on-screen buttons hide to make the game bigger; touch the screen to bring them back. Switching the controller off pauses the game, and Start resumes it.</p>
+      <p>Emulators: jsnes (Apache License 2.0) for NES, mGBA (Mozilla Public License 2.0, source at github.com/thenick775/mgba) for Game Boy, Gearsystem (GNU GPL 3 or later, source at frunk-apps.vercel.app/retro/sms/gearsystem-web-src.tar.gz) for Sega's consoles, Geargrafx (GNU GPL 3 or later, source at frunk-apps.vercel.app/retro/pce/geargrafx-web-src.tar.gz) for the PC Engine, clownmdemu (GNU AGPL 3 or later, source at frunk-apps.vercel.app/retro/md/clownmdemu-web-src.tar.gz) for the Mega Drive. The free games are by their authors, under the licenses shown on each card; source code is kept next to each game.</p>
       <p>Not affiliated with or endorsed by Nintendo, Sega, NEC or Konami. Play only while parked.</p>
     </div>
   </div>
@@ -195,11 +204,12 @@
     <canvas id="gbaScreen" width="240" height="160" hidden></canvas>
     <canvas id="smsScreen" width="256" height="192" hidden></canvas>
     <canvas id="pceScreen" width="256" height="224" hidden></canvas>
+    <canvas id="mdScreen" width="320" height="224" hidden></canvas>
     <div id="paused" hidden>Paused<small>Tap here or press Start to resume</small></div>
   </div>
   <div class="side right">
     <button class="pill shoulder" type="button" data-b="r">R</button>
-    <div class="ab"><button type="button" data-b="b">B</button><button type="button" data-b="a">A</button></div>
+    <div class="ab"><button type="button" data-b="y">Y</button><button type="button" data-b="b">B</button><button type="button" data-b="a">A</button></div>
     <div class="pills"><button class="pill" type="button" data-b="start">Start</button></div>
   </div>
 </section>

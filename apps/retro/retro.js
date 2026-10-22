@@ -1,17 +1,17 @@
 // Retro Console: NES (jsnes), Game Boy / Color / Advance (mGBA), Master
-// System / Game Gear / SG-1000 (Gearsystem) and PC Engine / TurboGrafx-16
-// (Geargrafx) emulators with free homebrew games built in, plus games the
-// player loads from their own files. Loaded files are kept in this screen's IndexedDB and never leave
+// System / Game Gear / SG-1000 (Gearsystem), PC Engine / TurboGrafx-16
+// (Geargrafx) and Mega Drive / Genesis (clownmdemu) emulators with free
+// homebrew games built in, plus games the player loads from their own files. Loaded files are kept in this screen's IndexedDB and never leave
 // it.
 //
 // The Holders menu opens this page as ?edition=holders: early access for
-// FrunkStore token holders, for now the PC Engine, which the ordinary
-// edition leaves out. It waits behind the holders' wall
+// FrunkStore token holders, for now the Mega Drive / Genesis and the PC
+// Engine, which the ordinary edition leaves out. It waits behind the holders' wall
 // (../_shared/holders.js) until a holder's phone unlocks the screen.
 //
 // Input comes from up to two gamepads, the on-screen buttons and the
 // keyboard; each frame they're merged and handed to the running core
-// (nes.js, gba.js, sms.js or pce.js) as sets of button names.
+// (nes.js, gba.js, sms.js, pce.js or md.js) as sets of button names.
 
 import { holdersGate } from '../_shared/holders.js';
 import { phonePanel } from '../_shared/phone.js';
@@ -20,6 +20,7 @@ import { createNes } from './nes.js';
 import { createGba } from './gba.js';
 import { createSms } from './sms.js';
 import { createPce } from './pce.js';
+import { createMd } from './md.js';
 
 const GAMES = [
   {
@@ -67,6 +68,11 @@ const GAMES = [
     about: 'Steer the falling blocks into full rows to clear them. I and II turn the block, down drops it faster, Run pauses.',
     license: 'MIT', source: 'games/blox-src.tar.gz',
   },
+  {
+    id: 'kleleatoms', title: 'KłełeAtoms MD', by: 'Nightwolf-47, 2022', file: 'games/kleleatoms.gen', system: 'md',
+    about: 'Place atoms in turn; a tile that gets too many explodes into its neighbours and takes their atoms, setting off chain reactions. Up to four players, against friends or the console.',
+    license: 'MIT', source: 'games/kleleatoms-md-1.2.1-src.tar.gz',
+  },
 ];
 
 const $ = id => document.getElementById(id);
@@ -76,7 +82,7 @@ const settings = {
 };
 
 const HOLDERS = document.documentElement.dataset.edition === 'holders';
-const EARLY = new Set(['pce']);                 // consoles only in the holders edition
+const EARLY = new Set(['pce', 'md']);           // consoles only in the holders edition
 const inEdition = system => EARLY.has(system) === HOLDERS;
 const LAST = HOLDERS ? 'holdersLast' : 'last';  // each edition continues its own game
 
@@ -130,7 +136,7 @@ async function addFiles(files) {
   }
   msg.textContent = added
     ? `Added ${added} game${added === 1 ? '' : 's'}.${skipped ? ` Skipped ${skipped} file${skipped === 1 ? '' : 's'} that weren't games.` : ''}`
-    : files.length ? `No game files (${HOLDERS ? '.pce' : '.nes, .gb, .gbc, .gba, .sms, .gg, .sg'} or .zip) found there.` : '';
+    : files.length ? `No game files (${HOLDERS ? '.md, .gen, .bin, .smd, .pce' : '.nes, .gb, .gbc, .gba, .sms, .gg, .sg'} or .zip) found there.` : '';
   renderMine();
 }
 
@@ -150,7 +156,8 @@ function ownGames(then) {
 
 const phone = phonePanel({
   app: 'retro', save: saveGame, onSaved: renderMine,
-  notPlayable: () => HOLDERS ? 'only PC Engine games play here' : 'not a game this plays (PC Engine games play on the Holders card)',
+  notPlayable: () => HOLDERS ? 'only Mega Drive / Genesis and PC Engine games play here'
+    : 'not a game this plays (Mega Drive / Genesis and PC Engine games play on the Holders card)',
 });
 
 function pick(inputId) {
@@ -416,16 +423,21 @@ addEventListener('blur', () => keyboard.clear());
 
 // ---------- running ----------
 
-const cores = { nes: createNes($('screen')), gba: createGba($('gbaScreen')), sms: createSms($('smsScreen')), pce: createPce($('pceScreen')) };
-const CORE = { nes: 'nes', gb: 'gba', gba: 'gba', sms: 'sms', gg: 'sms', sg: 'sms', pce: 'pce' };
+const cores = {
+  nes: createNes($('screen')), gba: createGba($('gbaScreen')), sms: createSms($('smsScreen')), pce: createPce($('pceScreen')),
+  md: createMd($('mdScreen')),
+};
+const CORE = { nes: 'nes', gb: 'gba', gba: 'gba', sms: 'sms', gg: 'sms', sg: 'sms', pce: 'pce', md: 'md' };
 
 // Sega's pads have buttons 1 and 2 where B and A are, and Start is the
-// Master System's Pause button; the PC Engine's have II and I there, and Run
-const LABELS = { sms: ['1', '2', 'Pause'], gg: ['1', '2', 'Start'], sg: ['1', '2', 'Pause'], pce: ['II', 'I', 'Run'] };
+// Master System's Pause button; the PC Engine's have II and I there, and
+// Run. The Mega Drive's A, B and C take Y (shown only for it), B and A.
+const LABELS = { sms: ['1', '2', 'Pause'], gg: ['1', '2', 'Start'], sg: ['1', '2', 'Pause'], pce: ['II', 'I', 'Run'], md: ['B', 'C', 'Start', 'A'] };
 function labelButtons(system) {
-  const [b, a, start] = LABELS[system] || ['B', 'A', 'Start'];
+  const [b, a, start, y = 'Y'] = LABELS[system] || ['B', 'A', 'Start'];
   document.querySelector('#player [data-b=b]').textContent = b;
   document.querySelector('#player [data-b=a]').textContent = a;
+  document.querySelector('#player [data-b=y]').textContent = y;
   document.querySelector('#player [data-b=start]').textContent = start;
 }
 let core = null, raf = 0, paused = false, frames = 0, fpsSince = 0, refreshes = 0;
@@ -468,7 +480,7 @@ function loop(t) {
     }
     // A core with its own refresh rate (NES, in a worker) decides for itself
     if ('refresh' in core) { hz = core.refresh; steady = core.isSteady; }
-    // Master System and PC Engine games can change their picture's size while they run
+    // Master System, PC Engine and Mega Drive games can change their picture's size while they run
     if (core.width !== fitted.width || core.height !== fitted.height) fit();
     $('fps').textContent = `${Math.round((core.frames - frames) * 1000 / (t - fpsSince))} fps` +
       (details ? ` · ${hz} Hz${steady ? ' · steady' : ''}` : '');
@@ -644,8 +656,8 @@ function showShelf() {
   renderContinue();
 }
 
-$('fileInput').accept = HOLDERS ? '.pce,.zip' : '.nes,.gb,.gbc,.gba,.sms,.gg,.sg,.zip';
+$('fileInput').accept = HOLDERS ? '.md,.gen,.bin,.smd,.pce,.zip' : '.nes,.gb,.gbc,.gba,.sms,.gg,.sg,.zip';
 if (HOLDERS) {
-  document.title = 'PC Engine · frunk.store';
-  holdersGate('PC Engine / TurboGrafx-16 games').then(showShelf);
+  document.title = 'Genesis & PC Engine · frunk.store';
+  holdersGate('Mega Drive / Genesis and PC Engine games').then(showShelf);
 } else showShelf();

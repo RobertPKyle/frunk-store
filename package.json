@@ -14,6 +14,7 @@
     "build:puzzles": "node tools/build-puzzles.mjs",
     "build:sms": "node tools/build-gearsystem.mjs",
     "build:pce": "node tools/build-geargrafx.mjs",
+    "build:md": "node tools/build-clownmdemu.mjs",
     "dev": "node tools/dev.mjs",
     "test:e2e": "node tools/e2e.mjs"
   },

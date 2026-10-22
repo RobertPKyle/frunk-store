@@ -29,6 +29,15 @@ Third-party components
   (BSD), minivorbis (BSD 3-Clause), JSON for Modern C++ (MIT) and qon (MIT),
   with their license texts in pce/THIRD-PARTY.txt.
 
+- clownmdemu (emulation core), copyright Clownacy, GNU Affero GPL version 3
+  or later (md/clownmdemu.js and md/clownmdemu.wasm, compiled unmodified
+  with a small front end, web.c, under the same license; license text in
+  md/LICENSE; the complete source, with the build script, in
+  md/clownmdemu-web-src.tar.gz). From https://github.com/Clownacy/clownmdemu
+  at commit 88ef45a6585556e2247dd26b6c937d6b9fb4a12d, with its libraries
+  clown68000 and clownz80 (GNU AGPL 3 or later) and clowncommon (zero-clause
+  BSD), described in md/THIRD-PARTY.txt.
+
 - Attack on Voxelburg (jam version), copyright 2022 John Tsiombikas, GNU GPL
   version 3 or later (games/voxelburg.gba; complete source in
   games/voxelburg-jam-src.tar.gz, license text in games/gpl-3.0.txt). From
@@ -79,5 +88,11 @@ Third-party components
   build/20220408.zip of https://github.com/dshadoff/PCE_Blox at commit
   48ce57974ef482d7ac4f7c20a656eb1bae22f753; the repository, with the license
   text in LICENSE, in games/blox-src.tar.gz)
+
+- KłełeAtoms MD 1.2.1, copyright 2022 Nightwolf-47, with pictures by
+  GreffMASTER, MIT License (games/kleleatoms.gen, kleleatoms-md-121.bin from
+  https://github.com/Nightwolf-47/KleleAtoms-MD/releases/tag/v1.2.1; the
+  source at that tag, with the license text in LICENSE, in
+  games/kleleatoms-md-1.2.1-src.tar.gz)
 
 All games are distributed exactly as published by their authors.
