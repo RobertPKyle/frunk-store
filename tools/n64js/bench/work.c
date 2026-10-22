@@ -11,11 +11,15 @@
 //   zig objcopy -O binary work.elf work.bin
 //
 // then n64TestRom({ work: { code: <work.bin's bytes>, count: 64 } }) (see
-// tools/n64-test-rom.mjs) runs it once a frame with 64 characters.
+// tools/n64-test-rom.mjs) runs it once a frame with 64 characters. count's
+// bits 8 to 15 add integer-only game logic, that many rounds a frame (a
+// small script interpreter per actor, a collision grid, and a checksum), and
+// bits 16 up animate the characters that many times a frame (once if 0).
 typedef unsigned int u32;
 typedef int s32;
 typedef short s16;
 typedef unsigned short u16;
+typedef unsigned char u8;
 
 void *memcpy(void *d, const void *s, unsigned n) { char *a = d; const char *b = s; while (n--) *a++ = *b++; return d; }
 void *memset(void *d, int c, unsigned n) { char *a = d; while (n--) *a++ = c; return d; }
@@ -128,10 +132,80 @@ static void move(Actor *a) {
   a->depth = a->pos.z * 0.8f + a->pos.x * 0.2f;
 }
 
+// ---------- integer game logic ----------
+
+#define GRID 16
+#define CELL_ITEMS 8
+enum { OP_ADD, OP_SUB, OP_AND, OP_SHL, OP_JNZ, OP_LOAD, OP_STORE, OP_END };
+
+typedef struct { s16 x, y; s16 dx, dy; u16 flags, hp; s32 regs[4]; u32 pc; } Mob;
+
+static Mob mobs[MAX_ACTORS];
+static u16 cells[GRID * GRID][CELL_ITEMS];
+static u8 counts[GRID * GRID];
+static s32 vars[16];
+static const u8 script[] = {
+  OP_LOAD, 0, 1, OP_ADD, 0, 3, OP_SHL, 1, 2, OP_AND, 1, 0x7f, OP_SUB, 2, 1,
+  OP_STORE, 2, 5, OP_ADD, 3, 1, OP_AND, 3, 7, OP_JNZ, 3, 0, OP_END,
+};
+
+static u32 run_script(Mob *m) {
+  u32 pc = 0, steps = 0;
+  while (steps++ < 64) {
+    const u8 *op = &script[pc];
+    switch (op[0]) {
+    case OP_ADD: m->regs[op[1] & 3] += op[2]; pc += 3; break;
+    case OP_SUB: m->regs[op[1] & 3] -= m->regs[op[2] & 3]; pc += 3; break;
+    case OP_AND: m->regs[op[1] & 3] &= op[2]; pc += 3; break;
+    case OP_SHL: m->regs[op[1] & 3] = m->regs[op[2] & 3] << 2; pc += 3; break;
+    case OP_JNZ: pc = m->regs[op[1] & 3] ? op[2] : pc + 3; break;
+    case OP_LOAD: m->regs[op[1] & 3] = vars[op[2] & 15] + m->x; pc += 3; break;
+    case OP_STORE: vars[op[2] & 15] ^= m->regs[op[1] & 3]; pc += 3; break;
+    default: return steps;
+    }
+  }
+  return steps;
+}
+
+static u32 logic(u32 frame, u32 count) {
+  u32 sum = 0;
+  for (int c = 0; c < GRID * GRID; c++) counts[c] = 0;
+  for (u32 i = 0; i < count; i++) {
+    Mob *m = &mobs[i];
+    if (!m->flags) { m->x = (s16)(i * 37 % 256); m->y = (s16)(i * 91 % 256); m->dx = (s16)(i % 5) - 2; m->dy = (s16)(i % 3) - 1; m->flags = 1; m->hp = 100; }
+    m->x += m->dx; m->y += m->dy;
+    if ((u16)m->x >= 256) { m->dx = -m->dx; m->x += m->dx * 2; }
+    if ((u16)m->y >= 256) { m->dy = -m->dy; m->y += m->dy * 2; }
+    sum += run_script(m);
+    u32 c = (u32)(m->y >> 4) * GRID + (u32)(m->x >> 4);
+    if (counts[c] < CELL_ITEMS) cells[c][counts[c]++] = (u16)i;
+  }
+  // pairs sharing a cell lose hit points
+  for (int c = 0; c < GRID * GRID; c++)
+    for (int a = 0; a < counts[c]; a++)
+      for (int b = a + 1; b < counts[c]; b++) {
+        Mob *p = &mobs[cells[c][a]], *q = &mobs[cells[c][b]];
+        s32 ddx = p->x - q->x, ddy = p->y - q->y;
+        if (ddx * ddx + ddy * ddy < 64) { p->hp--; q->hp--; if (!p->hp) p->flags = 0; if (!q->hp) q->flags = 0; }
+      }
+  // CRC-32 of the mobs, a byte at a time
+  u32 crc = ~frame;
+  const u8 *bytes = (const u8 *)mobs;
+  for (u32 n = 0; n < count * sizeof(Mob); n++) {
+    crc ^= bytes[n];
+    for (int k = 0; k < 8; k++) crc = (crc >> 1) ^ (0xedb88320 & -(crc & 1));
+  }
+  return sum + crc;
+}
+
 void work(u32 frame, u32 count) {
   if (!ready) setup();
+  u32 rounds = (count >> 8) & 0xff, passes = count >> 16, isum = 0;
+  count &= 0xff;
+  for (u32 r = 0; r < rounds; r++) isum += logic(frame + r, MAX_ACTORS);
   if (count > MAX_ACTORS) count = MAX_ACTORS;
-  for (u32 a = 0; a < count; a++) { move(&actors[a]); animate(&actors[a], frame); order[a] = &actors[a]; }
+  for (u32 p = 0; p == 0 || p < passes; p++)
+    for (u32 a = 0; a < count; a++) { move(&actors[a]); animate(&actors[a], frame); order[a] = &actors[a]; }
   // insertion sort by depth, far first
   for (u32 i = 1; i < count; i++) {
     Actor *x = order[i];
@@ -150,5 +224,5 @@ void work(u32 frame, u32 count) {
     }
   dl[n++] = 0xb8000000;
   dl[n++] = 0;
-  checksum = sum;
+  checksum = sum + isum;
 }

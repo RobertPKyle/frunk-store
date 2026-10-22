@@ -1,0 +1,1994 @@
+diff --git a/src/cpu/r4300.js b/src/cpu/r4300.js
+index 61c62dd..3fcaab9 100644
+--- a/src/cpu/r4300.js
++++ b/src/cpu/r4300.js
+@@ -3094,6 +3094,7 @@ function compileFragment(fragment, c = cpu0) {
+ 
+   const code = `
+   return function fragment_${toString32(fragment.entryPC)}_${fragment.opsCompiled}() {
++  'use strict';
+   ${header}
+   ${bodyCode}
+ }`;
+diff --git a/src/cpu/ram_access_group.js b/src/cpu/ram_access_group.js
+index 401d789..d491fc7 100644
+--- a/src/cpu/ram_access_group.js
++++ b/src/cpu/ram_access_group.js
+@@ -15,9 +15,17 @@ import {
+ } from './decode.js';
+ import { disassembleInstruction } from './disassemble.js';
+ import { toString32 } from '../format.js';
++import { cop1Words32, cop1Words64 } from './register_locals.js';
+ 
+-function gprS32Lo(reg) {
+-  return reg === 0 ? '0' : `c.gprS32[${reg * 2}]`;
++// GPR words are read from and written through the fragment's locals (see
++// RegisterLocals). Fast paths run conditionally.
++function gprS32Lo(ctx, reg) {
++  return reg === 0 ? '0' : ctx.regs.readS32(reg * 2);
++}
++
++function setGpr(ctx, reg, lo, hi) {
++  return `  ${ctx.regs.writeConditional(reg * 2, lo)}\n` +
++    `  ${ctx.regs.writeConditional(reg * 2 + 1, hi)}\n`;
+ }
+ 
+ function cop1WordIndex(reg) {
+@@ -39,24 +47,23 @@ function narrowSpec(name, noun, width, helper, emitFast) {
+   });
+ }
+ 
+-function narrowLoad(i, reg, relOffset, getter, signed) {
++function narrowLoad(ctx, i, reg, relOffset, getter, signed) {
+   if (reg === 0) {
+     return '';
+   }
+   return `  const v${i} = ramLoadDV.${getter}(ramLoadBase + ${relOffset}, false);\n` +
+-    `  c.gprS32[${reg * 2}] = v${i};\n` +
+-    `  c.gprS32[${reg * 2 + 1}] = ${signed ? `v${i} >> 31` : '0'};\n`;
++    setGpr(ctx, reg, `v${i}`, signed ? `v${i} >> 31` : '0');
+ }
+ 
+ const GROUP_SPECS = Object.freeze({
+-  [OP_LB]: narrowSpec('LB', 'loads', 1, 'execLB', (i, reg, off) => narrowLoad(i, reg, off, 'getInt8', true)),
+-  [OP_LBU]: narrowSpec('LBU', 'loads', 1, 'execLBU', (i, reg, off) => narrowLoad(i, reg, off, 'getUint8', false)),
+-  [OP_LH]: narrowSpec('LH', 'loads', 2, 'execLH', (i, reg, off) => narrowLoad(i, reg, off, 'getInt16', true)),
+-  [OP_LHU]: narrowSpec('LHU', 'loads', 2, 'execLHU', (i, reg, off) => narrowLoad(i, reg, off, 'getUint16', false)),
++  [OP_LB]: narrowSpec('LB', 'loads', 1, 'execLB', (ctx, i, reg, off) => narrowLoad(ctx, i, reg, off, 'getInt8', true)),
++  [OP_LBU]: narrowSpec('LBU', 'loads', 1, 'execLBU', (ctx, i, reg, off) => narrowLoad(ctx, i, reg, off, 'getUint8', false)),
++  [OP_LH]: narrowSpec('LH', 'loads', 2, 'execLH', (ctx, i, reg, off) => narrowLoad(ctx, i, reg, off, 'getInt16', true)),
++  [OP_LHU]: narrowSpec('LHU', 'loads', 2, 'execLHU', (ctx, i, reg, off) => narrowLoad(ctx, i, reg, off, 'getUint16', false)),
+   [OP_SB]: narrowSpec('SB', 'stores', 1, 'execSB',
+-    (i, reg, off) => `  ramStoreDV.setUint8(ramStoreBase + ${off}, ${gprS32Lo(reg)});\n`),
++    (ctx, i, reg, off) => `  ramStoreDV.setUint8(ramStoreBase + ${off}, ${gprS32Lo(ctx, reg)});\n`),
+   [OP_SH]: narrowSpec('SH', 'stores', 2, 'execSH',
+-    (i, reg, off) => `  ramStoreDV.setUint16(ramStoreBase + ${off}, ${gprS32Lo(reg)}, false);\n`),
++    (ctx, i, reg, off) => `  ramStoreDV.setUint16(ramStoreBase + ${off}, ${gprS32Lo(ctx, reg)}, false);\n`),
+   [OP_SW]: Object.freeze({
+     name: 'SW',
+     noun: 'stores',
+@@ -68,8 +75,8 @@ const GROUP_SPECS = Object.freeze({
+     helper: 'execSW',
+     writesGpr: false,
+     usesCop1: false,
+-    emitFast(i, reg, relOffset) {
+-      return `  ramStoreDV.setUint32(ramStoreBase + ${relOffset}, ${gprS32Lo(reg)}, false);\n`;
++    emitFast(ctx, i, reg, relOffset) {
++      return `  ramStoreDV.setUint32(ramStoreBase + ${relOffset}, ${gprS32Lo(ctx, reg)}, false);\n`;
+     },
+   }),
+   [OP_LW]: Object.freeze({
+@@ -83,13 +90,12 @@ const GROUP_SPECS = Object.freeze({
+     helper: 'execLW',
+     writesGpr: true,
+     usesCop1: false,
+-    emitFast(i, reg, relOffset) {
++    emitFast(ctx, i, reg, relOffset) {
+       if (reg === 0) {
+         return '';
+       }
+       return `  const v${i} = ramLoadDV.getInt32(ramLoadBase + ${relOffset}, false);\n` +
+-        `  c.gprS32[${reg * 2}] = v${i};\n` +
+-        `  c.gprS32[${reg * 2 + 1}] = v${i} >> 31;\n`;
++        setGpr(ctx, reg, `v${i}`, `v${i} >> 31`);
+     },
+   }),
+   // Use signed Int32 DataView methods and cpu1.regS32 for raw COP1 word copies:
+@@ -107,7 +113,7 @@ const GROUP_SPECS = Object.freeze({
+     helper: 'execLWC1Unchecked',
+     writesGpr: false,
+     usesCop1: true,
+-    emitFast(i, reg, relOffset) {
++    emitFast(ctx, i, reg, relOffset) {
+       return `  cpu1.regS32[${cop1WordIndex(reg)}] = ramLoadDV.getInt32(ramLoadBase + ${relOffset}, false);\n`;
+     },
+   }),
+@@ -122,7 +128,7 @@ const GROUP_SPECS = Object.freeze({
+     helper: 'execSWC1Unchecked',
+     writesGpr: false,
+     usesCop1: true,
+-    emitFast(i, reg, relOffset) {
++    emitFast(ctx, i, reg, relOffset) {
+       return `  ramStoreDV.setInt32(ramStoreBase + ${relOffset}, cpu1.regS32[${cop1WordIndex(reg)}], false);\n`;
+     },
+   }),
+@@ -137,7 +143,7 @@ const GROUP_SPECS = Object.freeze({
+     helper: 'execLDC1Unchecked',
+     writesGpr: false,
+     usesCop1: true,
+-    emitFast(i, reg, relOffset) {
++    emitFast(ctx, i, reg, relOffset) {
+       if ((reg & 1) === 0) {
+         return `  cpu1.regS32[${reg * 2 + 1}] = ramLoadDV.getInt32(ramLoadBase + ${relOffset}, false);\n` +
+           `  cpu1.regS32[${reg * 2}] = ramLoadDV.getInt32(ramLoadBase + ${relOffset + 4}, false);\n`;
+@@ -158,7 +164,7 @@ const GROUP_SPECS = Object.freeze({
+     helper: 'execSDC1Unchecked',
+     writesGpr: false,
+     usesCop1: true,
+-    emitFast(i, reg, relOffset) {
++    emitFast(ctx, i, reg, relOffset) {
+       if ((reg & 1) === 0) {
+         return `  ramStoreDV.setInt32(ramStoreBase + ${relOffset}, cpu1.regS32[${reg * 2 + 1}], false);\n` +
+           `  ramStoreDV.setInt32(ramStoreBase + ${relOffset + 4}, cpu1.regS32[${reg * 2}], false);\n`;
+@@ -296,13 +302,43 @@ export class RAMAccessGroup {
+       `}\n\n`;
+   }
+ 
++  // Reads back the registers the helpers loaded, after a slow path
++  genReloads(ctx) {
++    if (!this.spec.writesGpr) {
++      return '';
++    }
++    let code = '';
++    for (let i = 0; i < this.count; ++i) {
++      const rt = this.registers[i];
++      if (rt !== 0) {
++        code += `${ctx.regs.reload(rt * 2)}\n${ctx.regs.reload(rt * 2 + 1)}\n`;
++      }
++    }
++    return code;
++  }
++
++  // Reads back the float locals of the COP1 registers loaded, after either
++  // path (the fast one stores bits)
++  genCop1Reloads(ctx) {
++    const words = this.spec.name === 'LWC1' ? cop1Words32 : this.spec.name === 'LDC1' ? cop1Words64 : null;
++    if (!words) {
++      return '';
++    }
++    let code = '';
++    for (let i = 0; i < this.count; ++i) {
++      code += ctx.regs.reloadF32Words(words(this.registers[i]).words);
++    }
++    return code;
++  }
++
+   finish(ctx) {
+     if (this.count === 0) {
+       return;
+     }
+     const spec = this.spec;
+     if (this.count === 1 && !spec.usesCop1 && !spec.lone) {
+-      ctx.fragment.bodyCode += this.emitAccessBlock(ctx, 0, true);
++      const code = this.emitAccessBlock(ctx, 0, true) + this.genReloads(ctx) + this.genCop1Reloads(ctx);
++      ctx.fragment.bodyCode += ctx.regs.takePending() + code;
+       this.reset();
+       return;
+     }
+@@ -313,19 +349,23 @@ export class RAMAccessGroup {
+       // for a single exit). Lone word accesses keep their helpers, which the
+       // JIT inlines well, and which also serve MMIO polling.
+       const offset = this.offsets[0];
+-      ctx.fragment.bodyCode += `// ${disassembleInstruction(this.pcs[0], this.instructions[0], false).disassembly}
++      const code = `// ${disassembleInstruction(this.pcs[0], this.instructions[0], false).disassembly}
+ {
+-  const ${spec.baseVar} = (${gprS32Lo(this.base)} + ${offset}) ^ -0x80000000;
++  const ${spec.baseVar} = (${gprS32Lo(ctx, this.base)} + ${offset}) ^ -0x80000000;
+   if ((${spec.baseVar} & ${spec.guardMask}) === 0 && ${spec.baseVar} + ${spec.width} <= c.ramEnd) {
+     const ${spec.dvVar} = c.ramDV;
+-${spec.emitFast(0, this.registers[0], 0)}    c.pc = ${toString32(this.pcs[0] + 4)};
+-  } else ${this.emitAccessBlock(ctx, 0)}}
+-`;
++${spec.emitFast(ctx, 0, this.registers[0], 0)}    c.pc = ${toString32(this.pcs[0] + 4)};
++  } else {
++${this.emitAccessBlock(ctx, 0)}${this.genReloads(ctx)}}
++}
++${this.genCop1Reloads(ctx)}`;
++      ctx.fragment.bodyCode += ctx.regs.takePending() + code;
+       this.reset();
+       return;
+     }
+     const minOffset = this.minOffset;
+     const span = this.maxOffset - minOffset + spec.width;
++    const base = gprS32Lo(ctx, this.base);
+     let fast = '';
+     let slow = '';
+     for (let i = 0; i < this.count; ++i) {
+@@ -337,7 +377,7 @@ ${spec.emitFast(0, this.registers[0], 0)}    c.pc = ${toString32(this.pcs[0] + 4
+         ? ctx.genStepPreamble(pc, opsBefore)
+         : '';
+       const comment = `// ${disassembleInstruction(pc, this.instructions[i], false).disassembly}\n`;
+-      fast += `${stepPreamble}${comment}${spec.emitFast(i, rt, offset - minOffset)}`;
++      fast += `${stepPreamble}${comment}${spec.emitFast(ctx, i, rt, offset - minOffset)}`;
+       slow += `${stepPreamble}${this.emitAccessBlock(ctx, i)}`;
+     }
+     fast += `  c.pc = ${toString32(this.lastPC + 4)};\n`;
+@@ -348,18 +388,20 @@ ${spec.emitFast(0, this.registers[0], 0)}    c.pc = ${toString32(this.pcs[0] + 4
+     // positive 0x80000000 Double literal. Any kuseg/TLB address (< 0x80000000)
+     // becomes negative (bit 31 set), so `(${spec.baseVar} & ${spec.guardMask}) === 0`
+     // checks both `${spec.baseVar} >= 0` and natural alignment in one mask.
+-    ctx.fragment.bodyCode += `// Guarded RAM ${spec.name} group (${this.count} ${spec.noun})
++    const reloads = this.genReloads(ctx);
++    const cop1Reloads = this.genCop1Reloads(ctx);
++    ctx.fragment.bodyCode += ctx.regs.takePending() + `// Guarded RAM ${spec.name} group (${this.count} ${spec.noun})
+ {
+-  const ${spec.baseVar} = (${gprS32Lo(this.base)} + ${minOffset}) ^ -0x80000000;
++  const ${spec.baseVar} = (${base} + ${minOffset}) ^ -0x80000000;
+   const ${spec.dvVar} = c.ramDV;
+   if ((${spec.baseVar} & ${spec.guardMask}) === 0 && ${spec.baseVar} + ${span} <= Math.min(${spec.dvVar}.byteLength, 0x800000)) {
+ ${fast}  } else {
+     const slowExit = ((${slowParams}) => {
+ ${slow}    })(${slowParams});
+     if (slowExit !== undefined) { return slowExit; }
+-  }
++${reloads}  }
+ }
+-`;
++${cop1Reloads}`;
+     this.reset();
+   }
+ }
+diff --git a/src/cpu/ram_access_group.test.js b/src/cpu/ram_access_group.test.js
+index 445e40e..61f28f7 100644
+--- a/src/cpu/ram_access_group.test.js
++++ b/src/cpu/ram_access_group.test.js
+@@ -132,8 +132,8 @@ test('guarded LW preserves $zero, handles base-clobbering loads, and records sig
+   // while any load after the base-clobbering load is flushed out of the group.
+   const { code, ctx } = await generate([0, lw(0, 4, 0), lw(4, 4, 2), lw(8, 4, 4), lw(12, 4, 3)]);
+   expect(code).toContain('Guarded RAM LW group (3 loads)');
+-  expect(code).not.toContain('c.gprS32[0] =');
+-  expect(code).not.toContain('c.gprS32[1] =');
++  expect(code).not.toContain('$gpr[0] =');
++  expect(code).not.toContain('$gpr[1] =');
+   expect(isSigned32(ctx.gprFacts.get(2))).toBe(true);
+   expect(isSigned32(ctx.gprFacts.get(3))).toBe(true);
+   expect(isSigned32(ctx.gprFacts.get(4))).toBe(true);
+@@ -348,8 +348,8 @@ test('scratch buffers survive flushes and new fragments without retaining old st
+   expect(group.count).toBe(0);
+   const { code } = await generate([0, sw(12, 5, 3), sw(8, 5, 0)], { ctx });
+   expect(code).toContain('Guarded RAM SW group (2 stores)');
+-  expect(code).toContain('(c.gprS32[10] + 8) ^ -0x80000000');
+-  expect(code).toContain('ramStoreDV.setUint32(ramStoreBase + 4, c.gprS32[6], false)');
++  expect(code).toContain('($g10 + 8) ^ -0x80000000');
++  expect(code).toContain('ramStoreDV.setUint32(ramStoreBase + 4, $g6, false)');
+   expect(code).toContain('ramStoreDV.setUint32(ramStoreBase + 0, 0, false)');
+   expect(code).toContain('ramStoreBase + 8 <=');
+   expect(code.match(/\/\/ SW\s+r0 -> \[a1\+0x0008\]/g)).toHaveLength(1);
+@@ -412,15 +412,23 @@ for (const [name, [op, width, read]] of Object.entries(narrow)) {
+     for (const count of [1, 3]) {
+       test(`${count === 1 ? 'a lone' : 'grouped'} ${name} in ${where} matches its helper`, async () => {
+         const words = [0];
+-        for (let i = 0; i < count; i++) words.push(iop(op, 4, 5 + i, i * width * 3 + (width === 1 ? 1 : 0)));
++        for (let i = 0; i < count; i++) {
++          words.push(iop(op, 4, 5 + i, i * width * 3 + (width === 1 ? 1 : 0)));
++        }
+         const offsets = words.slice(1).map(w => (w << 16) >> 16);
+         const { code } = await generate(words);
+-        if (count > 1) expect(code).toContain(`Guarded RAM ${name} group (${count} `);
++        if (count > 1) {
++          expect(code).toContain(`Guarded RAM ${name} group (${count} `);
++        }
+         const ramDV = new DataView(new ArrayBuffer(0x1000));
+-        for (let i = 0; i < 0x1000; i++) ramDV.setUint8(i, (i * 37 + 0x81) & 0xff);
++        for (let i = 0; i < 0x1000; i++) {
++          ramDV.setUint8(i, (i * 37 + 0x81) & 0xff);
++        }
+         const gprS32 = new Int32Array(64);
+         gprS32[4 * 2] = base | 0;
+-        for (let i = 0; i < count; i++) { gprS32[(5 + i) * 2] = 0x89abcdef + i * 0x1111; gprS32[(5 + i) * 2 + 1] = 0x77; }
++        for (let i = 0; i < count; i++) {
++          gprS32[(5 + i) * 2] = 0x89abcdef + i * 0x1111; gprS32[(5 + i) * 2 + 1] = 0x77;
++        }
+         const helpers = [];
+         const helper = (...args) => helpers.push(args);
+         const c = { pc, delayPC: null, stuffToDo: 0, ramDV, gprS32, ramEnd: ramDV.byteLength, [`exec${name}`]: helper };
+diff --git a/src/cpu/recompiler.js b/src/cpu/recompiler.js
+index ab1996f..293e218 100644
+--- a/src/cpu/recompiler.js
++++ b/src/cpu/recompiler.js
+@@ -3,6 +3,7 @@
+ import * as cpu0reg from './cpu0reg.js';
+ import { GPRFacts, constant64, isSigned32, isUnsigned32, isKnown32 } from './gpr_facts.js';
+ import { RAMAccessGroup } from './ram_access_group.js';
++import { RegisterLocals, cop1WritesOf } from './register_locals.js';
+ import { convertModeCeil, convertModeFloor, convertModeRound, convertModeTrunc } from './cpu1.js';
+ import { disassembleInstruction } from './disassemble.js';
+ import { toString32 } from '../format.js';
+@@ -65,12 +66,14 @@ export class FragmentContext {
+     this.isTrivial = false; // Seeded from opTraits.isTrivial on set().
+     this.fuseDelaySlot = false; // When set, generateTrivialOpBoilerplate emits only the raw ALU body.
+     this.delayedPCUpdate = 0; // Trivial ops can try to delay setting the pc so that back-to-back trivial ops can emit them entirely.
++    this.inlineFastPath = false; // Set by an op whose inline fast path is trivial (see genInlineCop1).
+     this.dump = false; // Display this op when finished.
+     this.gprFacts = new GPRFacts();
+     this.forwardedComparison = null;
+     this.pendingComparison = null;
+     this.opsCounterVar = null;
+     this.ramAccessGroup = new RAMAccessGroup();
++    this.regs = new RegisterLocals();
+   }
+ 
+   genAssert(test, msg) {
+@@ -135,6 +138,7 @@ export class FragmentContext {
+     this.forwardedComparison = null;
+     this.opsCounterVar = opsCounterVar;
+     this.ramAccessGroup.reset();
++    this.regs.reset();
+   }
+ 
+   set(fragment, pc, instruction, postPC, nextPC) {
+@@ -190,9 +194,10 @@ export function generateCodeForOp(ctx, { includeStepPreamble = false } = {}) {
+   }
+ 
+   // If the last op tried to delay updating the pc, see if it needs updating now.
++  let applyDelayedPC = '';
+   if (!ctx.isTrivial && ctx.delayedPCUpdate !== 0) {
+     // TODO: add a template string function to dedent this.
+-    ctx.fragment.bodyCode += `// Applying delayed pc\nc.pc = ${toString32(ctx.delayedPCUpdate)};\n`;
++    applyDelayedPC = `// Applying delayed pc\nc.pc = ${toString32(ctx.delayedPCUpdate)};\n`;
+     ctx.delayedPCUpdate = 0;
+   }
+ 
+@@ -213,7 +218,18 @@ export function generateCodeForOp(ctx, { includeStepPreamble = false } = {}) {
+     `);
+   }
+ 
+-  const fn_code = preflight + generateOp(ctx);
++  ctx.inlineFastPath = false;
++  const opCode = generateOp(ctx);
++  let fn_code;
++  if (ctx.inlineFastPath) {
++    // Its fast path needs neither the pc nor fragmentOps (its slow path sets
++    // them), so it can delay the pc update as trivial ops do
++    fn_code = opCode + ctx.regs.finishOp(ctx.instruction);
++    ctx.delayedPCUpdate = ctx.pc + 4;
++  } else {
++    ctx.fragment.bodyCode += applyDelayedPC;
++    fn_code = preflight + opCode + ctx.regs.finishOp(ctx.instruction);
++  }
+   ctx.gprFacts.update(ctx.instruction);
+   ctx.forwardedComparison = ctx.pendingComparison;
+ 
+@@ -230,7 +246,7 @@ export function generateCodeForOp(ctx, { includeStepPreamble = false } = {}) {
+   const dasm = disassembleInstruction(ctx.pc, ctx.instruction, false);
+   const lines = redentLines(fn_code, '  ');
+ 
+-  ctx.fragment.bodyCode += `// ${dasm.disassembly}\n{\n${lines}\n}\n\n`;
++  ctx.fragment.bodyCode += `${ctx.regs.takePending()}// ${dasm.disassembly}\n{\n${lines}\n}\n\n`;
+ }
+ 
+ export function finishCodeGeneration(ctx) {
+@@ -253,13 +269,13 @@ function genBranchCondition(ctx, condition, branchInstr) {
+     case 'bgtz':
+       return genIsPositive(ctx, rs(branchInstr));
+     case 'bltz':
+-      return `${genSrcRegS32Hi(rs(branchInstr))} < 0`;
++      return `${genSrcRegS32Hi(ctx, rs(branchInstr))} < 0`;
+     case 'bgez':
+-      return `${genSrcRegS32Hi(rs(branchInstr))} >= 0`;
++      return `${genSrcRegS32Hi(ctx, rs(branchInstr))} >= 0`;
+     case 'bc1f':
+-      return '(cpu1.control[31] & FPCSR_C) === 0';
++      return `(${ctx.regs.readFCSR()} & FPCSR_C) === 0`;
+     case 'bc1t':
+-      return '(cpu1.control[31] & FPCSR_C) !== 0';
++      return `(${ctx.regs.readFCSR()} & FPCSR_C) !== 0`;
+     default:
+       throw new Error(`Unexpected branch condition: ${condition}`);
+   }
+@@ -317,6 +333,16 @@ function tryEmitFusedBranchAndDelaySlot(fragment, branchStep, delayStep, stepInd
+     : '';
+ 
+   finishCodeGeneration(ctx);
++  // Generated in the order they run, as RegisterLocals needs: a register jump
++  // reads its target before linking
++  const jumpCode = kind === 'conditional' || kind === 'unconditional'
++    ? ''
++    : `const jumpTarget = ${genSrcRegU32Lo(ctx, regSource)};\n`;
++  const linkCode = linkReg !== 0
++    ? `${genSetRegS64LoHi(ctx, linkReg, toString32(fallthroughPC), (fallthroughPC & 0x80000000) ? -1 : 0)}\n`
++    : '';
++  // (fusable branches only write the link register, through)
++  assert(ctx.regs.finishOp(branchInstr) === '', 'Expected a fused branch to write registers through');
+ 
+   // Advance register facts and comparison forwarding past the branch (so JAL/JALR
+   // link writes are visible to the delay-slot instruction).
+@@ -328,7 +354,7 @@ function tryEmitFusedBranchAndDelaySlot(fragment, branchStep, delayStep, stepInd
+   ctx.set(fragment, delaySlotPC, delayInstr, postPC, delayStep.nextPC);
+   ctx.needsDelayCheck = false;
+   ctx.fuseDelaySlot = true;
+-  const delayOpCode = generateOp(ctx);
++  const delayOpCode = generateOp(ctx) + ctx.regs.finishOp(delayInstr);
+   ctx.fuseDelaySlot = false;
+   assert(ctx.isTrivial, 'Expected fused delay slot to be trivial');
+   ctx.gprFacts.update(delayInstr);
+@@ -336,10 +362,6 @@ function tryEmitFusedBranchAndDelaySlot(fragment, branchStep, delayStep, stepInd
+   fragment.needsDelayCheck = false;
+ 
+   fragment.bodyCode += ctx.genStepPreamble(branchPC, stepIndex);
+-
+-  const linkCode = linkReg !== 0
+-    ? `${genSetRegS64LoHi(linkReg, toString32(fallthroughPC), (fallthroughPC & 0x80000000) ? -1 : 0)}\n`
+-    : '';
+   const returnDelayStep = ctx.genReturnOps(stepIndex + 1);
+   const returnAfterPair = ctx.genReturnOps(stepIndex + 2);
+ 
+@@ -364,7 +386,7 @@ function tryEmitFusedBranchAndDelaySlot(fragment, branchStep, delayStep, stepInd
+       }
+     }
+   } else {
+-    fnCode += `const jumpTarget = ${genSrcRegU32Lo(regSource)};\n`;
++    fnCode += jumpCode;
+     fnCode += linkCode;
+     fnCode += `if (!rsp.halted) { rsp.step(); if (c.stuffToDo) { c.pc = ${delaySlotPC}; c.delayPC = jumpTarget; ${returnDelayStep} } }\n`;
+     fnCode += delayOpCode;
+@@ -382,7 +404,7 @@ function tryEmitFusedBranchAndDelaySlot(fragment, branchStep, delayStep, stepInd
+   const branchDasm = disassembleInstruction(branchPC, branchInstr, false);
+   const delayDasm = disassembleInstruction(delaySlotPC, delayInstr, false);
+   const lines = redentLines(fnCode, '  ');
+-  fragment.bodyCode += `// ${branchDasm.disassembly}\n// ${delayDasm.disassembly}\n{\n${lines}\n}\n\n`;
++  fragment.bodyCode += `${ctx.regs.takePending()}// ${branchDasm.disassembly}\n// ${delayDasm.disassembly}\n{\n${lines}\n}\n\n`;
+   return true;
+ }
+ 
+@@ -410,9 +432,13 @@ export function compileTraceSteps(fragment, ctx = new FragmentContext(), { selfL
+   }
+   ctx.flushDelayedPCUpdate();
+ 
+-  const bodyCode = selfLoop
+-    ? `let opsExecuted = 0;\ndo {\n${fragment.bodyCode}opsExecuted += ${totalOps};\n} while (c.canContinueSelfLoop(opsExecuted, ${totalOps}));\nreturn opsExecuted;\n`
+-    : `${fragment.bodyCode}${ctx.genReturnOps(totalOps)}\n`;
++  let bodyCode;
++  if (selfLoop) {
++    const { header, body } = ctx.regs.hoist(fragment.bodyCode);
++    bodyCode = `${header}let opsExecuted = 0;\ndo {\n${body}opsExecuted += ${totalOps};\n} while (c.canContinueSelfLoop(opsExecuted, ${totalOps}));\nreturn opsExecuted;\n`;
++  } else {
++    bodyCode = `${fragment.bodyCode}${ctx.genReturnOps(totalOps)}\n`;
++  }
+   ctx.opsCounterVar = null;
+   return bodyCode;
+ }
+@@ -664,66 +690,91 @@ function generateNOPBoilerplate(comment, ctx) {
+   return generateTrivialOpBoilerplate(`// ${comment}\n`, ctx);
+ }
+ 
+-function genSrcRegU32Lo(i) {
+-  if (i === 0) {
+-    return '0';
+-  }
+-  return `c.getRegU32Lo(${i})`;
++// GPR words are read from and written through the fragment's locals (see
++// RegisterLocals).
++function genSrcRegU32Lo(ctx, i) {
++  return i === 0 ? '0' : ctx.regs.readU32(i * 2);
+ }
+ 
+ // A signed 64-bit value's sign is entirely in its high word.
+-function genSrcRegS32Hi(i) {
+-  return i === 0 ? '0' : `c.gprS32[${i * 2 + 1}]`;
++function genSrcRegS32Hi(ctx, i) {
++  return i === 0 ? '0' : ctx.regs.readS32(i * 2 + 1);
+ }
+ 
+-function genGprS32Lo(i) {
+-  return i === 0 ? '0' : `c.gprS32[${i * 2}]`;
++function genGprS32Lo(ctx, i) {
++  return i === 0 ? '0' : ctx.regs.readS32(i * 2);
+ }
+ 
+-function genGprU32Lo(i) {
+-  return i === 0 ? '0' : `c.gprU32[${i * 2}]`;
++function genGprU32Lo(ctx, i) {
++  return i === 0 ? '0' : ctx.regs.readU32(i * 2);
+ }
+ 
+-function genGprU32Hi(i) {
+-  return i === 0 ? '0' : `c.gprU32[${i * 2 + 1}]`;
++function genGprU32Hi(ctx, i) {
++  return i === 0 ? '0' : ctx.regs.readU32(i * 2 + 1);
+ }
+ 
+-// Emit direct constant-indexed typed-array stores instead of calling
+-// setRegS64LoHi / setRegS32Extend: those helpers exceed V8's small-function
+-// inlining threshold and quickly exhaust the fragment's inlining budget.
+-function genSetRegS64LoHi(r, lo, hi) {
++// An expression's value as an int32, as an Int32Array would store it
++function genInt32(expr) {
++  if (typeof expr === 'number' || /^(-?\d+|0x[0-9a-f]+)$/i.test(expr)) {
++    return `${Number(expr) | 0}`;
++  }
++  if (/^\$g\d+$/.test(expr) || isWrappedInt32(expr)) {
++    return expr;
++  }
++  return `(${expr}) | 0`;
++}
++
++// Whether an expression is already `(...) | 0`
++function isWrappedInt32(expr) {
++  if (!expr.startsWith('(') || !expr.endsWith(') | 0')) {
++    return false;
++  }
++  let depth = 0;
++  for (let i = 0; i < expr.length - 4; i++) {
++    depth += expr[i] === '(' ? 1 : expr[i] === ')' ? -1 : 0;
++    if (depth === 0) {
++      return i === expr.length - 5;
++    }
++  }
++  return false;
++}
++
++// Emit direct constant-indexed stores instead of calling setRegS64LoHi /
++// setRegS32Extend: those helpers exceed V8's small-function inlining
++// threshold and quickly exhaust the fragment's inlining budget.
++function genSetRegS64LoHi(ctx, r, lo, hi) {
+   if (r === 0) {
+     return '';
+   }
+-  return `c.gprS32[${r * 2}] = ${lo};\nc.gprS32[${r * 2 + 1}] = ${hi};`;
++  return `${ctx.regs.write(r * 2, genInt32(lo))}\n${ctx.regs.write(r * 2 + 1, genInt32(hi))}`;
+ }
+ 
+-function genSetRegS32Extend(r, expr) {
++function genSetRegS32Extend(ctx, r, expr) {
+   if (r === 0) {
+     return '';
+   }
+-  return `const v = ${expr};\nc.gprS32[${r * 2}] = v;\nc.gprS32[${r * 2 + 1}] = v >> 31;`;
++  return `const v = ${genInt32(expr)};\n${ctx.regs.write(r * 2, 'v')}\n${ctx.regs.write(r * 2 + 1, 'v >> 31')}`;
+ }
+ 
+-function genSetRegS32Const(r, val) {
++function genSetRegS32Const(ctx, r, val) {
+   const v = val | 0;
+-  return genSetRegS64LoHi(r, v, v >> 31);
++  return genSetRegS64LoHi(ctx, r, v, v >> 31);
+ }
+ 
+ function genIsPositive(ctx, i) {
+   const fact = ctx.gprFacts.get(i);
+   if (isKnown32(fact)) {
+-    return `${genKnownNumber(i, fact)} > 0`;
++    return `${genKnownNumber(ctx, i, fact)} > 0`;
+   }
+-  const hi = genSrcRegS32Hi(i);
+-  return `${hi} >= 0 && (${hi} | c.gprS32[${i * 2}]) !== 0`;
++  const hi = genSrcRegS32Hi(ctx, i);
++  return `${hi} >= 0 && (${hi} | ${genGprS32Lo(ctx, i)}) !== 0`;
+ }
+ 
+-function genKnownNumber(reg, fact) {
++function genKnownNumber(ctx, reg, fact) {
+   if (fact.kind === 'constant64') {
+     return `${Number(fact.value)}`;
+   }
+-  return `c.getReg${isSigned32(fact) ? 'S' : 'U'}32Lo(${reg})`;
++  return isSigned32(fact) ? genGprS32Lo(ctx, reg) : genGprU32Lo(ctx, reg);
+ }
+ 
+ function genLessThan(ctx, s, t, unsigned, immediate = null) {
+@@ -733,19 +784,19 @@ function genLessThan(ctx, s, t, unsigned, immediate = null) {
+     // Unsigned ordering of two sign-extended words matches their unsigned low
+     // words. A mixed signed/zero-extended pair does NOT have this property.
+     if ((isSigned32(sf) && isSigned32(tf)) || (isUnsigned32(sf) && isUnsigned32(tf))) {
+-      const rhs = immediate === null ? genSrcRegU32Lo(t) : `${immediate >>> 0}`;
+-      return `${genSrcRegU32Lo(s)} < ${rhs}`;
++      const rhs = immediate === null ? genSrcRegU32Lo(ctx, t) : `${immediate >>> 0}`;
++      return `${genSrcRegU32Lo(ctx, s)} < ${rhs}`;
+     }
+   } else if (isKnown32(sf) && isKnown32(tf)) {
+-    return `${genKnownNumber(s, sf)} < ${genKnownNumber(t, tf)}`;
++    return `${genKnownNumber(ctx, s, sf)} < ${genKnownNumber(ctx, t, tf)}`;
+   }
+   // Unknown-width inputs still have an exact lexicographic word comparison.
+   // Only the high word is signed; equal high words compare unsigned low words.
+-  const high = reg => reg === 0 ? '0' : `c.gpr${unsigned ? 'U' : 'S'}32[${reg * 2 + 1}]`;
++  const high = reg => reg === 0 ? '0' : unsigned ? genGprU32Hi(ctx, reg) : genSrcRegS32Hi(ctx, reg);
+   const sh = high(s);
+   const th = immediate === null ? high(t) : `${unsigned ? (immediate >> 31) >>> 0 : immediate >> 31}`;
+-  const tl = immediate === null ? genSrcRegU32Lo(t) : `${immediate >>> 0}`;
+-  return `(${sh} === ${th} ? ${genSrcRegU32Lo(s)} < ${tl} : ${sh} < ${th})`;
++  const tl = immediate === null ? genSrcRegU32Lo(ctx, t) : `${immediate >>> 0}`;
++  return `(${sh} === ${th} ? ${genSrcRegU32Lo(ctx, s)} < ${tl} : ${sh} < ${th})`;
+ }
+ 
+ function generateComparison(ctx, d, s, t, unsigned, immediate = null) {
+@@ -756,7 +807,7 @@ function generateComparison(ctx, d, s, t, unsigned, immediate = null) {
+   // var spans the per-instruction blocks, but is local to this invocation.
+   // Materialize the architectural result before any intervening RSP step/exit.
+   const impl = `var ${name} = ${genLessThan(ctx, s, t, unsigned, immediate)};\n` +
+-    `c.setRegU32Extend(${d}, ${name} ? 1 : 0);`;
++    genSetRegS64LoHi(ctx, d, `${name} ? 1 : 0`, 0);
+   return generateTrivialOpBoilerplate(impl, ctx);
+ }
+ 
+@@ -770,11 +821,11 @@ function genEquality(ctx, s, t, equal) {
+   const sf = ctx.gprFacts.get(s);
+   const tf = ctx.gprFacts.get(t);
+   if (isKnown32(sf) && isKnown32(tf)) {
+-    return `${genKnownNumber(s, sf)} ${op} ${genKnownNumber(t, tf)}`;
++    return `${genKnownNumber(ctx, s, sf)} ${op} ${genKnownNumber(ctx, t, tf)}`;
+   }
+   // Use constant word indices in compiled code, avoiding BigInt reads and a
+   // helper call on branches whose register widths are not known statically.
+-  const word = (reg, hi) => reg === 0 ? '0' : `c.gprU32[${reg * 2 + hi}]`;
++  const word = (reg, hi) => reg === 0 ? '0' : ctx.regs.readS32(reg * 2 + hi);
+   return `(${word(s, 0)} ${op} ${word(t, 0)} ${equal ? '&&' : '||'} ${word(s, 1)} ${op} ${word(t, 1)})`;
+ }
+ 
+@@ -796,11 +847,11 @@ function generateSLL(ctx) {
+   if (d === 0) {
+     impl = '';
+   } else if (tf.kind === 'constant64') {
+-    impl = genSetRegS32Const(d, Number(BigInt.asIntN(32, tf.value)) << shift);
++    impl = genSetRegS32Const(ctx, d, Number(BigInt.asIntN(32, tf.value)) << shift);
+   } else if (shift === 0) {
+-    impl = d === t && isSigned32(tf) ? '' : genSetRegS32Extend(d, genGprS32Lo(t));
++    impl = d === t && isSigned32(tf) ? '' : genSetRegS32Extend(ctx, d, genGprS32Lo(ctx, t));
+   } else {
+-    impl = genSetRegS32Extend(d, `${genGprS32Lo(t)} << ${shift}`);
++    impl = genSetRegS32Extend(ctx, d, `${genGprS32Lo(ctx, t)} << ${shift}`);
+   }
+   return generateTrivialOpBoilerplate(impl, ctx);
+ }
+@@ -814,12 +865,12 @@ function generateSRL(ctx) {
+   if (d === 0) {
+     impl = '';
+   } else if (tf.kind === 'constant64') {
+-    impl = genSetRegS32Const(d, Number(BigInt.asUintN(32, tf.value)) >>> shift);
++    impl = genSetRegS32Const(ctx, d, Number(BigInt.asUintN(32, tf.value)) >>> shift);
+   } else if (shift === 0) {
+-    impl = d === t && isSigned32(tf) ? '' : genSetRegS32Extend(d, genGprS32Lo(t));
++    impl = d === t && isSigned32(tf) ? '' : genSetRegS32Extend(ctx, d, genGprS32Lo(ctx, t));
+   } else {
+     // Non-zero logical right shift clears bit 31, so the high word is 0.
+-    impl = genSetRegS64LoHi(d, `${genGprU32Lo(t)} >>> ${shift}`, 0);
++    impl = genSetRegS64LoHi(ctx, d, `${genGprU32Lo(ctx, t)} >>> ${shift}`, 0);
+   }
+   return generateTrivialOpBoilerplate(impl, ctx);
+ }
+@@ -833,16 +884,16 @@ function generateSRA(ctx) {
+   if (d === 0) {
+     impl = '';
+   } else if (tf.kind === 'constant64') {
+-    impl = genSetRegS32Const(d, Number(BigInt.asIntN(32, tf.value >> BigInt(shift))));
++    impl = genSetRegS32Const(ctx, d, Number(BigInt.asIntN(32, tf.value >> BigInt(shift))));
+   } else if (shift === 0) {
+-    impl = d === t && isSigned32(tf) ? '' : genSetRegS32Extend(d, genGprS32Lo(t));
++    impl = d === t && isSigned32(tf) ? '' : genSetRegS32Extend(ctx, d, genGprS32Lo(ctx, t));
+   } else if (isSigned32(tf)) {
+-    impl = genSetRegS32Extend(d, `${genGprS32Lo(t)} >> ${shift}`);
++    impl = genSetRegS32Extend(ctx, d, `${genGprS32Lo(ctx, t)} >> ${shift}`);
+   } else if (isUnsigned32(tf)) {
+-    impl = genSetRegS64LoHi(d, `${genGprU32Lo(t)} >>> ${shift}`, 0);
++    impl = genSetRegS64LoHi(ctx, d, `${genGprU32Lo(ctx, t)} >>> ${shift}`, 0);
+   } else {
+     // VR4300 SRA shifts the full 64-bit register before sign-extending bit 31.
+-    impl = genSetRegS32Extend(d, `(${genGprU32Lo(t)} >>> ${shift}) | (${genGprU32Hi(t)} << ${32 - shift})`);
++    impl = genSetRegS32Extend(ctx, d, `(${genGprU32Lo(ctx, t)} >>> ${shift}) | (${genGprU32Hi(ctx, t)} << ${32 - shift})`);
+   }
+   return generateTrivialOpBoilerplate(impl, ctx);
+ }
+@@ -856,11 +907,11 @@ function generateSLLV(ctx) {
+   if (d === 0) {
+     impl = '';
+   } else if (s === 0) {
+-    impl = d === t && isSigned32(tf) ? '' : genSetRegS32Extend(d, genGprS32Lo(t));
++    impl = d === t && isSigned32(tf) ? '' : genSetRegS32Extend(ctx, d, genGprS32Lo(ctx, t));
+   } else if (t === 0) {
+-    impl = genSetRegS32Const(d, 0);
++    impl = genSetRegS32Const(ctx, d, 0);
+   } else {
+-    impl = genSetRegS32Extend(d, `${genGprS32Lo(t)} << ${genGprS32Lo(s)}`);
++    impl = genSetRegS32Extend(ctx, d, `${genGprS32Lo(ctx, t)} << ${genGprS32Lo(ctx, s)}`);
+   }
+   return generateTrivialOpBoilerplate(impl, ctx);
+ }
+@@ -874,11 +925,11 @@ function generateSRLV(ctx) {
+   if (d === 0) {
+     impl = '';
+   } else if (s === 0) {
+-    impl = d === t && isSigned32(tf) ? '' : genSetRegS32Extend(d, genGprS32Lo(t));
++    impl = d === t && isSigned32(tf) ? '' : genSetRegS32Extend(ctx, d, genGprS32Lo(ctx, t));
+   } else if (t === 0) {
+-    impl = genSetRegS32Const(d, 0);
++    impl = genSetRegS32Const(ctx, d, 0);
+   } else {
+-    impl = genSetRegS32Extend(d, `(${genGprU32Lo(t)} >>> ${genGprS32Lo(s)}) | 0`);
++    impl = genSetRegS32Extend(ctx, d, `(${genGprU32Lo(ctx, t)} >>> ${genGprS32Lo(ctx, s)}) | 0`);
+   }
+   return generateTrivialOpBoilerplate(impl, ctx);
+ }
+@@ -892,13 +943,13 @@ function generateSRAV(ctx) {
+   if (d === 0) {
+     impl = '';
+   } else if (s === 0) {
+-    impl = d === t && isSigned32(tf) ? '' : genSetRegS32Extend(d, genGprS32Lo(t));
++    impl = d === t && isSigned32(tf) ? '' : genSetRegS32Extend(ctx, d, genGprS32Lo(ctx, t));
+   } else if (t === 0) {
+-    impl = genSetRegS32Const(d, 0);
++    impl = genSetRegS32Const(ctx, d, 0);
+   } else if (isSigned32(tf)) {
+-    impl = genSetRegS32Extend(d, `${genGprS32Lo(t)} >> ${genGprS32Lo(s)}`);
++    impl = genSetRegS32Extend(ctx, d, `${genGprS32Lo(ctx, t)} >> ${genGprS32Lo(ctx, s)}`);
+   } else if (isUnsigned32(tf)) {
+-    impl = genSetRegS32Extend(d, `(${genGprU32Lo(t)} >>> ${genGprS32Lo(s)}) | 0`);
++    impl = genSetRegS32Extend(ctx, d, `(${genGprU32Lo(ctx, t)} >>> ${genGprS32Lo(ctx, s)}) | 0`);
+   } else {
+     impl = `c.execSRAV(${d}, ${t}, ${s});`;
+   }
+@@ -1082,13 +1133,13 @@ function generateADDU(ctx) {
+   if (d === 0) {
+     impl = '';
+   } else if (sf.kind === 'constant64' && tf.kind === 'constant64') {
+-    impl = genSetRegS32Const(d, Number(BigInt.asIntN(32, sf.value + tf.value)));
++    impl = genSetRegS32Const(ctx, d, Number(BigInt.asIntN(32, sf.value + tf.value)));
+   } else if (s === 0 || t === 0) {
+     const src = s === 0 ? t : s;
+     const srcFact = s === 0 ? tf : sf;
+-    impl = d === src && isSigned32(srcFact) ? '' : genSetRegS32Extend(d, genGprS32Lo(src));
++    impl = d === src && isSigned32(srcFact) ? '' : genSetRegS32Extend(ctx, d, genGprS32Lo(ctx, src));
+   } else {
+-    impl = genSetRegS32Extend(d, `(${genGprS32Lo(s)} + ${genGprS32Lo(t)}) | 0`);
++    impl = genSetRegS32Extend(ctx, d, `(${genGprS32Lo(ctx, s)} + ${genGprS32Lo(ctx, t)}) | 0`);
+   }
+   return generateTrivialOpBoilerplate(impl, ctx);
+ }
+@@ -1120,15 +1171,15 @@ function generateSUBU(ctx) {
+   if (d === 0) {
+     impl = '';
+   } else if (s === t) {
+-    impl = genSetRegS32Const(d, 0);
++    impl = genSetRegS32Const(ctx, d, 0);
+   } else if (sf.kind === 'constant64' && tf.kind === 'constant64') {
+-    impl = genSetRegS32Const(d, Number(BigInt.asIntN(32, sf.value - tf.value)));
++    impl = genSetRegS32Const(ctx, d, Number(BigInt.asIntN(32, sf.value - tf.value)));
+   } else if (t === 0) {
+-    impl = d === s && isSigned32(sf) ? '' : genSetRegS32Extend(d, genGprS32Lo(s));
++    impl = d === s && isSigned32(sf) ? '' : genSetRegS32Extend(ctx, d, genGprS32Lo(ctx, s));
+   } else if (s === 0) {
+-    impl = genSetRegS32Extend(d, `(-${genGprS32Lo(t)}) | 0`);
++    impl = genSetRegS32Extend(ctx, d, `(-${genGprS32Lo(ctx, t)}) | 0`);
+   } else {
+-    impl = genSetRegS32Extend(d, `(${genGprS32Lo(s)} - ${genGprS32Lo(t)}) | 0`);
++    impl = genSetRegS32Extend(ctx, d, `(${genGprS32Lo(ctx, s)} - ${genGprS32Lo(ctx, t)}) | 0`);
+   }
+   return generateTrivialOpBoilerplate(impl, ctx);
+ }
+@@ -1148,12 +1199,12 @@ function generateAND(ctx) {
+   if (d === 0) {
+     impl = '';
+   } else if (s === 0 || t === 0) {
+-    impl = genSetRegS32Const(d, 0);
++    impl = genSetRegS32Const(ctx, d, 0);
+   } else if (s === t) {
+-    impl = d === s ? '' : genSetRegS64LoHi(d, genGprS32Lo(s), genSrcRegS32Hi(s));
++    impl = d === s ? '' : genSetRegS64LoHi(ctx, d, genGprS32Lo(ctx, s), genSrcRegS32Hi(ctx, s));
+   } else {
+-    const hi = isUnsigned32(sf) || isUnsigned32(tf) ? 0 : `${genSrcRegS32Hi(s)} & ${genSrcRegS32Hi(t)}`;
+-    impl = genSetRegS64LoHi(d, `${genGprS32Lo(s)} & ${genGprS32Lo(t)}`, hi);
++    const hi = isUnsigned32(sf) || isUnsigned32(tf) ? 0 : `${genSrcRegS32Hi(ctx, s)} & ${genSrcRegS32Hi(ctx, t)}`;
++    impl = genSetRegS64LoHi(ctx, d, `${genGprS32Lo(ctx, s)} & ${genGprS32Lo(ctx, t)}`, hi);
+   }
+   return generateTrivialOpBoilerplate(impl, ctx);
+ }
+@@ -1172,15 +1223,15 @@ function generateOR(ctx) {
+     if (source === d) {
+       impl = '';
+     } else if (source === 0) {
+-      impl = genSetRegS32Const(d, 0);
++      impl = genSetRegS32Const(ctx, d, 0);
+     } else {
+-      impl = genSetRegS64LoHi(d, genGprS32Lo(source), genSrcRegS32Hi(source));
++      impl = genSetRegS64LoHi(ctx, d, genGprS32Lo(ctx, source), genSrcRegS32Hi(ctx, source));
+     }
+   } else if (s === t) {
+-    impl = d === s ? '' : genSetRegS64LoHi(d, genGprS32Lo(s), genSrcRegS32Hi(s));
++    impl = d === s ? '' : genSetRegS64LoHi(ctx, d, genGprS32Lo(ctx, s), genSrcRegS32Hi(ctx, s));
+   } else {
+-    const hi = isUnsigned32(sf) && isUnsigned32(tf) ? 0 : `${genSrcRegS32Hi(s)} | ${genSrcRegS32Hi(t)}`;
+-    impl = genSetRegS64LoHi(d, `${genGprS32Lo(s)} | ${genGprS32Lo(t)}`, hi);
++    const hi = isUnsigned32(sf) && isUnsigned32(tf) ? 0 : `${genSrcRegS32Hi(ctx, s)} | ${genSrcRegS32Hi(ctx, t)}`;
++    impl = genSetRegS64LoHi(ctx, d, `${genGprS32Lo(ctx, s)} | ${genGprS32Lo(ctx, t)}`, hi);
+   }
+   return generateTrivialOpBoilerplate(impl, ctx);
+ }
+@@ -1195,13 +1246,13 @@ function generateXOR(ctx) {
+   if (d === 0) {
+     impl = '';
+   } else if (s === t) {
+-    impl = genSetRegS32Const(d, 0);
++    impl = genSetRegS32Const(ctx, d, 0);
+   } else if (s === 0 || t === 0) {
+     const source = s === 0 ? t : s;
+-    impl = source === d ? '' : genSetRegS64LoHi(d, genGprS32Lo(source), genSrcRegS32Hi(source));
++    impl = source === d ? '' : genSetRegS64LoHi(ctx, d, genGprS32Lo(ctx, source), genSrcRegS32Hi(ctx, source));
+   } else {
+-    const hi = isUnsigned32(sf) && isUnsigned32(tf) ? 0 : `${genSrcRegS32Hi(s)} ^ ${genSrcRegS32Hi(t)}`;
+-    impl = genSetRegS64LoHi(d, `${genGprS32Lo(s)} ^ ${genGprS32Lo(t)}`, hi);
++    const hi = isUnsigned32(sf) && isUnsigned32(tf) ? 0 : `${genSrcRegS32Hi(ctx, s)} ^ ${genSrcRegS32Hi(ctx, t)}`;
++    impl = genSetRegS64LoHi(ctx, d, `${genGprS32Lo(ctx, s)} ^ ${genGprS32Lo(ctx, t)}`, hi);
+   }
+   return generateTrivialOpBoilerplate(impl, ctx);
+ }
+@@ -1216,14 +1267,14 @@ function generateNOR(ctx) {
+   if (d === 0) {
+     impl = '';
+   } else if (s === 0 && t === 0) {
+-    impl = genSetRegS32Const(d, -1);
++    impl = genSetRegS32Const(ctx, d, -1);
+   } else if (s === 0 || t === 0 || s === t) {
+     const src = s === 0 ? t : s;
+-    const hi = isUnsigned32(ctx.gprFacts.get(src)) ? -1 : `~${genSrcRegS32Hi(src)}`;
+-    impl = genSetRegS64LoHi(d, `~${genGprS32Lo(src)}`, hi);
++    const hi = isUnsigned32(ctx.gprFacts.get(src)) ? -1 : `~${genSrcRegS32Hi(ctx, src)}`;
++    impl = genSetRegS64LoHi(ctx, d, `~${genGprS32Lo(ctx, src)}`, hi);
+   } else {
+-    const hi = isUnsigned32(sf) && isUnsigned32(tf) ? -1 : `~(${genSrcRegS32Hi(s)} | ${genSrcRegS32Hi(t)})`;
+-    impl = genSetRegS64LoHi(d, `~(${genGprS32Lo(s)} | ${genGprS32Lo(t)})`, hi);
++    const hi = isUnsigned32(sf) && isUnsigned32(tf) ? -1 : `~(${genSrcRegS32Hi(ctx, s)} | ${genSrcRegS32Hi(ctx, t)})`;
++    impl = genSetRegS64LoHi(ctx, d, `~(${genGprS32Lo(ctx, s)} | ${genGprS32Lo(ctx, t)})`, hi);
+   }
+   return generateTrivialOpBoilerplate(impl, ctx);
+ }
+@@ -1255,11 +1306,11 @@ function generateADDIU(ctx) {
+   if (t === 0) {
+     impl = '';
+   } else if (sf.kind === 'constant64') {
+-    impl = genSetRegS32Const(t, Number(BigInt.asIntN(32, sf.value)) + imms);
++    impl = genSetRegS32Const(ctx, t, Number(BigInt.asIntN(32, sf.value)) + imms);
+   } else if (imms === 0) {
+-    impl = t === s && isSigned32(sf) ? '' : genSetRegS32Extend(t, genGprS32Lo(s));
++    impl = t === s && isSigned32(sf) ? '' : genSetRegS32Extend(ctx, t, genGprS32Lo(ctx, s));
+   } else {
+-    impl = genSetRegS32Extend(t, `(${genGprS32Lo(s)} + ${imms}) | 0`);
++    impl = genSetRegS32Extend(ctx, t, `(${genGprS32Lo(ctx, s)} + ${imms}) | 0`);
+   }
+   return generateTrivialOpBoilerplate(impl, ctx);
+ }
+@@ -1388,7 +1439,7 @@ function generateJAL(ctx) {
+   const ra = ctx.nextPC + 4;
+   // Optimise as sign is known at compile time.
+   const ra_hi = (ra & 0x80000000) ? -1 : 0;
+-  const impl = `c.delayPC = ${toString32(addr)};\n${genSetRegS64LoHi(cpu0reg.RA, toString32(ra), ra_hi)}`;
++  const impl = `c.delayPC = ${toString32(addr)};\n${genSetRegS64LoHi(ctx, cpu0reg.RA, toString32(ra), ra_hi)}`;
+   return generateBranchOpBoilerplate(impl, ctx, false);
+ }
+ 
+@@ -1400,15 +1451,15 @@ function generateJALR(ctx) {
+   const ra = ctx.nextPC + 4;
+   const ra_hi = (ra & 0x80000000) ? -1 : 0;
+   // NB needs to be unsigned
+-  const setLink = genSetRegS64LoHi(d, toString32(ra), ra_hi);
+-  const impl = `c.delayPC = ${genSrcRegU32Lo(s)};${setLink ? `\n${setLink}` : ''}`;
++  const setLink = genSetRegS64LoHi(ctx, d, toString32(ra), ra_hi);
++  const impl = `c.delayPC = ${genSrcRegU32Lo(ctx, s)};${setLink ? `\n${setLink}` : ''}`;
+   return generateBranchOpBoilerplate(impl, ctx, false);
+ }
+ 
+ function generateJR(ctx) {
+   // TODO: can this call execJR? It would need reworking to use branchTarget.
+   // NB needs to be unsigned
+-  const impl = `c.delayPC = ${genSrcRegU32Lo(ctx.instr_rs())};`;
++  const impl = `c.delayPC = ${genSrcRegU32Lo(ctx, ctx.instr_rs())};`;
+   return generateBranchOpBoilerplate(impl, ctx, false);
+ }
+ 
+@@ -1555,7 +1606,7 @@ function generateBLTZ(ctx) {
+   const addr = branchAddress(ctx.pc, ctx.instruction);
+ 
+   const impl = dedent(`
+-      if (${genSrcRegS32Hi(s)} < 0) {
++      if (${genSrcRegS32Hi(ctx, s)} < 0) {
+         c.delayPC = ${toString32(addr)};
+       } else {
+         c.delayPC = ${toString32(ctx.pc + 8)};
+@@ -1569,7 +1620,7 @@ function generateBLTZL(ctx) {
+   const addr = branchAddress(ctx.pc, ctx.instruction);
+ 
+   const impl = dedent(`
+-      if (${genSrcRegS32Hi(s)} < 0) {
++      if (${genSrcRegS32Hi(ctx, s)} < 0) {
+         c.delayPC = ${toString32(addr)};
+       } else {
+         c.nextPC += 4;
+@@ -1584,7 +1635,7 @@ function generateBGEZ(ctx) {
+   const addr = branchAddress(ctx.pc, ctx.instruction);
+ 
+   const impl = dedent(`
+-      if (${genSrcRegS32Hi(s)} >= 0) {
++      if (${genSrcRegS32Hi(ctx, s)} >= 0) {
+         c.delayPC = ${toString32(addr)};
+       } else {
+         c.delayPC = ${toString32(ctx.pc + 8)};
+@@ -1598,7 +1649,7 @@ function generateBGEZL(ctx) {
+   const addr = branchAddress(ctx.pc, ctx.instruction);
+ 
+   const impl = dedent(`
+-      if (${genSrcRegS32Hi(s)} >= 0) {
++      if (${genSrcRegS32Hi(ctx, s)} >= 0) {
+         c.delayPC = ${toString32(addr)};
+       } else {
+         c.nextPC += 4;
+@@ -1678,9 +1729,9 @@ function generateANDI(ctx) {
+   if (t === 0) {
+     impl = '';
+   } else if (sf.kind === 'constant64') {
+-    impl = genSetRegS64LoHi(t, Number(BigInt.asIntN(32, sf.value)) & imm, 0);
++    impl = genSetRegS64LoHi(ctx, t, Number(BigInt.asIntN(32, sf.value)) & imm, 0);
+   } else {
+-    impl = genSetRegS64LoHi(t, `${genGprS32Lo(s)} & ${imm}`, 0);
++    impl = genSetRegS64LoHi(ctx, t, `${genGprS32Lo(ctx, s)} & ${imm}`, 0);
+   }
+   return generateTrivialOpBoilerplate(impl, ctx);
+ }
+@@ -1703,20 +1754,20 @@ function generateLogicalImmediate(ctx, op) {
+     impl = '';
+   } else if (sf.kind === 'constant64') {
+     const val = op === '|' ? (sf.value | BigInt(imm)) : (sf.value ^ BigInt(imm));
+-    impl = genSetRegS64LoHi(t, Number(BigInt.asIntN(32, val)), Number(BigInt.asIntN(32, val >> 32n)));
++    impl = genSetRegS64LoHi(ctx, t, Number(BigInt.asIntN(32, val)), Number(BigInt.asIntN(32, val >> 32n)));
+   } else if (imm === 0) {
+-    impl = t === s ? '' : genSetRegS64LoHi(t, genGprS32Lo(s), genSrcRegS32Hi(s));
++    impl = t === s ? '' : genSetRegS64LoHi(ctx, t, genGprS32Lo(ctx, s), genSrcRegS32Hi(ctx, s));
+   } else if (t === s) {
+-    impl = `c.gprS32[${t * 2}] ${op}= ${imm};`;
++    impl = ctx.regs.write(t * 2, `${genGprS32Lo(ctx, t)} ${op} ${imm}`);
+   } else {
+-    const hi = isUnsigned32(sf) ? 0 : genSrcRegS32Hi(s);
+-    impl = genSetRegS64LoHi(t, `${genGprS32Lo(s)} ${op} ${imm}`, hi);
++    const hi = isUnsigned32(sf) ? 0 : genSrcRegS32Hi(ctx, s);
++    impl = genSetRegS64LoHi(ctx, t, `${genGprS32Lo(ctx, s)} ${op} ${imm}`, hi);
+   }
+   return generateTrivialOpBoilerplate(impl, ctx);
+ }
+ 
+ function generateLUI(ctx) {
+-  const impl = genSetRegS32Const(ctx.instr_rt(), ctx.instr_imm() << 16);
++  const impl = genSetRegS32Const(ctx, ctx.instr_rt(), ctx.instr_imm() << 16);
+   return generateTrivialOpBoilerplate(impl, ctx);
+ }
+ 
+@@ -1987,7 +2038,7 @@ function generateBCInstrStub(ctx) {
+   const delayTarget = known ? 'c.delayPC' : 'c.branchTarget';
+   const test = condition ? '!==' : '===';
+ 
+-  let opImpl = `const cond = (cpu1.control[31] & FPCSR_C) ${test} 0;\n`;
++  let opImpl = `const cond = (${ctx.regs.readFCSR()} & FPCSR_C) ${test} 0;\n`;
+   if (likely) {
+     opImpl += `if (cond) {\n`;
+     opImpl += `  ${delayTarget} = ${toString32(target)};\n`;
+@@ -2014,11 +2065,20 @@ function generateBCInstrStub(ctx) {
+ // raise Inexact, which is then just recorded in FCSR's cause and flag bits,
+ // as cpu1.f32BinaryOp does. Anything else (NaN, infinity, denormal,
+ // underflow, overflow, other rounding, enabled exceptions) runs the helper.
++// The fast paths keep registers and FCSR in the fragment's locals (see
++// RegisterLocals).
+ const kInlineF32Ops = { [cop1ADD]: '+', [cop1SUB]: '-', [cop1MUL]: '*', [cop1DIV]: '/' };
+ 
+-// Bits of a single that's normal or zero
+-function genF32NormalOrZero(bits) {
+-  return `((((${bits} >>> 23) & 0xff) - 1) >>> 0 < 254 || (${bits} & 0x7fffffff) === 0)`;
++// Whether a single's value (|v|, by value) is normal: from the smallest
++// normal up to the largest finite, which leaves out denormals, infinities
++// and NaNs
++const genNormal = v => `(${v} >= 1.1754943508222875e-38 && ${v} < Infinity)`;
++const genNormalOrZero = v => `(${v} === 0 || ${genNormal(`Math.abs(${v})`)})`;
++
++// A single's value in an fs field: its word only depends on the FR mode for
++// odd registers
++function genF32SourceS(ctx, s) {
++  return (s & 1) === 0 ? ctx.regs.readF32(s * 2) : `cpu1.regF32[cpu1.regIdx32_s[${s}]]`;
+ }
+ 
+ // Whether a COP1 op can have an inline fast path here: COP1 known usable,
+@@ -2028,28 +2088,34 @@ function canInlineCop1(ctx) {
+     ctx.fragment.cop1statusKnown && !ctx.needsDelayCheck && ctx.postPC === ctx.pc + 4;
+ }
+ 
+-// An op's inline fast path (code that sets fast = true when it applies),
+-// with its helper (slowImpl) run as usual when it doesn't
++// An op's inline fast path (code that sets fast = true when it applies, and
++// writes through the locals of what it changes), with its helper (slowImpl)
++// run as usual when it doesn't, after which the locals of what the helper
++// can change are reloaded. The fast path is trivial: only the slow path sets
++// the pc (for exceptions) and fragmentOps, and the op delays its pc update
++// (see generateCodeForOp).
+ function genInlineCop1(fastCode, slowImpl, ctx) {
+-  const slow = generateCop1FaultingOp(slowImpl, ctx);
++  const slow = `c.pc = ${toString32(ctx.pc)};\n${ctx.genSetFragmentOps()}\n${generateCop1FaultingOp(slowImpl, ctx)}`;
++  const { words } = cop1WritesOf(ctx.instruction);
++  const reloads = `${ctx.regs.reloadF32Words(words)}${ctx.regs.reloadFCSR()}\n`;
++  ctx.regs.markWritten(...words.map(word => `$f${word}`), '$fcsr');
++  ctx.inlineFastPath = true;
+   return `let fast = false;
+-${fastCode}if (fast) {
+-  c.pc = ${toString32(ctx.pc + 4)};
+-} else {
+-${slow}}
++${fastCode}if (!fast) {
++${slow}${reloads}}
+ `;
+ }
+ 
+-// Stores a single's bits as cpu1.store32ZeroExtend does
+-function genStoreF32(d, bits) {
+-  return `const di = cpu1.regIdx32_d[${d}];
+-cpu1.regS32[di] = ${bits};
+-cpu1.regS32[di + 1] = 0;
++// Stores a single's value as cpu1.store32ZeroExtend does (fd is word 2 * d)
++function genStoreF32(ctx, d, value) {
++  return `${ctx.regs.writeF32Conditional(d * 2, value)}
++cpu1.regS32[${d * 2 + 1}] = 0;
+ `;
+ }
+ 
+ // FCSR after an op that raised at most Inexact (with exceptions disabled)
+-const genSetInexact = inexact => `cpu1.control[31] = (cpu1.control[31] & ~0x3f000) | (${inexact} ? 0x1004 : 0);\n`;
++const genSetInexact = (ctx, inexact) =>
++  `${ctx.regs.writeFCSRConditional(`(${ctx.regs.readFCSR()} & ~0x3f000) | (${inexact} ? 0x1004 : 0)`)}\n`;
+ 
+ function generateInlineF32BinaryOp(op, d, s, t, ctx) {
+   const operator = kInlineF32Ops[op];
+@@ -2057,24 +2123,17 @@ function generateInlineF32BinaryOp(op, d, s, t, ctx) {
+     return null;
+   }
+   const helper = { [cop1ADD]: 'ADD_S', [cop1SUB]: 'SUB_S', [cop1MUL]: 'MUL_S', [cop1DIV]: 'DIV_S' }[op];
+-  // (by value: normal is from the smallest normal up to the largest finite,
+-  // which leaves out denormals, infinities and NaNs)
+-  const normal = v => `(${v} >= 1.1754943508222875e-38 && ${v} < Infinity)`;
+-  const divisorOk = op === cop1DIV ? normal('Math.abs(tv)') : `(tv === 0 || ${normal('Math.abs(tv)')})`;
++  const divisorOk = op === cop1DIV ? genNormal('Math.abs(tv)') : genNormalOrZero('tv');
+   // ADD and SUB also count as inexact when a non-zero operand was lost
+   const lost = op === cop1ADD || op === cop1SUB
+     ? ` || (tv !== 0 && r === sv) || (sv !== 0 && r === tv)`
+     : '';
+-  return genInlineCop1(`const si = cpu1.regIdx32_s[${s}], ti = cpu1.regIdx32_t[${t}];
+-const sv = cpu1.regF32[si], tv = cpu1.regF32[ti];
+-if ((cpu1.control[31] & 0xf83) === 0 && (sv === 0 || ${normal('Math.abs(sv)')}) && ${divisorOk}) {
++  return genInlineCop1(`const sv = ${genF32SourceS(ctx, s)}, tv = ${ctx.regs.readF32(t * 2)};
++if ((${ctx.regs.readFCSR()} & 0xf83) === 0 && ${genNormalOrZero('sv')} && ${divisorOk}) {
+   const r = sv ${operator} tv;
+   const f = Math.fround(r);
+-  if (${normal('Math.abs(f)')} || r === 0) {
+-    ${genSetInexact(`r !== f${lost}`)}    const di = cpu1.regIdx32_d[${d}];
+-    cpu1.regF32[di] = f;
+-    cpu1.regS32[di + 1] = 0;
+-    fast = true;
++  if (${genNormal('Math.abs(f)')} || r === 0) {
++    ${genSetInexact(ctx, `r !== f${lost}`)}    ${genStoreF32(ctx, d, 'f')}    fast = true;
+   }
+ }
+ `, `cpu1.${helper}(${d}, ${s}, ${t});`, ctx);
+@@ -2086,11 +2145,11 @@ function generateInlineF32SignOp(op, d, s, ctx) {
+     return null;
+   }
+   const helper = op === cop1NEG ? 'NEG_S' : 'ABS_S';
+-  const result = op === cop1NEG ? 'sb ^ -0x80000000' : 'sb & 0x7fffffff';
+-  return genInlineCop1(`const sb = cpu1.regS32[cpu1.regIdx32_s[${s}]];
+-if (${genF32NormalOrZero('sb')}) {
+-  cpu1.control[31] &= ~0x3f000;
+-  ${genStoreF32(d, result)}  fast = true;
++  const result = op === cop1NEG ? '-sv' : 'Math.abs(sv)';
++  return genInlineCop1(`const sv = ${genF32SourceS(ctx, s)};
++if (${genNormalOrZero('sv')}) {
++  ${ctx.regs.writeFCSRConditional(`${ctx.regs.readFCSR()} & ~0x3f000`)}
++  ${genStoreF32(ctx, d, result)}  fast = true;
+ }
+ `, `cpu1.${helper}(${d}, ${s});`, ctx);
+ }
+@@ -2101,13 +2160,17 @@ function generateInlineF32Compare(op, s, t, ctx) {
+     return null;
+   }
+   const tests = [];
+-  if (op & 0x4) tests.push('sv < tv');
+-  if (op & 0x2) tests.push('sv === tv');
++  if (op & 0x4) {
++    tests.push('sv < tv');
++  }
++  if (op & 0x2) {
++    tests.push('sv === tv');
++  }
+   const cond = tests.length ? tests.join(' || ') : 'false';
+-  return genInlineCop1(`const si = cpu1.regIdx32_s[${s}], ti = cpu1.regIdx32_t[${t}];
+-if ((cpu1.regS32[si] & 0x7fffffff) <= 0x7f800000 && (cpu1.regS32[ti] & 0x7fffffff) <= 0x7f800000) {
+-  const sv = cpu1.regF32[si], tv = cpu1.regF32[ti];
+-  cpu1.control[31] = (${cond}) ? cpu1.control[31] | 0x00800000 : cpu1.control[31] & ~0x00800000;
++  const fcsr = ctx.regs.readFCSR();
++  return genInlineCop1(`const sv = ${genF32SourceS(ctx, s)}, tv = ${ctx.regs.readF32(t * 2)};
++if (sv === sv && tv === tv) {
++  ${ctx.regs.writeFCSRConditional(`(${cond}) ? ${fcsr} | 0x00800000 : ${fcsr} & ~0x00800000`)}
+   fast = true;
+ }
+ `, `cpu1.handleFloatCompareSingle(${op}, ${s}, ${t});`, ctx);
+@@ -2130,13 +2193,15 @@ function generateInlineConvertSToW(op, d, s, ctx, slowImpl) {
+     ? `let r = Math.round(sv);
+   if (r - sv === 0.5 && (r & 1) !== 0) r -= 1;`
+     : `const r = ${fn}(sv);`;
+-  return genInlineCop1(`const si = cpu1.regIdx32_s[${s}];
+-const sb = cpu1.regS32[si];
+-if ((cpu1.control[31] & ${mask}) === 0 && ${genF32NormalOrZero('sb')}) {
+-  const sv = cpu1.regF32[si];
++  // (the word now holds an integer, so its float local is read back)
++  return genInlineCop1(`const sv = ${genF32SourceS(ctx, s)};
++if ((${ctx.regs.readFCSR()} & ${mask}) === 0 && ${genNormalOrZero('sv')}) {
+   ${convert}
+   if (r <= 0x7fffffff && r >= -0x80000000) {
+-    ${genSetInexact('sv !== r')}    ${genStoreF32(d, 'r | 0')}    fast = true;
++    ${genSetInexact(ctx, 'sv !== r')}    cpu1.regS32[${d * 2}] = r | 0;
++    cpu1.regS32[${d * 2 + 1}] = 0;
++    ${ctx.regs.reloadF32(d * 2)}
++    fast = true;
+   }
+ }
+ `, slowImpl, ctx);
+@@ -2147,10 +2212,11 @@ function generateInlineConvertWToS(d, s, ctx) {
+   if (!canInlineCop1(ctx)) {
+     return null;
+   }
+-  return genInlineCop1(`if ((cpu1.control[31] & 0xf83) === 0) {
+-  const iv = cpu1.regS32[cpu1.regIdx32_s[${s}]];
+-  cpu1.tempF32[0] = iv;
+-  ${genSetInexact('cpu1.tempF32[0] !== iv')}  ${genStoreF32(d, 'cpu1.tempS32[0]')}  fast = true;
++  const word = (s & 1) === 0 ? `${s * 2}` : `cpu1.regIdx32_s[${s}]`;
++  return genInlineCop1(`if ((${ctx.regs.readFCSR()} & 0xf83) === 0) {
++  const iv = cpu1.regS32[${word}];
++  const f = Math.fround(iv);
++  ${genSetInexact(ctx, 'f !== iv')}  ${genStoreF32(ctx, d, 'f')}  fast = true;
+ }
+ `, `cpu1.CVT_S_W(${d}, ${s});`, ctx);
+ }
+diff --git a/src/cpu/recompiler_branch_fusion.test.js b/src/cpu/recompiler_branch_fusion.test.js
+index 53760da..7f9eec6 100644
+--- a/src/cpu/recompiler_branch_fusion.test.js
++++ b/src/cpu/recompiler_branch_fusion.test.js
+@@ -185,9 +185,9 @@ describe('branch + trivial delay-slot fusion codegen', () => {
+       expect(code).toContain('c.pc = 0x80001104;\nreturn 3;');
+       expect(code).not.toContain('c.pc = 0x80001100;');
+       if (expectsLink) {
+-        expect(code).toContain('c.gprS32[62] = 0x80001008;\n  c.gprS32[63] = -1;');
++        expect(code).toContain('$gpr[62] = $g62 = -2147479544;\n  $gpr[63] = $g63 = -1;');
+       } else {
+-        expect(code).not.toContain('c.gprS32[62]');
++        expect(code).not.toContain('$gpr[62]');
+       }
+     }
+   });
+@@ -198,9 +198,9 @@ describe('branch + trivial delay-slot fusion codegen', () => {
+       { pc, instruction: jump(target, decode.OP_JAL), postPC: pc + 4 },
+       { pc: pc + 4, instruction: special(decode.SPECIAL_SRA, 0, 31, 2, 4), postPC: target },
+     ]);
+-    // Because JAL marks RA as signExtended32, SRA v0, ra, 4 uses a 32-bit shift without reading gprU32[63].
+-    expect(code).toContain('const v = c.gprS32[62] >> 4;');
+-    expect(code).not.toContain('c.gprU32[63]');
++    // Because JAL marks RA as signExtended32, SRA v0, ra, 4 uses a 32-bit shift without reading the high word ($g63).
++    expect(code).toContain('const v = ($g62 >> 4) | 0;');
++    expect(code).not.toContain('($g63 >>> 0)');
+   });
+ 
+   test('fuses conditional branches (BEQ, BNE, BLEZ, BGTZ, BLTZ, BGEZ, BC1F, BC1T) into a single branchTaken check', () => {
+@@ -296,7 +296,7 @@ describe('branch + trivial delay-slot fusion codegen', () => {
+       expect(code.match(/c\.delayPC/g)).toHaveLength(needsCop1Prefix ? 2 : 1);
+       const untakenExit = `{ c.pc = 0x80001008; return ${branchIdx + 1}; }`;
+       const delayRspStep = `if (!rsp.halted) { rsp.step(); if (c.stuffToDo) { c.pc = ${pc + 4}; c.delayPC = 0x80001100; return ${branchIdx + 1}; } }`;
+-      const delayAlu = 'const v = (c.gprS32[16] + -1) | 0;';
++      const delayAlu = 'const v = ($g16 + -1) | 0;';
+       const untakenPos = code.indexOf(untakenExit);
+       const rspPos = code.indexOf(delayRspStep);
+       const aluPos = code.indexOf(delayAlu);
+@@ -316,9 +316,9 @@ describe('branch + trivial delay-slot fusion codegen', () => {
+     expect(jrCode).not.toContain('c.fragmentOps');
+     expect(jrCode).not.toContain('if (c.delayPC !== null)');
+     expect(jrCode.match(/c\.delayPC/g)).toHaveLength(1);
+-    const jumpTargetPos = jrCode.indexOf('const jumpTarget = c.getRegU32Lo(31);');
++    const jumpTargetPos = jrCode.indexOf('const jumpTarget = ($g62 >>> 0);');
+     const rspStepPos = jrCode.indexOf(`c.pc = ${pc + 4}; c.delayPC = jumpTarget; return 1;`);
+-    const delayWritePos = jrCode.indexOf('c.gprS32[62] = c.gprS32[32];');
++    const delayWritePos = jrCode.indexOf('$gpr[62] = $g62 = $g32;');
+     const guardPos = jrCode.indexOf('if (jumpTarget !== 0x80001200) { c.pc = jumpTarget; return 2; }');
+     expect(jumpTargetPos).toBeGreaterThan(-1);
+     expect(rspStepPos).toBeGreaterThan(jumpTargetPos);
+@@ -330,8 +330,8 @@ describe('branch + trivial delay-slot fusion codegen', () => {
+       { pc, instruction: special(decode.SPECIAL_JALR, 25, 0, 25), postPC: pc + 4 },
+       { pc: pc + 4, instruction: ADDIU_T0_1, postPC: target },
+     ]);
+-    const jalrReadPos = jalrCode.indexOf('const jumpTarget = c.getRegU32Lo(25);');
+-    const jalrLinkPos = jalrCode.indexOf('c.gprS32[50] = 0x80001008;');
++    const jalrReadPos = jalrCode.indexOf('const jumpTarget = ($g50 >>> 0);');
++    const jalrLinkPos = jalrCode.indexOf('$gpr[50] = $g50 = -2147479544;');
+     const jalrRspPos = jalrCode.indexOf('c.delayPC = jumpTarget;');
+     expect(jalrReadPos).toBeGreaterThan(-1);
+     expect(jalrLinkPos).toBeGreaterThan(jalrReadPos);
+@@ -676,7 +676,7 @@ for (const profiled of [false, true]) {
+         });
+         expect(result.gpr[31]).toBe(BigInt.asUintN(64, BigInt(0x80009990 | 0)));
+         expect(result.gpr[10]).toBe(trainMatch ? 11n : 22n);
+-        expect(result.code).toContain('const jumpTarget = c.getRegU32Lo(31);');
++        expect(result.code).toContain('const jumpTarget = ($g62 >>> 0);');
+       });
+     }
+ 
+diff --git a/src/cpu/recompiler_gpr_facts.test.js b/src/cpu/recompiler_gpr_facts.test.js
+index 82ebb77..23075bd 100644
+--- a/src/cpu/recompiler_gpr_facts.test.js
++++ b/src/cpu/recompiler_gpr_facts.test.js
+@@ -71,13 +71,13 @@ describe('GPR fact generated code', () => {
+       iop(decode.OP_BNEL, 1, 0, -2),
+       iop(decode.OP_LW, 2, 15),
+     ]);
+-    expect(code).toContain('(c.gprS32[31] === c.gprS32[9] ? c.getRegU32Lo(15) < c.getRegU32Lo(4) : c.gprS32[31] < c.gprS32[9])');
++    expect(code).toContain('($g31 === $g9 ? ($g30 >>> 0) < ($g8 >>> 0) : $g31 < $g9)');
+     expect(code).not.toContain('getRegS64');
+-    expect(code).toContain('c.setRegU32Extend(1, compare_1 ? 1 : 0)');
++    expect(code).toContain('$gpr[2] = $g2 = (compare_1 ? 1 : 0) | 0;\n  $gpr[3] = $g3 = 0;');
+     expect(code).toContain('if (compare_1)');
+     expect(code).not.toContain('c.getRegU64(1)');
+     const afterLoad = generated([iop(decode.OP_LW, 2, 15), special(decode.SPECIAL_SLT, 15, 4, 1)]);
+-    expect(afterLoad).toContain('(c.gprS32[31] === c.gprS32[9] ? c.getRegU32Lo(15) < c.getRegU32Lo(4) : c.gprS32[31] < c.gprS32[9])');
++    expect(afterLoad).toContain('($g31 === $g9 ? ($g30 >>> 0) < ($g8 >>> 0) : $g31 < $g9)');
+   });
+ 
+   test('Zelda word arithmetic proves both SLTU inputs', () => {
+@@ -89,7 +89,7 @@ describe('GPR fact generated code', () => {
+       iop(decode.OP_BNEL, 1, 0, -5),
+       iop(decode.OP_SB, 2, 0),
+     ]);
+-    expect(code).toContain('c.getRegU32Lo(2) < c.getRegU32Lo(24)');
++    expect(code).toContain('($g4 >>> 0) < ($g48 >>> 0)');
+     expect(code).toContain('if (compare_4)');
+   });
+ 
+@@ -101,7 +101,7 @@ describe('GPR fact generated code', () => {
+       0,
+       iop(decode.OP_BEQ, 3, 0, 2),
+     ]);
+-    expect(code).toContain('c.getRegU32Lo(3) === 0');
++    expect(code).toContain('($g6 >>> 0) === 0');
+   });
+ 
+   test('overwrites and unknown effects kill proofs and forwarding', () => {
+@@ -116,13 +116,13 @@ describe('GPR fact generated code', () => {
+       0x0000000f,
+     ]) {
+       const code = generated([special(decode.SPECIAL_SLT, 4, 5, 1), overwrite, iop(decode.OP_BNE, 1, 0, 2)]);
+-      expect(code).toContain('(c.gprU32[2] !== 0 || c.gprU32[3] !== 0)');
++      expect(code).toContain('($g2 !== 0 || $g3 !== 0)');
+     }
+   });
+ 
+   test('a nonadjacent comparison uses its width but not the old local', () => {
+     const code = generated([special(decode.SPECIAL_SLT, 4, 5, 1), 0, iop(decode.OP_BNE, 1, 0, 2)]);
+-    expect(code).toContain('c.getRegS32Lo(1) !== 0');
++    expect(code).toContain('$g2 !== 0');
+   });
+ 
+   test('facts reset on fragment changes, explicit starts and invalidation/rebuilds', () => {
+@@ -130,9 +130,9 @@ describe('GPR fact generated code', () => {
+     const fragment = new Fragment(pc);
+     generated([iop(decode.OP_ADDIU, 0, 1, 1)], ctx, fragment);
+     fragment.invalidate();
+-    expect(generated([iop(decode.OP_BNE, 1, 0, 2)], ctx, fragment)).toContain('(c.gprU32[2] !== 0 || c.gprU32[3] !== 0)');
++    expect(generated([iop(decode.OP_BNE, 1, 0, 2)], ctx, fragment)).toContain('($g2 !== 0 || $g3 !== 0)');
+     generated([iop(decode.OP_ADDIU, 0, 1, 1)], ctx, fragment);
+-    expect(generated([iop(decode.OP_BNE, 1, 0, 2)], ctx)).toContain('(c.gprU32[2] !== 0 || c.gprU32[3] !== 0)');
++    expect(generated([iop(decode.OP_BNE, 1, 0, 2)], ctx)).toContain('($g2 !== 0 || $g3 !== 0)');
+     ctx.newFragment();
+     expect(ctx.gprFacts.get(1).kind).toBe('unknown64');
+     expect(ctx.gprFacts.get(0).value).toBe(0n);
+@@ -165,17 +165,17 @@ describe('GPR fact generated code', () => {
+     expect(code).not.toMatch(/c\.exec(LUI|ORI|XORI|ANDI|ADDIU|ADDU|SUBU|SLL|SRL|SRA|SLLV|SRLV|SRAV|AND|OR|XOR|NOR)\b/);
+     expect(code).not.toMatch(/c\.setReg/);
+     // LUI + ORI + XORI + ADDIU fold to compile-time constants.
+-    expect(code).toContain('c.gprS32[2] = -2147418112;\n  c.gprS32[3] = -1;');
+-    expect(code).toContain('c.gprS32[4] = -2147409084;\n  c.gprS32[5] = -1;');
+-    expect(code).toContain('c.gprS32[6] = -2147409089;\n  c.gprS32[7] = -1;');
++    expect(code).toContain('$gpr[2] = $g2 = -2147418112;\n  $gpr[3] = $g3 = -1;');
++    expect(code).toContain('$gpr[4] = $g4 = -2147409084;\n  $gpr[5] = $g5 = -1;');
++    expect(code).toContain('$gpr[6] = $g6 = -2147409089;\n  $gpr[7] = $g7 = -1;');
+     // SRL by non-zero shift clears the upper word without >> 31.
+-    expect(code).toContain('c.gprS32[18] = c.gprU32[8] >>> 3;\n  c.gprS32[19] = 0;');
++    expect(code).toContain('$gpr[18] = $g18 = (($g8 >>> 0) >>> 3) | 0;\n  $gpr[19] = $g19 = 0;');
+     // SRA uses a 32-bit shift when proven sign-extended, and a 64-bit funnel shift when unknown64.
+-    expect(code).toContain('const v = c.gprS32[12] >> 3;');
+-    expect(code).toContain('const v = (c.gprU32[22] >>> 3) | (c.gprU32[23] << 29);');
++    expect(code).toContain('const v = ($g12 >> 3) | 0;');
++    expect(code).toContain('const v = ((($g22 >>> 0) >>> 3) | (($g23 >>> 0) << 29)) | 0;');
+     // In-place ORI updates only the low word; zero-extended source folds high word to 0.
+-    expect(code).toContain('c.gprS32[42] |= 3840;');
+-    expect(code).toContain('c.gprS32[44] = c.gprS32[42] | 240;\n  c.gprS32[45] = 0;');
++    expect(code).toContain('$gpr[42] = $g42 = $g42 | 3840;');
++    expect(code).toContain('$gpr[44] = $g44 = ($g42 | 240) | 0;\n  $gpr[45] = $g45 = 0;');
+   });
+ });
+ 
+diff --git a/src/cpu/recompiler_inline_f32.test.js b/src/cpu/recompiler_inline_f32.test.js
+index 628ebdf..bfb5d59 100644
+--- a/src/cpu/recompiler_inline_f32.test.js
++++ b/src/cpu/recompiler_inline_f32.test.js
+@@ -52,17 +52,38 @@ function randomBits(rand) {
+   const sign = rand() < 0.5 ? 0x80000000 : 0;
+   const mantissa = Math.floor(rand() * 0x800000);
+   const pick = rand();
+-  if (pick < 0.08) return (sign | 0) >>> 0;                          // zero
+-  if (pick < 0.12) return (sign | Math.max(1, mantissa)) >>> 0;      // denormal
+-  if (pick < 0.15) return (sign | 0x7f800000) >>> 0;                 // infinity
+-  if (pick < 0.18) return (0x7f800000 | Math.max(1, mantissa)) >>> 0; // NaN
+-  if (pick < 0.24) return (sign | ((126 + Math.floor(rand() * 4)) << 23) | (rand() < 0.5 ? 0 : 0x400000)) >>> 0; // halves
+-  if (pick < 0.3) return (sign | ((150 + Math.floor(rand() * 10)) << 23) | mantissa) >>> 0; // near the int limits
+-  if (pick < 0.34) return (rand() * 0x100000000) >>> 0;              // any word (for CVT.S.W)
++  // zero, denormal, infinity, NaN
++  if (pick < 0.08) {
++    return (sign | 0) >>> 0;
++  }
++  if (pick < 0.12) {
++    return (sign | Math.max(1, mantissa)) >>> 0;
++  }
++  if (pick < 0.15) {
++    return (sign | 0x7f800000) >>> 0;
++  }
++  if (pick < 0.18) {
++    return (0x7f800000 | Math.max(1, mantissa)) >>> 0;
++  }
++  // halves, near the int limits, any word (for CVT.S.W)
++  if (pick < 0.24) {
++    return (sign | ((126 + Math.floor(rand() * 4)) << 23) | (rand() < 0.5 ? 0 : 0x400000)) >>> 0;
++  }
++  if (pick < 0.3) {
++    return (sign | ((150 + Math.floor(rand() * 10)) << 23) | mantissa) >>> 0;
++  }
++  if (pick < 0.34) {
++    return (rand() * 0x100000000) >>> 0;
++  }
++  // near underflow, near overflow, ordinary
+   let exponent;
+-  if (pick < 0.44) exponent = 1 + Math.floor(rand() * 8);            // near underflow
+-  else if (pick < 0.54) exponent = 246 + Math.floor(rand() * 8);     // near overflow
+-  else exponent = 100 + Math.floor(rand() * 56);                     // ordinary
++  if (pick < 0.44) {
++    exponent = 1 + Math.floor(rand() * 8);
++  } else if (pick < 0.54) {
++    exponent = 246 + Math.floor(rand() * 8);
++  } else {
++    exponent = 100 + Math.floor(rand() * 56);
++  }
+   return (sign | (exponent << 23) | mantissa) >>> 0;
+ }
+ 
+@@ -87,12 +108,24 @@ for (const [name, [fmt, funct, helper]] of Object.entries(ops)) {
+       // FCSR: mostly the fast case, sometimes other rounding, enables, flush, flags, condition
+       let fcsr = 0;
+       const mode = rand();
+-      if (mode < 0.15) fcsr |= Math.floor(rand() * 4);
+-      if (mode > 0.85) fcsr |= Math.floor(rand() * 32) << 7;
+-      if (rand() < 0.2) fcsr |= 0x01000000;
+-      if (rand() < 0.3) fcsr |= Math.floor(rand() * 32) << 2;
+-      if (rand() < 0.2) fcsr |= Math.floor(rand() * 64) << 12;
+-      if (rand() < 0.5) fcsr |= 0x00800000;
++      if (mode < 0.15) {
++        fcsr |= Math.floor(rand() * 4);
++      }
++      if (mode > 0.85) {
++        fcsr |= Math.floor(rand() * 32) << 7;
++      }
++      if (rand() < 0.2) {
++        fcsr |= 0x01000000;
++      }
++      if (rand() < 0.3) {
++        fcsr |= Math.floor(rand() * 32) << 2;
++      }
++      if (rand() < 0.2) {
++        fcsr |= Math.floor(rand() * 64) << 12;
++      }
++      if (rand() < 0.5) {
++        fcsr |= 0x00800000;
++      }
+       const regs = Array.from({ length: 64 }, () => (rand() * 0x100000000) >>> 0);
+       const sBits = randomBits(rand), tBits = randomBits(rand);
+ 
+diff --git a/src/cpu/register_locals.js b/src/cpu/register_locals.js
+new file mode 100644
+index 0000000..4c07948
+--- /dev/null
++++ b/src/cpu/register_locals.js
+@@ -0,0 +1,373 @@
++import * as decode from './decode.js';
++
++// Keeps the registers a fragment uses in local variables, which V8 can hold
++// in machine registers: the typed arrays the registers live in have to be
++// reloaded after every call the fragment makes, even ones on paths not taken.
++//
++//   $g0..$g63  the words of c.gprS32 (the GPRs' low and high halves)
++//   $f0..$f62  the even words of cpu1.regF32, as floats (the single in each
++//              FPR's low word, wherever the FR mode puts the register)
++//   $fcsr      cpu1.control[31] (FCSR), as an int32
++//
++// Stores still go to the arrays as well (write-through), so a local always
++// equals its register: exits need nothing written back, and helpers read and
++// write the arrays as before. After a helper that may write a register, the
++// register is read back into its local.
++//
++// A local is loaded where the fragment first touches it, unless that touch
++// overwrites it. Self-looping fragments load them ahead of the loop instead.
++export class RegisterLocals {
++  constructor() {
++    this.reset();
++  }
++
++  reset() {
++    this.touched = new Map();      // local -> its load, or null if first written
++    this.pending = '';             // loads to emit ahead of the current op
++    this.loads = [];               // every load statement emitted
++    this.written = new Set();      // locals the current op wrote through
++    this.reloadedAll = false;      // whether some helper's writes were unknown
++    this.arrays = new Set();       // array locals declared
++  }
++
++  touch(name, array, load) {
++    if (this.touched.has(name)) {
++      return;
++    }
++    if (array && !this.arrays.has(array)) {
++      this.arrays.add(array);
++      this.emitLoad(`var ${array} = ${kArrays[array]};\n`);
++    }
++    this.touched.set(name, load);
++    if (load) {
++      this.emitLoad(`var ${name} = ${load};\n`);
++    } else {
++      // (just declared, never global; hoisting adds its own declaration)
++      this.pending += `var ${name};\n`;
++    }
++  }
++
++  emitLoad(code) {
++    this.pending += code;
++    this.loads.push(code);
++  }
++
++  // The loads the code generated since the last call needs, to be emitted
++  // ahead of it (at the fragment's top level)
++  takePending() {
++    const code = this.pending;
++    this.pending = '';
++    return code;
++  }
++
++  // ---- GPR words ----
++
++  readS32(word) {
++    this.touch(`$g${word}`, '$gpr', `$gpr[${word}]`);
++    return `$g${word}`;
++  }
++
++  readU32(word) {
++    return `(${this.readS32(word)} >>> 0)`;
++  }
++
++  // A store run on every path through the current op (expr is an int32)
++  write(word, expr) {
++    this.touch(`$g${word}`, '$gpr', null);
++    this.written.add(`$g${word}`);
++    return `$gpr[${word}] = $g${word} = ${expr};`;
++  }
++
++  // A store run on some paths only
++  writeConditional(word, expr) {
++    this.readS32(word);
++    return `$gpr[${word}] = $g${word} = ${expr};`;
++  }
++
++  reload(word) {
++    this.touch(`$g${word}`, '$gpr', null);
++    return `$g${word} = $gpr[${word}];`;
++  }
++
++  // ---- COP1 words (even ones) ----
++
++  readF32(word) {
++    this.touch(`$f${word}`, '$fpr', `$fpr[${word}]`);
++    return `$f${word}`;
++  }
++
++  // A store on some paths only (expr is a float32's value)
++  writeF32Conditional(word, expr) {
++    this.readF32(word);
++    return `$fpr[${word}] = $f${word} = ${expr};`;
++  }
++
++  reloadF32(word) {
++    this.touch(`$f${word}`, '$fpr', null);
++    return `$f${word} = $fpr[${word}];`;
++  }
++
++  // Reloads the locals of words written some other way (see cop1WritesOf)
++  reloadF32Words(words) {
++    let code = '';
++    for (const word of words) {
++      if (!this.written.has(`$f${word}`)) {
++        code += `${this.reloadF32(word)}\n`;
++      }
++    }
++    return code;
++  }
++
++  // ---- FCSR ----
++
++  readFCSR() {
++    this.touch('$fcsr', null, 'cpu1.control[31] | 0');
++    return '$fcsr';
++  }
++
++  // A store on some paths only (expr is an int32)
++  writeFCSRConditional(expr) {
++    this.readFCSR();
++    return `cpu1.control[31] = $fcsr = ${expr};`;
++  }
++
++  reloadFCSR() {
++    this.touch('$fcsr', null, null);
++    return '$fcsr = cpu1.control[31] | 0;';
++  }
++
++  // Marks locals as written on every path through the current op (through,
++  // or by reloading them where a helper wrote them)
++  markWritten(...names) {
++    for (const name of names) {
++      this.written.add(name);
++    }
++  }
++
++  // Reloads the registers an instruction may have written by a helper (the
++  // ones the current op didn't write through), then starts the next op.
++  // Locals not touched yet are loaded too: a load ahead of a self-loop would
++  // miss the helper's write.
++  finishOp(instruction) {
++    let code = '';
++    const gprs = gprWritesOf(instruction);
++    if (gprs === null) {
++      this.reloadedAll = true;
++      for (const name of this.touched.keys()) {
++        if (!this.written.has(name)) {
++          code += `${this.reloadLocal(name)}\n`;
++        }
++      }
++    } else {
++      for (const reg of gprs) {
++        for (const word of [reg * 2, reg * 2 + 1]) {
++          if (!this.written.has(`$g${word}`)) {
++            code += `${this.reload(word)}\n`;
++          }
++        }
++      }
++      const cop1 = cop1WritesOf(instruction);
++      code += this.reloadF32Words(cop1.words);
++      if (cop1.fcsr && !this.written.has('$fcsr')) {
++        code += `${this.reloadFCSR()}\n`;
++      }
++    }
++    this.written.clear();
++    return code;
++  }
++
++  reloadLocal(name) {
++    if (name === '$fcsr') {
++      return this.reloadFCSR();
++    }
++    const word = Number(name.slice(2));
++    return name.startsWith('$g') ? this.reload(word) : this.reloadF32(word);
++  }
++
++  // A self-looping fragment's body with its loads moved ahead of the loop
++  // (locals first touched by a store start at 0 rather than undefined, so the
++  // loop doesn't merge the two). Not when some helper's writes were unknown:
++  // its reload only covers the locals touched before it.
++  hoist(body) {
++    if (this.reloadedAll || this.loads.length === 0) {
++      return { header: '', body };
++    }
++    let header = '';
++    for (const load of this.loads) {
++      body = body.replace(load, '');
++      header += load;
++    }
++    for (const [name, load] of this.touched) {
++      if (!load) {
++        header += `var ${name} = 0;\n`;
++      }
++    }
++    return { header, body };
++  }
++}
++
++const kArrays = {
++  $gpr: 'c.gprS32',
++  $fpr: 'cpu1.regF32',
++};
++
++// The GPRs an instruction can write (besides $r0), or null if that's not
++// known. Exceptions don't count: they leave the fragment.
++export function gprWritesOf(instruction) {
++  const rt = decode.rt(instruction);
++  const rd = decode.rd(instruction);
++  const ra = 31;
++  const nonZero = (...regs) => regs.filter(r => r !== 0);
++  switch (decode.simpleOp(instruction)) {
++    case decode.OP_SPECIAL:
++      switch (decode.specialOp(instruction)) {
++        case decode.SPECIAL_JR:
++        case decode.SPECIAL_SYSCALL:
++        case decode.SPECIAL_BREAK:
++        case decode.SPECIAL_SYNC:
++        case decode.SPECIAL_MTHI:
++        case decode.SPECIAL_MTLO:
++        case decode.SPECIAL_MULT:
++        case decode.SPECIAL_MULTU:
++        case decode.SPECIAL_DIV:
++        case decode.SPECIAL_DIVU:
++        case decode.SPECIAL_DMULT:
++        case decode.SPECIAL_DMULTU:
++        case decode.SPECIAL_DDIV:
++        case decode.SPECIAL_DDIVU:
++        case decode.SPECIAL_TGE:
++        case decode.SPECIAL_TGEU:
++        case decode.SPECIAL_TLT:
++        case decode.SPECIAL_TLTU:
++        case decode.SPECIAL_TEQ:
++        case decode.SPECIAL_TNE:
++          return [];
++        default:
++          return nonZero(rd);
++      }
++    case decode.OP_REGIMM:
++      switch (decode.regImmOp(instruction)) {
++        case decode.REGIMM_BLTZAL:
++        case decode.REGIMM_BGEZAL:
++        case decode.REGIMM_BLTZALL:
++        case decode.REGIMM_BGEZALL:
++          return [ra];
++        default:
++          return [];
++      }
++    case decode.OP_JAL:
++      return [ra];
++    case decode.OP_J:
++    case decode.OP_BEQ:
++    case decode.OP_BNE:
++    case decode.OP_BLEZ:
++    case decode.OP_BGTZ:
++    case decode.OP_BEQL:
++    case decode.OP_BNEL:
++    case decode.OP_BLEZL:
++    case decode.OP_BGTZL:
++    case decode.OP_SB:
++    case decode.OP_SH:
++    case decode.OP_SWL:
++    case decode.OP_SW:
++    case decode.OP_SDL:
++    case decode.OP_SDR:
++    case decode.OP_SWR:
++    case decode.OP_SD:
++    case decode.OP_CACHE:
++    case decode.OP_LWC1:
++    case decode.OP_LDC1:
++    case decode.OP_SWC1:
++    case decode.OP_SDC1:
++    case decode.OP_LWC2:
++    case decode.OP_LDC2:
++    case decode.OP_SWC2:
++    case decode.OP_SDC2:
++    case decode.OP_COP3:
++      return [];
++    case decode.OP_ADDI:
++    case decode.OP_ADDIU:
++    case decode.OP_SLTI:
++    case decode.OP_SLTIU:
++    case decode.OP_ANDI:
++    case decode.OP_ORI:
++    case decode.OP_XORI:
++    case decode.OP_LUI:
++    case decode.OP_DADDI:
++    case decode.OP_DADDIU:
++    case decode.OP_LDL:
++    case decode.OP_LDR:
++    case decode.OP_LB:
++    case decode.OP_LH:
++    case decode.OP_LWL:
++    case decode.OP_LW:
++    case decode.OP_LBU:
++    case decode.OP_LHU:
++    case decode.OP_LWR:
++    case decode.OP_LWU:
++    case decode.OP_LL:
++    case decode.OP_LLD:
++    case decode.OP_LD:
++    case decode.OP_SC:
++    case decode.OP_SCD:
++      return nonZero(rt);
++    case decode.OP_COP0:
++    case decode.OP_COP1:
++    case decode.OP_COP2:
++      // MFCz, DMFCz, CFCz and DCFCz write rt; the other coprocessor
++      // instructions write no GPR
++      if ((instruction & 0x02000000) === 0 && decode.copOp(instruction) < 4) {
++        return nonZero(rt);
++      }
++      return [];
++    default:
++      return null;
++  }
++}
++
++// The even COP1 words an instruction can write, and whether it can write
++// FCSR (only asked once gprWritesOf has said the instruction is known). A
++// 32-bit write to register r through an fd or ft field (as cpu1's regIdx32_d
++// and regIdx32_t) is to word 2r, and so is a 64-bit one (regIdx64_d); through
++// an fs field of a move or load (regIdx32_cop), it's word 2r, or with FR
++// clear and r odd, the high word below (not kept), and a 64-bit one
++// (regIdx64_cop) is to 2r's words, or with FR clear, those of r & ~1.
++export function cop1WritesOf(instruction) {
++  switch (decode.simpleOp(instruction)) {
++    case decode.OP_LWC1:
++      return cop1Words32(decode.rt(instruction));
++    case decode.OP_LDC1:
++      return cop1Words64(decode.rt(instruction));
++    case decode.OP_COP1:
++      if ((instruction & 0x02000000) !== 0) {
++        // arithmetic, conversions and moves; compares write FCSR alone, and
++        // moves don't
++        const funct = instruction & 0x3f;
++        return { words: funct >= 0x30 ? [] : [decode.fd(instruction) * 2], fcsr: funct !== kFunctMov };
++      }
++      switch (decode.copOp(instruction)) {
++        case decode.COP_MT:
++          return cop1Words32(decode.fs(instruction));
++        case decode.COP_DMT:
++          return cop1Words64(decode.fs(instruction));
++        case decode.COP_CT:
++        case decode.COP_DCT:
++          return { words: [], fcsr: true };
++        default:
++          return kNoCop1Writes;
++      }
++    default:
++      return kNoCop1Writes;
++  }
++}
++
++export function cop1Words32(reg) {
++  return { words: [reg * 2], fcsr: false };
++}
++
++export function cop1Words64(reg) {
++  return { words: reg & 1 ? [reg * 2, (reg - 1) * 2] : [reg * 2], fcsr: false };
++}
++
++const kFunctMov = 0x06;
++const kNoCop1Writes = Object.freeze({ words: [], fcsr: false });
+diff --git a/src/cpu/register_locals.test.js b/src/cpu/register_locals.test.js
+new file mode 100644
+index 0000000..6ce1759
+--- /dev/null
++++ b/src/cpu/register_locals.test.js
+@@ -0,0 +1,197 @@
++import { beforeAll, describe, expect, test } from 'bun:test';
++import * as decode from './decode.js';
++import * as regs from './cpu0reg.js';
++import { cop1WritesOf, gprWritesOf } from './register_locals.js';
++import {
++  DEFAULT_PC,
++  captureExecutionSnapshot,
++  compileFragmentAt,
++  cop1,
++  copMove,
++  createTestEmulator,
++  iop,
++  resetExecutionState,
++  special,
++} from './test_helpers.js';
++
++// Fragments keep registers in locals (RegisterLocals). Random programs mixing
++// integer, memory and COP1 instructions, in loops short enough to compile as
++// self-loops (whose loads are hoisted) and longer ones, must leave the same
++// state compiled as interpreted.
++
++const pc = DEFAULT_PC;
++const S = decode.COP1_FMT_S, D = decode.COP1_FMT_D, W = decode.COP1_FMT_W;
++const base = 4;        // a0: points at the scratch RAM
++const control = 5;     // a1: small values for CTC1
++const counter = 25;    // t9: the loop counter
++const dests = [2, 3, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 31];
++
++function seeded(seed) {
++  return () => {
++    seed = (Math.imul(seed, 1103515245) + 12345) >>> 0;
++    return ((seed >>> 8) & 0xffffff) / 0x1000000;
++  };
++}
++
++function program(rand, length) {
++  const pick = list => list[Math.floor(rand() * list.length)];
++  const reg = () => Math.floor(rand() * 32);
++  const fpr = () => Math.floor(rand() * 32);
++  const dest = () => pick(dests);
++  const words = [];
++  const access = (op, width) => {
++    // runs of the same access make RAM groups
++    const run = rand() < 0.4 ? 2 + Math.floor(rand() * 3) : 1;
++    let offset = Math.floor(rand() * (0x100 / width)) * width;
++    for (let i = 0; i < run && words.length < length; i++, offset += width) {
++      const rt = op === decode.OP_LWC1 || op === decode.OP_LDC1 || op === decode.OP_SWC1 || op === decode.OP_SDC1
++        ? fpr()
++        : [decode.OP_SB, decode.OP_SH, decode.OP_SW, decode.OP_SD].includes(op) ? reg() : dest();
++      words.push(iop(op, base, rt, offset));
++    }
++  };
++  const generators = [
++    () => words.push(special(pick([0x21, 0x23, 0x24, 0x25, 0x26, 0x27, 0x2a, 0x2b, 0x2d, 0x2f]), reg(), reg(), dest())),
++    () => words.push(special(pick([0x00, 0x02, 0x03, 0x3c]), 0, reg(), dest(), Math.floor(rand() * 32))),
++    () => words.push(special(pick([0x04, 0x06, 0x07]), reg(), reg(), dest())),
++    () => words.push(special(pick([0x18, 0x19]), reg(), reg(), 0), special(pick([0x10, 0x12]), 0, 0, dest())),
++    () => words.push(iop(pick([0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e]), reg(), dest(), Math.floor(rand() * 0x10000))),
++    () => words.push(iop(0x0f, 0, dest(), Math.floor(rand() * 0x10000))),
++    () => access(pick([decode.OP_LB, decode.OP_LBU, decode.OP_SB]), 1),
++    () => access(pick([decode.OP_LH, decode.OP_LHU, decode.OP_SH]), 2),
++    () => access(pick([decode.OP_LW, decode.OP_SW, decode.OP_LWC1, decode.OP_SWC1]), 4),
++    () => access(pick([decode.OP_LD, decode.OP_SD, decode.OP_LDC1, decode.OP_SDC1]), 8),
++    () => words.push(copMove(decode.OP_COP1, pick([decode.COP_MT, decode.COP_DMT]), reg(), fpr())),
++    () => words.push(copMove(decode.OP_COP1, pick([decode.COP_MF, decode.COP_DMF]), dest(), fpr())),
++    () => words.push(copMove(decode.OP_COP1, decode.COP_CF, dest(), 31)),
++    () => rand() < 0.2 && words.push(copMove(decode.OP_COP1, decode.COP_CT, control, 31)),
++    () => words.push(cop1(S, pick([0, 1, 2, 3]), fpr(), fpr(), fpr())),
++    () => words.push(cop1(S, pick([0, 1, 2, 3]), fpr(), fpr(), fpr())),
++    () => words.push(cop1(S, pick([0x04, 0x05, 0x06, 0x07, 0x0c, 0x0d, 0x0e, 0x0f, 0x21, 0x24]), fpr(), fpr())),
++    () => words.push(cop1(S, 0x30 + Math.floor(rand() * 16), 0, fpr(), fpr())),
++    () => words.push(cop1(W, 0x20, fpr(), fpr())),
++    () => words.push(cop1(D, pick([0, 2, 0x20]), fpr(), fpr(), fpr())),
++  ];
++  while (words.length < length) {
++    pick(generators)();
++  }
++  return words.slice(0, length);
++}
++
++// A single's bits from classes that reach the fast paths and the helpers
++function floatBits(rand) {
++  const sign = rand() < 0.5 ? 0x80000000 : 0;
++  const pick = rand();
++  if (pick < 0.08) {
++    return sign;
++  }
++  if (pick < 0.12) {
++    return (sign | Math.max(1, Math.floor(rand() * 0x800000))) >>> 0;
++  }
++  if (pick < 0.15) {
++    return (sign | 0x7f800000) >>> 0;
++  }
++  if (pick < 0.18) {
++    return (0x7fc00000 | Math.floor(rand() * 0x400000)) >>> 0;
++  }
++  if (pick < 0.25) {
++    return Math.floor(rand() * 2000) - 1000;
++  }
++  return (sign | ((100 + Math.floor(rand() * 56)) << 23) | Math.floor(rand() * 0x800000)) >>> 0;
++}
++
++let emulator;
++beforeAll(async () => {
++  emulator = await createTestEmulator();
++});
++
++function run(words, prepare, { train = 0, cycles }) {
++  const { cpu0: cpu, hardware } = emulator;
++  const setup = () => {
++    hardware.fragmentCache.reset();
++    resetExecutionState(cpu, words, { pc });
++    prepare(cpu, hardware);
++  };
++  setup();
++  cpu.run(cycles);
++  const interpreted = captureExecutionSnapshot(emulator, { ramOffset: 0x3000, ramLength: 0x200 });
++
++  setup();
++  const fragment = compileFragmentAt(cpu, pc, train);
++  setup();
++  hardware.fragmentCache.fragments.set(pc, fragment);
++  cpu.run(cycles);
++  expect(fragment.executionCount).toBeGreaterThanOrEqual(1);
++  const compiled = captureExecutionSnapshot(emulator, { ramOffset: 0x3000, ramLength: 0x200 });
++  return { interpreted, compiled, fragment };
++}
++
++describe('register locals', () => {
++  test('know which registers instructions write', () => {
++    expect(gprWritesOf(special(0x21, 1, 2, 3))).toEqual([3]);
++    expect(gprWritesOf(special(0x18, 1, 2, 0))).toEqual([]);
++    expect(gprWritesOf(iop(decode.OP_LW, 4, 0, 0))).toEqual([]);
++    expect(gprWritesOf(iop(decode.OP_LW, 4, 7, 0))).toEqual([7]);
++    expect(gprWritesOf(iop(decode.OP_JAL, 0, 0, 0))).toEqual([31]);
++    expect(gprWritesOf(copMove(decode.OP_COP1, decode.COP_MF, 9, 4))).toEqual([9]);
++    expect(gprWritesOf(copMove(decode.OP_COP1, decode.COP_MT, 9, 4))).toEqual([]);
++    expect(gprWritesOf(0x7c000000)).toBeNull();
++
++    expect(cop1WritesOf(iop(decode.OP_LWC1, 4, 3, 0))).toEqual({ words: [6], fcsr: false });
++    expect(cop1WritesOf(iop(decode.OP_LDC1, 4, 3, 0))).toEqual({ words: [6, 4], fcsr: false });
++    expect(cop1WritesOf(cop1(S, 2, 5, 1, 2))).toEqual({ words: [10], fcsr: true });
++    expect(cop1WritesOf(cop1(S, 6, 5, 1))).toEqual({ words: [10], fcsr: false });
++    expect(cop1WritesOf(cop1(S, 0x3c, 0, 1, 2))).toEqual({ words: [], fcsr: true });
++    expect(cop1WritesOf(copMove(decode.OP_COP1, decode.COP_CT, 5, 31))).toEqual({ words: [], fcsr: true });
++    expect(cop1WritesOf(special(0x21, 1, 2, 3))).toEqual({ words: [], fcsr: false });
++  });
++
++  for (const [name, length, loops] of [['self-looping', 12, true], ['long', 60, true], ['straight', 40, false]]) {
++    test(`random ${name} programs run the same compiled`, () => {
++      const rand = seeded(length * 7919 + (loops ? 1 : 0));
++      let selfLoops = 0;
++      for (let n = 0; n < 120; n++) {
++        const body = program(rand, length);
++        const words = loops
++          // t9 -= 1; if (t9 != 0) back to the start
++          ? [...body, iop(decode.OP_ADDIU, counter, counter, -1), iop(decode.OP_BNE, counter, 0, -(body.length + 2)), 0]
++          // then a jump back to the start
++          : [...body, (decode.OP_J << 26) | ((pc >>> 2) & 0x3ffffff), 0];
++        while (words.length < length + 40) {
++          words.push(0);
++        }
++        const fr = rand() < 0.5;
++        const word = () => BigInt(Math.floor(rand() * 0x100000000));
++        // mostly sign-extended words, as 32-bit code leaves them
++        const gprs = Array.from({ length: 32 }, () => rand() < 0.8 ? BigInt.asIntN(32, word()) : (word() << 32n) | word());
++        const fcsrSource = Math.floor(rand() * 4);
++        // the scratch RAM, sometimes through KSEG1, which the fast paths
++        // leave to the helpers
++        const address = rand() < 0.3 ? 0xa0003000 : 0x80003000;
++        const fprs = Array.from({ length: 64 }, () => floatBits(rand));
++        const fcsr = rand() < 0.7 ? 0 : (Math.floor(rand() * 4) | (Math.floor(rand() * 32) << 2));
++        const memory = Array.from({ length: 0x200 }, () => Math.floor(rand() * 256));
++        const prepare = (cpu, hardware) => {
++          cpu.setControlU32(regs.controlStatus, 0x20000000 | (fr ? 0x04000000 : 0));
++          cpu.cop1ControlChanged();
++          gprs.forEach((v, i) => cpu.setRegU64(i, BigInt.asUintN(64, v)));
++          cpu.setRegS32Extend(base, address);
++          cpu.setRegS32Extend(control, fcsrSource);
++          cpu.setRegS32Extend(counter, 5);
++          fprs.forEach((bits, i) => { hardware.cpu1.regU32[i] = bits; });
++          hardware.cpu1.control[31] = fcsr;
++          memory.forEach((b, i) => { hardware.ram.u8[0x3000 + i] = b; });
++        };
++        const iteration = body.length + 3;
++        const { interpreted, compiled, fragment } = run(words, prepare, { train: iteration, cycles: iteration * 5 + 20 });
++        if (fragment.func.toString().includes('do {')) {
++          selfLoops++;
++        }
++        expect(compiled).toEqual(interpreted);
++      }
++      if (name === 'self-looping') {
++        expect(selfLoops).toBeGreaterThan(30);
++      }
++    });
++  }
++});
+diff --git a/src/cpu/test_helpers.js b/src/cpu/test_helpers.js
+index b707c52..561e6f7 100644
+--- a/src/cpu/test_helpers.js
++++ b/src/cpu/test_helpers.js
+@@ -92,7 +92,9 @@ export function createOpRunner(compiled, word, options = {}) {
+     return () => globalThis.n64js.executeOp(instruction);
+   }
+   const fragment = compileOp(instruction, options);
+-  const run = new Function('c', fragment.bodyCode);
++  // (compiled code reaches COP1 through cpu1, as fragments do)
++  const body = new Function('c', 'cpu1', fragment.bodyCode);
++  const run = c => body(c, c.hardware.cpu1);
+   run.code = fragment.bodyCode;
+   return run;
+ }

@@ -161,7 +161,13 @@ to the cache again.
   desktop, game-like float code compiled from C (skeletal animation, 64
   characters) took 33% of the time before and 9% after, with RDRAM identical
   after 300 frames; 9000 triangles a frame went from 43% drawing to 2%,
-  pixel-identical. On
+  pixel-identical. The second patch keeps the registers a compiled block
+  uses (GPRs, singles, FCSR) in JavaScript locals, written through to n64js's
+  arrays and read back after helpers, which V8 can hold in machine
+  registers (checked with random programs run compiled and interpreted);
+  with the CPU fully loaded, integer game logic ran about 20% faster and
+  the animation code 13% (`count` takes integer rounds in bits 8 to 15 and
+  animation passes from bit 16, see `tools/n64js/bench/work.c`). On
   the N64 the touch D-pad is an analog stick with a knob, and a second
   controller plays as player 2. Moving n64js off the page's main thread
   took the test cartridge's page load from 812 to 5 ms a second with the
