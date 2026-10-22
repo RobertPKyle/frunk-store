@@ -6,9 +6,10 @@
 // it.
 //
 // The Holders menu opens this page as ?edition=holders: early access for
-// FrunkStore token holders, for now the Mega Drive / Genesis, the PC Engine
-// and the Nintendo 64, which the ordinary edition leaves out. It waits behind the holders' wall
-// (../_shared/holders.js) until a holder's phone unlocks the screen.
+// FrunkStore token holders, for now the Mega Drive / Genesis and the PC
+// Engine, which the ordinary edition leaves out. It waits behind the holders' wall
+// (../_shared/holders.js) until a holder's phone unlocks the screen. The
+// Nintendo 64 core is switched off (see OFF): too slow in the car.
 //
 // Input comes from up to two gamepads, the on-screen buttons and the
 // keyboard; each frame they're merged and handed to the running core
@@ -86,7 +87,11 @@ const settings = {
 
 const HOLDERS = document.documentElement.dataset.edition === 'holders';
 const EARLY = new Set(['pce', 'md', 'n64']);           // consoles only in the holders edition
-const inEdition = system => EARLY.has(system) === HOLDERS;
+// Consoles switched off in both editions: their games aren't added, listed
+// or continued (any already added stay stored). The N64 ran at about a
+// sixth of full speed in the car (2026-10-22).
+const OFF = new Set(['n64']);
+const inEdition = system => !OFF.has(system) && EARLY.has(system) === HOLDERS;
 const LAST = HOLDERS ? 'holdersLast' : 'last';  // each edition continues its own game
 
 // ---------- your games (IndexedDB) ----------
@@ -139,7 +144,7 @@ async function addFiles(files) {
   }
   msg.textContent = added
     ? `Added ${added} game${added === 1 ? '' : 's'}.${skipped ? ` Skipped ${skipped} file${skipped === 1 ? '' : 's'} that weren't games.` : ''}`
-    : files.length ? `No game files (${HOLDERS ? '.md, .gen, .bin, .smd, .pce, .z64, .n64, .v64' : '.nes, .gb, .gbc, .gba, .sms, .gg, .sg'} or .zip) found there.` : '';
+    : files.length ? `No game files (${HOLDERS ? '.md, .gen, .bin, .smd, .pce' : '.nes, .gb, .gbc, .gba, .sms, .gg, .sg'} or .zip) found there.` : '';
   renderMine();
 }
 
@@ -159,7 +164,7 @@ function ownGames(then) {
 
 const phone = phonePanel({
   app: 'retro', save: saveGame, onSaved: renderMine,
-  notPlayable: () => HOLDERS ? 'only Mega Drive / Genesis, PC Engine and Nintendo 64 games play here'
+  notPlayable: () => HOLDERS ? 'only Mega Drive / Genesis and PC Engine games play here'
     : 'not a game this plays (Mega Drive / Genesis and PC Engine games play on the Holders card)',
 });
 
@@ -715,8 +720,8 @@ function showShelf() {
   renderContinue();
 }
 
-$('fileInput').accept = HOLDERS ? '.md,.gen,.bin,.smd,.pce,.z64,.n64,.v64,.zip' : '.nes,.gb,.gbc,.gba,.sms,.gg,.sg,.zip';
+$('fileInput').accept = HOLDERS ? '.md,.gen,.bin,.smd,.pce,.zip' : '.nes,.gb,.gbc,.gba,.sms,.gg,.sg,.zip';
 if (HOLDERS) {
-  document.title = 'Genesis, PC Engine & N64 · frunk.store';
-  holdersGate('Mega Drive / Genesis and PC Engine games').then(showShelf);   // (the N64, in testing, isn't named before unlocking)
+  document.title = 'Genesis & PC Engine · frunk.store';
+  holdersGate('Mega Drive / Genesis and PC Engine games').then(showShelf);
 } else showShelf();

@@ -121,9 +121,11 @@ to the cache again.
   4 MB), and leaves out the Mega CD here. All three run in workers
   (`sms-worker.js`, `pce-worker.js`, `md-worker.js`, sharing
   `gear-worker.js`) the way jsnes runs in its own (the page side is
-  `worker-core.js`). Nintendo 64 cartridges (holders edition only, an
-  early test, so only the holders edition names it: not the hub's grid,
-  the ordinary edition, the phone page or the holders' lock screen) run on n64js (MIT, pure JavaScript, commit
+  `worker-core.js`). The Nintendo 64 is switched off (2026-10-22, after
+  two car tests at about a sixth of full speed): `OFF` in `retro.js` keeps
+  its games from being added, listed or continued in either edition, and
+  no text names it (it was tested in the holders edition as "Genesis, PC
+  Engine & N64", commit ac6afec). Its code stays: Nintendo 64 cartridges run on n64js (MIT, pure JavaScript, commit
   1eb54aa, with `tools/n64js/patches/*.patch` applied), bundled by `npm run build:n64` (`tools/build-n64js.mjs` runs
   Bun's bundler through npx on n64js's sources plus `tools/n64js/web.js`,
   which stands in for n64js's own page and debugger, and
@@ -133,20 +135,32 @@ to the cache again.
   the OffscreenCanvas). Its sound is resampled to the speaker's rate and
   paced by a shared count of the samples the AudioWorklet has taken (about
   50 ms queued, frames skipped past 100 ms, as n64js does with Web Audio).
-  In-game saves go to IndexedDB ("n64"); there are no snapshots. While the
-  emulator is busy over 80% of the time and frames are overdue, up to two
-  in three frames are worked out but not drawn (and not shown), and with
-  sound off the game's audio tasks are skipped. Tapping the frame rate also
-  shows how busy the emulator is, and how much of that is the game's code,
-  its display lists, WebGL drawing and sound, and the frames drawn and
-  skipped (measured only while shown). A first car test (2026-10-22) ran
-  at about 10 fps (a sixth of full speed), 98% busy. Today's free N64
+  In-game saves go to IndexedDB ("n64"); there are no snapshots. When a
+  frame takes longer than 20 ms, the worker runs one frame at a time, each
+  straight after the last (not waiting for the screen's next refresh), so
+  every frame worked out is shown; catching up three at a time showed only
+  one in three, a picture every third of a second in the car. While the
+  emulator is busy over 80% of the time, frames are overdue and WebGL
+  drawing takes over a fifth of a drawn frame's time, up to two in three
+  frames are worked out but not drawn (and not shown), and with sound off
+  the game's audio tasks are skipped. Tapping the frame rate also shows how
+  busy the emulator is, and how much of that is the game's code, its
+  display lists, WebGL drawing and sound, the frames drawn and skipped, and
+  the RSP tasks n64js can't do itself (their kind, and how much of the time
+  its RSP emulator, which steps along with the game's code, was running
+  them), measured only while shown. A first car test (2026-10-22) ran at
+  about 10 fps (a sixth of full speed), 98% busy; the second, with the
+  readout (Super Smash Bros.' menus), read 9 fps · 2 Hz · 97% busy · game
+  89% · lists 4% · gl 2% · sound 0% · 2 drawn, 5 skipped · rsp 7: the
+  game's code is the cost, so moving drawing to another thread would gain
+  little. Today's free N64
   homebrew uses libdragon's boot code, which n64js doesn't boot, so there's
-  no free N64 game; the e2e check plays a tiny test cartridge made by
+  no free N64 game; the e2e check played a tiny test cartridge made by
   `tools/n64-test-rom.mjs` (double-buffered display lists drawn by n64js's
   Fast3D emulation, controller, tone and EEPROM save; `n64TestRom({
   triangles: 9000 })` makes it heavy, and `work: { code, count }` runs a
-  compiled MIPS function each frame). Dropping WebGL calls that change
+  compiled MIPS function each frame; it now checks the holders edition
+  turns that cartridge away). Dropping WebGL calls that change
   nothing was tried and saved under 10% of the drawing time, so it was left
   out. The patches (each with tests, run with n64js's own suite, `bun
   test`) speed up n64js for the car: its recompiler compiles single-precision

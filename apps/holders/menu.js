@@ -10,7 +10,7 @@
 import { holdersGate, lockHolders, qr, voteLink } from '../_shared/holders.js';
 
 const APPS = [
-  { id: 'pce', title: 'Genesis, PC Engine & N64', path: '/retro/?edition=holders', icon: '/retro/icon.svg', about: 'Mega Drive / Genesis, TurboGrafx-16 and Nintendo 64 games: free homebrew, or cartridges you own. N64 is an early test.' },
+  { id: 'pce', title: 'Genesis & PC Engine', path: '/retro/?edition=holders', icon: '/retro/icon.svg', about: 'Mega Drive / Genesis and TurboGrafx-16 games: free homebrew, or cartridges you own.' },
   { id: 'craft4k', title: 'Craft 4K', path: '/craft4k/', about: 'Notch\'s Minecraft4k rebuilt in C++: break, build and watch the sun set.' },
   { id: 'doom', title: 'Freedoom', path: '/doom/', about: 'The classic Doom engine with the free Freedoom games, or Doom games you own.' },
   { id: 'quake', title: 'LibreQuake', path: '/quake/', about: 'The classic Quake engine with the free LibreQuake, or Quake you own.' },

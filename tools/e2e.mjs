@@ -5,7 +5,6 @@
 //   node tools/e2e.mjs https://frunk.store   # against production
 import { chromium } from 'playwright-core';
 import { mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
-import { decodePng } from './blocks/png.mjs';
 import { n64TestRom } from './n64-test-rom.mjs';
 
 const base = process.argv[2] || 'http://localhost:5173';
@@ -581,7 +580,7 @@ async function holderPhone(apps, tokens) {
 // The holder's phone that unlocks the test browsers, made when first needed
 let holder = null;
 const holderNow = async () => holder || (holder = await holderPhone(appsBase, 150000));
-await check('holders unlock with a phone and play Genesis, PC Engine and N64 games', async () => {
+await check('holders unlock with a phone and play Genesis and PC Engine games', async () => {
   // The ordinary Retro Console leaves the PC Engine and Mega Drive out, and the hub's grid the early-access apps
   await openFromHub(/Retro Console/);
   for (const game of ['Blox', 'KłełeAtoms']) {
@@ -589,7 +588,7 @@ await check('holders unlock with a phone and play Genesis, PC Engine and N64 gam
   }
   await page.goto(base + '/');
   await page.waitForSelector('.card');
-  for (const name of ['Craft 4K', 'Freedoom', 'LibreQuake', 'OpenTTD', 'OpenArena', 'Genesis, PC Engine & N64']) {
+  for (const name of ['Craft 4K', 'Freedoom', 'LibreQuake', 'OpenTTD', 'OpenArena', 'Genesis & PC Engine']) {
     if (await page.locator('#grid .card h2').filter({ hasText: new RegExp(`^${name}$`) }).count()) throw new Error(`${name} is on the grid`);
   }
 
@@ -607,7 +606,7 @@ await check('holders unlock with a phone and play Genesis, PC Engine and N64 gam
   if (!linked.ok) throw new Error(`link: ${linked.error}`);
   await appFrame().locator('#apps .app').first().waitFor({ timeout: 10000 });
   const tiles = (await appFrame().locator('#apps .app b').allTextContents()).join(', ');
-  if (tiles !== 'Genesis, PC Engine & N64, Craft 4K, Freedoom, LibreQuake, OpenArena, OpenTTD') throw new Error(`menu lists ${tiles}`);
+  if (tiles !== 'Genesis & PC Engine, Craft 4K, Freedoom, LibreQuake, OpenArena, OpenTTD') throw new Error(`menu lists ${tiles}`);
   await appFrame().locator('#voteQr a[href$="/vote/"]').waitFor();
 
   await openFromHub(/PC Engine/);
@@ -684,7 +683,7 @@ await check('holders unlock with a phone and play Genesis, PC Engine and N64 gam
       smd[512 + block + 8192 + i] = atoms[block + i * 2];
     }
   }
-  // and an N64 cartridge by its first word, here in the .v64 byte order
+  // but not an N64 cartridge: the N64 is switched off (too slow in the car)
   const n64 = n64TestRom();
   n64.swap16();
   await (await picker).setFiles([
@@ -693,12 +692,14 @@ await check('holders unlock with a phone and play Genesis, PC Engine and N64 gam
     { name: 'copier.smd', mimeType: 'application/octet-stream', buffer: smd },
     { name: 'n64 test.v64', mimeType: 'application/octet-stream', buffer: n64 },
   ]);
-  for (const name of ['falling', 'atoms', 'copier', 'n64 test']) await appFrame().locator('#mine .game').filter({ hasText: name }).waitFor({ timeout: 5000 });
+  for (const name of ['falling', 'atoms', 'copier']) await appFrame().locator('#mine .game').filter({ hasText: name }).waitFor({ timeout: 5000 });
+  const addMsg = await appFrame().locator('#addMsg').textContent();
+  if (await appFrame().locator('#mine .game').filter({ hasText: 'n64 test' }).count() || !addMsg.includes('Skipped 1 file')) throw new Error(`the N64 cartridge was taken: ${addMsg}`);
   const kinds = {};
   for (const card of await appFrame().locator('#mine .game').all()) {
     kinds[await card.locator('b').textContent()] = (await card.locator('small').textContent()).split(' · ')[0];
   }
-  if (kinds.falling !== 'PC Engine' || kinds.atoms !== 'Mega Drive / Genesis' || kinds.copier !== 'Mega Drive / Genesis' || kinds['n64 test'] !== 'Nintendo 64') {
+  if (kinds.falling !== 'PC Engine' || kinds.atoms !== 'Mega Drive / Genesis' || kinds.copier !== 'Mega Drive / Genesis') {
     throw new Error(`own games read as ${JSON.stringify(kinds)}`);
   }
   // The copier dump plays once unscrambled
@@ -707,85 +708,6 @@ await check('holders unlock with a phone and play Genesis, PC Engine and N64 gam
   await page.waitForTimeout(1500);
   if (!(parseInt(await appFrame().locator('#fps').textContent()) >= 50)) throw new Error('the .smd game isn\'t running');
   await appFrame().getByRole('button', { name: 'Games' }).click();
-
-  // The N64 test cartridge (tools/n64-test-rom.mjs) on n64js, in its worker:
-  // it shows blue, red while a button is held, green while the stick is
-  // pushed, and magenta at its next start once a button was pressed (it
-  // keeps that in its EEPROM), drawn by display lists as games draw; and it
-  // plays a tone
-  const n64Game = appFrame().locator('#mine .game').filter({ hasText: 'n64 test' });
-  const startN64 = async () => {
-    await n64Game.click();
-    await appFrame().locator('#fps').filter({ hasText: /fps/ }).waitFor({ timeout: 20000 });
-    await page.waitForTimeout(2500);
-  };
-  await startN64();
-  // in this browser's software GL the worker's canvas refreshes far less
-  // often (on a GPU it's 60 fps)
-  const n64Fps = parseInt(await appFrame().locator('#fps').textContent());
-  if (!(n64Fps >= 20)) throw new Error(`N64 test running at ${n64Fps} fps`);
-  const n64Labels = (await appFrame().locator('.ab [data-b=b], .ab [data-b=y], .pill[data-b=select], .pill[data-b=start], .cpad [data-b]').allTextContents()).join(' ');
-  if (n64Labels !== 'Z C▲ C◀ C▶ C▼ B A Start') throw new Error(`N64 buttons read "${n64Labels}"`);
-  const n64Box = await appFrame().locator('#display').boundingBox();
-  if (Math.abs(n64Box.width / n64Box.height - 4 / 3) > 0.03) throw new Error(`N64 screen is ${n64Box.width}x${n64Box.height}`);
-  // The worker's sound reaches the speaker, at the speaker's pace, with
-  // about 50 ms queued (less here: in this browser's software GL the
-  // emulator can fall behind, and the speaker then runs dry now and then)
-  const n64Worker = page.workers().find(w => w.url().includes('/retro/n64-worker.js'));
-  if (!n64Worker) throw new Error('no N64 worker');
-  const heard = () => n64Worker.evaluate(() => ({ written: sound.written, played: Atomics.load(sound.played, 0), rate: sound.rate }));
-  const before = await heard();
-  await page.waitForTimeout(1000);
-  const after = await heard();
-  const taken = (after.played - before.played) / after.rate, queued = (after.written - after.played) / after.rate;
-  const n64Sound = `${taken.toFixed(2)} s of sound taken in 1 s, ${Math.round(queued * 1000)} ms queued`;
-  if (!(taken > 0.5 && taken < 1.2) || !(queued >= 0 && queued < 0.15)) throw new Error(`N64 sound: ${n64Sound}`);
-  // Touches are sent as events: after a screenshot, real taps into the frame go astray
-  const colour = async () => {
-    const { width, height, data } = decodePng(await appFrame().locator('#display').screenshot());
-    const at = ((height >> 1) * width + (width >> 1)) * 4;
-    const [r, g, b] = data.subarray(at, at + 3);
-    const hi = v => v > 200, lo = v => v < 60;
-    return hi(r) && lo(g) && lo(b) ? 'red' : hi(g) && lo(r) && lo(b) ? 'green' : hi(b) && lo(r) && lo(g) ? 'blue'
-      : hi(r) && lo(g) && hi(b) ? 'magenta' : `${r},${g},${b}`;
-  };
-  const knob = () => appFrame().locator('#knob').evaluate(k => k.style.transform);
-  let knobHeld = '';
-  const hold = async (selector, dx = 0) => {
-    const el = appFrame().locator(selector);
-    const b = await el.boundingBox();
-    const frameBox = await page.locator('#frame').boundingBox();
-    const at = { clientX: b.x - frameBox.x + b.width / 2 + dx, clientY: b.y - frameBox.y + b.height / 2, pointerId: 7, bubbles: true };
-    await el.dispatchEvent('pointerdown', at);
-    await page.waitForTimeout(600);
-    const seen = await colour();
-    knobHeld = await knob();
-    await el.dispatchEvent('pointerup', at);
-    await page.waitForTimeout(300);
-    return seen;
-  };
-  const seen = { idle: await colour(), a: await hold('.ab [data-b=b]'), stick: await hold('#dpad', 45) };
-  if (seen.idle !== 'blue' || seen.a !== 'red' || seen.stick !== 'green') throw new Error(`N64 test shows ${JSON.stringify(seen)}`);
-  // the touch stick's knob follows the thumb, and goes back to the middle
-  const knobLeft = await knob();
-  if (!/^translate\(3\dpx, 0px\)$/.test(knobHeld) || knobLeft) throw new Error(`the stick's knob was at "${knobHeld}", then "${knobLeft}"`);
-  // Tapping the frame rate shows where the emulator's time goes, then hides it
-  await appFrame().locator('#fps').dispatchEvent('click');
-  await page.waitForTimeout(2500);
-  const n64Details = await appFrame().locator('#fps').textContent();
-  if (!/% busy · game \d+% · lists \d+% · gl \d+% · sound \d+% · \d+ drawn, \d+ skipped/.test(n64Details)) throw new Error(`N64 details read "${n64Details}"`);
-  await appFrame().locator('#player').screenshot({ path: shots + 'n64.png' });
-  await appFrame().locator('#fps').dispatchEvent('click');
-  await appFrame().getByRole('button', { name: 'Games' }).click();
-  // The EEPROM was kept: the next start shows magenta, and so does Reset
-  await startN64();
-  const kept = await colour();
-  await appFrame().locator('#resetBtn').click();
-  await appFrame().locator('#resetBtn').click();
-  await page.waitForTimeout(1500);
-  const afterReset = await colour();
-  if (kept !== 'magenta' || afterReset !== 'magenta') throw new Error(`N64 save: ${kept} at the next start, ${afterReset} after Reset`);
-  await appFrame().getByRole('button', { name: 'Games' }).click();
   await page.screenshot({ path: shots + 'holders.png' });
   // The ordinary Retro Console doesn't list the HuCard
   await openFromHub(/Retro Console/);
@@ -793,7 +715,7 @@ await check('holders unlock with a phone and play Genesis, PC Engine and N64 gam
   for (const name of ['falling', 'atoms', 'n64 test']) {
     if (await appFrame().locator('#mine .game').filter({ hasText: name }).count()) throw new Error(`${name} shows in the ordinary Retro Console`);
   }
-  console.log(`     Blox ${fps} fps, snapshot ${saved} bytes; KłełeAtoms ${mdFps} fps, snapshot ${mdSaved} bytes; N64 test ${n64Fps} fps, ${n64Sound}`);
+  console.log(`     Blox ${fps} fps, snapshot ${saved} bytes; KłełeAtoms ${mdFps} fps, snapshot ${mdSaved} bytes`);
 });
 
 await check('freedoom takes WADs from a phone', async () => {

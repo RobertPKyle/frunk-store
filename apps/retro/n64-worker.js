@@ -86,9 +86,18 @@ const nextFrame = self.requestAnimationFrame
   ? f => self.requestAnimationFrame(f)
   : f => setTimeout(() => f(performance.now()), 1000 / 60);
 
+// When a frame takes longer than the screen's refresh (a slow computer),
+// the next starts as soon as it's done rather than at the next refresh,
+// which would be time lost; each frame's picture still shows as it ends
+const soon = new MessageChannel();
+soon.port1.onmessage = () => tick(performance.now());
+const SLOW = 20;   // ms
+let slow = false;
+
 function tick(t) {
-  nextFrame(tick);
-  if (!game || paused || failed) { since = t; refreshes = working = 0; return; }
+  if (slow) soon.port2.postMessage(0);
+  else nextFrame(tick);
+  if (!game || paused || failed) { since = t; refreshes = working = 0; slow = false; return; }
   refreshes++;
   if (t - since >= 1000) {
     const elapsed = t - since;
@@ -106,7 +115,9 @@ function tick(t) {
   } catch (e) {
     error = e && e.message || String(e);
   }
-  working += performance.now() - started;
+  const took = performance.now() - started;
+  working += took;
+  slow = took > SLOW;
   if (error) {
     // n64js stopped on something it can't emulate
     failed = true;
@@ -122,13 +133,16 @@ nextFrame(tick);
 // The details readout's line: how much of the time (in percent) went to the
 // game's own code, reading its display lists, drawing (WebGL) and sound;
 // then the frames drawn and skipped each second, and the RSP tasks n64js
-// couldn't do itself (which run slowly, along with the game's code)
+// couldn't do itself each second, their kinds and how much of the time the
+// RSP was running them (slowly, a step at a time along with the game's
+// code, whose share includes it)
 function describe(p, working, elapsed) {
   const pc = ms => Math.round(ms * 100 / elapsed);
   const per = n => Math.round(n * 1000 / elapsed);
   const game = working - p.gl - p.lists - p.sound;
   return `game ${pc(game)}% · lists ${pc(p.lists)}% · gl ${pc(p.gl)}% · sound ${pc(p.sound)}%` +
-    ` · ${per(p.drawn)} drawn, ${per(p.skipped)} skipped` + (p.rsp ? ` · rsp ${per(p.rsp)}` : '');
+    ` · ${per(p.drawn)} drawn, ${per(p.skipped)} skipped` +
+    (p.rsp ? ` · rsp ${per(p.rsp)} ${p.rspKinds} ${pc(p.rspRunning)}%` : '');
 }
 
 async function load({ bytes, name }) {

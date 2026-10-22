@@ -144,7 +144,7 @@
 <section id="library">
   <header>
     <h1 data-only="retro">Retro Console</h1>
-    <h1 data-only="holders">Genesis, PC Engine &amp; N64 · Holders</h1>
+    <h1 data-only="holders">Genesis &amp; PC Engine · Holders</h1>
     <button class="btn" id="continue" type="button" hidden></button>
   </header>
   <div class="scroll">
@@ -158,7 +158,7 @@
       <button class="btn" id="addFiles" type="button">Add game files</button>
       <button class="btn" id="addFolder" type="button">Add a folder</button>
     </div>
-    <input id="fileInput" type="file" accept=".nes,.gb,.gbc,.gba,.sms,.gg,.sg,.pce,.md,.gen,.bin,.smd,.z64,.n64,.v64,.zip" multiple hidden>
+    <input id="fileInput" type="file" accept=".nes,.gb,.gbc,.gba,.sms,.gg,.sg,.pce,.md,.gen,.bin,.smd,.zip" multiple hidden>
     <input id="folderInput" type="file" webkitdirectory multiple hidden>
     <p class="note" id="addMsg" aria-live="polite"></p>
     <div class="games" id="mine"></div>
@@ -166,11 +166,9 @@
 
     <div class="legal">
       <p data-only="retro">Plays NES, Game Boy, Game Boy Color, Game Boy Advance, Master System, Game Gear and SG-1000 games (.nes, .gb, .gbc, .gba, .sms, .gg, .sg, also zipped). Mega Drive / Genesis and PC Engine / TurboGrafx-16 games are in early access for FrunkStore token holders, on the Holders card. Games remember your progress: they pick up where you left off, and Reset starts over (keeping in-game saves).</p>
-      <p data-only="holders">Plays Mega Drive / Genesis cartridges (.md, .gen, .bin, .smd), PC Engine / TurboGrafx-16 HuCard games (.pce) and Nintendo 64 cartridges (.z64, .n64, .v64), also zipped. Mega CD, 32X and PC Engine CD games aren't supported, nor are the few Mega Drive games that save to EEPROM chips or are bigger than 4 MB (Super Street Fighter II). Games remember your progress: they pick up where you left off, and Reset starts over (keeping in-game saves). Nintendo 64 support is an early test: many games are too heavy for the car's computer and run slowly, some don't run at all, and N64 games start from the title screen each time, keeping only their in-game saves. The FrunkStore token isn't an investment; frunk.store will never ask for your recovery phrase or a transaction.</p>
+      <p data-only="holders">Plays Mega Drive / Genesis cartridges (.md, .gen, .bin, .smd) and PC Engine / TurboGrafx-16 HuCard games (.pce), also zipped. Mega CD, 32X and PC Engine CD games aren't supported, nor are the few Mega Drive games that save to EEPROM chips or are bigger than 4 MB (Super Street Fighter II). Games remember your progress: they pick up where you left off, and Reset starts over (keeping in-game saves). The FrunkStore token isn't an investment; frunk.store will never ask for your recovery phrase or a transaction.</p>
       <p>Controls: a USB or Bluetooth controller, the on-screen buttons, or a keyboard (arrows, Z = B, X = A, Q = L, W = R, Enter = Start, Shift = Select). On Sega's consoles, B is button 1, A is button 2, and Start is the Master System's Pause button. On the PC Engine, B is II, A is I, and Start is Run. On the Mega Drive, a controller's left, bottom and right buttons are A, B and C (keys A, Z and X); the six-button pad's X, Y and Z are L, the top button and R, and Mode is Select. With a controller, the on-screen buttons hide to make the game bigger; touch the screen to bring them back. Switching the controller off pauses the game, and Start resumes it.</p>
       <p>Emulators: jsnes (Apache License 2.0) for NES, mGBA (Mozilla Public License 2.0, source at github.com/thenick775/mgba) for Game Boy, Gearsystem (GNU GPL 3 or later, source at frunk-apps.vercel.app/retro/sms/gearsystem-web-src.tar.gz) for Sega's consoles, Geargrafx (GNU GPL 3 or later, source at frunk-apps.vercel.app/retro/pce/geargrafx-web-src.tar.gz) for the PC Engine, clownmdemu (GNU AGPL 3 or later, source at frunk-apps.vercel.app/retro/md/clownmdemu-web-src.tar.gz) for the Mega Drive. The free games are by their authors, under the licenses shown on each card; source code is kept next to each game.</p>
-      <!-- Nintendo 64 is in testing: only the holders edition mentions it -->
-      <p data-only="holders">On the Nintendo 64, a controller's left stick is the stick, its bottom and left buttons are A and B, its triggers are Z, its right stick is the C buttons, and its D-pad is the D-pad; on screen, the round pad is the stick (push it further to go faster), and the keyboard's arrows move the stick, Z is A, A is B and Shift is Z. A second controller plays as player 2. Its emulator is n64js (MIT license, source at github.com/hulkholden/n64js).</p>
       <p>Not affiliated with or endorsed by Nintendo, Sega, NEC or Konami. Play only while parked.</p>
     </div>
   </div>

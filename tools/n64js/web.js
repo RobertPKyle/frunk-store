@@ -11,9 +11,10 @@
 // the worker (see sound()), and its saves, which it would keep in
 // localStorage, go to an object the worker stores (see load()).
 //
-// For slow computers (the car's), frames are left undrawn while the
-// emulator is behind (see "frame skipping"), and profile() says where the
-// time goes.
+// For slow computers (the car's), each frame is shown as it's worked out
+// rather than catching up (see run()), frames are left undrawn while the
+// emulator is behind and drawing is costly (see "frame skipping"), and
+// profile() says where the time goes.
 
 import { setDisplay } from './shims.js';
 import { simulateBoot } from './src/boot.js';
@@ -23,6 +24,7 @@ import { FramePacer } from './src/frame_pacer.js';
 import { Hardware } from './src/hardware.js';
 import { audioOptions } from './src/hle/audio/options.js';
 import { EmulationMode } from './src/hle/emulation_mode.js';
+import { TASK_OFFSET } from './src/hle/rsp_task_constants.js';
 import { graphics, initialiseRenderer } from './src/hle/graphics/hle_graphics.js';
 import { graphicsOptions } from './src/hle/graphics/graphics_options.js';
 import { Renderer } from './src/hle/graphics/renderer.js';
@@ -129,9 +131,15 @@ export function reset() {
   hardware.loadROM();
   simulateBoot(n64js.cpu0, hardware, rominfo);
   phase = lastL = lastR = 0;
+  rspStart = 0;
 }
 
-// Runs the frames due by now (at most 3), as src/n64.js's loop does;
+// A frame taking longer than this (ms) is one the screen has to wait for
+const SLOW_FRAME = 20;
+
+// Runs the frames due by now (at most 3), as src/n64.js's loop does, or
+// only one when a frame takes longer than the screen's refresh: catching up
+// is out of reach then, and the picture is only shown once run() returns;
 // returns false once the emulator has stopped on an error
 export function run(now) {
   if (error) return false;
@@ -143,6 +151,7 @@ export function run(now) {
   for (let i = 0; i < frames && !error; i++) {
     // sound is far enough ahead: let it catch up
     if (hardware.aiRegDevice.shouldSkipFrame()) break;
+    if (i && performance.now() - started > SLOW_FRAME) break;
     n64js.cpu0.run(100_000_000);
   }
   if (lastRun) share += ((performance.now() - started) / Math.max(1, now - lastRun) - share) * 0.1;
@@ -243,9 +252,10 @@ function play(address, length, frequency) {
 // sound, the rest being the game's own code. Measured only while asked for
 // (profile(true)), as the timing itself takes time.
 
-const spent = { gl: 0, lists: 0, sound: 0 };
+const spent = { gl: 0, lists: 0, sound: 0, rspRunning: 0 };
 const counts = { drawn: 0, skipped: 0, rsp: 0 };
-let profiling = false, bucket = null, mark = 0;
+const TASK_KINDS = { 1: 'graphics', 2: 'sound' };
+let profiling = false, bucket = null, mark = 0, rspKinds = new Set();
 
 // fn, with its time (less that of the timed calls it makes) added to spent[name]
 function timed(name, fn) {
@@ -274,10 +284,24 @@ const timedTask = fn => timed('lists', function () {
 graphics.processTask = timedTask(graphics.processTask);
 // The game starting an RSP task: sound tasks run here; graphics tasks are
 // put off (see above), and tasks n64js can't do itself start the RSP,
-// which then runs alongside the game's code and is counted with it
+// which then runs a step at a time alongside the game's code and is counted
+// with it (rspRunning: how long it ran, overlapping the rest)
 hardware.spRegDevice.spUpdateStatus = timed('sound', hardware.spRegDevice.spUpdateStatus);
-const unhalt = hardware.rsp.unhalt;
-hardware.rsp.unhalt = function () { counts.rsp++; return unhalt.apply(this, arguments); };
+const { unhalt, halt } = hardware.rsp;
+let rspStart = 0;
+hardware.rsp.unhalt = function () {
+  if (profiling) {
+    counts.rsp++;
+    rspKinds.add(TASK_KINDS[hardware.sp_mem.getU32(TASK_OFFSET)] || 'other');
+    if (this.halted) rspStart = performance.now();
+  }
+  return unhalt.apply(this, arguments);
+};
+hardware.rsp.halt = function () {
+  if (rspStart) spent.rspRunning += performance.now() - rspStart;
+  rspStart = 0;
+  return halt.apply(this, arguments);
+};
 
 const R = Renderer.prototype;
 for (const name of ['flushTris', 'lleRect', 'fillRect', 'clearColor', 'clearDepth', 'copyTextureToFrontBuffer', 'copyPixelsToFrontBuffer']) {
@@ -286,32 +310,50 @@ for (const name of ['flushTris', 'lleRect', 'fillRect', 'clearColor', 'clearDept
 
 // Switches measuring on or off, and returns what was measured since the
 // last call: milliseconds in each part, frames drawn and skipped, and RSP
-// tasks n64js couldn't do itself
+// tasks n64js couldn't do itself, with their kinds ('sound', 'graphics')
 export function profile(on) {
-  const result = { ...spent, ...counts };
+  if (rspStart) {
+    // the RSP is running: count it up to now, and on from here
+    const now = performance.now();
+    spent.rspRunning += now - rspStart;
+    rspStart = on ? now : 0;
+  }
+  const result = { ...spent, ...counts, rspKinds: [...rspKinds].join(' and ') };
   profiling = on;
   for (const key in spent) spent[key] = 0;
   for (const key in counts) counts[key] = 0;
+  rspKinds = new Set();
   return result;
 }
 
 // ---------- frame skipping ----------
-// While the emulator is behind, some frames aren't drawn, only worked out:
-// a frame's picture is decided on when the game starts drawing into it (a
-// colour image that has been shown before), and isn't shown if skipped, so
-// the screen keeps the last one drawn. At least one in MAX_SKIP + 1 is drawn.
+// While the emulator is behind, and drawing takes more than DRAW_SHARE of
+// the time of the frames drawn, some frames aren't drawn, only worked out
+// (when drawing is cheap, skipping it would save little and leave the
+// picture still): a frame's picture is decided on when the game starts
+// drawing into it (a colour image that has been shown before), and isn't
+// shown if skipped, so the screen keeps the last one drawn. At least one in
+// MAX_SKIP + 1 is drawn.
 
-const MAX_SKIP = 2;
-// share: how much of the time run() takes (smoothed over a few frames)
+const MAX_SKIP = 2, DRAW_SHARE = 0.2;
+// share: how much of the time run() takes (smoothed over a few frames);
+// drawing: ms spent drawing the frame being worked out, which started at
+// frameStart; drawShare: drawing's share of a drawn frame's time (smoothed)
 let behind = false, skipping = 0, share = 0, lastRun = 0;
+let drawing = 0, drawShare = 0, frameStart = 0, lastSkipped = false;
 
 const setColorImage = R.setColorImage;
 R.setColorImage = function (image) {
   setColorImage.call(this, image);
   const target = this.renderTargets.current;
   if (!target.shown || target.decided) return;
+  const now = performance.now();
+  if (frameStart && !lastSkipped) drawShare += (drawing / Math.max(1, now - frameStart) - drawShare) * 0.25;
+  frameStart = now;
+  drawing = 0;
   target.decided = true;
-  target.skip = behind && skipping < MAX_SKIP;
+  target.skip = behind && drawShare > DRAW_SHARE && skipping < MAX_SKIP;
+  lastSkipped = target.skip;
   skipping = target.skip ? skipping + 1 : 0;
   counts[target.skip ? 'skipped' : 'drawn']++;
 };
@@ -319,9 +361,17 @@ R.setColorImage = function (image) {
 for (const name of ['flushTris', 'lleRect', 'fillRect', 'clearColor', 'clearDepth']) {
   const draw = R[name];
   R[name] = function (batch) {
-    if (!this.renderTargets.current.skip) return draw.apply(this, arguments);
-    // (a batch of triangles is emptied once drawn)
-    if (name === 'flushTris') batch.reset();
+    if (this.renderTargets.current.skip) {
+      // (a batch of triangles is emptied once drawn)
+      if (name === 'flushTris') batch.reset();
+      return;
+    }
+    const start = performance.now();
+    try {
+      return draw.apply(this, arguments);
+    } finally {
+      drawing += performance.now() - start;
+    }
   };
 }
 
