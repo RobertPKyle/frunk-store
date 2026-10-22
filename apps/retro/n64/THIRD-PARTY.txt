@@ -1,0 +1,30 @@
+n64js 1eb54aa55fa55db831f7491a289ec55afc7a1688, by Paul Holden, MIT license (LICENSE).
+It includes a CRT shader adapted from crtemu by Mattias Gustavsson:
+
+Mattias CRT presentation, adapted from crtemu_pc.h by Mattias Gustavsson:
+https://github.com/mattiasgustavsson/crtview/blob/de7897958ac1f346ca7fa3dbf5a57dab5fcc5bb3/source/crtemu_pc.h
+Visual reference: MattiasCRT, https://www.shadertoy.com/view/Ms23DR
+
+n64js adaptation: one presentation pass, spatial ghosts sampled from the current
+frame, VI-based animated scanlines, and no frame overlay or temporal blur buffers.
+The original offers MIT or public domain licensing; this adaptation uses MIT.
+
+Copyright (c) 2016 Mattias Gustavsson
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of
+this software and associated documentation files (the "Software"), to deal in
+the Software without restriction, including without limitation the rights to
+use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+of the Software, and to permit persons to whom the Software is furnished to do
+so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

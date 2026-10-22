@@ -157,8 +157,8 @@
     },
     {
       "id": "pce",
-      "name": "Genesis & PC Engine",
-      "tagline": "Mega Drive / Genesis and TurboGrafx-16 games for FrunkStore token holders: free homebrew, or cartridges you own.",
+      "name": "Genesis, PC Engine & N64",
+      "tagline": "Mega Drive / Genesis, TurboGrafx-16 and Nintendo 64 games for FrunkStore token holders: free homebrew, or cartridges you own.",
       "path": "/retro/?edition=holders",
       "icon": "/retro/icon.svg",
       "tags": [

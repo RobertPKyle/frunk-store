@@ -16,6 +16,7 @@ export const SYSTEMS = {
   pce: { name: 'PC Engine', exts: ['pce'], max: 2560 * 1024 + 512 },   // Street Fighter II' is the biggest HuCard
   // clownmdemu has no bank switching, so the 5 MB Super Street Fighter II is out
   md: { name: 'Mega Drive / Genesis', exts: ['md', 'gen', 'bin', 'smd'], max: 4 * MB },
+  n64: { name: 'Nintendo 64', exts: ['z64', 'n64', 'v64'], max: 64 * MB },
 };
 
 export const GAME_EXTS = Object.values(SYSTEMS).flatMap(s => s.exts);
@@ -62,6 +63,10 @@ export function systemOf(bytes, name = '') {
   // HuCards are whole multiples of 8 KB, some dumps with a 512-byte header
   if (ext(name) === 'pce' && bytes.length >= 8192 && [0, 512].includes(bytes.length % 8192)) return 'pce';
   if (SYSTEMS.md.exts.includes(ext(name)) && mdHeader(unSmd(bytes))) return 'md';
+  // N64 cartridges start with the same word, in one of three byte orders
+  // (.z64 as on the cartridge, .v64 with byte pairs swapped, .n64 with each
+  // four reversed); n64js puts them right
+  if (bytes.length >= 0x1000 && [[0x80, 0x37, 0x12, 0x40], [0x37, 0x80, 0x40, 0x12], [0x40, 0x12, 0x37, 0x80]].some(sig => at(bytes, 0, sig))) return 'n64';
   return null;
 }
 

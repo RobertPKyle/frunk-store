@@ -121,7 +121,27 @@ to the cache again.
   4 MB), and leaves out the Mega CD here. All three run in workers
   (`sms-worker.js`, `pce-worker.js`, `md-worker.js`, sharing
   `gear-worker.js`) the way jsnes runs in its own (the page side is
-  `worker-core.js`). Gearsystem takes about 0.5 ms a frame on a desktop
+  `worker-core.js`). Nintendo 64 cartridges (holders edition only, an
+  early test, so only the holders edition names it: not the hub's grid,
+  the ordinary edition, the phone page or the holders' lock screen) run on n64js (MIT, pure JavaScript, unmodified, commit
+  1eb54aa), bundled by `npm run build:n64` (`tools/build-n64js.mjs` runs
+  Bun's bundler through npx on n64js's sources plus `tools/n64js/web.js`,
+  which stands in for n64js's own page and debugger, and
+  `tools/n64js/shims.js`, stand-ins for the page globals it expects; output
+  in `apps/retro/n64/`, committed). It runs in `n64-worker.js` like the other
+  cores (it compiles the game's code to JavaScript and draws with WebGL 2 to
+  the OffscreenCanvas). Its sound is resampled to the speaker's rate and
+  paced by a shared count of the samples the AudioWorklet has taken (about
+  50 ms queued, frames skipped past 100 ms, as n64js does with Web Audio).
+  In-game saves go to IndexedDB ("n64"); there are no snapshots. Tapping
+  the frame rate also shows how busy the emulator is. Today's free N64
+  homebrew uses libdragon's boot code, which n64js doesn't boot, so there's
+  no free N64 game; the e2e check plays a tiny test cartridge made by
+  `tools/n64-test-rom.mjs` (picture, controller, tone and EEPROM save). On
+  the N64 the touch D-pad is an analog stick with a knob, and a second
+  controller plays as player 2. Moving n64js off the page's main thread
+  took the test cartridge's page load from 812 to 5 ms a second with the
+  CPU slowed 4.5x. Gearsystem takes about 0.5 ms a frame on a desktop
   (2.2 ms with the CPU slowed 4.5x), Geargrafx 1.5 ms (6.7 ms slowed),
   clownmdemu 1.4 ms (7.7 ms slowed). The console is picked from the file's
   header (Sega's 8-bit consoles' and the PC Engine's by name, .sms, .gg, .sg
@@ -589,6 +609,7 @@ npm run build:puzzles                   # Simon Tatham's Puzzles + their help an
 npm run build:sms                       # Gearsystem for Retro Console (needs Docker); output is committed, rerun only to update it
 npm run build:pce                       # Geargrafx for Retro Console (needs Docker); output is committed, rerun only to update it
 npm run build:md                        # clownmdemu for Retro Console (needs Docker); output is committed, rerun only to update it
+npm run build:n64                       # n64js for Retro Console (needs npx to fetch Bun); output is committed, rerun only to update it
 npm run dev                             # hub on localhost:5173, apps on 127.0.0.1:5174
 npm run test:e2e                        # checks against the dev server
 node tools/e2e.mjs https://frunk.store  # checks against production

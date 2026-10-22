@@ -98,14 +98,33 @@
   #player[data-system=md] .ab [data-b=y] { display: block; left: 0; top: 70px; }
   #player[data-system=md] .ab [data-b=b] { left: 44px; top: 38px; bottom: auto; }
   #player[data-system=md] .ab [data-b=a] { left: 88px; top: 6px; right: auto; }
-  .ab button.on, .pill.on { filter: brightness(1.4); transform: scale(.94); }
+  /* the N64's A below its B, and its four C buttons above them */
+  #player[data-system=n64] .ab [data-b=a] { display: none; }
+  #player[data-system=n64] .ab [data-b=b] { left: 52px; bottom: 6px; top: auto; right: auto; }
+  #player[data-system=n64] .ab [data-b=y] { display: block; left: 0; top: 14px; width: 48px; height: 48px; font-size: 18px; }
+  .cpad { display: none; position: relative; width: 96px; height: 96px; }
+  #player[data-system=n64] .cpad { display: block; }
+  .cpad button { position: absolute; width: 36px; height: 36px; border-radius: 50%; border: 0; background: var(--accent2); color: #1a1405; font-size: 13px; font-weight: 800; }
+  .cpad [data-b=cu] { left: 30px; top: 0; }
+  .cpad [data-b=cd] { left: 30px; bottom: 0; }
+  .cpad [data-b=cl] { left: 0; top: 30px; }
+  .cpad [data-b=cr] { right: 0; top: 30px; }
+  /* the N64's stick: the round pad with a knob that follows the thumb, and a bigger Z */
+  .dpad .knob { display: none; position: absolute; left: 50%; top: 50%; width: 52px; height: 52px; margin: -26px 0 0 -26px; border-radius: 50%;
+                background: #4a4a60; border: 1px solid var(--line); box-shadow: 0 2px 6px rgba(0, 0, 0, .5); pointer-events: none; }
+  #player[data-system=n64] .dpad i { display: none; }
+  #player[data-system=n64] .dpad .knob { display: block; }
+  #player[data-system=n64] .pill[data-b=select] { min-width: 96px; min-height: 48px; font-size: 16px; font-weight: 700; color: var(--text); }
+  /* 3D games look better smoothed than as blocks of pixels */
+  #display { image-rendering: auto; }
+  .ab button.on, .pill.on, .cpad button.on { filter: brightness(1.4); transform: scale(.94); }
   .pills { display: flex; gap: 8px; }
   .pill { min-height: 40px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--line); background: #1d1d29; font-size: 13px; color: var(--muted); }
   /* a controller is in use: the game takes the on-screen buttons' room */
   #player.pad .side { display: none; }
   #player.pad .screen { grid-column: 1 / -1; }
   .shoulder { min-width: 96px; font-size: 15px; font-weight: 700; color: var(--text); }
-  #player:not([data-system=gba]) .shoulder { display: none; }
+  #player:not([data-system=gba], [data-system=n64]) .shoulder { display: none; }
   /* Sega's consoles have no Select */
   #player:is([data-system=sms], [data-system=gg], [data-system=sg]) [data-b=select] { visibility: hidden; }
   /* the Mega Drive's Mode button is only on the six-button pad, so it stays on controllers */
@@ -125,7 +144,7 @@
 <section id="library">
   <header>
     <h1 data-only="retro">Retro Console</h1>
-    <h1 data-only="holders">Genesis &amp; PC Engine · Holders</h1>
+    <h1 data-only="holders">Genesis, PC Engine &amp; N64 · Holders</h1>
     <button class="btn" id="continue" type="button" hidden></button>
   </header>
   <div class="scroll">
@@ -139,7 +158,7 @@
       <button class="btn" id="addFiles" type="button">Add game files</button>
       <button class="btn" id="addFolder" type="button">Add a folder</button>
     </div>
-    <input id="fileInput" type="file" accept=".nes,.gb,.gbc,.gba,.sms,.gg,.sg,.pce,.md,.gen,.bin,.smd,.zip" multiple hidden>
+    <input id="fileInput" type="file" accept=".nes,.gb,.gbc,.gba,.sms,.gg,.sg,.pce,.md,.gen,.bin,.smd,.z64,.n64,.v64,.zip" multiple hidden>
     <input id="folderInput" type="file" webkitdirectory multiple hidden>
     <p class="note" id="addMsg" aria-live="polite"></p>
     <div class="games" id="mine"></div>
@@ -147,9 +166,11 @@
 
     <div class="legal">
       <p data-only="retro">Plays NES, Game Boy, Game Boy Color, Game Boy Advance, Master System, Game Gear and SG-1000 games (.nes, .gb, .gbc, .gba, .sms, .gg, .sg, also zipped). Mega Drive / Genesis and PC Engine / TurboGrafx-16 games are in early access for FrunkStore token holders, on the Holders card. Games remember your progress: they pick up where you left off, and Reset starts over (keeping in-game saves).</p>
-      <p data-only="holders">Plays Mega Drive / Genesis cartridges (.md, .gen, .bin, .smd) and PC Engine / TurboGrafx-16 HuCard games (.pce), also zipped. Mega CD, 32X and PC Engine CD games aren't supported, nor are the few Mega Drive games that save to EEPROM chips or are bigger than 4 MB (Super Street Fighter II). Games remember your progress: they pick up where you left off, and Reset starts over (keeping in-game saves). The FrunkStore token isn't an investment; frunk.store will never ask for your recovery phrase or a transaction.</p>
+      <p data-only="holders">Plays Mega Drive / Genesis cartridges (.md, .gen, .bin, .smd), PC Engine / TurboGrafx-16 HuCard games (.pce) and Nintendo 64 cartridges (.z64, .n64, .v64), also zipped. Mega CD, 32X and PC Engine CD games aren't supported, nor are the few Mega Drive games that save to EEPROM chips or are bigger than 4 MB (Super Street Fighter II). Games remember your progress: they pick up where you left off, and Reset starts over (keeping in-game saves). Nintendo 64 support is an early test: many games are too heavy for the car's computer and run slowly, some don't run at all, and N64 games start from the title screen each time, keeping only their in-game saves. The FrunkStore token isn't an investment; frunk.store will never ask for your recovery phrase or a transaction.</p>
       <p>Controls: a USB or Bluetooth controller, the on-screen buttons, or a keyboard (arrows, Z = B, X = A, Q = L, W = R, Enter = Start, Shift = Select). On Sega's consoles, B is button 1, A is button 2, and Start is the Master System's Pause button. On the PC Engine, B is II, A is I, and Start is Run. On the Mega Drive, a controller's left, bottom and right buttons are A, B and C (keys A, Z and X); the six-button pad's X, Y and Z are L, the top button and R, and Mode is Select. With a controller, the on-screen buttons hide to make the game bigger; touch the screen to bring them back. Switching the controller off pauses the game, and Start resumes it.</p>
       <p>Emulators: jsnes (Apache License 2.0) for NES, mGBA (Mozilla Public License 2.0, source at github.com/thenick775/mgba) for Game Boy, Gearsystem (GNU GPL 3 or later, source at frunk-apps.vercel.app/retro/sms/gearsystem-web-src.tar.gz) for Sega's consoles, Geargrafx (GNU GPL 3 or later, source at frunk-apps.vercel.app/retro/pce/geargrafx-web-src.tar.gz) for the PC Engine, clownmdemu (GNU AGPL 3 or later, source at frunk-apps.vercel.app/retro/md/clownmdemu-web-src.tar.gz) for the Mega Drive. The free games are by their authors, under the licenses shown on each card; source code is kept next to each game.</p>
+      <!-- Nintendo 64 is in testing: only the holders edition mentions it -->
+      <p data-only="holders">On the Nintendo 64, a controller's left stick is the stick, its bottom and left buttons are A and B, its triggers are Z, its right stick is the C buttons, and its D-pad is the D-pad; on screen, the round pad is the stick (push it further to go faster), and the keyboard's arrows move the stick, Z is A, A is B and Shift is Z. A second controller plays as player 2. Its emulator is n64js (MIT license, source at github.com/hulkholden/n64js).</p>
       <p>Not affiliated with or endorsed by Nintendo, Sega, NEC or Konami. Play only while parked.</p>
     </div>
   </div>
@@ -196,7 +217,7 @@
   </div>
   <div class="side left">
     <button class="pill shoulder" type="button" data-b="l">L</button>
-    <div class="dpad" id="dpad"><i class="h"></i><i class="v"></i></div>
+    <div class="dpad" id="dpad"><i class="h"></i><i class="v"></i><b class="knob" id="knob"></b></div>
     <div class="pills"><button class="pill" type="button" data-b="select">Select</button></div>
   </div>
   <div class="screen">
@@ -205,10 +226,13 @@
     <canvas id="smsScreen" width="256" height="192" hidden></canvas>
     <canvas id="pceScreen" width="256" height="224" hidden></canvas>
     <canvas id="mdScreen" width="320" height="224" hidden></canvas>
+    <!-- n64js finds its canvas by this id -->
+    <canvas id="display" width="320" height="240" hidden></canvas>
     <div id="paused" hidden>Paused<small>Tap here or press Start to resume</small></div>
   </div>
   <div class="side right">
     <button class="pill shoulder" type="button" data-b="r">R</button>
+    <div class="cpad"><button type="button" data-b="cu" aria-label="C up">C▲</button><button type="button" data-b="cl" aria-label="C left">C◀</button><button type="button" data-b="cr" aria-label="C right">C▶</button><button type="button" data-b="cd" aria-label="C down">C▼</button></div>
     <div class="ab"><button type="button" data-b="y">Y</button><button type="button" data-b="b">B</button><button type="button" data-b="a">A</button></div>
     <div class="pills"><button class="pill" type="button" data-b="start">Start</button></div>
   </div>
