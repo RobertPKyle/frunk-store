@@ -21,10 +21,13 @@
 //   { type: 'input', buttons: [p1, p2] }     held buttons as bitmasks (or what the
 //                                            core's encode() makes of the input)
 //   { type: 'pause', on } / { type: 'reset' }
+//   { type: 'detail', on }                   the details readout is shown, or hidden
 //   { id, type: 'save' }, { id, type: 'quit' }  -> { id } once saved
 // and from the worker, { type: 'frames', n, hz, steady, width?, height?, busy? } a
-// few times a second when there's no shared counter, and { type: 'failed',
-// error } when the emulator stops on something it can't do.
+// few times a second when there's no shared counter, { type: 'failed',
+// error } when the emulator stops on something it can't do, and { type:
+// 'detail', text } each second while the details readout is shown, from a
+// worker with more to say there.
 
 // Samples arrive from the worker in batches on a port, into a ring buffer of
 // about 170 ms. With a shared counter (sent before the port), it counts the
@@ -86,6 +89,7 @@ export function createWorkerCore(canvas, { system, worker: url, module = false, 
       worker.onmessage = ({ data }) => {
         if (data.type === 'frames') { fromWorker = data; return; }
         if (data.type === 'failed') { core.failed = `stopped: ${String(data.error).slice(0, 60)}`; return; }
+        if (data.type === 'detail') { core.detail = data.text; return; }
         const done = waiting.get(data.id);
         waiting.delete(data.id);
         if (done) done(data);
@@ -139,6 +143,8 @@ export function createWorkerCore(canvas, { system, worker: url, module = false, 
 
   const core = {
     system, canvas, failed: '',
+    // More for the details readout, from workers that measure it (see details())
+    detail: '',
     get width() { return (count ? Atomics.load(count, 3) : fromWorker.width) || width; },
     get height() { return (count ? Atomics.load(count, 4) : fromWorker.height) || height; },
     get frames() { return count ? Atomics.load(count, 0) : fromWorker.n; },
@@ -196,6 +202,13 @@ export function createWorkerCore(canvas, { system, worker: url, module = false, 
       soundOn = on;
       if (audio.ctx && !paused) (on ? audio.ctx.resume() : audio.ctx.suspend()).catch(() => {});
       if (worker) worker.postMessage({ type: 'sound', on });
+    },
+
+    // The details readout is shown (or hidden): workers that can, measure
+    // where their time goes, at some cost to their speed
+    details(on) {
+      if (!on) core.detail = '';
+      thread().postMessage({ type: 'detail', on });
     },
 
     // Saves everything now, for when the page may be about to close

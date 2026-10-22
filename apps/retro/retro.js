@@ -503,9 +503,14 @@ let steady = false, slowSeconds = 0, startedAt = 0;
 
 // Tapping the frame rate shows details for checking speed in the car: how
 // often the screen refreshed (60 when the page keeps up) and, for the N64,
-// how much of the time its emulator is busy (near 100 when it can't keep up)
+// how much of the time its emulator is busy (near 100 when it can't keep
+// up) and what it's busy with
 let details = settings.get('details', false);
-$('fps').onclick = () => { details = !details; settings.set('details', details); };
+$('fps').onclick = () => {
+  details = !details;
+  settings.set('details', details);
+  core?.details?.(details);
+};
 
 function loop(t) {
   raf = requestAnimationFrame(loop);
@@ -535,7 +540,8 @@ function loop(t) {
     // Master System, PC Engine and Mega Drive games can change their picture's size while they run
     if (core.width !== fitted.width || core.height !== fitted.height) fit();
     $('fps').textContent = core.failed || `${Math.round((core.frames - frames) * 1000 / (t - fpsSince))} fps` +
-      (details ? ` · ${hz} Hz${steady ? ' · steady' : ''}${core.busy ? ` · ${core.busy}% busy` : ''}` : '');
+      (details ? ` · ${hz} Hz${steady ? ' · steady' : ''}${core.busy ? ` · ${core.busy}% busy` : ''}` +
+        (core.detail ? ` · ${core.detail}` : '') : '');
     frames = core.frames;
     fpsSince = t;
     refreshes = 0;
@@ -616,6 +622,7 @@ async function play(title, system, bytes, fileName) {
   $('player').hidden = false;
   showSound();
   fit();
+  core.details?.(details);
   setPaused(false);
   frames = core.frames; fpsSince = startedAt = performance.now(); refreshes = 0;
   steady = false; slowSeconds = 0;

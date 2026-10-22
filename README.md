@@ -133,11 +133,21 @@ to the cache again.
   the OffscreenCanvas). Its sound is resampled to the speaker's rate and
   paced by a shared count of the samples the AudioWorklet has taken (about
   50 ms queued, frames skipped past 100 ms, as n64js does with Web Audio).
-  In-game saves go to IndexedDB ("n64"); there are no snapshots. Tapping
-  the frame rate also shows how busy the emulator is. Today's free N64
+  In-game saves go to IndexedDB ("n64"); there are no snapshots. While the
+  emulator is busy over 80% of the time and frames are overdue, up to two
+  in three frames are worked out but not drawn (and not shown), and with
+  sound off the game's audio tasks are skipped. Tapping the frame rate also
+  shows how busy the emulator is, and how much of that is the game's code,
+  its display lists, WebGL drawing and sound, and the frames drawn and
+  skipped (measured only while shown). A first car test (2026-10-22) ran
+  at about 10 fps (a sixth of full speed), 98% busy. Today's free N64
   homebrew uses libdragon's boot code, which n64js doesn't boot, so there's
   no free N64 game; the e2e check plays a tiny test cartridge made by
-  `tools/n64-test-rom.mjs` (picture, controller, tone and EEPROM save). On
+  `tools/n64-test-rom.mjs` (double-buffered display lists drawn by n64js's
+  Fast3D emulation, controller, tone and EEPROM save; `n64TestRom({
+  triangles: 9000 })` makes it heavy enough to need frame skipping). Dropping
+  WebGL calls that change nothing was tried and saved under 10% of the
+  drawing time, so it was left out. On
   the N64 the touch D-pad is an analog stick with a knob, and a second
   controller plays as player 2. Moving n64js off the page's main thread
   took the test cartridge's page load from 812 to 5 ms a second with the

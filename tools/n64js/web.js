@@ -10,6 +10,10 @@
 // which it would play with Web Audio nodes, is resampled here and handed to
 // the worker (see sound()), and its saves, which it would keep in
 // localStorage, go to an object the worker stores (see load()).
+//
+// For slow computers (the car's), frames are left undrawn while the
+// emulator is behind (see "frame skipping"), and profile() says where the
+// time goes.
 
 import { setDisplay } from './shims.js';
 import { simulateBoot } from './src/boot.js';
@@ -17,8 +21,11 @@ import { ControllerInputs } from './src/controllers.js';
 import { fixRomByteOrder } from './src/endian.js';
 import { FramePacer } from './src/frame_pacer.js';
 import { Hardware } from './src/hardware.js';
+import { audioOptions } from './src/hle/audio/options.js';
+import { EmulationMode } from './src/hle/emulation_mode.js';
 import { graphics, initialiseRenderer } from './src/hle/graphics/hle_graphics.js';
 import { graphicsOptions } from './src/hle/graphics/graphics_options.js';
+import { Renderer } from './src/hle/graphics/renderer.js';
 import { Joybus } from './src/joybus.js';
 import { initCPU } from './src/cpu/r4300.js';
 import { romdb, generateRomId, generateCICType, uint8ArrayReadString } from './src/romdb.js';
@@ -126,16 +133,25 @@ export function reset() {
 export function run(now) {
   if (error) return false;
   const frames = pacer.framesDue(now, hardware.viRegDevice.refreshRate);
+  // Behind: more than one frame due, and the emulator busy most of the
+  // time lately (not only a screen that refreshes less often than 60 Hz)
+  behind = frames > 1 && share > 0.8;
+  const started = performance.now();
   for (let i = 0; i < frames && !error; i++) {
     // sound is far enough ahead: let it catch up
     if (hardware.aiRegDevice.shouldSkipFrame()) break;
     n64js.cpu0.run(100_000_000);
   }
+  if (lastRun) share += ((performance.now() - started) / Math.max(1, now - lastRun) - share) * 0.1;
+  lastRun = now;
   return !error;
 }
 
 // After a pause, carry on from now rather than catching up
-export const resume = () => pacer.reset();
+export function resume() {
+  pacer.reset();
+  lastRun = 0;
+}
 
 // A controller's buttons (the N64 bitmask) and stick (-128 to 127, up
 // positive). Port 1 is always plugged in; plug() sets the others.
@@ -166,19 +182,21 @@ const TARGET_LEAD = 0.05, MAX_LEAD = 0.1, MAX_NUDGE = 0.005;
 let out = null;   // { rate, send(left, right), lead() -> seconds queued, or null when unknown }
 let phase = 0, lastL = 0, lastR = 0;
 
-// Where sound goes (null for nowhere)
+// Where sound goes (null for nowhere). With nowhere, the game's sound isn't
+// made at all (its audio tasks are let off), which saves some time.
 export function sound(sink) {
   out = sink;
   phase = lastL = lastR = 0;
+  audioOptions.emulationMode = sink ? EmulationMode.HLE : EmulationMode.Disabled;
 }
 
 // The audio interface's timing and interrupts stay n64js's own
 const ai = hardware.aiRegDevice;
-ai.startPlayback = function () {
+ai.startPlayback = timed('sound', function () {
   if (out) play(this.dmaAddresses[0], this.dmaLengths[0], this.frequency);
   this.raiseAI();
   this.addAIDMAEvent(this.dmaDurations[0]);
-};
+});
 ai.shouldSkipFrame = () => {
   const lead = out ? out.lead() : null;
   return lead !== null && lead > MAX_LEAD;
@@ -215,3 +233,100 @@ function play(address, length, frequency) {
   lastL = xl[n]; lastR = xr[n];
   out.send(l.subarray(0, k), r.subarray(0, k));
 }
+
+// ---------- where the time goes ----------
+// For the details readout: the time spent in WebGL calls (drawing), in the
+// rest of the graphics tasks (reading the game's display lists) and making
+// sound, the rest being the game's own code. Measured only while asked for
+// (profile(true)), as the timing itself takes time.
+
+const spent = { gl: 0, lists: 0, sound: 0 };
+const counts = { drawn: 0, skipped: 0, rsp: 0 };
+let profiling = false, bucket = null, mark = 0;
+
+// fn, with its time (less that of the timed calls it makes) added to spent[name]
+function timed(name, fn) {
+  return function () {
+    if (!profiling) return fn.apply(this, arguments);
+    const outer = bucket, start = performance.now();
+    if (outer) spent[outer] += start - mark;
+    bucket = name;
+    mark = start;
+    try {
+      return fn.apply(this, arguments);
+    } finally {
+      const end = performance.now();
+      spent[name] += end - mark;
+      bucket = outer;
+      mark = end;
+    }
+  };
+}
+
+// A graphics task returns a function to carry on with when it has to wait
+const timedTask = fn => timed('lists', function () {
+  const next = fn.apply(this, arguments);
+  return typeof next === 'function' ? timedTask(next) : next;
+});
+graphics.processTask = timedTask(graphics.processTask);
+// The game starting an RSP task: sound tasks run here; graphics tasks are
+// put off (see above), and tasks n64js can't do itself start the RSP,
+// which then runs alongside the game's code and is counted with it
+hardware.spRegDevice.spUpdateStatus = timed('sound', hardware.spRegDevice.spUpdateStatus);
+const unhalt = hardware.rsp.unhalt;
+hardware.rsp.unhalt = function () { counts.rsp++; return unhalt.apply(this, arguments); };
+
+const R = Renderer.prototype;
+for (const name of ['flushTris', 'lleRect', 'fillRect', 'clearColor', 'clearDepth', 'copyTextureToFrontBuffer', 'copyPixelsToFrontBuffer']) {
+  R[name] = timed('gl', R[name]);
+}
+
+// Switches measuring on or off, and returns what was measured since the
+// last call: milliseconds in each part, frames drawn and skipped, and RSP
+// tasks n64js couldn't do itself
+export function profile(on) {
+  const result = { ...spent, ...counts };
+  profiling = on;
+  for (const key in spent) spent[key] = 0;
+  for (const key in counts) counts[key] = 0;
+  return result;
+}
+
+// ---------- frame skipping ----------
+// While the emulator is behind, some frames aren't drawn, only worked out:
+// a frame's picture is decided on when the game starts drawing into it (a
+// colour image that has been shown before), and isn't shown if skipped, so
+// the screen keeps the last one drawn. At least one in MAX_SKIP + 1 is drawn.
+
+const MAX_SKIP = 2;
+// share: how much of the time run() takes (smoothed over a few frames)
+let behind = false, skipping = 0, share = 0, lastRun = 0;
+
+const setColorImage = R.setColorImage;
+R.setColorImage = function (image) {
+  setColorImage.call(this, image);
+  const target = this.renderTargets.current;
+  if (!target.shown || target.decided) return;
+  target.decided = true;
+  target.skip = behind && skipping < MAX_SKIP;
+  skipping = target.skip ? skipping + 1 : 0;
+  counts[target.skip ? 'skipped' : 'drawn']++;
+};
+
+for (const name of ['flushTris', 'lleRect', 'fillRect', 'clearColor', 'clearDepth']) {
+  const draw = R[name];
+  R[name] = function (batch) {
+    if (!this.renderTargets.current.skip) return draw.apply(this, arguments);
+    // (a batch of triangles is emptied once drawn)
+    if (name === 'flushTris') batch.reset();
+  };
+}
+
+const present = R.copyBackBufferToFrontBuffer;
+R.copyBackBufferToFrontBuffer = function (address) {
+  const target = this.renderTargets.targetForVI(address);
+  target.shown = true;
+  target.decided = false;
+  if (!target.skip) present.apply(this, arguments);
+};
+

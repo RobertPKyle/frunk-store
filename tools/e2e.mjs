@@ -711,7 +711,8 @@ await check('holders unlock with a phone and play Genesis, PC Engine and N64 gam
   // The N64 test cartridge (tools/n64-test-rom.mjs) on n64js, in its worker:
   // it shows blue, red while a button is held, green while the stick is
   // pushed, and magenta at its next start once a button was pressed (it
-  // keeps that in its EEPROM); and it plays a tone
+  // keeps that in its EEPROM), drawn by display lists as games draw; and it
+  // plays a tone
   const n64Game = appFrame().locator('#mine .game').filter({ hasText: 'n64 test' });
   const startN64 = async () => {
     await n64Game.click();
@@ -768,7 +769,13 @@ await check('holders unlock with a phone and play Genesis, PC Engine and N64 gam
   // the touch stick's knob follows the thumb, and goes back to the middle
   const knobLeft = await knob();
   if (!/^translate\(3\dpx, 0px\)$/.test(knobHeld) || knobLeft) throw new Error(`the stick's knob was at "${knobHeld}", then "${knobLeft}"`);
+  // Tapping the frame rate shows where the emulator's time goes, then hides it
+  await appFrame().locator('#fps').dispatchEvent('click');
+  await page.waitForTimeout(2500);
+  const n64Details = await appFrame().locator('#fps').textContent();
+  if (!/% busy · game \d+% · lists \d+% · gl \d+% · sound \d+% · \d+ drawn, \d+ skipped/.test(n64Details)) throw new Error(`N64 details read "${n64Details}"`);
   await appFrame().locator('#player').screenshot({ path: shots + 'n64.png' });
+  await appFrame().locator('#fps').dispatchEvent('click');
   await appFrame().getByRole('button', { name: 'Games' }).click();
   // The EEPROM was kept: the next start shows magenta, and so does Reset
   await startN64();

@@ -41,7 +41,7 @@ const queue = job => (saving = saving.then(job).catch(() => {}));
 // ---------- state ----------
 
 let count = null, game = null, items = null, paused = true, failed = false, saveTimer = 0;
-let refreshes = 0, since = 0, hz = 0, reported = 0, working = 0, busy = 0;
+let refreshes = 0, since = 0, hz = 0, reported = 0, working = 0, busy = 0, detail = false;
 
 // The game's saves as they are now, written in order with any before
 function persist() {
@@ -91,8 +91,10 @@ function tick(t) {
   if (!game || paused || failed) { since = t; refreshes = working = 0; return; }
   refreshes++;
   if (t - since >= 1000) {
-    hz = Math.round(refreshes * 1000 / (t - since));
-    busy = Math.min(100, Math.round(working * 100 / (t - since)));
+    const elapsed = t - since;
+    hz = Math.round(refreshes * 1000 / elapsed);
+    busy = Math.min(100, Math.round(working * 100 / elapsed));
+    if (detail) postMessage({ type: 'detail', text: describe(emu.profile(true), working, elapsed) });
     since = t;
     refreshes = working = 0;
     if (count) { Atomics.store(count, 1, hz); Atomics.store(count, 5, busy); }
@@ -116,6 +118,18 @@ function tick(t) {
   else if (t - reported > 250) { reported = t; postMessage({ type: 'frames', n, hz, steady: false, busy }); }
 }
 nextFrame(tick);
+
+// The details readout's line: how much of the time (in percent) went to the
+// game's own code, reading its display lists, drawing (WebGL) and sound;
+// then the frames drawn and skipped each second, and the RSP tasks n64js
+// couldn't do itself (which run slowly, along with the game's code)
+function describe(p, working, elapsed) {
+  const pc = ms => Math.round(ms * 100 / elapsed);
+  const per = n => Math.round(n * 1000 / elapsed);
+  const game = working - p.gl - p.lists - p.sound;
+  return `game ${pc(game)}% · lists ${pc(p.lists)}% · gl ${pc(p.gl)}% · sound ${pc(p.sound)}%` +
+    ` · ${per(p.drawn)} drawn, ${per(p.skipped)} skipped` + (p.rsp ? ` · rsp ${per(p.rsp)}` : '');
+}
 
 async function load({ bytes, name }) {
   game = null;
@@ -173,6 +187,11 @@ onmessage = async ({ data: msg }) => {
         emu.resume();
         audio.seenAt = performance.now();
       }
+      break;
+    case 'detail':
+      // the details readout: measure where the time goes, or stop
+      detail = msg.on;
+      emu.profile(detail);
       break;
     case 'reset':
       if (!game) break;
