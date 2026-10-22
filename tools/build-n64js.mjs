@@ -1,5 +1,6 @@
 // Builds the Nintendo 64 core: n64js (MIT, https://github.com/hulkholden/n64js)
-// at a fixed commit, unmodified, bundled with tools/n64js/web.js (Retro
+// at a fixed commit, with tools/n64js/patches/*.patch applied (speed-ups for
+// slow computers like the car's), bundled with tools/n64js/web.js (Retro
 // Console's entry point, in place of n64js's src/n64.js) and
 // tools/n64js/shims.js (stand-ins for the page globals n64js expects, as it
 // runs in a worker) into apps/retro/n64/n64js.js. The bundler is Bun's, as
@@ -11,7 +12,7 @@
 //
 //   node tools/build-n64js.mjs
 import { execFileSync } from 'node:child_process';
-import { copyFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
@@ -29,6 +30,10 @@ mkdirSync(work, { recursive: true });
 run('git', ['init', '--quiet', src]);
 run('git', ['-C', src, 'fetch', '--quiet', '--depth', '1', 'https://github.com/hulkholden/n64js.git', N64JS_COMMIT]);
 run('git', ['-C', src, '-c', 'advice.detachedHead=false', 'checkout', '--quiet', 'FETCH_HEAD']);
+const patches = `${root}tools/n64js/patches/`;
+for (const patch of readdirSync(patches).filter(f => f.endsWith('.patch')).sort()) {
+  run('git', ['-C', src, 'apply', `${patches}${patch}`]);
+}
 copyFileSync(`${root}tools/n64js/web.js`, `${src}web.js`);
 copyFileSync(`${root}tools/n64js/shims.js`, `${src}shims.js`);
 
@@ -71,7 +76,8 @@ copyFileSync(`${src}LICENSE`, `${out}LICENSE`);
 // with it (and off unless chosen), carries its own MIT notice
 const crt = readFileSync(`${src}src/hle/graphics/shaders/crt_mattias.glsl`, 'utf8');
 writeFileSync(`${out}THIRD-PARTY.txt`, [
-  `n64js ${N64JS_COMMIT}, by Paul Holden, MIT license (LICENSE).`,
+  `n64js ${N64JS_COMMIT}, by Paul Holden, MIT license (LICENSE), with frunk.store's`,
+  'changes (tools/n64js/patches in https://github.com/RobertPKyle/frunk-store).',
   'It includes a CRT shader adapted from crtemu by Mattias Gustavsson:',
   '',
   crt.slice(crt.indexOf('/*') + 2, crt.indexOf('*/')).trim(),

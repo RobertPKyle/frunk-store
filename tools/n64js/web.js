@@ -85,6 +85,9 @@ export function init(canvas) {
   // Draw at the game's own resolution and let the page scale it
   graphicsOptions.canvasScale = 1;
   graphicsOptions.renderScale = 1;
+  // Fewer, larger draws (tools/n64js/patches: triangles joined across
+  // vertex loads and matrices)
+  graphicsOptions.batchTriangles = true;
   initialiseRenderer(canvas);
 }
 

@@ -123,8 +123,8 @@ to the cache again.
   `gear-worker.js`) the way jsnes runs in its own (the page side is
   `worker-core.js`). Nintendo 64 cartridges (holders edition only, an
   early test, so only the holders edition names it: not the hub's grid,
-  the ordinary edition, the phone page or the holders' lock screen) run on n64js (MIT, pure JavaScript, unmodified, commit
-  1eb54aa), bundled by `npm run build:n64` (`tools/build-n64js.mjs` runs
+  the ordinary edition, the phone page or the holders' lock screen) run on n64js (MIT, pure JavaScript, commit
+  1eb54aa, with `tools/n64js/patches/*.patch` applied), bundled by `npm run build:n64` (`tools/build-n64js.mjs` runs
   Bun's bundler through npx on n64js's sources plus `tools/n64js/web.js`,
   which stands in for n64js's own page and debugger, and
   `tools/n64js/shims.js`, stand-ins for the page globals it expects; output
@@ -145,9 +145,23 @@ to the cache again.
   no free N64 game; the e2e check plays a tiny test cartridge made by
   `tools/n64-test-rom.mjs` (double-buffered display lists drawn by n64js's
   Fast3D emulation, controller, tone and EEPROM save; `n64TestRom({
-  triangles: 9000 })` makes it heavy enough to need frame skipping). Dropping
-  WebGL calls that change nothing was tried and saved under 10% of the
-  drawing time, so it was left out. On
+  triangles: 9000 })` makes it heavy, and `work: { code, count }` runs a
+  compiled MIPS function each frame). Dropping WebGL calls that change
+  nothing was tried and saved under 10% of the drawing time, so it was left
+  out. The patches (each with tests, run with n64js's own suite, `bun
+  test`) speed up n64js for the car: its recompiler compiles single-precision
+  ADD/SUB/MUL/DIV, NEG/ABS/MOV, compares and float/int conversions inline for
+  the common case (round to nearest, no FPU exceptions enabled, ordinary
+  numbers; anything else runs n64js's exact helpers, checked against them
+  with random operands), and lone float, byte and halfword loads and stores
+  inline with a cheap RAM guard (lone word accesses keep their helpers, which
+  also serve MMIO polling); and its HLE display lists draw triangles from
+  batches separated only by vertex loads, matrices and the like together (up
+  to 512, `graphicsOptions.batchTriangles`, which web.js turns on). On a
+  desktop, game-like float code compiled from C (skeletal animation, 64
+  characters) took 33% of the time before and 9% after, with RDRAM identical
+  after 300 frames; 9000 triangles a frame went from 43% drawing to 2%,
+  pixel-identical. On
   the N64 the touch D-pad is an analog stick with a knob, and a second
   controller plays as player 2. Moving n64js off the page's main thread
   took the test cartridge's page load from 812 to 5 ms a second with the

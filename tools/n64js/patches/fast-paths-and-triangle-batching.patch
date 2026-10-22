@@ -1,0 +1,956 @@
+diff --git a/src/cpu/r4300.js b/src/cpu/r4300.js
+index b02b6fd..61c62dd 100644
+--- a/src/cpu/r4300.js
++++ b/src/cpu/r4300.js
+@@ -411,6 +411,8 @@ export class CPU0 {
+     this.randomSource = Math.random;
+ 
+     this.ramDV = hardware.cachedMemDevice.mem.dataView;
++    // Where cached RAM ends, for compiled code's guards on lone accesses
++    this.ramEnd = Math.min(this.ramDV.byteLength, 0x800000);
+ 
+     const gprMem = new ArrayBuffer(32 * 8);
+     this.gprU32 = new Uint32Array(gprMem);
+diff --git a/src/cpu/ram_access_group.js b/src/cpu/ram_access_group.js
+index 41af1d2..401d789 100644
+--- a/src/cpu/ram_access_group.js
++++ b/src/cpu/ram_access_group.js
+@@ -1,4 +1,10 @@
+ import {
++  OP_LB,
++  OP_LBU,
++  OP_LH,
++  OP_LHU,
++  OP_SB,
++  OP_SH,
+   OP_LW,
+   OP_SW,
+   OP_LWC1,
+@@ -18,7 +24,39 @@ function cop1WordIndex(reg) {
+   return (reg & 1) === 0 ? `${reg * 2}` : `cpu1.regIdx32_cop[${reg}]`;
+ }
+ 
++// Byte and halfword loads and stores (sign- or zero-extending loads)
++function narrowSpec(name, noun, width, helper, emitFast) {
++  return Object.freeze({
++    name, noun, width, helper, emitFast,
++    baseVar: noun === 'loads' ? 'ramLoadBase' : 'ramStoreBase',
++    dvVar: noun === 'loads' ? 'ramLoadDV' : 'ramStoreDV',
++    alignMask: width - 1,
++    guardMask: width === 1 ? '0x80000000' : '0x80000001',
++    writesGpr: noun === 'loads',
++    usesCop1: false,
++    // they hardly ever reach MMIO, so a lone one is worth the guard
++    lone: true,
++  });
++}
++
++function narrowLoad(i, reg, relOffset, getter, signed) {
++  if (reg === 0) {
++    return '';
++  }
++  return `  const v${i} = ramLoadDV.${getter}(ramLoadBase + ${relOffset}, false);\n` +
++    `  c.gprS32[${reg * 2}] = v${i};\n` +
++    `  c.gprS32[${reg * 2 + 1}] = ${signed ? `v${i} >> 31` : '0'};\n`;
++}
++
+ const GROUP_SPECS = Object.freeze({
++  [OP_LB]: narrowSpec('LB', 'loads', 1, 'execLB', (i, reg, off) => narrowLoad(i, reg, off, 'getInt8', true)),
++  [OP_LBU]: narrowSpec('LBU', 'loads', 1, 'execLBU', (i, reg, off) => narrowLoad(i, reg, off, 'getUint8', false)),
++  [OP_LH]: narrowSpec('LH', 'loads', 2, 'execLH', (i, reg, off) => narrowLoad(i, reg, off, 'getInt16', true)),
++  [OP_LHU]: narrowSpec('LHU', 'loads', 2, 'execLHU', (i, reg, off) => narrowLoad(i, reg, off, 'getUint16', false)),
++  [OP_SB]: narrowSpec('SB', 'stores', 1, 'execSB',
++    (i, reg, off) => `  ramStoreDV.setUint8(ramStoreBase + ${off}, ${gprS32Lo(reg)});\n`),
++  [OP_SH]: narrowSpec('SH', 'stores', 2, 'execSH',
++    (i, reg, off) => `  ramStoreDV.setUint16(ramStoreBase + ${off}, ${gprS32Lo(reg)}, false);\n`),
+   [OP_SW]: Object.freeze({
+     name: 'SW',
+     noun: 'stores',
+@@ -262,12 +300,30 @@ export class RAMAccessGroup {
+     if (this.count === 0) {
+       return;
+     }
+-    if (this.count === 1) {
++    const spec = this.spec;
++    if (this.count === 1 && !spec.usesCop1 && !spec.lone) {
+       ctx.fragment.bodyCode += this.emitAccessBlock(ctx, 0, true);
+       this.reset();
+       return;
+     }
+-    const spec = this.spec;
++    if (this.count === 1) {
++      // A lone COP1, byte or halfword access (these are kept in RAM, not
++      // MMIO, so the guard rarely fails): a guarded fast path against
++      // c.ramEnd, with its helper inline as the slow path (no closure needed
++      // for a single exit). Lone word accesses keep their helpers, which the
++      // JIT inlines well, and which also serve MMIO polling.
++      const offset = this.offsets[0];
++      ctx.fragment.bodyCode += `// ${disassembleInstruction(this.pcs[0], this.instructions[0], false).disassembly}
++{
++  const ${spec.baseVar} = (${gprS32Lo(this.base)} + ${offset}) ^ -0x80000000;
++  if ((${spec.baseVar} & ${spec.guardMask}) === 0 && ${spec.baseVar} + ${spec.width} <= c.ramEnd) {
++    const ${spec.dvVar} = c.ramDV;
++${spec.emitFast(0, this.registers[0], 0)}    c.pc = ${toString32(this.pcs[0] + 4)};
++  } else ${this.emitAccessBlock(ctx, 0)}}
++`;
++      this.reset();
++      return;
++    }
+     const minOffset = this.minOffset;
+     const span = this.maxOffset - minOffset + spec.width;
+     let fast = '';
+diff --git a/src/cpu/ram_access_group.test.js b/src/cpu/ram_access_group.test.js
+index 2c4fc6d..445e40e 100644
+--- a/src/cpu/ram_access_group.test.js
++++ b/src/cpu/ram_access_group.test.js
+@@ -367,3 +367,83 @@ test('scratch buffers survive flushes and new fragments without retaining old st
+   expect((await generate([0, sw(0)], { ctx })).code).not.toContain('Guarded RAM SW group');
+   expect(group.count).toBe(0);
+ });
++
++for (const [name, base, hits] of [['RAM', 0x80000200, true], ['MMIO', 0xa4040000, false], ['unaligned', 0x80000202, false]]) {
++  test(`a lone LWC1 or SWC1 takes the guarded fast path, or its helper (${name})`, async () => {
++    const { code } = await generate([lwc1(0, 4, 0), lwc1(0, 4, 2), lw(0, 5, 6), swc1(8, 4, 2)]);
++    expect(code).not.toContain('Guarded RAM LWC1 group');
++    expect(code).toContain('c.execLW(6, 5, 0)');
++    const ramDV = new DataView(new ArrayBuffer(0x1000));
++    ramDV.setUint32(0x200, 0xbf800000, false);
++    const cpu1 = new CPU1();
++    const gprS32 = new Int32Array(64);
++    gprS32[4 * 2] = base | 0;
++    const helpers = [];
++    const c = {
++      pc, delayPC: null, stuffToDo: 0, ramDV, gprS32, ramEnd: ramDV.byteLength,
++      execLWC1: () => {},
++      execLW: () => {},
++      execLWC1Unchecked: (...args) => { helpers.push(['LWC1', ...args]); },
++      execSWC1Unchecked: (...args) => { helpers.push(['SWC1', ...args]); },
++    };
++    new Function('c', 'cpu1', 'rsp', code)(c, cpu1, { halted: true, step() {} });
++    expect(c.pc).toBe(pc + 16);
++    if (hits) {
++      expect(helpers).toEqual([]);
++      expect(cpu1.regU32[4]).toBe(0xbf800000);
++      expect(ramDV.getUint32(0x208, false)).toBe(0xbf800000);
++    } else {
++      expect(helpers).toEqual([['LWC1', 2, 4, 0], ['SWC1', 2, 4, 8]]);
++    }
++  });
++}
++
++// Byte and halfword accesses, lone and grouped, against what their helpers do
++const narrow = {
++  LB: [decode.OP_LB, 1, (dv, a) => dv.getInt8(a)],
++  LBU: [decode.OP_LBU, 1, (dv, a) => dv.getUint8(a)],
++  LH: [decode.OP_LH, 2, (dv, a) => dv.getInt16(a, false)],
++  LHU: [decode.OP_LHU, 2, (dv, a) => dv.getUint16(a, false)],
++  SB: [decode.OP_SB, 1, null],
++  SH: [decode.OP_SH, 2, null],
++};
++for (const [name, [op, width, read]] of Object.entries(narrow)) {
++  for (const [where, base, hits] of [['RAM', 0x80000200, true], ['MMIO', 0xa4040000, false], ['TLB', 0x00400000, false]]) {
++    for (const count of [1, 3]) {
++      test(`${count === 1 ? 'a lone' : 'grouped'} ${name} in ${where} matches its helper`, async () => {
++        const words = [0];
++        for (let i = 0; i < count; i++) words.push(iop(op, 4, 5 + i, i * width * 3 + (width === 1 ? 1 : 0)));
++        const offsets = words.slice(1).map(w => (w << 16) >> 16);
++        const { code } = await generate(words);
++        if (count > 1) expect(code).toContain(`Guarded RAM ${name} group (${count} `);
++        const ramDV = new DataView(new ArrayBuffer(0x1000));
++        for (let i = 0; i < 0x1000; i++) ramDV.setUint8(i, (i * 37 + 0x81) & 0xff);
++        const gprS32 = new Int32Array(64);
++        gprS32[4 * 2] = base | 0;
++        for (let i = 0; i < count; i++) { gprS32[(5 + i) * 2] = 0x89abcdef + i * 0x1111; gprS32[(5 + i) * 2 + 1] = 0x77; }
++        const helpers = [];
++        const helper = (...args) => helpers.push(args);
++        const c = { pc, delayPC: null, stuffToDo: 0, ramDV, gprS32, ramEnd: ramDV.byteLength, [`exec${name}`]: helper };
++        const before = new Uint8Array(ramDV.buffer.slice(0));
++        new Function('c', 'rsp', code)(c, { halted: true, step() {} });
++        expect(c.pc).toBe(pc + 4 * words.length);
++        if (!hits) {
++          expect(helpers).toEqual(offsets.map((offset, i) => [5 + i, 4, offset]));
++          return;
++        }
++        expect(helpers).toEqual([]);
++        offsets.forEach((offset, i) => {
++          const at = (base + offset + 0x80000000) >>> 0;
++          if (read) {
++            const v = read(new DataView(before.buffer), at);
++            expect(gprS32[(5 + i) * 2]).toBe(v);
++            expect(gprS32[(5 + i) * 2 + 1]).toBe(v < 0 ? -1 : 0);
++          } else {
++            const value = 0x89abcdef + i * 0x1111;
++            expect(width === 1 ? ramDV.getUint8(at) : ramDV.getUint16(at, false)).toBe(width === 1 ? value & 0xff : value & 0xffff);
++          }
++        });
++      });
++    }
++  }
++}
+diff --git a/src/cpu/recompiler.js b/src/cpu/recompiler.js
+index 822ea79..ab1996f 100644
+--- a/src/cpu/recompiler.js
++++ b/src/cpu/recompiler.js
+@@ -2008,12 +2008,165 @@ function generateBCInstrStub(ctx) {
+     : generateGenericOpBoilerplate(impl, ctx);
+ }
+ 
++// Single-precision ADD, SUB, MUL and DIV, inline for the common case: round
++// to nearest with no FPU exceptions enabled, normal or zero operands (a
++// normal divisor) and a normal or exactly zero result. That case can only
++// raise Inexact, which is then just recorded in FCSR's cause and flag bits,
++// as cpu1.f32BinaryOp does. Anything else (NaN, infinity, denormal,
++// underflow, overflow, other rounding, enabled exceptions) runs the helper.
++const kInlineF32Ops = { [cop1ADD]: '+', [cop1SUB]: '-', [cop1MUL]: '*', [cop1DIV]: '/' };
++
++// Bits of a single that's normal or zero
++function genF32NormalOrZero(bits) {
++  return `((((${bits} >>> 23) & 0xff) - 1) >>> 0 < 254 || (${bits} & 0x7fffffff) === 0)`;
++}
++
++// Whether a COP1 op can have an inline fast path here: COP1 known usable,
++// not in a delay slot, and falling through to the next instruction
++function canInlineCop1(ctx) {
++  return kUseOptimisedDynarecHandlers && !kDebugDynarec && !kValidateDynarecPCs && !kAccurateCountUpdating &&
++    ctx.fragment.cop1statusKnown && !ctx.needsDelayCheck && ctx.postPC === ctx.pc + 4;
++}
++
++// An op's inline fast path (code that sets fast = true when it applies),
++// with its helper (slowImpl) run as usual when it doesn't
++function genInlineCop1(fastCode, slowImpl, ctx) {
++  const slow = generateCop1FaultingOp(slowImpl, ctx);
++  return `let fast = false;
++${fastCode}if (fast) {
++  c.pc = ${toString32(ctx.pc + 4)};
++} else {
++${slow}}
++`;
++}
++
++// Stores a single's bits as cpu1.store32ZeroExtend does
++function genStoreF32(d, bits) {
++  return `const di = cpu1.regIdx32_d[${d}];
++cpu1.regS32[di] = ${bits};
++cpu1.regS32[di + 1] = 0;
++`;
++}
++
++// FCSR after an op that raised at most Inexact (with exceptions disabled)
++const genSetInexact = inexact => `cpu1.control[31] = (cpu1.control[31] & ~0x3f000) | (${inexact} ? 0x1004 : 0);\n`;
++
++function generateInlineF32BinaryOp(op, d, s, t, ctx) {
++  const operator = kInlineF32Ops[op];
++  if (!operator || !canInlineCop1(ctx)) {
++    return null;
++  }
++  const helper = { [cop1ADD]: 'ADD_S', [cop1SUB]: 'SUB_S', [cop1MUL]: 'MUL_S', [cop1DIV]: 'DIV_S' }[op];
++  // (by value: normal is from the smallest normal up to the largest finite,
++  // which leaves out denormals, infinities and NaNs)
++  const normal = v => `(${v} >= 1.1754943508222875e-38 && ${v} < Infinity)`;
++  const divisorOk = op === cop1DIV ? normal('Math.abs(tv)') : `(tv === 0 || ${normal('Math.abs(tv)')})`;
++  // ADD and SUB also count as inexact when a non-zero operand was lost
++  const lost = op === cop1ADD || op === cop1SUB
++    ? ` || (tv !== 0 && r === sv) || (sv !== 0 && r === tv)`
++    : '';
++  return genInlineCop1(`const si = cpu1.regIdx32_s[${s}], ti = cpu1.regIdx32_t[${t}];
++const sv = cpu1.regF32[si], tv = cpu1.regF32[ti];
++if ((cpu1.control[31] & 0xf83) === 0 && (sv === 0 || ${normal('Math.abs(sv)')}) && ${divisorOk}) {
++  const r = sv ${operator} tv;
++  const f = Math.fround(r);
++  if (${normal('Math.abs(f)')} || r === 0) {
++    ${genSetInexact(`r !== f${lost}`)}    const di = cpu1.regIdx32_d[${d}];
++    cpu1.regF32[di] = f;
++    cpu1.regS32[di + 1] = 0;
++    fast = true;
++  }
++}
++`, `cpu1.${helper}(${d}, ${s}, ${t});`, ctx);
++}
++
++// NEG.S and ABS.S of a normal or zero: exact, so FCSR's cause is just cleared
++function generateInlineF32SignOp(op, d, s, ctx) {
++  if ((op !== cop1NEG && op !== cop1ABS) || !canInlineCop1(ctx)) {
++    return null;
++  }
++  const helper = op === cop1NEG ? 'NEG_S' : 'ABS_S';
++  const result = op === cop1NEG ? 'sb ^ -0x80000000' : 'sb & 0x7fffffff';
++  return genInlineCop1(`const sb = cpu1.regS32[cpu1.regIdx32_s[${s}]];
++if (${genF32NormalOrZero('sb')}) {
++  cpu1.control[31] &= ~0x3f000;
++  ${genStoreF32(d, result)}  fast = true;
++}
++`, `cpu1.${helper}(${d}, ${s});`, ctx);
++}
++
++// C.cond.S without NaNs: only the condition bit changes
++function generateInlineF32Compare(op, s, t, ctx) {
++  if (!canInlineCop1(ctx)) {
++    return null;
++  }
++  const tests = [];
++  if (op & 0x4) tests.push('sv < tv');
++  if (op & 0x2) tests.push('sv === tv');
++  const cond = tests.length ? tests.join(' || ') : 'false';
++  return genInlineCop1(`const si = cpu1.regIdx32_s[${s}], ti = cpu1.regIdx32_t[${t}];
++if ((cpu1.regS32[si] & 0x7fffffff) <= 0x7f800000 && (cpu1.regS32[ti] & 0x7fffffff) <= 0x7f800000) {
++  const sv = cpu1.regF32[si], tv = cpu1.regF32[ti];
++  cpu1.control[31] = (${cond}) ? cpu1.control[31] | 0x00800000 : cpu1.control[31] & ~0x00800000;
++  fast = true;
++}
++`, `cpu1.handleFloatCompareSingle(${op}, ${s}, ${t});`, ctx);
++}
++
++// ROUND/TRUNC/CEIL/FLOOR.W.S, and CVT.W.S when rounding to nearest, of a
++// normal or zero that fits, with exceptions disabled (as ConvertSToW)
++const kInlineConvertSToW = {
++  [cop1ROUND_W]: 'round', [cop1TRUNC_W]: 'Math.trunc', [cop1CEIL_W]: 'Math.ceil', [cop1FLOOR_W]: 'Math.floor', [cop1CVT_W]: 'round',
++};
++
++function generateInlineConvertSToW(op, d, s, ctx, slowImpl) {
++  const fn = kInlineConvertSToW[op];
++  if (!fn || !canInlineCop1(ctx)) {
++    return null;
++  }
++  const mask = op === cop1CVT_W ? '0xf83' : '0xf80';
++  // Nearest, with ties to even (cpu1.round)
++  const convert = fn === 'round'
++    ? `let r = Math.round(sv);
++  if (r - sv === 0.5 && (r & 1) !== 0) r -= 1;`
++    : `const r = ${fn}(sv);`;
++  return genInlineCop1(`const si = cpu1.regIdx32_s[${s}];
++const sb = cpu1.regS32[si];
++if ((cpu1.control[31] & ${mask}) === 0 && ${genF32NormalOrZero('sb')}) {
++  const sv = cpu1.regF32[si];
++  ${convert}
++  if (r <= 0x7fffffff && r >= -0x80000000) {
++    ${genSetInexact('sv !== r')}    ${genStoreF32(d, 'r | 0')}    fast = true;
++  }
++}
++`, slowImpl, ctx);
++}
++
++// CVT.S.W when rounding to nearest with exceptions disabled
++function generateInlineConvertWToS(d, s, ctx) {
++  if (!canInlineCop1(ctx)) {
++    return null;
++  }
++  return genInlineCop1(`if ((cpu1.control[31] & 0xf83) === 0) {
++  const iv = cpu1.regS32[cpu1.regIdx32_s[${s}]];
++  cpu1.tempF32[0] = iv;
++  ${genSetInexact('cpu1.tempF32[0] !== iv')}  ${genStoreF32(d, 'cpu1.tempS32[0]')}  fast = true;
++}
++`, `cpu1.CVT_S_W(${d}, ${s});`, ctx);
++}
++
+ function generateSInstrStub(ctx) {
+   const s = ctx.instr_fs();
+   const t = ctx.instr_ft();
+   const d = ctx.instr_fd();
+ 
+   const op = copFmtFuncOp(ctx.instruction);
++  const inline = op < 0x30
++    ? generateInlineF32BinaryOp(op, d, s, t, ctx) ?? generateInlineF32SignOp(op, d, s, ctx)
++    : generateInlineF32Compare(op, s, t, ctx);
++  if (inline) {
++    return inline;
++  }
+   if (op < 0x30) {
+     switch (op) {
+       case cop1ADD: return generateCop1FaultingOp(`cpu1.ADD_S(${d}, ${s}, ${t});`, ctx);
+@@ -2022,19 +2175,23 @@ function generateSInstrStub(ctx) {
+       case cop1DIV: return generateCop1FaultingOp(`cpu1.DIV_S(${d}, ${s}, ${t});`, ctx);
+       case cop1SQRT: return generateCop1FaultingOp(`cpu1.SQRT_S(${d}, ${s});`, ctx);
+       case cop1ABS: return generateCop1FaultingOp(`cpu1.ABS_S(${d}, ${s});`, ctx);
+-      case cop1MOV: return generateCop1TrivialOp(`cpu1.MOV_S(${d}, ${s});`, ctx);
++      case cop1MOV: return generateCop1TrivialOp(ctx.fragment.cop1statusKnown && kUseOptimisedDynarecHandlers
++        // the register's two words, as MOV_S's 64-bit copy (without BigInts)
++        ? `{ const si = cpu1.regIdx64_s[${s}] * 2, di = cpu1.regIdx64_d[${d}] * 2;\n` +
++          `cpu1.regS32[di] = cpu1.regS32[si]; cpu1.regS32[di + 1] = cpu1.regS32[si + 1]; }`
++        : `cpu1.MOV_S(${d}, ${s});`, ctx);
+       case cop1NEG: return generateCop1FaultingOp(`cpu1.NEG_S(${d}, ${s});`, ctx);
+       case cop1ROUND_L: return generateCop1FaultingOp(`cpu1.ConvertSToL(${d}, ${s}, ${convertModeRound});`, ctx);
+       case cop1TRUNC_L: return generateCop1FaultingOp(`cpu1.ConvertSToL(${d}, ${s}, ${convertModeTrunc});`, ctx);
+       case cop1CEIL_L: return generateCop1FaultingOp(`cpu1.ConvertSToL(${d}, ${s}, ${convertModeCeil});`, ctx);
+       case cop1FLOOR_L: return generateCop1FaultingOp(`cpu1.ConvertSToL(${d}, ${s}, ${convertModeFloor});`, ctx);
+-      case cop1ROUND_W: return generateCop1FaultingOp(`cpu1.ConvertSToW(${d}, ${s}, ${convertModeRound});`, ctx);
+-      case cop1TRUNC_W: return generateCop1FaultingOp(`cpu1.ConvertSToW(${d}, ${s}, ${convertModeTrunc});`, ctx);
+-      case cop1CEIL_W: return generateCop1FaultingOp(`cpu1.ConvertSToW(${d}, ${s}, ${convertModeCeil});`, ctx);
+-      case cop1FLOOR_W: return generateCop1FaultingOp(`cpu1.ConvertSToW(${d}, ${s}, ${convertModeFloor});`, ctx);
++      case cop1ROUND_W: return generateInlineConvertSToW(op, d, s, ctx, `cpu1.ConvertSToW(${d}, ${s}, ${convertModeRound});`) ?? generateCop1FaultingOp(`cpu1.ConvertSToW(${d}, ${s}, ${convertModeRound});`, ctx);
++      case cop1TRUNC_W: return generateInlineConvertSToW(op, d, s, ctx, `cpu1.ConvertSToW(${d}, ${s}, ${convertModeTrunc});`) ?? generateCop1FaultingOp(`cpu1.ConvertSToW(${d}, ${s}, ${convertModeTrunc});`, ctx);
++      case cop1CEIL_W: return generateInlineConvertSToW(op, d, s, ctx, `cpu1.ConvertSToW(${d}, ${s}, ${convertModeCeil});`) ?? generateCop1FaultingOp(`cpu1.ConvertSToW(${d}, ${s}, ${convertModeCeil});`, ctx);
++      case cop1FLOOR_W: return generateInlineConvertSToW(op, d, s, ctx, `cpu1.ConvertSToW(${d}, ${s}, ${convertModeFloor});`) ?? generateCop1FaultingOp(`cpu1.ConvertSToW(${d}, ${s}, ${convertModeFloor});`, ctx);
+       case cop1CVT_S: return generateCop1Reserved(ctx);
+       case cop1CVT_D: return generateCop1FaultingOp(`cpu1.CVT_D_S(${d}, ${s});`, ctx);
+-      case cop1CVT_W: return generateCop1FaultingOp(`cpu1.ConvertSToW(${d}, ${s}, cpu1.roundingMode);`, ctx);
++      case cop1CVT_W: return generateInlineConvertSToW(op, d, s, ctx, `cpu1.ConvertSToW(${d}, ${s}, cpu1.roundingMode);`) ?? generateCop1FaultingOp(`cpu1.ConvertSToW(${d}, ${s}, cpu1.roundingMode);`, ctx);
+       case cop1CVT_L: return generateCop1FaultingOp(`cpu1.ConvertSToL(${d}, ${s}, cpu1.roundingMode);`, ctx);
+     }
+ 
+@@ -2095,7 +2252,7 @@ function generateWInstrStub(ctx) {
+     case cop1CVT_W:
+     case cop1CVT_L:
+       return generateCop1Reserved(ctx);
+-    case cop1CVT_S: return generateCop1FaultingOp(`cpu1.CVT_S_W(${d}, ${s});`, ctx);
++    case cop1CVT_S: return generateInlineConvertWToS(d, s, ctx) ?? generateCop1FaultingOp(`cpu1.CVT_S_W(${d}, ${s});`, ctx);
+     case cop1CVT_D: return generateCop1TrivialOp(`cpu1.CVT_D_W(${d}, ${s});`, ctx);
+   }
+   return generateCop1Reserved(ctx);
+diff --git a/src/cpu/recompiler_cop1_boilerplate.test.js b/src/cpu/recompiler_cop1_boilerplate.test.js
+index 362e3c1..4dbc4e7 100644
+--- a/src/cpu/recompiler_cop1_boilerplate.test.js
++++ b/src/cpu/recompiler_cop1_boilerplate.test.js
+@@ -125,17 +125,18 @@ describe('recompiler COP1 boilerplate codegen', () => {
+     ['MTC1', copMove(decode.OP_COP1, decode.COP_MT, 2, 4), 'c.execMTC1(2, 4);'],
+     ['DMTC1', copMove(decode.OP_COP1, decode.COP_DMT, 2, 4), 'c.execDMTC1(2, 4);'],
+     ['CFC1', copMove(decode.OP_COP1, decode.COP_CF, 2, 31), 'c.execCFC1(2, 31);'],
+-    ['MOV.S', cop1(decode.COP1_FMT_S, decode.COP1_FUNC_MOV, 4, 2), 'cpu1.MOV_S(4, 2);'],
++    // (once COP1 is known usable, MOV.S copies the register's words inline)
++    ['MOV.S', cop1(decode.COP1_FMT_S, decode.COP1_FUNC_MOV, 4, 2), 'cpu1.MOV_S(4, 2);', 'cpu1.regIdx64_d[4] * 2'],
+     ['MOV.D', cop1(decode.COP1_FMT_D, decode.COP1_FUNC_MOV, 4, 2), 'cpu1.MOV_D(4, 2);'],
+     ['CVT.D.W', cop1(decode.COP1_FMT_W, decode.COP1_FUNC_CVT_D, 4, 2), 'cpu1.CVT_D_W(4, 2);'],
+   ];
+ 
+-  for (const [name, word, expectedCall] of trivialCop1Ops) {
++  for (const [name, word, expectedCall, knownCall = expectedCall] of trivialCop1Ops) {
+     test(`${name} uses trivial boilerplate when cop1statusKnown is true`, () => {
+       const fragment = compileOp(word, { needsDelayCheck: false, cop1statusKnown: true });
+       expect(fragment.needsDelayCheck).toBe(false);
+       expect(fragment.usesCop1).toBe(true);
+-      expect(fragment.bodyCode).toContain(expectedCall);
++      expect(fragment.bodyCode).toContain(knownCall);
+       expect(fragment.bodyCode).toContain('// Delaying pc update');
+       expect(fragment.bodyCode).not.toContain('c.fragmentOps');
+       expect(fragment.bodyCode).not.toContain('c.branchTarget');
+diff --git a/src/cpu/recompiler_inline_f32.test.js b/src/cpu/recompiler_inline_f32.test.js
+new file mode 100644
+index 0000000..628ebdf
+--- /dev/null
++++ b/src/cpu/recompiler_inline_f32.test.js
+@@ -0,0 +1,125 @@
++import { beforeAll, expect, test } from 'bun:test';
++import { createHeadlessEmulator } from '../headless/headless_env.js';
++import { CPU1 } from './cpu1.js';
++import { Fragment } from './fragments.js';
++import { FragmentContext, emitTraceStep } from './recompiler.js';
++import * as decode from './decode.js';
++
++// The recompiler's inline single-precision ADD/SUB/MUL/DIV must match the
++// CPU1 helpers exactly: result bits, FCSR, and whether an FPE was raised.
++
++const pc = 0x80001000;
++const fmtS = 0x10, fmtW = 0x14;
++const encode = (fmt, funct, fd, fs, ft) => ((decode.OP_COP1 << 26) | (fmt << 21) | (ft << 16) | (fs << 11) | (fd << 6) | funct) >>> 0;
++
++// name: [format, funct, how the helper is called]
++const ops = {
++  ADD_S: [fmtS, 0x00, (cpu1, d, s, t) => cpu1.ADD_S(d, s, t)],
++  SUB_S: [fmtS, 0x01, (cpu1, d, s, t) => cpu1.SUB_S(d, s, t)],
++  MUL_S: [fmtS, 0x02, (cpu1, d, s, t) => cpu1.MUL_S(d, s, t)],
++  DIV_S: [fmtS, 0x03, (cpu1, d, s, t) => cpu1.DIV_S(d, s, t)],
++  ABS_S: [fmtS, 0x05, (cpu1, d, s) => cpu1.ABS_S(d, s)],
++  MOV_S: [fmtS, 0x06, (cpu1, d, s) => cpu1.MOV_S(d, s)],
++  NEG_S: [fmtS, 0x07, (cpu1, d, s) => cpu1.NEG_S(d, s)],
++  ROUND_W_S: [fmtS, 0x0c, (cpu1, d, s) => cpu1.ConvertSToW(d, s, 0)],
++  TRUNC_W_S: [fmtS, 0x0d, (cpu1, d, s) => cpu1.ConvertSToW(d, s, 1)],
++  CEIL_W_S: [fmtS, 0x0e, (cpu1, d, s) => cpu1.ConvertSToW(d, s, 2)],
++  FLOOR_W_S: [fmtS, 0x0f, (cpu1, d, s) => cpu1.ConvertSToW(d, s, 3)],
++  CVT_W_S: [fmtS, 0x24, (cpu1, d, s) => cpu1.ConvertSToW(d, s, cpu1.roundingMode)],
++  CVT_S_W: [fmtW, 0x20, (cpu1, d, s) => cpu1.CVT_S_W(d, s)],
++};
++for (let cond = 0x30; cond < 0x40; cond++) {
++  ops[`C_${cond.toString(16)}_S`] = [fmtS, cond, (cpu1, d, s, t) => cpu1.handleFloatCompareSingle(cond, s, t)];
++}
++
++beforeAll(async () => {
++  await createHeadlessEmulator({ romBuffer: new ArrayBuffer(0x1000), rominfo: { cic: '6102', tvType: 1, save: 'Eeprom4k' } });
++});
++
++function compile(instruction) {
++  const fragment = new Fragment(pc);
++  fragment.cop1statusKnown = true;
++  fragment.needsDelayCheck = false;
++  fragment.opsCompiled++;
++  const ctx = new FragmentContext();
++  emitTraceStep(fragment, { pc, instruction, postPC: pc + 4, nextPC: pc + 4 }, ctx);
++  ctx.flushDelayedPCUpdate();
++  return fragment.bodyCode;
++}
++
++// A random float's bits, from classes that exercise every path
++function randomBits(rand) {
++  const sign = rand() < 0.5 ? 0x80000000 : 0;
++  const mantissa = Math.floor(rand() * 0x800000);
++  const pick = rand();
++  if (pick < 0.08) return (sign | 0) >>> 0;                          // zero
++  if (pick < 0.12) return (sign | Math.max(1, mantissa)) >>> 0;      // denormal
++  if (pick < 0.15) return (sign | 0x7f800000) >>> 0;                 // infinity
++  if (pick < 0.18) return (0x7f800000 | Math.max(1, mantissa)) >>> 0; // NaN
++  if (pick < 0.24) return (sign | ((126 + Math.floor(rand() * 4)) << 23) | (rand() < 0.5 ? 0 : 0x400000)) >>> 0; // halves
++  if (pick < 0.3) return (sign | ((150 + Math.floor(rand() * 10)) << 23) | mantissa) >>> 0; // near the int limits
++  if (pick < 0.34) return (rand() * 0x100000000) >>> 0;              // any word (for CVT.S.W)
++  let exponent;
++  if (pick < 0.44) exponent = 1 + Math.floor(rand() * 8);            // near underflow
++  else if (pick < 0.54) exponent = 246 + Math.floor(rand() * 8);     // near overflow
++  else exponent = 100 + Math.floor(rand() * 56);                     // ordinary
++  return (sign | (exponent << 23) | mantissa) >>> 0;
++}
++
++function seeded(seed) {
++  return () => {
++    seed = (seed * 1103515245 + 12345) >>> 0;
++    return ((seed >>> 8) & 0xffffff) / 0x1000000;
++  };
++}
++
++let seed = 1;
++for (const [name, [fmt, funct, helper]] of Object.entries(ops)) {
++  test(`inline ${name} matches the helper`, () => {
++    const rand = seeded(seed++);
++    for (let n = 0; n < 3000; n++) {
++      const fullMode = rand() < 0.7;
++      const fd = Math.floor(rand() * 32), fs = Math.floor(rand() * 32), ft = Math.floor(rand() * 32);
++      const code = compile(encode(fmt, funct, fd, fs, ft));
++      if (name !== 'MOV_S') {
++        expect(code).toContain('let fast = false;');
++      }
++      // FCSR: mostly the fast case, sometimes other rounding, enables, flush, flags, condition
++      let fcsr = 0;
++      const mode = rand();
++      if (mode < 0.15) fcsr |= Math.floor(rand() * 4);
++      if (mode > 0.85) fcsr |= Math.floor(rand() * 32) << 7;
++      if (rand() < 0.2) fcsr |= 0x01000000;
++      if (rand() < 0.3) fcsr |= Math.floor(rand() * 32) << 2;
++      if (rand() < 0.2) fcsr |= Math.floor(rand() * 64) << 12;
++      if (rand() < 0.5) fcsr |= 0x00800000;
++      const regs = Array.from({ length: 64 }, () => (rand() * 0x100000000) >>> 0);
++      const sBits = randomBits(rand), tBits = randomBits(rand);
++
++      const run = compiled => {
++        let raised = 0;
++        const c = { pc, delayPC: null, nextPC: 0, stuffToDo: 0, fragmentOps: 0 };
++        const cpu1 = new CPU1({ cpu0: { raiseFPE() { raised++; c.nextPC = 0x80000180; } } });
++        cpu1.reset();
++        cpu1.fullMode = fullMode;
++        cpu1.regU32.set(regs);
++        cpu1.regU32[cpu1.regIdx32_s[fs]] = sBits;
++        cpu1.regU32[cpu1.regIdx32_t[ft]] = tBits;
++        cpu1.control[31] = fcsr;
++        if (compiled) {
++          new Function('c', 'cpu1', 'rsp', code)(c, cpu1, { halted: true, step() {} });
++        } else {
++          helper(cpu1, fd, fs, ft);
++          c.pc = raised ? 0x80000180 : pc + 4;
++        }
++        return { regs: [...cpu1.regU32], fcsr: cpu1.control[31], raised, pc: c.pc };
++      };
++      const want = run(false), got = run(true);
++      if (JSON.stringify(got) !== JSON.stringify(want)) {
++        throw new Error(`${name} f${fd}, f${fs}=${sBits.toString(16)}, f${ft}=${tBits.toString(16)}, fcsr ${fcsr.toString(16)}, fr ${fullMode}: ` +
++          `got fcsr ${got.fcsr.toString(16)} raised ${got.raised} pc ${got.pc.toString(16)}, ` +
++          `want fcsr ${want.fcsr.toString(16)} raised ${want.raised} pc ${want.pc.toString(16)}`);
++      }
++    }
++  }, 60000);
++}
+diff --git a/src/hle/graphics/display_list.js b/src/hle/graphics/display_list.js
+index d52dbfe..67c97e9 100644
+--- a/src/hle/graphics/display_list.js
++++ b/src/hle/graphics/display_list.js
+@@ -1,4 +1,5 @@
+ import { toString32 } from '../../format.js';
++import { graphicsOptions } from './graphics_options.js';
+ 
+ // A host execution safeguard, not an emulated RSP timing or stack limit.
+ const defaultCommandLimit = 1_000_000;
+@@ -13,6 +14,43 @@ const defaultCommandLimit = 1_000_000;
+  * commandLimit bounds each synchronous run, checked between command batches.
+  * Producer waits get a fresh budget on resume so waiting cannot exhaust it.
+  */
++// Commands after which queued triangles would still be drawn the same:
++// these change only vertices, matrices, lights, segments and the like, or
++// which command comes next. Before any other command, they're drawn.
++const kKeepsQueuedTriangles = new Set([
++  'executeVertex', 'executeModifyVertex', 'executeTri1', 'executeTri2', 'executeTri4', 'executeQuad',
++  'executeMatrix', 'executePopMatrix', 'executeMoveWord', 'executeMoveMem',
++  'executeDL', 'executeEndDL', 'executeCullDL', 'executeBranchZ', 'executeRDPHalf1',
++  'executeNoop', 'executeSpNoop',
++].map(name => `bound ${name}`));
++
++// A microcode's command table; when batching, other commands first draw the
++// triangles queued so far
++function commandTable(microcode, batching) {
++  const table = microcode.buildCommandTable();
++  if (!batching || !microcode.flushPendingTris) {
++    return table;
++  }
++  return table.map(fn => kKeepsQueuedTriangles.has(fn.name) ? fn : (cmd0, cmd1, dis) => {
++    microcode.flushPendingTris();
++    return fn(cmd0, cmd1, dis);
++  });
++}
++
++function startBatch(microcode) {
++  if (microcode.flushPendingTris) {
++    microcode.batchTris = true;
++  }
++}
++
++// Draws what's queued and stops queueing
++function endBatch(microcode) {
++  if (microcode.flushPendingTris) {
++    microcode.flushPendingTris();
++    microcode.batchTris = false;
++  }
++}
++
+ export function executeDisplayList(state, microcode, {
+   loadMicrocode = null,
+   disassembler = null,
+@@ -27,12 +65,20 @@ export function executeDisplayList(state, microcode, {
+     throw new RangeError('Display-list command limit must be a positive safe integer');
+   }
+   state.bailAfter = bailAfter;
+-  let ucodeTable = microcode.buildCommandTable();
++  // (the debugger's disassembly draws each triangle command as it comes)
++  const batching = graphicsOptions.batchTriangles && !disassembler;
++  let current = microcode;
++  let ucodeTable = commandTable(microcode, batching);
+ 
+   if (loadMicrocode) {
+     microcode.onLoadUcode((codeAddr, codeSize, codeDataAddr, codeDataSize) => {
++      endBatch(current);
+       const nextMicrocode = loadMicrocode(codeAddr, codeSize, codeDataAddr, codeDataSize);
+-      ucodeTable = nextMicrocode.buildCommandTable();
++      current = nextMicrocode;
++      ucodeTable = commandTable(nextMicrocode, batching);
++      if (batching) {
++        startBatch(current);
++      }
+       return nextMicrocode;
+     });
+   } else {
+@@ -58,6 +104,17 @@ export function executeDisplayList(state, microcode, {
+   }
+ 
+   function run() {
++    if (batching) {
++      startBatch(current);
++    }
++    try {
++      return runCommands();
++    } finally {
++      endBatch(current);
++    }
++  }
++
++  function runCommands() {
+     const startOp = state.currentOp;
+     while (state.nextCommand()) {
+       checkLimit(startOp);
+diff --git a/src/hle/graphics/display_list_batching.test.js b/src/hle/graphics/display_list_batching.test.js
+new file mode 100644
+index 0000000..47eaa87
+--- /dev/null
++++ b/src/hle/graphics/display_list_batching.test.js
+@@ -0,0 +1,102 @@
++import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
++import { executeDisplayList } from './display_list.js';
++import { graphicsOptions } from './graphics_options.js';
++import { GBI1 } from './microcodes/gbi1.js';
++import { GBI2 } from './microcodes/gbi2.js';
++import { NullRenderer } from './null_renderer.js';
++import { RSPState } from './rsp_state.js';
++
++// With graphicsOptions.batchTriangles, triangles from batches separated only
++// by vertex loads, vertex edits and the like are drawn together, and drawn
++// before any other command; the triangles drawn are the same.
++
++function run(Type, commands, { batch, disassemble = false } = {}) {
++  graphicsOptions.batchTriangles = batch;
++  const ram = new DataView(new ArrayBuffer(0x10000));
++  const state = new RSPState();
++  state.reset(ram, 8);
++  const microcode = new Type(state, ram);
++  microcode.renderer = new NullRenderer(state);
++  microcode.warn = () => {};
++  for (let i = 0; i < 32; ++i) {
++    ram.setInt16(0x8000 + i * 16, i * 3);
++    ram.setInt16(0x8000 + i * 16 + 2, -i * 5);
++    ram.setUint32(0x8000 + i * 16 + 12, 0x01020304 * (i + 1));
++  }
++  commands.forEach(([cmd0, cmd1], i) => {
++    ram.setUint32(8 + i * 8, cmd0 >>> 0);
++    ram.setUint32(12 + i * 8, cmd1 >>> 0);
++  });
++  const draws = [];
++  microcode.renderer.flushTris = buffer => {
++    draws.push([...buffer.colours.slice(0, buffer.numTris * 3)]);
++    buffer.reset();
++  };
++  // (a disassembler that accepts and formats anything)
++  const disassembler = disassemble ? new Proxy({}, { get: () => () => '' }) : null;
++  executeDisplayList(state, microcode, { disassembler });
++  return draws;
++}
++
++const kinds = {
++  GBI1: {
++    Type: GBI1,
++    vertex: (n, v0, at) => [(0x04 << 24) | ((n - 1) << 20) | (v0 << 16) | (n * 16), at],
++    tri: (a, b, c) => [0xbf000000, (a * 10 << 16) | (b * 10 << 8) | c * 10],
++    tri2: (a, b, c, d, e, f) => [(0xb1 << 24) | (a * 10 << 16) | (b * 10 << 8) | c * 10, (d * 10 << 16) | (e * 10 << 8) | f * 10],
++    modify: (index, rgba) => [(0xb2 << 24) | 0x100000 | (index * 2), rgba],
++    end: [0xb8000000, 0],
++  },
++  GBI2: {
++    Type: GBI2,
++    vertex: (n, v0, at) => [(0x01 << 24) | (n << 12) | ((v0 + n) << 1), at],
++    tri: (a, b, c) => [(0x05 << 24) | (c << 17) | (b << 9) | (a << 1), 0],
++    tri2: (a, b, c, d, e, f) => [(0x06 << 24) | (f << 17) | (e << 9) | (d << 1), (c << 17) | (b << 9) | (a << 1)],
++    modify: (index, rgba) => [(0x02 << 24) | 0x100000 | (index * 2), rgba],
++    end: [0xdf000000, 0],
++  },
++};
++
++let saved;
++beforeEach(() => { saved = graphicsOptions.batchTriangles; });
++afterEach(() => { graphicsOptions.batchTriangles = saved; });
++
++for (const [name, k] of Object.entries(kinds)) {
++  describe(`${name} batching`, () => {
++    const list = [
++      k.vertex(8, 0, 0x8000),
++      k.tri(0, 1, 2),
++      k.tri2(1, 2, 3, 3, 4, 5),
++      k.modify(2, 0xff0000ff),
++      k.tri(0, 1, 2),
++      k.vertex(8, 0, 0x8080),
++      k.tri(5, 6, 7),
++      [0xfa000000, 0x11223344],   // G_SETPRIMCOLOR: changes how triangles are drawn
++      k.tri(0, 1, 2),
++      [0xe7000000, 0],            // G_RDPPIPESYNC
++      k.tri2(2, 3, 4, 4, 5, 6),
++      k.end,
++    ];
++
++    test('joins batches until a command that could change the drawing, with the same triangles', () => {
++      const single = run(k.Type, list, { batch: false });
++      const batched = run(k.Type, list, { batch: true });
++      expect(single.length).toBe(6);
++      expect(batched.length).toBe(3);
++      expect(batched).toEqual([single.slice(0, 4).flat(), single[4], single[5]]);
++    });
++
++    test('draws what is left at the end of the list, and splits batches that fill the buffer', () => {
++      const tris = Array.from({ length: 600 }, (_, i) => k.tri(i % 6, (i + 1) % 6, (i + 2) % 6));
++      const commands = [k.vertex(8, 0, 0x8000), ...tris.slice(0, 300), k.vertex(8, 0, 0x8080), ...tris.slice(300), k.end];
++      const single = run(k.Type, commands, { batch: false });
++      const batched = run(k.Type, commands, { batch: true });
++      expect(batched.map(d => d.length / 3)).toEqual([512, 88]);
++      expect(batched.flat()).toEqual(single.flat());
++    });
++
++    test('the debugger draws each batch as it comes', () => {
++      expect(run(k.Type, list, { batch: true, disassemble: true })).toEqual(run(k.Type, list, { batch: false, disassemble: true }));
++    });
++  });
++}
+diff --git a/src/hle/graphics/graphics_options.js b/src/hle/graphics/graphics_options.js
+index b9c5bca..25d9728 100644
+--- a/src/hle/graphics/graphics_options.js
++++ b/src/hle/graphics/graphics_options.js
+@@ -28,6 +28,11 @@ export const graphicsOptions = {
+ 
+   // Whether to dump RDP commands.
+   dumpRDP: false,
++
++  // Draw triangles from consecutive batches together (up to 512), joined
++  // across vertex loads, matrices and the like (see display_list.js). Fewer,
++  // larger draws, for slow computers. Read when microcodes are created.
++  batchTriangles: false,
+ };
+ addOptionsFolder('Graphics', folder => {
+   folder.add(graphicsOptions, 'canvasScale').name('Canvas Scale').min(1).max(4).step(0.25);
+diff --git a/src/hle/graphics/microcodes/gbi0.js b/src/hle/graphics/microcodes/gbi0.js
+index 10a2323..d27d218 100644
+--- a/src/hle/graphics/microcodes/gbi0.js
++++ b/src/hle/graphics/microcodes/gbi0.js
+@@ -138,8 +138,7 @@ export class GBI0 extends GBI1 {
+ 
+   executeTri4(cmd0, cmd1, dis) {
+     const verts = this.state.projectedVertices;
+-    const tb = this.triangleBuffer;
+-    tb.reset();
++    const tb = this.beginTris(4);
+ 
+     // Process triangles individually when disassembling
+     let limit = dis ? 1 : 0;
+@@ -176,7 +175,7 @@ export class GBI0 extends GBI1 {
+       return tb.hasCapacity(4);
+     });
+     this.state.currentOp += commandsExecuted - 1;
+-    this.renderer.flushTris(tb);
++    this.endTris();
+   }
+ }
+ // Launch-era Fast3D in Saikyou Habu Shougi predates G_MW_MATRIX.
+diff --git a/src/hle/graphics/microcodes/gbi1.js b/src/hle/graphics/microcodes/gbi1.js
+index bcc1977..f047b08 100644
+--- a/src/hle/graphics/microcodes/gbi1.js
++++ b/src/hle/graphics/microcodes/gbi1.js
+@@ -343,8 +343,7 @@ export class GBI1 extends GBIMicrocode {
+   executeTri1(cmd0, cmd1, dis) {
+     const stride = this.vertexStride;
+     const verts = this.state.projectedVertices;
+-    const tb = this.triangleBuffer;
+-    tb.reset();
++    const tb = this.beginTris(1);
+ 
+     // Process triangles individually when disassembling
+     let limit = dis ? 1 : 0;
+@@ -363,14 +362,13 @@ export class GBI1 extends GBIMicrocode {
+     });
+ 
+     this.state.currentOp += commandsExecuted - 1;
+-    this.renderer.flushTris(tb);
++    this.endTris();
+   }
+ 
+   executeTri2(cmd0, cmd1, dis) {
+     const stride = this.vertexStride;
+     const verts = this.state.projectedVertices;
+-    const tb = this.triangleBuffer;
+-    tb.reset();
++    const tb = this.beginTris(2);
+ 
+     // Process triangles individually when disassembling
+     let limit = dis ? 1 : 0;
+@@ -391,7 +389,7 @@ export class GBI1 extends GBIMicrocode {
+       return tb.hasCapacity(2);
+     });
+     this.state.currentOp += commandsExecuted - 1;
+-    this.renderer.flushTris(tb);
++    this.endTris();
+   }
+ 
+   executeLine3D(cmd0, cmd1, dis) {
+diff --git a/src/hle/graphics/microcodes/gbi2.js b/src/hle/graphics/microcodes/gbi2.js
+index e007064..bd776b9 100644
+--- a/src/hle/graphics/microcodes/gbi2.js
++++ b/src/hle/graphics/microcodes/gbi2.js
+@@ -208,8 +208,7 @@ export class GBI2 extends GBIMicrocode {
+   }
+ 
+   executeTri1(cmd0, cmd1, dis) {
+-    const tb = this.triangleBuffer;
+-    tb.reset();
++    const tb = this.beginTris(1);
+ 
+     // Bound commands as well as emitted triangles: degenerates use no capacity.
+     const limit = dis ? 1 : tb.maxTris;
+@@ -227,12 +226,11 @@ export class GBI2 extends GBIMicrocode {
+       return tb.hasCapacity(1);
+     });
+     this.state.currentOp += commandsExecuted - 1;
+-    this.renderer.flushTris(tb);
++    this.endTris();
+   }
+ 
+   executeTri2(cmd0, cmd1, dis) {
+-    const tb = this.triangleBuffer;
+-    tb.reset();
++    const tb = this.beginTris(2);
+ 
+     // Process at most one buffer's worth of commands, even if none emit triangles.
+     const limit = dis ? 1 : tb.maxTris / 2;
+@@ -253,13 +251,12 @@ export class GBI2 extends GBIMicrocode {
+       return tb.hasCapacity(2);
+     });
+     this.state.currentOp += commandsExecuted - 1;
+-    this.renderer.flushTris(tb);
++    this.endTris();
+   }
+ 
+   // TODO: this is effectively the same as executeTri2, just different disassembly.
+   executeQuad(cmd0, cmd1, dis) {
+-    const tb = this.triangleBuffer;
+-    tb.reset();
++    const tb = this.beginTris(2);
+ 
+     // Process at most one buffer's worth of commands, even if none emit triangles.
+     const limit = dis ? 1 : tb.maxTris / 2;
+@@ -280,7 +277,7 @@ export class GBI2 extends GBIMicrocode {
+       return tb.hasCapacity(2);
+     });
+     this.state.currentOp += commandsExecuted - 1;
+-    this.renderer.flushTris(tb);
++    this.endTris();
+   }
+ 
+   pushTriangle(idx0, idx1, idx2) {
+diff --git a/src/hle/graphics/microcodes/gbi_microcode.js b/src/hle/graphics/microcodes/gbi_microcode.js
+index a1f9aa1..e4d929f 100644
+--- a/src/hle/graphics/microcodes/gbi_microcode.js
++++ b/src/hle/graphics/microcodes/gbi_microcode.js
+@@ -19,6 +19,9 @@ let colorImages = new Map();
+ // Map to keep track of which warnings we've already shown.
+ const loggedWarnings = new Map();
+ 
++// Most triangles drawn at once when batching (graphicsOptions.batchTriangles)
++const kMaxBatchedTris = 512;
++
+ export class GBIMicrocode {
+   constructor(state, ramDV) {
+     this.state = state;
+@@ -29,7 +32,12 @@ export class GBIMicrocode {
+     // Set after creation.
+     this.version = '';
+ 
+-    this.triangleBuffer = new TriangleBuffer(64);
++    this.triangleBuffer = new TriangleBuffer(graphicsOptions.batchTriangles ? kMaxBatchedTris : 64);
++    // While a display list runs (see display_list.js), triangle commands
++    // leave their triangles queued (pendingTris), and the runner draws them
++    // before any command that could change how they'd be drawn
++    this.batchTris = false;
++    this.pendingTris = false;
+ 
+     // A callback for when a loadUcode command is executed.
+     this.onLoadUcodeHandler = null;
+@@ -65,6 +73,36 @@ export class GBIMicrocode {
+     ]);
+   }
+ 
++  // The triangle buffer for a triangle command adding up to perCommand
++  // triangles at a time: with any queued triangles still in it, if they fit
++  beginTris(perCommand) {
++    const tb = this.triangleBuffer;
++    if (!this.pendingTris) {
++      tb.reset();
++    } else if (!tb.hasCapacity(perCommand)) {
++      this.flushPendingTris();
++    }
++    return tb;
++  }
++
++  // A triangle command's triangles: queued while batching, else drawn now
++  endTris() {
++    if (this.batchTris) {
++      this.pendingTris = !this.triangleBuffer.empty();
++    } else {
++      this.renderer.flushTris(this.triangleBuffer);
++    }
++  }
++
++  // Draws the queued triangles, if any
++  flushPendingTris() {
++    if (this.pendingTris) {
++      this.pendingTris = false;
++      this.renderer.flushTris(this.triangleBuffer);
++      this.triangleBuffer.reset();
++    }
++  }
++
+   buildCommandTable() {
+     const table = [];
+     for (let i = 0; i < 256; ++i) {

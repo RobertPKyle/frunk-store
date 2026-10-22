@@ -17,9 +17,15 @@
 // n64js uses for tasks it doesn't recognise; no microcode is included).
 //
 //   import { n64TestRom } from './n64-test-rom.mjs';
-//   n64TestRom() -> Buffer; n64TestRom({ triangles: 400 }) for more drawing
+//   n64TestRom() -> Buffer; n64TestRom({ triangles: 400 }) for more drawing;
+//   n64TestRom({ work: { code, count } }) also runs code (a MIPS function
+//   work(frame, count), built to run at 0x80380000, with its data after it
+//   below 3.75 MB, where its stack starts) once a frame, for benchmarking
 
-const REG = { zero: 0, v0: 2, v1: 3, a0: 4, t0: 8, t1: 9, t2: 10, t3: 11, t4: 12, t5: 13, t6: 14, t7: 15, t9: 25 };
+const REG = {
+  zero: 0, a0: 4, a1: 5, t0: 8, t1: 9, t2: 10, t3: 11, t4: 12, t5: 13, t6: 14, t7: 15,
+  s0: 16, s1: 17, s2: 18, s3: 19, t9: 25, sp: 29, ra: 31,
+};
 const r = (op, rs, rt, rd, sa, funct) => (op << 26 | rs << 21 | rt << 16 | rd << 11 | sa << 6 | funct) >>> 0;
 const i = (op, rs, rt, imm) => (op << 26 | rs << 21 | rt << 16 | (imm & 0xffff)) >>> 0;
 
@@ -46,6 +52,7 @@ function assemble(lines, base) {
       srl: () => r(0, 0, R(b), R(a), c, 0x02),
       or: () => r(0, R(b), R(c), R(a), 0, 0x25),
       xor: () => r(0, R(b), R(c), R(a), 0, 0x26),
+      jalr: () => r(0, R(a), 0, 31, 0, 0x09),
       beq: () => i(0x04, R(a), R(b), branch(c)),
       bne: () => i(0x05, R(a), R(b), branch(c)),
       bltz: () => i(0x01, R(a), 0, branch(b)),
@@ -180,15 +187,17 @@ const block = (at, words) => [
   ...li('t1', 1), ['sw', 't1', 0x3c, 't2'],
 ];
 
-const program = ({ picture, fill, list, size, length }) => [
+// work: the function run each frame (see n64TestRom), or none
+const WORK = 0x00380000, STACK = 0x803c0000;
+const program = ({ picture, fill, list, size, length, work }) => [
   ...li('t0', 0xa4400000),
   ...VI.flatMap(([off, v]) => [...li('t1', v), ['sw', 't1', off, 't0']]),
 
   // Sound: 16-bit stereo at 32 kHz (the video clock, 48681812 Hz, / 1521)
-  ...li('v1', 0xa4500000),
-  ...li('t1', 1520), ['sw', 't1', 0x10, 'v1'],             // AI_DACRATE
-  ...li('t1', 15), ['sw', 't1', 0x14, 'v1'],               // AI_BITRATE
-  ...li('t1', 1), ['sw', 't1', 0x08, 'v1'],                // AI_CONTROL: DMA on
+  ...li('s1', 0xa4500000),
+  ...li('t1', 1520), ['sw', 't1', 0x10, 's1'],             // AI_DACRATE
+  ...li('t1', 15), ['sw', 't1', 0x14, 's1'],               // AI_BITRATE
+  ...li('t1', 1), ['sw', 't1', 0x08, 's1'],                // AI_CONTROL: DMA on
   // a quiet 250 Hz square wave, 1024 samples at 3 MB
   ...li('t5', 0xa0300000), ...li('t6', 0), ['addiu', 't9', 'zero', 1024],
   'tone',
@@ -209,8 +218,18 @@ const program = ({ picture, fill, list, size, length }) => [
   ['bne', 't1', 'zero', 'pi'], ['nop'],
   // The task: graphics (type 1), its display list
   ...store(TASK, [1, 0, 0, 0, NO_UCODE, 0, NO_UCODE, 0, 0, 0, 0, 0, list, size, 0, 0]),
-  // a0: the picture drawn into, the one not shown
-  ...li('a0', 0x00140000),
+  // s2: the picture drawn into, the one not shown
+  ...li('s2', 0x00140000),
+  // the work function, by the cartridge's DMA; s3 counts frames for it
+  ...(work ? [
+    ...li('t0', 0xa4600000),
+    ...li('t1', WORK), ['sw', 't1', 0x00, 't0'],
+    ...li('t1', 0x10000000 + work.rom), ['sw', 't1', 0x04, 't0'],
+    ...li('t1', work.code.length - 1), ['sw', 't1', 0x0c, 't0'],
+    'workpi', ['lw', 't1', 0x10, 't0'], ['andi', 't1', 't1', 3],
+    ['bne', 't1', 'zero', 'workpi'], ['nop'],
+    ...li('sp', STACK), ...li('s3', 0),
+  ] : []),
 
   // Controller 1: "read buttons" (1 byte out, 4 back), then the end mark
   ...block(0x200040, [0x01040100, 0x000000fe]),
@@ -219,14 +238,14 @@ const program = ({ picture, fill, list, size, length }) => [
   ...block(0x200080, [0, 0x02080400, 0, 0, 0xfe000000]),
   ...block(0x2000c0, [0, 0x0a010500, 0x5a000000, 0, 0x00fe0000]),
 
-  // v0: the colour shown when nothing's held: magenta when the EEPROM says
+  // s0: the colour shown when nothing's held: magenta when the EEPROM says
   // a button was pressed on an earlier run, else blue
   ...exchange(0x00200080),
   ...li('t2', 0xa0200000), ['lw', 't3', 8, 't2'], ['srl', 't3', 't3', 24],
   ['addiu', 't9', 'zero', 0x5a],
-  ...li('v0', BLUE),
+  ...li('s0', BLUE),
   ['bne', 't3', 't9', 'main'], ['nop'],
-  ...li('v0', MAGENTA),
+  ...li('s0', MAGENTA),
 
   'main',
   // wait for a vertical blank (MI_INTR's VI bit), and clear it
@@ -243,12 +262,12 @@ const program = ({ picture, fill, list, size, length }) => [
   ['srl', 't4', 't4', 16], ['andi', 't4', 't4', 0xff],  // t4: stick x
   // queue the tone whenever the audio interface has room (AI_STATUS's top
   // bit: both its buffers are taken)
-  ['lw', 't1', 0x0c, 'v1'],
+  ['lw', 't1', 0x0c, 's1'],
   ['bltz', 't1', 'queued'], ['nop'],
-  ...li('t1', 0x00300000), ['sw', 't1', 0x00, 'v1'],   // AI_DRAM_ADDR
-  ...li('t1', 4096), ['sw', 't1', 0x04, 'v1'],         // AI_LEN
+  ...li('t1', 0x00300000), ['sw', 't1', 0x00, 's1'],   // AI_DRAM_ADDR
+  ...li('t1', 4096), ['sw', 't1', 0x04, 's1'],         // AI_LEN
   'queued',
-  ['or', 't7', 'v0', 'zero'],
+  ['or', 't7', 's0', 'zero'],
   ['beq', 't4', 'zero', 'buttons'], ['nop'],
   ...li('t7', GREEN),
   'buttons',
@@ -256,21 +275,26 @@ const program = ({ picture, fill, list, size, length }) => [
   ...li('t7', RED),
   ...exchange(0x002000c0),
   'fill',
+  ...(work ? [
+    ['or', 'a0', 's3', 'zero'], ...li('a1', work.count),
+    ...li('t9', 0x80000000 + WORK), ['jalr', 't9'], ['nop'],
+    ['addiu', 's3', 's3', 1],
+  ] : []),
   // the picture and colour into the display list, then the RSP started
   // (SP_STATUS: clear halt and broke) and waited for (halted again)
-  ...li('t5', 0xa0000000 + picture), ['sw', 'a0', 0, 't5'],
+  ...li('t5', 0xa0000000 + picture), ['sw', 's2', 0, 't5'],
   ...li('t5', 0xa0000000 + fill), ['sw', 't7', 0, 't5'],
   ...li('t0', 0xa4040000),
   ...li('t1', 5), ['sw', 't1', 0x10, 't0'],
   'rsp', ['lw', 't1', 0x10, 't0'], ['andi', 't1', 't1', 1],
   ['beq', 't1', 'zero', 'rsp'], ['nop'],
   // show it (VI_ORIGIN), and draw into the other next time
-  ...li('t0', 0xa4400000), ['sw', 'a0', 0x04, 't0'],
-  ...li('t1', 0x00100000 ^ 0x00140000), ['xor', 'a0', 'a0', 't1'],
+  ...li('t0', 0xa4400000), ['sw', 's2', 0x04, 't0'],
+  ...li('t1', 0x00100000 ^ 0x00140000), ['xor', 's2', 's2', 't1'],
   ['j', 'main'], ['nop'],
 ];
 
-export function n64TestRom({ triangles = 16 } = {}) {
+export function n64TestRom({ triangles = 16, work = null } = {}) {
   const rom = Buffer.alloc(0x101000);
   rom.writeUInt32BE(0x80371240, 0);   // cartridge settings, as every game has
   rom.writeUInt32BE(0x0000000f, 4);   // clock rate
@@ -282,7 +306,12 @@ export function n64TestRom({ triangles = 16 } = {}) {
   const data = graphicsData(triangles);
   if (DATA_ROM + data.bytes.length > rom.length) throw new Error('too many triangles for the test cartridge');
   data.bytes.copy(rom, DATA_ROM);
-  const code = assemble(program({ ...data, length: data.bytes.length }), 0xa4000040);
+  if (work) {
+    work = { ...work, rom: (DATA_ROM + data.bytes.length + 15) & ~15 };
+    if (work.rom + work.code.length > rom.length) throw new Error('the work function doesn\'t fit');
+    work.code.copy(rom, work.rom);
+  }
+  const code = assemble(program({ ...data, length: data.bytes.length, work }), 0xa4000040);
   // (the task's description follows it)
   if (code.length > (TASK - 0xa4000040) / 4) throw new Error('the test program is bigger than the boot code\'s room');
   code.forEach((w, n) => rom.writeUInt32BE(w, 0x40 + n * 4));

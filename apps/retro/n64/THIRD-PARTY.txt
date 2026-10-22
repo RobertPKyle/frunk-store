@@ -1,4 +1,5 @@
-n64js 1eb54aa55fa55db831f7491a289ec55afc7a1688, by Paul Holden, MIT license (LICENSE).
+n64js 1eb54aa55fa55db831f7491a289ec55afc7a1688, by Paul Holden, MIT license (LICENSE), with frunk.store's
+changes (tools/n64js/patches in https://github.com/RobertPKyle/frunk-store).
 It includes a CRT shader adapted from crtemu by Mattias Gustavsson:
 
 Mattias CRT presentation, adapted from crtemu_pc.h by Mattias Gustavsson:
