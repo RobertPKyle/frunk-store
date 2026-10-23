@@ -652,6 +652,12 @@ to the cache again.
   adds `web_keys`, `web_key`, `web_cursor` and `web_status`, gives each
   puzzle its own preferences key, and fixes a Guess redraw that left a trail
   behind a dragged peg.
+- `apps/terrarium`: Terrarium, by Jason Goldfeder (jasongoldfeder.com). An
+  artificial-life aquarium on Canvas 2D whose fish carry genomes, breed and
+  evolve. It saves to localStorage and, when reopened, catches up on the time
+  it was away. Ported from https://github.com/jasongold/tesla-demo, where it
+  lives at `games/terrarium/`; the shared helpers it needs are copied into
+  `apps/terrarium/engine/`.
 - `apps/_shared/place.js`: the location picker. Star Map, Weather,
   Satellites, Sky Events, What's Around Me and Pit Stop share one saved place
   (`frunk.place` in localStorage). A place picked as the car's location

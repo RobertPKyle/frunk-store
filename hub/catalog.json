@@ -318,6 +318,17 @@
         "Game",
         "Puzzle"
       ]
+    },
+    {
+      "id": "terrarium",
+      "name": "Terrarium",
+      "tagline": "An aquarium that keeps living while you're away. Feed it, watch it evolve. By Jason Goldfeder.",
+      "path": "/terrarium/",
+      "icon": "/terrarium/icon.svg",
+      "tags": [
+        "Camp Mode",
+        "Offline"
+      ]
     }
   ]
 }
