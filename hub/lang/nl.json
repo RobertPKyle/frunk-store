@@ -90,6 +90,7 @@
     "pitstop": { "name": "Pitstop", "tagline": "Toiletten, koffie, eten en winkels op loopafstand van de lader, met wat er nu open is." },
     "speedtest": { "name": "Snelheidstest", "tagline": "Hoe snel is het internet in de auto nu? Download, upload en ping, via wifi of LTE." },
     "probe": { "name": "Auto-benchmark", "tagline": "Bekijk wat de browser van deze auto kan." },
+    "tic80": { "name": "Mini-games", "tagline": "Negen gratis retrogames op de fantasyconsole TIC-80, plus .tic-carts die je vanaf je telefoon stuurt. Met aanraken of een controller." },
     "retro": { "name": "Retroconsole", "tagline": "Speel homebrew-games, of NES-, Game Boy-, GBA-, Master System- en Game Gear-games die je bezit, verstuurd vanaf je telefoon, met een controller of op het scherm." },
     "holders": { "name": "Holders", "tagline": "Vroege toegang voor houders van de FrunkStore-token: Craft 4K, Freedoom, LibreQuake, OpenArena, OpenTTD en Mega Drive- en TurboGrafx-16-games, plus stemmen over wat er komt. Ontgrendel met de wallet op je telefoon." },
     "doom": { "tagline": "De klassieke Doom-engine met de gratis Freedoom-games, of Doom-games die je bezit, verstuurd vanaf je telefoon, met een controller of op het scherm." },

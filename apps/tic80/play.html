@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Playing</title>
+<!-- One game in TIC-80's web player, inside Tiny Games' page:
+     play.html?player=lua&cart=games/quest.tic for a game that comes with
+     the app, or cart=mine/<id>.tic for one the player added, which is read
+     from IndexedDB. The page is thrown away to quit, which stops the player
+     and its sound. The player draws its own touch controls. -->
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #1a1c2c; }
+  #canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; image-rendering: pixelated; touch-action: none; outline: none; }
+  /* the player's "add a file" dialog, used only by TIC-80's own console */
+  .modal { display: none; }
+</style>
+</head>
+<body>
+<canvas id="canvas" tabindex="0" oncontextmenu="event.preventDefault()"></canvas>
+<div id="add-modal" class="modal"><input type="file" id="upload-input"></div>
+<script type="module">
+import { PLAYERS } from './cart.js';
+import { getCart } from './store.js';
+
+const params = new URLSearchParams(location.search);
+const player = params.get('player'), cart = params.get('cart') || '';
+const fail = text => parent.postMessage({ tic80: 'failed', text }, location.origin);
+
+// The car shows each controller twice: the controller itself (no standard
+// layout) and a "Tesla Virtual Gamepad" copy with the standard layout. The
+// player would take them as players 1 and 2, so when any standard pad is
+// connected, only standard pads are shown to it.
+const getGamepads = navigator.getGamepads.bind(navigator);
+navigator.getGamepads = () => {
+  const pads = [...getGamepads()];
+  if (!pads.some(p => p?.mapping === 'standard')) return pads;
+  return pads.filter(p => p?.mapping === 'standard').concat(pads.filter(p => !p || p.mapping !== 'standard').map(() => null));
+};
+
+// The player fetches its cart by URL; carts the player added come from
+// this browser's storage
+const realFetch = window.fetch.bind(window);
+window.fetch = async (input, init) => {
+  const url = new URL(typeof input === 'string' ? input : input.url, location.href);
+  const mine = /^\/tic80\/mine\/([\w-]+)\.tic$/.exec(url.pathname);
+  if (!mine) return realFetch(input, init);
+  const saved = await getCart(mine[1]);
+  return saved ? new Response(saved.bytes) : new Response('', { status: 404 });
+};
+
+// Sound may start before this frame has seen a tap; the first tap resumes it
+const contexts = [];
+const Real = window.AudioContext || window.webkitAudioContext;
+window.AudioContext = window.webkitAudioContext = class extends Real {
+  constructor(...args) { super(...args); contexts.push(this); }
+};
+const resume = () => contexts.forEach(c => c.state === 'suspended' && c.resume().catch(() => {}));
+addEventListener('pointerdown', resume, true);
+addEventListener('keydown', resume, true);
+
+// The player's options file, in the database its file system is kept in
+// (Emscripten's IDBFS: version 21, store FILE_DATA). The CRT effect is on
+// by default; it blurs the small screen and costs the car's graphics chip,
+// so it's off unless Tiny Games' setting turns it on (crt=1). The folder is
+// named after the TIC-80 build (62c24e5 is 1.3.1).
+const ROOT = '/com.nesbox.tic/TIC-80', LOCAL = `${ROOT}/.local`, VERSION = `${LOCAL}/62c24e5`;
+function setOptions(crt) {
+  return new Promise(resolve => {
+    const req = indexedDB.open(ROOT, 21);
+    req.onupgradeneeded = () => req.result.createObjectStore('FILE_DATA').createIndex('timestamp', 'timestamp', { unique: false });
+    req.onerror = () => resolve();
+    req.onsuccess = () => {
+      const db = req.result, now = new Date();
+      const tx = db.transaction('FILE_DATA', 'readwrite'), files = tx.objectStore('FILE_DATA');
+      for (const dir of [LOCAL, VERSION]) files.put({ timestamp: now, mode: 0o40755 }, dir);
+      files.put({ timestamp: now, mode: 0o100644, contents: new TextEncoder().encode(JSON.stringify({ crt })) }, `${VERSION}/options.json`);
+      tx.oncomplete = tx.onerror = tx.onabort = () => { db.close(); resolve(); };
+    };
+  });
+}
+
+if (!PLAYERS.includes(player) || !/^(games|mine)\/[\w-]+\.tic$/.test(cart)) {
+  fail('That game link is damaged.');
+} else {
+  await setOptions(params.get('crt') === '1');
+  window.Module = {
+    canvas: document.getElementById('canvas'),
+    arguments: [cart],
+    onAbort: what => fail(`The game stopped: ${what}`),
+  };
+  const script = Object.assign(document.createElement('script'), { src: `players/${player}/tic80.js` });
+  script.onerror = () => fail('The player didn\'t load. Check the connection.');
+  document.body.append(script);
+  document.getElementById('canvas').focus();
+  parent.postMessage({ tic80: 'started' }, location.origin);
+}
+
+// Emscripten ends its start-up with an 'unwind' throw; that's not a failure
+addEventListener('error', e => { if (!/unwind/.test(e.message)) fail(e.message); });
+</script>
+</body>
+</html>

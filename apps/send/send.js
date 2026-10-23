@@ -4,6 +4,7 @@
 // in pieces when it's big. Zipped games are sent zipped; the car unzips them.
 import { sealPieces } from '../_shared/transfer.js';
 import { keepAwake } from '../_shared/awake.js';
+import { MAX_CART, isCart } from '../tic80/cart.js';
 import { MAX_ADVENTURE_FILE, MAX_FILE, MAX_QUAKE_FILE, MAX_STORY_FILE, MAX_WAD_FILE, findAdventureFile, findGame, findQuakeFile, findStory, findWad } from '../_shared/roms.js';
 
 const $ = id => document.getElementById(id);
@@ -13,7 +14,7 @@ let key = null;
 
 // Which app on the car asked: Retro Console (console games), Freedoom (Doom
 // WADs), Blasphemer (Heretic WADs), Adventure Games (folders of game files), Text Adventures (story
-// files) or LibreQuake (Quake paks). Files are checked here so the wrong
+// files), LibreQuake (Quake paks) or Tiny Games (TIC-80 carts). Files are checked here so the wrong
 // kind isn't sent.
 const APPS = {
   doom: { name: 'Freedoom', max: MAX_WAD_FILE, check: findWad, wrong: 'Not a Doom WAD',
@@ -26,6 +27,8 @@ const APPS = {
     lede: 'Pick text adventure story files on this phone (.z3, .z5, .z8 or .zblorb, zipped or not), such as free games from the Interactive Fiction Archive or ones you own. They appear on the car screen in a few seconds.' },
   quake: { name: 'LibreQuake', max: MAX_QUAKE_FILE, check: findQuakeFile, wrong: 'Not a Quake file',
     lede: 'Pick the Quake files from a copy you own: PAK0.PAK and PAK1.PAK from its id1 folder (in a Steam or GOG copy, the original id1 folder, not the "rerelease" one), and the mission packs\' PAK0.PAK from their hipnotic or rogue folders. Music files named trackNN.ogg work too. They appear on the car screen in a few seconds.' },
+  tic80: { name: 'Tiny Games', max: MAX_CART, check: isCart, wrong: 'Not a TIC-80 cart (.tic)',
+    lede: 'Pick TIC-80 carts (.tic) on this phone: your own games, or ones their makers let you share. They appear on the car screen in a few seconds.' },
   retro: { name: 'Retro Console', max: MAX_FILE, check: findGame, wrong: 'Not a game this plays' },
 };
 const APP = APPS[new URLSearchParams(location.search).get('app')] || APPS.retro;

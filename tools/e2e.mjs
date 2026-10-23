@@ -384,6 +384,56 @@ await check('brain test scores, ranks and makes a share card', async () => {
   await page.screenshot({ path: shots + 'brain-card.png' });
 });
 
+await check('tiny games plays a free game and an added cart', async () => {
+  await openFromHub(/Tiny Games/);
+  const games = await (await fetch(`${appsBase}/tic80/games.json`)).json();
+  await appFrame().locator('#games .game').nth(games.games.length - 1).waitFor({ timeout: 10000 });
+  const playing = () => page.frames().find(f => f.url().includes('/tic80/play.html'));
+  // a free game starts its player (the one for its language: Dunkman is MoonScript)
+  await appFrame().getByRole('button', { name: 'Play Dunkman' }).click();
+  await page.waitForFunction(() => document.querySelector('#frame').contentWindow.length === 1);
+  await page.waitForTimeout(500);
+  await playing().waitForFunction(() => !!window.Module?.ctx, null, { timeout: 30000 });
+  if (!playing().url().includes('player=moon')) throw new Error(`wrong player: ${playing().url()}`);
+  await page.waitForTimeout(2000);
+  await page.screenshot({ path: shots + 'tic80.png' });
+  await appFrame().getByRole('button', { name: '‹ Games' }).click();
+  await appFrame().locator('#library:not([hidden])').waitFor();
+
+  // a cart from a USB drive: one of the free games stands in
+  const [chooser] = await Promise.all([page.waitForEvent('filechooser'), appFrame().getByRole('button', { name: 'Add files' }).click()]);
+  writeFileSync(shots + 'notacart.tic', 'not a cart');
+  await chooser.setFiles([new URL('../apps/tic80/games/grow.tic', import.meta.url).pathname, shots + 'notacart.tic']);
+  await appFrame().locator('#status').filter({ hasText: 'notacart.tic' }).waitFor({ timeout: 5000 });
+  await appFrame().locator('#mine .game').filter({ hasText: 'Grow quickly' }).waitFor({ timeout: 5000 });
+  await appFrame().locator('#mine').getByRole('button', { name: 'Play Grow quickly' }).click();
+  await page.waitForTimeout(500);
+  await playing().waitForFunction(() => !!window.Module?.ctx, null, { timeout: 30000 });
+  if (!/cart=mine%2F/.test(playing().url())) throw new Error(`not the added cart: ${playing().url()}`);
+  await appFrame().getByRole('button', { name: '‹ Games' }).click();
+  await appFrame().getByRole('button', { name: 'Remove Grow quickly' }).click();
+  await appFrame().getByRole('button', { name: 'Remove Grow quickly' }).click();
+  await appFrame().locator('#mine .game').waitFor({ state: 'detached', timeout: 5000 });
+
+  // the phone page takes .tic carts for Tiny Games and turns away other files
+  await appFrame().getByRole('button', { name: 'Get carts from phone' }).click();
+  await appFrame().locator('#transferStatus').filter({ hasText: 'Waiting' }).waitFor({ timeout: 10000 });
+  const link = await appFrame().locator('#qr a').getAttribute('href');
+  if (!link.includes('?app=tic80')) throw new Error(`phone link doesn't ask for carts: ${link}`);
+  const phone = await browser.newPage({ viewport: { width: 390, height: 800 }, isMobile: true, hasTouch: true });
+  await phone.goto(link);
+  const [pick] = await Promise.all([phone.waitForEvent('filechooser'), phone.getByRole('button', { name: 'Choose games' }).click()]);
+  await pick.setFiles([new URL('../apps/tic80/games/quest.tic', import.meta.url).pathname, shots + 'notacart.tic']);
+  await phone.locator('#files li.ok').waitFor({ timeout: 20000 });
+  await phone.locator('#files li.bad').filter({ hasText: 'Not a TIC-80 cart' }).waitFor({ timeout: 5000 });
+  await phone.close();
+  await appFrame().locator('#received li:not(.bad):not(.busy)').filter({ hasText: 'QUEST FOR GLORY' }).waitFor({ timeout: 20000 });
+  await appFrame().getByRole('button', { name: 'Done' }).click();
+  await appFrame().getByRole('button', { name: 'Remove QUEST FOR GLORY' }).click();
+  await appFrame().getByRole('button', { name: 'Remove QUEST FOR GLORY' }).click();
+  await appFrame().locator('#mine .game').waitFor({ state: 'detached', timeout: 5000 });
+});
+
 await check('retro console adds a local file and plays a game', async () => {
   await openFromHub(/Retro Console/);
   // A player's own file: use one of the bundled free games as the stand-in

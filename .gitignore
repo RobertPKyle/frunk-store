@@ -44,3 +44,7 @@ tools/.n64js-build
 roms/
 tools/.battleship-build
 apps/battleship/engine
+tools/.tic80-build
+apps/tic80/players
+apps/tic80/games
+apps/tic80/games.json

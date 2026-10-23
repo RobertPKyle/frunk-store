@@ -92,6 +92,20 @@ to the cache again.
   (speed.cloudflare.com). Each direction runs for a fixed time on several
   connections and reports the average after a 2 second warm-up. Data use is
   capped at about 350 MB per test. The last 30 results are kept on the device.
+- `apps/tic80`: Tiny Games. TIC-80 1.3.1's official web players (MIT), one
+  per cart language, and nine freely licensed games (MIT or GPL-3, listed
+  with their sources in the app), all built by `node tools/build-tic80.mjs`
+  (needs gcc and Chrome; outputs are not committed). Games kept as text
+  projects are turned into carts with TIC-80's own prj2cart, compiled
+  without the script engines (`tools/tic80/prj2cart-langs.c`); its output
+  matched TIC-80's prebuilt demo carts byte for byte. Covers are the cart's
+  saved screen, or the game's screen a few seconds in. `cart.js` reads a
+  cart's language, title and cover; `play.html` runs one game in a frame
+  of its own, serves added carts from IndexedDB, shows the player only
+  standard-layout controllers (the car doubles each one), and turns the
+  player's CRT effect off unless the app's setting asks for it, by writing
+  its options file into the player's own IndexedDB before it starts. Carts
+  come from the phone (`/send/?app=tic80`) or a USB drive.
 - `apps/brain` and `apps/api/brain.js`: Brain Test ("Can your Tesla brain?").
   A 20-second benchmark: a mixed JavaScript kernel on one core and on every
   core (`worker.js`), then a ray-marched brain drawn at a fixed 480x270 as

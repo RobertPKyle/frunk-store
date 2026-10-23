@@ -144,6 +144,17 @@
       ]
     },
     {
+      "id": "tic80",
+      "name": "Tiny Games",
+      "tagline": "Nine free retro games on the TIC-80 fantasy console, plus any .tic carts you send from your phone. Touch or controller.",
+      "path": "/tic80/",
+      "icon": "/tic80/icon.svg",
+      "tags": [
+        "Game",
+        "Controller"
+      ]
+    },
+    {
       "id": "retro",
       "name": "Retro Console",
       "tagline": "Play homebrew games, or NES, Game Boy, GBA, Master System and Game Gear games you own sent from your phone, with a controller or on screen.",
