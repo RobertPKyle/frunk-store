@@ -349,6 +349,29 @@ await check('chess puzzle renders a board', async () => {
   await page.screenshot({ path: shots + 'chess.png' });
 });
 
+await check('terrarium runs, feeds and catches up after time away', async () => {
+  await openFromHub(/Terrarium/);
+  const tank = () => page.frames().find(f => f.url().includes('/terrarium/'));
+  await tank().waitForFunction(() => window.__terrarium?.loop.stats.fps > 0, null, { timeout: 10000 });
+  const food = () => tank().evaluate(() => window.__terrarium.sim.state.food.length);
+  const before = await food();
+  await appFrame().getByRole('button', { name: 'Scatter food' }).click();
+  if (!(await food() > before)) throw new Error('Feed added no food');
+  // pretend the tank was left a week ago, and keep its save on the way out
+  // from writing over that, then come back
+  await tank().evaluate(() => {
+    window.__terrarium.store.write({ seed: 1, sim: window.__terrarium.sim.serialize() });
+    const save = JSON.parse(localStorage.getItem('tesla.terrarium'));
+    save.savedAt -= 7 * 86400e3;
+    localStorage.setItem('tesla.terrarium', JSON.stringify(save));
+    Storage.prototype.setItem = () => {};
+  });
+  await openFromHub(/Terrarium/);
+  await tank().waitForFunction(() => window.__terrarium?.awaySummary?.days > 1, null, { timeout: 10000 });
+  await appFrame().locator('.away.visible').filter({ hasText: 'While you were away' }).waitFor({ timeout: 5000 });
+  console.log(`     ${await tank().evaluate(() => `${window.__terrarium.sim.state.creatures.length} alive after ${window.__terrarium.awaySummary.days.toFixed(0)} tank days away`)}`);
+});
+
 await check('speed test measures ping and starts the download', async () => {
   await openFromHub(/Speed Test/);
   await appFrame().getByRole('button', { name: 'Start test' }).click();

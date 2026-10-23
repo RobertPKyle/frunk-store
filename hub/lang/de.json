@@ -102,6 +102,7 @@
     "adventure": { "name": "Adventure-Spiele", "tagline": "Klassische Point-and-Click-Adventures mit ScummVM: sieben kostenlose Spiele oder eigene, die du vom Handy schickst." },
     "text": { "name": "Textadventures", "tagline": "Zork I, II und III, die Infocom-Klassiker, jetzt Open Source. Tippe auf Wörter, um Befehle zu bauen, oder schreib selbst." },
     "puzzles": { "name": "Logikrätsel", "tagline": "Vierzig klassische Logikrätsel von Simon Tatham, von Solo (Sudoku) über Mines bis Net, mit endlos neuen Feldern in jeder Größe." },
-    "chess": { "name": "Schachrätsel", "tagline": "Löse das tägliche Schachrätsel von Lichess auf deinem Bildschirm." }
+    "chess": { "name": "Schachrätsel", "tagline": "Löse das tägliche Schachrätsel von Lichess auf deinem Bildschirm." },
+    "terrarium": { "tagline": "Ein Aquarium, das weiterlebt, während du weg bist. Füttere es und sieh zu, wie es sich entwickelt. Von Jason Goldfeder." }
   }
 }

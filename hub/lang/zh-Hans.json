@@ -102,6 +102,7 @@
     "adventure": { "name": "冒险游戏", "tagline": "ScummVM 上的经典点击式冒险游戏：七款免费游戏，或从手机发送你拥有的游戏。" },
     "text": { "name": "文字冒险", "tagline": "Infocom 的经典 Zork I、II、III，现已开源。点选单词组成指令，或直接输入。" },
     "puzzles": { "name": "逻辑谜题", "tagline": "Simon Tatham 的 40 款经典逻辑谜题，从 Solo（数独）到 Mines、Net，任何尺寸都有无穷无尽的新盘面。" },
-    "chess": { "name": "国际象棋谜题", "tagline": "在屏幕上解 Lichess 每日国际象棋谜题。" }
+    "chess": { "name": "国际象棋谜题", "tagline": "在屏幕上解 Lichess 每日国际象棋谜题。" },
+    "terrarium": { "tagline": "你不在时也持续生活的水族箱。喂食它们，看着它们进化。作者：Jason Goldfeder。" }
   }
 }
