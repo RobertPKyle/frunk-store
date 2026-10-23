@@ -1,0 +1,507 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index df980c5..4f0762c 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -27,7 +27,7 @@ endif()
+ # and the in-engine call sites (#ifndef DISABLE_SCRIPTING). Forced ON for
+ # Android: funchook/TinyCC have no Android target and the loader is desktop-only.
+ # Set BEFORE add_subdirectory(libultraship) so the engine half sees it too.
+-if (CMAKE_SYSTEM_NAME STREQUAL "Android")
++if (CMAKE_SYSTEM_NAME STREQUAL "Android" OR CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
+     set(DISABLE_SCRIPTING ON CACHE BOOL "Disable the mod system (scripting + hooks)" FORCE)
+ endif()
+ 
+@@ -141,7 +141,7 @@ set(GBI_UCODE "F3DEX_GBI_2" CACHE STRING "" FORCE)
+ # Android needs GLES3 instead of desktop GL + GLEW. Pin USE_OPENGLES ON
+ # before the libultraship subdirectory so its src/CMakeLists.txt picks the
+ # GLESv3 branch and the ENABLE_OPENGL/USE_OPENGLES compile defs are set.
+-if (CMAKE_SYSTEM_NAME STREQUAL "Android")
++if (CMAKE_SYSTEM_NAME STREQUAL "Android" OR CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
+     set(USE_OPENGLES ON CACHE BOOL "" FORCE)
+ endif()
+ 
+@@ -237,7 +237,10 @@ if (NOT DISABLE_SCRIPTING)
+     endif()
+ endif()
+ 
+-if (CMAKE_SYSTEM_NAME STREQUAL "Android")
++if (CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
++    # Web: the page extracts the ROM with its own Torch build, so the game
++    # build needs no Torch at all.
++elseif (CMAKE_SYSTEM_NAME STREQUAL "Android")
+     # Android: build Torch in-tree as a STATIC lib (USE_STANDALONE=OFF
+     # was forced above). The libtorch_runner.so SHARED library at the
+     # bottom of this file wraps it for JNI.
+@@ -537,7 +540,7 @@ list(FILTER SSB64_SRC_PORT EXCLUDE REGEX "port/coroutine_test\\.cpp$")
+ if (DISABLE_SCRIPTING)
+     list(FILTER SSB64_SRC_PORT EXCLUDE REGEX "port/mods/")
+ endif()
+-if (CMAKE_SYSTEM_NAME STREQUAL "Android")
++if (CMAKE_SYSTEM_NAME STREQUAL "Android" OR CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
+     # libtorch_runner.so wraps android_torch_bridge.cpp separately; keep
+     # it out of libmain.so so the static libtorch + its FetchContent'd
+     # deps don't bloat the SDL-bound game library.
+@@ -552,6 +555,9 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Android")
+         "port/enhancements/(Updater|DiscordRichPresence|ShaderDownloader)\\.cpp$")
+     list(FILTER SSB64_SRC_PORT EXCLUDE REGEX "port/port_window_icon\\.cpp$")
+ endif()
++if (CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
++    list(FILTER SSB64_SRC_PORT EXCLUDE REGEX "port/first_run\\.cpp$")
++endif()
+ if(BATTLESHIP_UWP)
+     # Xbox packages are updated as MSIX and cannot use these Win32
+     # shell-out/IPC integrations.
+@@ -562,7 +568,7 @@ if(BATTLESHIP_UWP)
+ endif()
+ # Treat the generated icon header as a source so CMake schedules it ahead
+ # of any port TU compilation (port_window_icon.cpp #includes it).
+-if (NOT CMAKE_SYSTEM_NAME STREQUAL "Android" AND NOT BATTLESHIP_UWP)
++if (NOT CMAKE_SYSTEM_NAME STREQUAL "Android" AND NOT CMAKE_SYSTEM_NAME STREQUAL "Emscripten" AND NOT BATTLESHIP_UWP)
+     list(APPEND SSB64_SRC_PORT ${SSB64_ICON_GEN})
+ endif()
+ # Arrow + nameplate baked headers — added as sources so CMake schedules their
+@@ -846,7 +852,7 @@ endif()
+ # Fetch Discord RPC (desktop only — Android drops Discord Rich Presence
+ # along with the rest of the network-dependent features).
+ ################################################################################
+-if (NOT CMAKE_SYSTEM_NAME STREQUAL "Android" AND NOT BATTLESHIP_UWP)
++if (NOT CMAKE_SYSTEM_NAME STREQUAL "Android" AND NOT CMAKE_SYSTEM_NAME STREQUAL "Emscripten" AND NOT BATTLESHIP_UWP)
+     # discord-rpc v3.4.0's CMakeLists declares cmake_minimum_required(VERSION 2.x),
+     # which CMake 3.30+ refuses to honor. Force a baseline policy version for the
+     # fetched subdir so the build still configures with current CMake.
+@@ -948,7 +954,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE
+     ${CMAKE_CURRENT_SOURCE_DIR}/debug_tools
+     ${SSB64_CSS_GEN_DIR}                         # CSS icon baked headers (arrow_data.h)
+ )
+-if (NOT CMAKE_SYSTEM_NAME STREQUAL "Android" AND NOT BATTLESHIP_UWP)
++if (NOT CMAKE_SYSTEM_NAME STREQUAL "Android" AND NOT CMAKE_SYSTEM_NAME STREQUAL "Emscripten" AND NOT BATTLESHIP_UWP)
+     target_include_directories(${PROJECT_NAME} PRIVATE
+         ${SSB64_ICON_GEN_DIR}                         # Generated icon header (port_icon_data.h)
+         ${discord_rpc_SOURCE_DIR}/include             # Discord Rich Presence
+@@ -965,7 +971,7 @@ endif()
+ # Link libultraship and Torch
+ ################################################################################
+ 
+-if (CMAKE_SYSTEM_NAME STREQUAL "Android")
++if (CMAKE_SYSTEM_NAME STREQUAL "Android" OR CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
+     add_dependencies(${PROJECT_NAME} libultraship)
+     target_link_libraries(${PROJECT_NAME} PRIVATE libultraship)
+ elseif(BATTLESHIP_UWP)
+@@ -1050,6 +1056,28 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Windows" AND NOT BATTLESHIP_UWP)
+     target_sources(${PROJECT_NAME} PRIVATE ${CMAKE_BINARY_DIR}/port/ssb64.rc)
+ elseif (CMAKE_SYSTEM_NAME STREQUAL "Linux")
+     target_link_options(${PROJECT_NAME} PRIVATE -Wl,-export-dynamic)
++elseif (CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
++    # Coroutines are Emscripten fibers, which need Asyncify. The page loads
++    # the extracted BattleShip.o2r into the virtual file system before main.
++    set_target_properties(${PROJECT_NAME} PROPERTIES SUFFIX ".js")
++    target_link_options(${PROJECT_NAME} PRIVATE
++        -sASYNCIFY=1
++        -sASYNCIFY_STACK_SIZE=131072
++        -sMIN_WEBGL_VERSION=2
++        -sMAX_WEBGL_VERSION=2
++        -sALLOW_MEMORY_GROWTH=1
++        -sINITIAL_MEMORY=256MB
++        -sSTACK_SIZE=2MB
++        -sPTHREAD_POOL_SIZE=4
++        -sMODULARIZE=1
++        -sEXPORT_NAME=createBattleShip
++        -sINVOKE_RUN=0
++        -sEXIT_RUNTIME=0
++        -sFORCE_FILESYSTEM=1
++        -sEXPORTED_RUNTIME_METHODS=FS,callMain
++        -sENVIRONMENT=web,worker
++        -lidbfs.js
++    )
+ endif()
+ # NOTE (APPLE): the mod hook backend needs __TEXT max-protection = rwx so
+ # the JIT-entitled process can flip an engine code page writable to patch
+@@ -1081,7 +1109,7 @@ endif()
+ # these into the APK assets/ at Gradle time via android/app/build.gradle.kts).
+ ################################################################################
+ 
+-if (NOT CMAKE_SYSTEM_NAME STREQUAL "Android")
++if (NOT CMAKE_SYSTEM_NAME STREQUAL "Android" AND NOT CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
+     configure_file(
+         ${CMAKE_SOURCE_DIR}/gamecontrollerdb.txt
+         ${CMAKE_BINARY_DIR}/gamecontrollerdb.txt
+@@ -1259,7 +1287,7 @@ endif()
+ # port/android_torch_bridge.cpp + RomImporter.java).
+ ################################################################################
+ 
+-if (NOT CMAKE_SYSTEM_NAME STREQUAL "Android")
++if (NOT CMAKE_SYSTEM_NAME STREQUAL "Android" AND NOT CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
+ # Accept .z64 (big-endian), .n64 (little-endian), or .v64 (byteswapped).
+ # Torch's Cartridge::Normalize converts non-z64 byte orders in-memory.
+ set(SSB64_BASEROM "")
+diff --git a/port/coroutine_emscripten.cpp b/port/coroutine_emscripten.cpp
+new file mode 100644
+index 0000000..5cd0f7a
+--- /dev/null
++++ b/port/coroutine_emscripten.cpp
+@@ -0,0 +1,141 @@
++/**
++ * coroutine_emscripten.cpp — Emscripten fiber coroutine implementation.
++ *
++ * WebAssembly has no way to switch native stacks, so each coroutine is an
++ * emscripten_fiber_t: a C stack plus an Asyncify buffer that holds the
++ * unwound WebAssembly call stack while the fiber is suspended. The caller's
++ * context is captured fresh on every resume, which keeps nested resumes
++ * (main -> service thread -> GObj thread) working like the ucontext backend.
++ */
++
++#if defined(__EMSCRIPTEN__)
++
++#include "coroutine.h"
++#include "port_watchdog.h"
++
++#include <emscripten/fiber.h>
++#include <stdio.h>
++#include <stdlib.h>
++
++#define MIN_STACK_SIZE 32768
++#define CALLER_ASYNCIFY_SIZE (128 * 1024)
++
++struct PortCoroutine {
++	emscripten_fiber_t fiber;
++	emscripten_fiber_t caller;
++	void (*entry)(void *);
++	void *arg;
++	int finished;
++	char *c_stack;
++	char *asyncify_stack;
++	char *caller_asyncify_stack;
++};
++
++static PortCoroutine *sCurrentCoroutine = NULL;
++
++static void fiber_entry(void *p)
++{
++	PortCoroutine *co = (PortCoroutine *)p;
++
++	co->entry(co->arg);
++
++	co->finished = 1;
++	sCurrentCoroutine = NULL;
++
++	/* A fiber's entry must never return; hand control back for good. */
++	emscripten_fiber_swap(&co->fiber, &co->caller);
++	abort();
++}
++
++void port_coroutine_init_main(void)
++{
++}
++
++PortCoroutine *port_coroutine_create(void (*entry)(void *), void *arg,
++                                     size_t stack_size)
++{
++	if (stack_size < MIN_STACK_SIZE) {
++		stack_size = MIN_STACK_SIZE;
++	}
++
++	PortCoroutine *co = (PortCoroutine *)calloc(1, sizeof(PortCoroutine));
++	if (co == NULL) {
++		return NULL;
++	}
++	co->c_stack = (char *)malloc(stack_size);
++	co->asyncify_stack = (char *)malloc(stack_size);
++	co->caller_asyncify_stack = (char *)malloc(CALLER_ASYNCIFY_SIZE);
++	if (co->c_stack == NULL || co->asyncify_stack == NULL || co->caller_asyncify_stack == NULL) {
++		free(co->c_stack);
++		free(co->asyncify_stack);
++		free(co->caller_asyncify_stack);
++		free(co);
++		return NULL;
++	}
++
++	co->entry = entry;
++	co->arg = arg;
++	emscripten_fiber_init(&co->fiber, fiber_entry, co, co->c_stack, stack_size,
++	                      co->asyncify_stack, stack_size);
++	return co;
++}
++
++void port_coroutine_destroy(PortCoroutine *co)
++{
++	if (co == NULL) {
++		return;
++	}
++	if (co == sCurrentCoroutine) {
++		fprintf(stderr, "SSB64: port_coroutine_destroy on current coroutine\n");
++		abort();
++	}
++	free(co->c_stack);
++	free(co->asyncify_stack);
++	free(co->caller_asyncify_stack);
++	free(co);
++}
++
++void port_coroutine_resume(PortCoroutine *co)
++{
++	if (co == NULL || co->finished) {
++		return;
++	}
++
++	PortCoroutine *prev = sCurrentCoroutine;
++
++	sCurrentCoroutine = co;
++	emscripten_fiber_init_from_current_context(&co->caller, co->caller_asyncify_stack,
++	                                           CALLER_ASYNCIFY_SIZE);
++	emscripten_fiber_swap(&co->caller, &co->fiber);
++
++	sCurrentCoroutine = prev;
++}
++
++void port_coroutine_yield(void)
++{
++	PortCoroutine *co = sCurrentCoroutine;
++	if (co == NULL) {
++		fprintf(stderr, "SSB64: port_coroutine_yield called outside coroutine\n");
++		return;
++	}
++
++	port_watchdog_note_yield();
++
++	sCurrentCoroutine = NULL;
++	emscripten_fiber_swap(&co->fiber, &co->caller);
++}
++
++int port_coroutine_is_finished(PortCoroutine *co)
++{
++	if (co == NULL) {
++		return 1;
++	}
++	return co->finished;
++}
++
++int port_coroutine_in_coroutine(void)
++{
++	return sCurrentCoroutine != NULL;
++}
++
++#endif /* __EMSCRIPTEN__ */
+diff --git a/port/coroutine_posix.cpp b/port/coroutine_posix.cpp
+index 121995c..7f54d04 100644
+--- a/port/coroutine_posix.cpp
++++ b/port/coroutine_posix.cpp
+@@ -5,7 +5,7 @@
+  * swapcontext() provides the resume/yield mechanism.
+  */
+ 
+-#if !defined(_WIN32) && !defined(__ANDROID__)
++#if !defined(_WIN32) && !defined(__ANDROID__) && !defined(__EMSCRIPTEN__)
+ 
+ /*
+  * macOS marks the ucontext / swapcontext routines as deprecated and hides
+diff --git a/port/gameloop.cpp b/port/gameloop.cpp
+index 77df317..b00062a 100644
+--- a/port/gameloop.cpp
++++ b/port/gameloop.cpp
+@@ -575,7 +575,9 @@ void PortGameInit(void)
+ 
+ 	/* Start the hang watchdog now that the boot chain has yielded back.
+ 	 * This avoids firing false alarms during the long synchronous boot. */
++#ifndef __EMSCRIPTEN__
+ 	port_watchdog_init();
++#endif
+ }
+ 
+ /* ========================================================================= */
+@@ -712,7 +714,19 @@ void PortPushFrame(void)
+ 	/* Post a VI retrace event to the scheduler's message queue. See
+ 	 * port_make_os_mesg_int() above for why we don't just write
+ 	 * `(OSMesg)INTR_VRETRACE` here. */
++#ifdef __EMSCRIPTEN__
++	/* n64_stubs.c defines osSendMesg with the decomp's void* OSMesg, and
++	 * WebAssembly passes the libultraship OSMesg union by address instead of
++	 * by value, so hand over the pointer-sized value itself. The pointer is
++	 * volatile so the compiler can't turn this back into a union call. */
++	{
++		s32 (*volatile sendRaw)(OSMesgQueue *, void *, s32) =
++			reinterpret_cast<s32 (*)(OSMesgQueue *, void *, s32)>(osSendMesg);
++		sendRaw(&gSYSchedulerTaskMesgQueue, (void *)(uintptr_t)INTR_VRETRACE, OS_MESG_NOBLOCK);
++	}
++#else
+ 	osSendMesg(&gSYSchedulerTaskMesgQueue, port_make_os_mesg_int(INTR_VRETRACE), OS_MESG_NOBLOCK);
++#endif
+ 
+ 	/* TCC mod hook: GamePreUpdateEvent fires once per frame BEFORE the
+ 	 * per-frame coroutine resume. Listeners run on the main thread with
+@@ -733,7 +747,7 @@ void PortPushFrame(void)
+ 	port_widescreen_tick();
+ 
+ #if !defined(__ANDROID__)
+-#if !defined(BATTLESHIP_UWP)
++#if !defined(BATTLESHIP_UWP) && !defined(__EMSCRIPTEN__)
+ 	ssb64::enhancements::TickDiscordPresence(); // DRP
+ #endif
+ #endif
+diff --git a/port/gui/PortMenu.cpp b/port/gui/PortMenu.cpp
+index bfce6b8..61150f2 100644
+--- a/port/gui/PortMenu.cpp
++++ b/port/gui/PortMenu.cpp
+@@ -357,7 +357,7 @@ void RenderPostProcessDiagnostics(WidgetInfo& /*widget*/) {
+     }
+ }
+ 
+-#if !defined(__ANDROID__) && !defined(BATTLESHIP_UWP)
++#if !defined(__ANDROID__) && !defined(BATTLESHIP_UWP) && !defined(__EMSCRIPTEN__)
+ // Shader-pack downloader UI is gated off on Android (the libretro
+ // catalog fetch + ZIP-extract pipeline doesn't fit Play Store distro;
+ // port/enhancements/ShaderDownloader.cpp is not compiled into libmain.so).
+@@ -858,7 +858,7 @@ void PortMenu::AddMenuSettings() {
+         .RaceDisable(false)
+         .Options(CheckboxOptions().Tooltip("Gives the search input focus when it becomes visible."));
+ 
+-#if !defined(__ANDROID__) && !defined(BATTLESHIP_UWP)
++#if !defined(__ANDROID__) && !defined(BATTLESHIP_UWP) && !defined(__EMSCRIPTEN__)
+     // DRP — Android drops discord-rpc entirely (no curl + Play Store
+     // distribution friction; the Discord SDK isn't built for mobile).
+     AddWidget(path, "Enable Discord Rich Presence", WIDGET_CVAR_CHECKBOX)
+@@ -937,7 +937,7 @@ void PortMenu::AddMenuSettings() {
+                      .DefaultValue(1));
+ #endif
+ 
+-#if !defined(__ANDROID__) && !defined(BATTLESHIP_UWP)
++#if !defined(__ANDROID__) && !defined(BATTLESHIP_UWP) && !defined(__EMSCRIPTEN__)
+     // Post-process / CRT shader stack — hidden on Android. The libretro
+     // slang→SPIR-V→backend transpile path hasn't been validated against
+     // GLES on mobile, and the libretro shader catalog download (curl +
+@@ -992,7 +992,7 @@ void PortMenu::AddMenuSettings() {
+                               "90/120/144/165 Hz phones, TVs, monitors, and Xbox display modes.")
+                      .DefaultValue(false));
+ 
+-#if !defined(__ANDROID__) && !defined(BATTLESHIP_UWP)
++#if !defined(__ANDROID__) && !defined(BATTLESHIP_UWP) && !defined(__EMSCRIPTEN__)
+     AddWidget(path, "Windowed Fullscreen", WIDGET_CVAR_CHECKBOX)
+         .CVar(CVAR_SDL_WINDOWED_FULLSCREEN)
+         .RaceDisable(false)
+@@ -1443,7 +1443,7 @@ void PortMenu::AddMenuAssets() {
+     // Pack-authoring dump tooling is desktop-only — it writes hundreds of
+     // files into <app>/ and is driven from a separate offline conversion
+     // pipeline, neither of which makes sense on a touch device.
+-#if !defined(__ANDROID__) && !defined(BATTLESHIP_UWP)
++#if !defined(__ANDROID__) && !defined(BATTLESHIP_UWP) && !defined(__EMSCRIPTEN__)
+     AddWidget(path, "Pack Authoring", WIDGET_SEPARATOR_TEXT);
+     AddWidget(path,
+               "Dump Source Textures writes one .bin per unique texture into "
+@@ -1708,7 +1708,7 @@ void PortMenu::AddMenuAbout() {
+     AddWidget(path, "Zorkats: C Modding Documentation", WIDGET_TEXT);
+ 
+ 
+-#if !defined(__ANDROID__) && !defined(BATTLESHIP_UWP)
++#if !defined(__ANDROID__) && !defined(BATTLESHIP_UWP) && !defined(__EMSCRIPTEN__)
+     // BUILT-IN UPDATER — hidden on Android. App updates come through the
+     // Play Store on mobile; a curl-driven GitHub-releases updater can't
+     // replace a system-managed installation, and the curl shell-out
+@@ -1891,7 +1891,7 @@ void PortMenu::DrawElement() {
+     }
+ 
+     RenderPostProcessLowResWarnModal();
+-#if !defined(__ANDROID__) && !defined(BATTLESHIP_UWP)
++#if !defined(__ANDROID__) && !defined(BATTLESHIP_UWP) && !defined(__EMSCRIPTEN__)
+     RenderShaderPackModal();
+ #endif
+ }
+diff --git a/port/port.cpp b/port/port.cpp
+index c30a7dc..b47f1e4 100644
+--- a/port/port.cpp
++++ b/port/port.cpp
+@@ -45,6 +45,25 @@
+ #if defined(__ANDROID__)
+ #include <android/api-level.h>  // android_get_device_api_level (audio-driver gate)
+ #endif
++#ifdef __EMSCRIPTEN__
++#include <emscripten.h>
++// Waits for the next browser frame and says whether a 60 Hz game frame is
++// due. A late frame never runs twice, so a slow computer plays slower
++// instead of falling further behind.
++EM_ASYNC_JS(int, port_web_frame_due, (), {
++	const now = await new Promise(requestAnimationFrame);
++	const step = 1000 / 60;
++	if (Module.nextFrameAt === undefined || now - Module.nextFrameAt > step) {
++		Module.nextFrameAt = now;
++	}
++	if (now + 2 < Module.nextFrameAt) {
++		return 0;
++	}
++	Module.nextFrameAt += step;
++	Module.gameFrames = (Module.gameFrames || 0) + 1;
++	return 1;
++});
++#endif
+ #ifndef DISABLE_SCRIPTING
+ #include "mods/HookManager.h"
+ #include "mods/SymbolResolver.h"
+@@ -915,7 +934,7 @@ static int PortInitImpl(int argc, char* argv[]) {
+ 			port_log("SSB64: Port menu attached\n");
+ 		}
+ 
+-#if !defined(__ANDROID__) && !defined(BATTLESHIP_UWP)
++#if !defined(__ANDROID__) && !defined(BATTLESHIP_UWP) && !defined(__EMSCRIPTEN__)
+ 		// Linux: WMs only show the app icon if SDL_SetWindowIcon is called
+ 		// on the live window. .ico/.icns paths are baked into the .exe /
+ 		// .app on Windows / macOS so this is a no-op there. Android pulls
+@@ -948,7 +967,7 @@ static int PortInitImpl(int argc, char* argv[]) {
+ 	 *      render loop until the user provides a ROM and extraction
+ 	 *      succeeds — or quits the window. */
+ 	{
+-#ifdef BATTLESHIP_UWP
++#if defined(BATTLESHIP_UWP) || defined(__EMSCRIPTEN__)
+ 		// A UWP app cannot launch the desktop Torch sidecar or browse arbitrary
+ 		// files. Assets are prepared on a PC and copied to E:/BattleShip.
+ 		std::error_code ec;
+@@ -1409,6 +1428,13 @@ int main(int argc, char* argv[]) {
+ 	int frame = 0;
+ 	bool firstRunHintShown = false;
+ 	while (WindowIsRunning()) {
++#ifdef __EMSCRIPTEN__
++		// The browser draws only when control returns to it, so hand it back
++		// once per frame. The game runs at 60 Hz on any refresh rate.
++		if (!port_web_frame_due()) {
++			continue;
++		}
++#endif
+ 		PortPushFrame();
+ 		frame++;
+ 
+@@ -1436,6 +1462,12 @@ int main(int argc, char* argv[]) {
+ 	port_log("SSB64: main loop exited cleanly at frame=%d (WindowIsRunning=%d)\n",
+ 	         frame, WindowIsRunning());
+ 
++#ifdef __EMSCRIPTEN__
++	// Quitting from the game's own menu: the page saves and reloads. Shutting
++	// down here would touch the WebGL context after SDL let it go.
++	EM_ASM({ if (Module.onGameExit) Module.onGameExit(); });
++	emscripten_exit_with_live_runtime();
++#endif
+ 	PortGameShutdown();
+ 	port_log("SSB64: PortGameShutdown returned\n");
+ 
+diff --git a/port/port_watchdog.cpp b/port/port_watchdog.cpp
+index 0b4787c..0b0a067 100644
+--- a/port/port_watchdog.cpp
++++ b/port/port_watchdog.cpp
+@@ -23,7 +23,7 @@
+  * the symbols aren't linkable. For the Android spike, stub these out — a
+  * production build can either raise minSdk or use libunwind directly.
+  */
+-#if defined(__ANDROID__) && __ANDROID_API__ < 33
++#if (defined(__ANDROID__) && __ANDROID_API__ < 33) || defined(__EMSCRIPTEN__)
+ static inline int backtrace(void * /*frames*/[], int /*max*/) { return 0; }
+ static inline void backtrace_symbols_fd(void *const /*frames*/[], int /*n*/, int /*fd*/) {}
+ #else
+diff --git a/port/renderdoc_app.h b/port/renderdoc_app.h
+index 3cee3bd..20e972b 100644
+--- a/port/renderdoc_app.h
++++ b/port/renderdoc_app.h
+@@ -35,7 +35,7 @@
+ 
+ #if defined(WIN32) || defined(__WIN32__) || defined(_WIN32) || defined(_MSC_VER)
+ #define RENDERDOC_CC __cdecl
+-#elif defined(__linux__) || defined(__FreeBSD__) || defined(__sun__) || defined(__OpenBSD__)
++#elif defined(__linux__) || defined(__FreeBSD__) || defined(__sun__) || defined(__OpenBSD__) || defined(__EMSCRIPTEN__)
+ #define RENDERDOC_CC
+ #elif defined(__APPLE__)
+ #define RENDERDOC_CC

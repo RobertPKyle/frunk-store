@@ -1,0 +1,114 @@
+diff --git a/include/PR/os.h b/include/PR/os.h
+index aad60c9..2bbeb3d 100644
+--- a/include/PR/os.h
++++ b/include/PR/os.h
+@@ -898,7 +898,10 @@ extern "C"
+ 
+ 	/* Address translation routines and macros */
+ 
+-#ifdef PORT
++#if defined(PORT) && defined(__EMSCRIPTEN__)
++	/* libultraship returns uintptr_t, which is 32 bits in WebAssembly. */
++	extern u32 osVirtualToPhysical(void*);
++#elif defined(PORT)
+ 	extern u64 osVirtualToPhysical(void*);
+ #else
+ 	extern u32 osVirtualToPhysical(void*);
+diff --git a/src/ft/ftmain.c b/src/ft/ftmain.c
+index 22c73a1..878b46f 100644
+--- a/src/ft/ftmain.c
++++ b/src/ft/ftmain.c
+@@ -4582,7 +4582,7 @@ void ftMainSetStatus(GObj *fighter_gobj, s32 status_id, f32 frame_begin, f32 ani
+     if (status_id < 0) {
+         port_log("SSB64: !!! ftMainSetStatus ENTRY status_id=0x%x (negative) "
+                  "fighter_gobj=%p caller_ra=%p\n",
+-#if defined(_MSC_VER)
++#if defined(_MSC_VER) || defined(__EMSCRIPTEN__)
+             (u32)status_id, fighter_gobj, (void *)0);
+ #else
+             (u32)status_id, fighter_gobj, __builtin_return_address(0));
+diff --git a/src/it/itfighter/itlinkbomb.c b/src/it/itfighter/itlinkbomb.c
+index 3474450..7ee7df3 100644
+--- a/src/it/itfighter/itlinkbomb.c
++++ b/src/it/itfighter/itlinkbomb.c
+@@ -1,3 +1,4 @@
++#include <string.h>
+ #include <it/item.h>
+ #include <ft/fighter.h>
+ #include <reloc_data.h>
+@@ -15,7 +16,13 @@ extern void portFixupStructU16(void *base, unsigned int byte_offset, unsigned in
+ // // // // // // // // // // // //
+ 
+ // WARNING: Intentionally erroneous declaration. Missing two u16 arguments after f32. HAL's mistake, not mine.
++#ifdef PORT
++/* WebAssembly traps when a call's argument count differs from the definition,
++ * so pass the two trailing arguments the original call left as garbage. */
++extern void itMainSetFighterRelease(GObj*, Vec3f*, f32, u16, u16);
++#else
+ extern void itMainSetFighterRelease(GObj*, Vec3f*, f32);
++#endif
+ 
+ // // // // // // // // // // // //
+ //                               //
+@@ -405,7 +412,16 @@ sb32 itLinkBombHoldProcUpdate(GObj *item_gobj)
+ 			// Update 3/23/2023: itMainSetFighterRelease matches as variadic. No comment.
+ 			// Update  7/2/2023: variadic match confirmed fake, so does this file really use an erroneous decleration?
+ 
++#ifdef PORT
++			{
++				u16 stat_flags;
++
++				memcpy(&stat_flags, &ip->attack_coll.stat_flags, sizeof(u16));
++				itMainSetFighterRelease(item_gobj, &ip->physics.vel_air, 1.0F, stat_flags, ip->attack_coll.stat_count);
++			}
++#else
+ 			itMainSetFighterRelease(item_gobj, &ip->physics.vel_air, 1.0F);
++#endif
+ 			itMainClearOwnerStats(item_gobj);
+ 			itLinkBombExplodeInitVars(item_gobj);
+ 		}
+diff --git a/src/lb/lbtransition.c b/src/lb/lbtransition.c
+index 8e3a4f6..4729844 100644
+--- a/src/lb/lbtransition.c
++++ b/src/lb/lbtransition.c
+@@ -7,7 +7,7 @@
+ #endif
+ 
+ extern void *gSYSchedulerCurrentFramebuffer;
+-extern syRdpSetViewport(void*, f32, f32, f32, f32);
++extern void syRdpSetViewport(void*, f32, f32, f32, f32);
+ 
+ // // // // // // // // // // // //
+ //                               //
+diff --git a/src/sys/objman.c b/src/sys/objman.c
+index 9831637..885a28c 100644
+--- a/src/sys/objman.c
++++ b/src/sys/objman.c
+@@ -22,6 +22,9 @@ extern void port_log(const char *fmt, ...);
+ #include <intrin.h>
+ #pragma intrinsic(_ReturnAddress)
+ #define PORT_CALLER_RA() _ReturnAddress()
++#elif defined(__EMSCRIPTEN__)
++/* WebAssembly has no return addresses to log. */
++#define PORT_CALLER_RA() ((void *)0)
+ #else
+ #define PORT_CALLER_RA() __builtin_return_address(0)
+ #endif
+diff --git a/src/wp/wpness/wpnesspkthunder.c b/src/wp/wpness/wpnesspkthunder.c
+index e221fae..a30759c 100644
+--- a/src/wp/wpness/wpnesspkthunder.c
++++ b/src/wp/wpness/wpnesspkthunder.c
+@@ -450,7 +450,12 @@ GObj* wpNessPKThunderTrailMakeWeapon(GObj *head_gobj, Vec3f *pos, s32 trail_id)
+ 
+     if (trail_id == 0)
+     {
+-        trail_wp->group_id = wpManagerGetGroupID(head_gobj, trail_gobj); // Bruh this doesn't any take arguments but it doesn't match otherwise
++        #ifdef PORT
++        /* WebAssembly traps when a call's argument count differs from the definition. */
++        trail_wp->group_id = wpManagerGetGroupID();
++#else
++        trail_wp->group_id = wpManagerGetGroupID(head_gobj, trail_gobj);
++#endif // Bruh this doesn't any take arguments but it doesn't match otherwise
+     }
+     else trail_wp->group_id = head_wp->group_id;
+ 

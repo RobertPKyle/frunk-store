@@ -1,0 +1,187 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 7f2e09a..385464a 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -54,6 +54,10 @@ if(CMAKE_SYSTEM_NAME STREQUAL "OpenBSD")
+     include(cmake/dependencies/openbsd.cmake)
+ endif()
+ 
++if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
++    include(cmake/dependencies/emscripten.cmake)
++endif()
++
+ if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
+     include(cmake/dependencies/windows.cmake)
+ endif()
+diff --git a/cmake/dependencies/common.cmake b/cmake/dependencies/common.cmake
+index 03b994f..7a2b252 100644
+--- a/cmake/dependencies/common.cmake
++++ b/cmake/dependencies/common.cmake
+@@ -126,7 +126,7 @@ endif()
+ # Heavy first-build cost (~10-20s extra link), so default OFF on the mobile
+ # targets that don't yet have a CRT-shader UI. Desktops get it ON so user
+ # .glsl drops Just Work cross-backend.
+-if (CMAKE_SYSTEM_NAME STREQUAL "iOS" OR CMAKE_SYSTEM_NAME STREQUAL "Android")
++if (CMAKE_SYSTEM_NAME STREQUAL "iOS" OR CMAKE_SYSTEM_NAME STREQUAL "Android" OR CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
+     set(_LUS_PP_TRANSPILER_DEFAULT OFF)
+ else()
+     set(_LUS_PP_TRANSPILER_DEFAULT ON)
+@@ -204,7 +204,7 @@ FetchContent_MakeAvailable(prism)
+ # success but hid_enumerate() returns nullptr, so RaphnetPhysicalDeviceManager
+ # decides "no adapter found" and the SDL2 / Java HIDDeviceManager handles
+ # everything that's actually present.
+-if (CMAKE_SYSTEM_NAME STREQUAL "Android")
++if (CMAKE_SYSTEM_NAME STREQUAL "Android" OR CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
+     set(_LUS_HIDAPI_STUB_DIR ${CMAKE_CURRENT_BINARY_DIR}/hidapi_stub)
+     file(MAKE_DIRECTORY ${_LUS_HIDAPI_STUB_DIR})
+     file(WRITE ${_LUS_HIDAPI_STUB_DIR}/hidapi.h [=[
+diff --git a/cmake/dependencies/emscripten.cmake b/cmake/dependencies/emscripten.cmake
+new file mode 100644
+index 0000000..01cf63f
+--- /dev/null
++++ b/cmake/dependencies/emscripten.cmake
+@@ -0,0 +1,74 @@
++include(FetchContent)
++
++#=================== SDL2 ===================
++# Emscripten ships SDL2 as a port, switched on by a compile and link flag.
++if (NOT TARGET SDL2::SDL2)
++    add_library(SDL2::SDL2 INTERFACE IMPORTED)
++    set_target_properties(SDL2::SDL2 PROPERTIES
++        INTERFACE_COMPILE_OPTIONS "-sUSE_SDL=2"
++        INTERFACE_LINK_OPTIONS "-sUSE_SDL=2")
++endif()
++set(SDL2_FOUND TRUE)
++set(SDL2_INCLUDE_DIRS "")
++
++#=================== nlohmann-json ===================
++FetchContent_Declare(
++    nlohmann_json
++    GIT_REPOSITORY https://github.com/nlohmann/json.git
++    GIT_TAG v3.12.0
++    OVERRIDE_FIND_PACKAGE
++)
++FetchContent_MakeAvailable(nlohmann_json)
++
++#=================== tinyxml2 ===================
++set(tinyxml2_BUILD_TESTING OFF)
++FetchContent_Declare(
++    tinyxml2
++    GIT_REPOSITORY https://github.com/leethomason/tinyxml2.git
++    GIT_TAG 11.0.0
++    OVERRIDE_FIND_PACKAGE
++)
++FetchContent_MakeAvailable(tinyxml2)
++
++#=================== spdlog ===================
++FetchContent_Declare(
++    spdlog
++    GIT_REPOSITORY https://github.com/gabime/spdlog.git
++    GIT_TAG v1.16.0
++    OVERRIDE_FIND_PACKAGE
++)
++FetchContent_MakeAvailable(spdlog)
++
++#=================== libzip ===================
++# zlib comes from Emscripten's port (ZLIB_INCLUDE_DIR / ZLIB_LIBRARY are
++# passed in by the build script).
++set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
++set(BUILD_TOOLS OFF)
++set(BUILD_REGRESS OFF)
++set(BUILD_EXAMPLES OFF)
++set(BUILD_DOC OFF)
++set(BUILD_OSSFUZZ OFF)
++set(BUILD_SHARED_LIBS OFF)
++set(ENABLE_BZIP2 OFF)
++set(ENABLE_LZMA OFF)
++set(ENABLE_ZSTD OFF)
++set(ENABLE_COMMONCRYPTO OFF)
++set(ENABLE_GNUTLS OFF)
++set(ENABLE_MBEDTLS OFF)
++set(ENABLE_OPENSSL OFF)
++set(ENABLE_WINDOWS_CRYPTO OFF)
++FetchContent_Declare(
++    libzip
++    GIT_REPOSITORY https://github.com/nih-at/libzip.git
++    GIT_TAG v1.11.4
++    OVERRIDE_FIND_PACKAGE
++)
++FetchContent_MakeAvailable(libzip)
++list(APPEND ADDITIONAL_LIB_INCLUDES ${libzip_SOURCE_DIR}/lib ${libzip_BINARY_DIR})
++
++target_link_libraries(ImGui PUBLIC SDL2::SDL2)
++add_compile_definitions(IMGUI_IMPL_OPENGL_ES3)
++
++# prism replaces CMAKE_CXX_FLAGS, which drops the -pthread every object in a
++# threaded build needs.
++target_compile_options(prism PRIVATE -pthread)
+diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
+index 936b8b4..b32aa5d 100644
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -90,6 +90,7 @@ target_link_libraries(libultraship PRIVATE hidapi::hidapi)
+ option(LUS_GCADAPTER "Native GameCube adapter support (libusb)" ON)
+ option(LUS_GCADAPTER_FETCH_LIBUSB "Always build libusb from source instead of using the system one" OFF)
+ if (LUS_GCADAPTER AND NOT CMAKE_SYSTEM_NAME STREQUAL "Android" AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS"
++    AND NOT CMAKE_SYSTEM_NAME STREQUAL "Emscripten"
+     AND NOT BATTLESHIP_UWP)
+     set(_LUS_LIBUSB_TARGET "")
+     if (NOT LUS_GCADAPTER_FETCH_LIBUSB AND (CMAKE_SYSTEM_NAME STREQUAL "Linux" OR CMAKE_SYSTEM_NAME MATCHES "BSD"))
+@@ -155,6 +156,8 @@ if (USE_OPENGLES)
+         target_link_libraries(libultraship PRIVATE GLESv3)
+     elseif(CMAKE_SYSTEM_NAME STREQUAL "OpenBSD")
+         target_link_libraries(libultraship PRIVATE OpenGL::GLES2)
++    elseif(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
++        # emcc links WebGL itself.
+     else()
+         find_library(OPENGLES_LIBRARY GLESv2)
+         target_link_libraries(libultraship PRIVATE GLESv2)
+diff --git a/src/fast/backends/gfx_opengl.cpp b/src/fast/backends/gfx_opengl.cpp
+index 8a62750..3d6c5b0 100644
+--- a/src/fast/backends/gfx_opengl.cpp
++++ b/src/fast/backends/gfx_opengl.cpp
+@@ -736,7 +736,7 @@ void GfxRenderingAPIOGL::DrawTriangles(float buf_vbo[], size_t buf_vbo_len, size
+ }
+ 
+ void GfxRenderingAPIOGL::Init() {
+-#if !defined(__linux__) && !defined(__OpenBSD__)
++#if !defined(__linux__) && !defined(__OpenBSD__) && !defined(__EMSCRIPTEN__)
+     glewInit();
+ #endif
+ 
+diff --git a/src/fast/backends/gfx_sdl2.cpp b/src/fast/backends/gfx_sdl2.cpp
+index ddd8180..59b0e0e 100644
+--- a/src/fast/backends/gfx_sdl2.cpp
++++ b/src/fast/backends/gfx_sdl2.cpp
+@@ -765,7 +765,9 @@ void GfxWindowBackendSDL2::SwapBuffersBegin() {
+         SDL_RenderSetVSync(mRenderer, mVsyncEnabled ? 1 : 0);
+     }
+ 
++#ifndef __EMSCRIPTEN__
+     SyncFramerateWithTime();
++#endif
+     SDL_GL_SwapWindow(mWnd);
+ }
+ 
+diff --git a/src/libultraship/libultra/os.cpp b/src/libultraship/libultra/os.cpp
+index 39f8d5d..76e1361 100644
+--- a/src/libultraship/libultra/os.cpp
++++ b/src/libultraship/libultra/os.cpp
+@@ -97,7 +97,17 @@ int32_t osContInit(OSMesgQueue* mq, uint8_t* controllerBits, OSContStatus* statu
+ 
+ int32_t osContStartReadData(OSMesgQueue* mesg) {
+     if (mesg != nullptr) {
++#ifdef __EMSCRIPTEN__
++        // Games may define osSendMesg with a void* message, and WebAssembly
++        // passes the OSMesg union by address, so pass a plain pointer. The
++        // pointer is volatile so the compiler can't turn this back into a
++        // union call.
++        int32_t (*volatile sendRaw)(OSMesgQueue*, void*, int32_t) =
++            reinterpret_cast<int32_t (*)(OSMesgQueue*, void*, int32_t)>(osSendMesg);
++        sendRaw(mesg, nullptr, OS_MESG_NOBLOCK);
++#else
+         osSendMesg(mesg, OSMesg{}, OS_MESG_NOBLOCK);
++#endif
+     }
+     return 0;
+ }

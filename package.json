@@ -16,6 +16,7 @@
     "build:pce": "node tools/build-geargrafx.mjs",
     "build:md": "node tools/build-clownmdemu.mjs",
     "build:n64": "node tools/build-n64js.mjs",
+    "build:battleship": "node tools/build-battleship.mjs",
     "dev": "node tools/dev.mjs",
     "test:e2e": "node tools/e2e.mjs"
   },

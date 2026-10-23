@@ -1,5 +1,5 @@
 // "Get games from phone", shared by Retro Console, Freedoom, Blasphemer,
-// Adventure Games, Text Adventures and LibreQuake.
+// Adventure Games, Text Adventures, LibreQuake and BattleShip.
 //
 // The car opens a session on /api/transfer and shows a QR code with the
 // session id and a fresh AES key in the #fragment. The phone uploads games
@@ -15,7 +15,7 @@ import { cleanName } from './roms.js';
 const $ = id => document.getElementById(id);
 
 // app: which app the phone page checks files for ('retro', 'doom',
-// 'heretic', 'adventure', 'text' or 'quake').
+// 'heretic', 'adventure', 'text', 'quake' or 'battleship').
 // save(name, bytes): saves one file; resolves to its title, or null when it
 // isn't a file this app plays. notPlayable() says why, after a null.
 // onSaved(): called after each saved file. onClose(): called when the panel
