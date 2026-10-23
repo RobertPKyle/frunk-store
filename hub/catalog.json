@@ -240,18 +240,6 @@
       "holders": true
     },
     {
-      "id": "battleship",
-      "name": "BattleShip",
-      "tagline": "The Super Smash Bros. PC port, built from the game's decompilation and running natively: plays your own N64 cartridge, with a controller.",
-      "path": "/battleship/",
-      "icon": "/battleship/icon.svg",
-      "tags": [
-        "Game",
-        "Controller"
-      ],
-      "holders": true
-    },
-    {
       "id": "blocks",
       "name": "Block Builder",
       "tagline": "Build anything in a Minecraft Classic-style world of blocks: creative mode, flying, and worlds that save as you play.",

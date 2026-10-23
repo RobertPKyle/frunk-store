@@ -606,7 +606,7 @@ await check('holders unlock with a phone and play Genesis and PC Engine games', 
   if (!linked.ok) throw new Error(`link: ${linked.error}`);
   await appFrame().locator('#apps .app').first().waitFor({ timeout: 10000 });
   const tiles = (await appFrame().locator('#apps .app b').allTextContents()).join(', ');
-  if (tiles !== 'Genesis & PC Engine, Craft 4K, Freedoom, LibreQuake, OpenArena, OpenTTD, BattleShip (testing)') throw new Error(`menu lists ${tiles}`);
+  if (tiles !== 'Genesis & PC Engine, Craft 4K, Freedoom, LibreQuake, OpenArena, OpenTTD') throw new Error(`menu lists ${tiles}`);
   await appFrame().locator('#voteQr a[href$="/vote/"]').waitFor();
 
   await openFromHub(/PC Engine/);
@@ -1547,36 +1547,6 @@ await check('craft 4k breaks and places with touch, saves when left and keeps th
   const again = await stored();
   if (again.seed !== kept.seed || again.edits.length < kept.edits.length) throw new Error('reopening changed the world');
   console.log(`     ${fps} fps, ${kept.edits.length} changes saved`);
-});
-
-// No Super Smash Bros. ROM can ship with the tests, so this checks that the
-// engine and extractor are served and that another cartridge is turned
-// away. BATTLESHIP_ROM=<your own US ROM> also makes the game files and plays.
-await check('battleship turns away other cartridges, and plays your own rom', async () => {
-  await openFromHub(/BattleShip/);
-  const frame = () => page.frames().find(f => f.url().includes('/battleship/'));
-  if (!(await frame().evaluate(() => crossOriginIsolated))) throw new Error('not cross-origin isolated (the game needs threads)');
-  for (const f of ['BattleShip.wasm', 'torch.wasm', 'recipe.json', 'f3d.o2r']) {
-    const res = await fetch(`${appsBase}/battleship/engine/${f}`, { method: 'HEAD' });
-    if (!res.ok) throw new Error(`engine/${f}: ${res.status}`);
-  }
-  const add = async file => {
-    const chooser = page.waitForEvent('filechooser');
-    await appFrame().locator('#addFile').click();
-    const terms = appFrame().getByRole('button', { name: 'I own this game' });
-    if (await terms.isVisible().catch(() => false)) await terms.click();
-    await (await chooser).setFiles(file);
-  };
-  await add({ name: 'test.z64', mimeType: 'application/octet-stream', buffer: n64TestRom() });
-  await appFrame().locator('#status').filter({ hasText: 'not the US version 1.0' }).waitFor({ timeout: 10000 });
-  if (!process.env.BATTLESHIP_ROM) return;
-  await add(process.env.BATTLESHIP_ROM);
-  await appFrame().locator('#playBtn').waitFor({ state: 'visible', timeout: 120000 });
-  await appFrame().locator('#playBtn').click();
-  await appFrame().locator('#fps').filter({ hasText: /[1-9]\d* fps/ }).waitFor({ timeout: 30000 });
-  await page.waitForTimeout(5000);
-  await page.screenshot({ path: shots + 'battleship.png' });
-  console.log(`     ${await appFrame().locator('#fps').textContent()}`);
 });
 
 await check('logic puzzles lists every puzzle, plays solo by touch and keeps it when closed', async () => {

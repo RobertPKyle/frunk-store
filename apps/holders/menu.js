@@ -16,7 +16,6 @@ const APPS = [
   { id: 'quake', title: 'LibreQuake', path: '/quake/', about: 'The classic Quake engine with the free LibreQuake, or Quake you own.' },
   { id: 'openarena', title: 'OpenArena', path: '/openarena/', about: 'Fast arena shooting against bots on the Quake III engine.' },
   { id: 'openttd', title: 'OpenTTD', path: '/openttd/', about: 'Build a transport empire with trains, trucks, ships and planes.' },
-  { id: 'battleship', title: 'BattleShip (testing)', path: '/battleship/', about: 'The Super Smash Bros. PC port, built from the game\'s decompilation: plays your own N64 cartridge.' },
 ];
 
 const $ = id => document.getElementById(id);

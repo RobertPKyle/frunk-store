@@ -13,7 +13,7 @@ let key = null;
 
 // Which app on the car asked: Retro Console (console games), Freedoom (Doom
 // WADs), Blasphemer (Heretic WADs), Adventure Games (folders of game files), Text Adventures (story
-// files), LibreQuake (Quake paks) or BattleShip (a Super Smash Bros. ROM). Files are checked here so the wrong
+// files) or LibreQuake (Quake paks). Files are checked here so the wrong
 // kind isn't sent.
 const APPS = {
   doom: { name: 'Freedoom', max: MAX_WAD_FILE, check: findWad, wrong: 'Not a Doom WAD',
@@ -26,9 +26,6 @@ const APPS = {
     lede: 'Pick text adventure story files on this phone (.z3, .z5, .z8 or .zblorb, zipped or not), such as free games from the Interactive Fiction Archive or ones you own. They appear on the car screen in a few seconds.' },
   quake: { name: 'LibreQuake', max: MAX_QUAKE_FILE, check: findQuakeFile, wrong: 'Not a Quake file',
     lede: 'Pick the Quake files from a copy you own: PAK0.PAK and PAK1.PAK from its id1 folder (in a Steam or GOG copy, the original id1 folder, not the "rerelease" one), and the mission packs\' PAK0.PAK from their hipnotic or rogue folders. Music files named trackNN.ogg work too. They appear on the car screen in a few seconds.' },
-  battleship: { name: 'BattleShip', max: MAX_FILE, check: async (name, bytes) => (await findGame(name, bytes))?.system === 'n64',
-    wrong: 'Not a Nintendo 64 game',
-    lede: 'Pick the ROM you dumped from your Super Smash Bros. cartridge (US version 1.0; .z64, .n64 or .v64, zipped or not) on this phone. It appears on the car screen in a few seconds.' },
   retro: { name: 'Retro Console', max: MAX_FILE, check: findGame, wrong: 'Not a game this plays' },
 };
 const APP = APPS[new URLSearchParams(location.search).get('app')] || APPS.retro;
