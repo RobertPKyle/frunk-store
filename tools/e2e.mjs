@@ -363,6 +363,27 @@ await check('speed test measures ping and starts the download', async () => {
   console.log(`     ping ${await appFrame().locator('#tPing b').textContent()} ms, ${live} Mbps live, ${await appFrame().locator('#server').textContent()}`);
 });
 
+await check('brain test scores, ranks and makes a share card', async () => {
+  await openFromHub(/Brain Test/);
+  await appFrame().getByRole('button', { name: 'Test my brain' }).click();
+  // this browser's software graphics isn't a Tesla, so the score goes in without asking for a car
+  await appFrame().locator('#share:not([hidden])').waitFor({ timeout: 60000 });
+  const total = await appFrame().locator('#total').textContent();
+  if (!(parseInt(total.replace(/,/g, '')) > 0)) throw new Error(`no score: "${total}"`);
+  const rank = await appFrame().locator('#rank').textContent();
+  if (!/Faster than|First score/.test(rank)) throw new Error(`no rank: "${rank}"`);
+  await appFrame().locator('#board .bar.you').waitFor({ timeout: 5000 });
+  console.log(`     ${total} points, ${rank}; ${await appFrame().locator('#chip').textContent()}`);
+  // the hub opens the card in its place. (A screenshot before this click
+  // stops the click reaching the app's frame at this scale factor.)
+  await appFrame().getByRole('button', { name: 'Open the card on this screen' }).click();
+  await page.waitForURL(/\/brain\/share\.html/, { waitUntil: 'commit' });
+  await page.locator('#actions:not([hidden])').waitFor({ timeout: 10000 });
+  const post = await page.locator('#post').getAttribute('href');
+  if (!post.includes(encodeURIComponent(total))) throw new Error(`post text lacks the score: ${post}`);
+  await page.screenshot({ path: shots + 'brain-card.png' });
+});
+
 await check('retro console adds a local file and plays a game', async () => {
   await openFromHub(/Retro Console/);
   // A player's own file: use one of the bundled free games as the stand-in

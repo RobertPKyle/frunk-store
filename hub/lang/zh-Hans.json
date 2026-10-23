@@ -77,6 +77,7 @@
     "SIMD": "SIMD"
   },
   "apps": {
+    "brain": { "name": "大脑测试", "tagline": "你的 Tesla 有多聪明？用 20 秒测试车载电脑，和其他 Tesla、手机与电脑一比高下。" },
     "breakout": { "name": "打砖块", "tagline": "经典的挡板游戏。拖动移动挡板，点一下发球。" },
     "fractal": { "name": "分形探索", "tagline": "多线程 WebAssembly 曼德博集合。用两指缩放。" },
     "sleep": { "name": "助眠音效", "tagline": "雨声、海浪、篝火等声音，适合露营模式，附调暗的时钟和睡眠定时器。" },

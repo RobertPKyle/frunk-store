@@ -42,10 +42,15 @@ function memory(commands) {
       }
       case 'EXPIRE': if (e && !e.exp) e.exp = now + args[0] * 1000; return e ? 1 : 0;
       case 'TTL': return e ? (e.exp ? Math.ceil((e.exp - now) / 1000) : -1) : -2;
-      case 'HSET': case 'HDEL': case 'HGET': case 'HGETALL': {
+      case 'HSET': case 'HDEL': case 'HGET': case 'HGETALL': case 'HINCRBY': {
         const h = e ? JSON.parse(e.v) : {};
         if (cmd === 'HGET') return h[args[0]] ?? null;
         if (cmd === 'HGETALL') return Object.entries(h).flat();
+        if (cmd === 'HINCRBY') {
+          h[args[0]] = String((+h[args[0]] || 0) + +args[1]);
+          mem.set(key, { v: JSON.stringify(h), exp: 0 });
+          return +h[args[0]];
+        }
         const had = args[0] in h;
         if (cmd === 'HSET') h[args[0]] = args[1]; else delete h[args[0]];
         mem.set(key, { v: JSON.stringify(h), exp: 0 });

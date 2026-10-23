@@ -92,6 +92,19 @@ to the cache again.
   (speed.cloudflare.com). Each direction runs for a fixed time on several
   connections and reports the average after a 2 second warm-up. Data use is
   capped at about 350 MB per test. The last 30 results are kept on the device.
+- `apps/brain` and `apps/api/brain.js`: Brain Test ("Can your Tesla brain?").
+  A 20-second benchmark: a mixed JavaScript kernel on one core and on every
+  core (`worker.js`), then a ray-marched brain drawn at a fixed 480x270 as
+  many times as the GPU can (`gpu.js`). Points and leaderboard groups come
+  from `score.js`, which the server uses too. A car is told apart by its
+  graphics chip (Intel HD Graphics 505 in MCU2, AMD in MCU3) and only counts
+  as a Tesla once its owner picks a model. The server keeps a histogram per
+  group in Redis, shows each group's median and returns the result's
+  percentile; results are kept a year for the share page
+  (`share.html`), which a QR code opens on the phone. It draws a score card
+  for the share sheet, to save, or with a post on X. The point constants in
+  `score.js` are estimates until a car has run the test; changing them
+  needs a `VERSION` bump, which starts the board over.
 - `apps/retro`: Retro Console. NES games run on jsnes 2.1.0 (Apache-2.0,
   `nes.js`), in a worker (`nes-worker.js`) that draws through an
   OffscreenCanvas and sends sound straight to an AudioWorklet, so the

@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>My brain score</title>
+<link rel="icon" href="icon.svg">
+<style>
+  :root { --bg: #07080f; --card: #161a27; --line: rgba(170, 160, 230, .16); --text: #eceaf6; --muted: #918fab; --brain: #f2729e; --bad: #ff9f8a; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); font: 17px/1.45 system-ui, -apple-system, sans-serif; }
+  main { max-width: 640px; margin: 0 auto; padding: 22px 16px 40px; }
+  h1 { font-size: 22px; margin: 0 0 14px; }
+  #card { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; border-radius: 14px; border: 1px solid var(--line); background: var(--card); }
+  .actions { display: grid; gap: 10px; margin-top: 16px; }
+  .actions a, .actions button { display: flex; align-items: center; justify-content: center; min-height: 54px; border-radius: 14px; border: 1px solid var(--line); background: var(--card); color: var(--text); font: inherit; font-weight: 700; text-decoration: none; cursor: pointer; }
+  #shareBtn { background: var(--brain); color: #2a0614; border: 0; font-size: 19px; }
+  #msg { margin: 14px 0 0; color: var(--bad); }
+  #msg:empty { display: none; }
+  .fine { margin-top: 22px; font-size: 14px; color: var(--muted); }
+  .fine a { color: var(--text); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Your brain score</h1>
+  <canvas id="card" width="1200" height="675" aria-label="Score card"></canvas>
+  <div class="actions" id="actions" hidden>
+    <button id="shareBtn" type="button" hidden>Share</button>
+    <a id="post" target="_blank" rel="noopener">Post on X</a>
+    <a id="save" download="brain-score.png">Save image</a>
+  </div>
+  <p id="msg" role="alert"></p>
+  <p class="fine">Tip: post the image with the text, so people see the score right away. Test another car, phone or computer at <a href="https://frunk.store/app/brain">frunk.store</a>.</p>
+</main>
+<script type="module" src="share.js"></script>
+</body>
+</html>

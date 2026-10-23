@@ -206,6 +206,11 @@ addEventListener('message', e => {
     history.replaceState({ app: e.data.app }, '', `/app/${encodeURIComponent(e.data.app)}`);
     openApp(e.data.app, { push: false });
   }
+  // Brain Test's score card, opened in place of the hub: the app's frame
+  // can't open pages itself
+  if (e.data?.frunk === 'share' && /^[\w-]{12}$/.test(e.data.id || '')) {
+    location.href = `${appsOrigin}/brain/share.html#${e.data.id}`;
+  }
 });
 
 document.getElementById('home').addEventListener('click', () => {

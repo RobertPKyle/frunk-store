@@ -2,6 +2,16 @@
   "appsOrigin": "https://frunk-apps.vercel.app",
   "apps": [
     {
+      "id": "brain",
+      "name": "Brain Test",
+      "tagline": "Can your Tesla brain? A 20-second test of the car's computer, ranked against other Teslas, phones and PCs.",
+      "path": "/brain/",
+      "icon": "/brain/icon.svg",
+      "tags": [
+        "Tool"
+      ]
+    },
+    {
       "id": "breakout",
       "name": "Brick Breaker",
       "tagline": "Classic paddle game. Drag to move, tap to launch.",
