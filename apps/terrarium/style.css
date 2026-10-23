@@ -146,7 +146,8 @@ html, body {
 }
 
 .inspect { right: max(26px, env(safe-area-inset-right)); top: max(26px, env(safe-area-inset-top)); width: 290px; }
-.away    { right: max(26px, env(safe-area-inset-right)); top: max(26px, env(safe-area-inset-top)); width: 340px; }
+/* below the credit, which stays readable while the card is up */
+.away    { right: max(26px, env(safe-area-inset-right)); top: calc(max(24px, env(safe-area-inset-top)) + 28px); width: 340px; }
 .journal { right: max(26px, env(safe-area-inset-right)); bottom: max(26px, env(safe-area-inset-bottom)); width: 340px; max-height: 62vh; overflow-y: auto; }
 
 /* ---- genome bars -------------------------------------------------------- */
