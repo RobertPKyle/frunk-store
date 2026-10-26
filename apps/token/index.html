@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>FrunkStore Token</title>
+<style>
+  :root { --bg: #0b0b12; --panel: #13131d; --card: #1b1b28; --line: rgba(190, 180, 255, .15); --text: #ecebf5; --muted: #9592ab;
+          --soft: #c9c6dc; --accent: #ff5d73; --up: #3ddc97; --down: #ff5d73; --gold: #ffc65c; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 15px/1.35 system-ui, sans-serif; overflow: hidden;
+               -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  [hidden] { display: none !important; }
+  main { display: flex; flex-direction: column; height: 100%; }
+  /* left padding keeps clear of the hub's Apps button */
+  header { display: flex; align-items: center; gap: 14px; min-height: 60px; padding: 6px 14px 6px 110px; border-bottom: 1px solid var(--line); }
+  header img { width: 34px; height: 34px; border-radius: 9px; }
+  .name { font-size: 13px; color: var(--muted); line-height: 1.2; }
+  .name b { display: block; font-size: 16px; color: var(--text); }
+  #price { font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+  .change { font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .change.up { color: var(--up); } .change.down { color: var(--down); }
+  .change small { font-weight: 400; color: var(--muted); }
+  #live { margin-left: auto; display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
+  #live i { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+  #live.on i { background: var(--up); box-shadow: 0 0 0 3px rgba(61, 220, 151, .18); }
+
+  .body { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 236px; gap: 12px; padding: 10px 12px 10px; }
+  .left { display: flex; flex-direction: column; min-height: 0; }
+  .bar { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+  .ranges { display: flex; gap: 4px; }
+  .ranges button { min-width: 46px; min-height: 40px; padding: 4px 10px; border-radius: 10px; background: transparent; border: 1px solid transparent; color: var(--muted); font-size: 14px; font-weight: 600; }
+  .ranges button[aria-pressed="true"] { background: var(--card); border-color: var(--line); color: var(--text); }
+  #readout { margin-left: auto; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #readout b { color: var(--text); font-weight: 600; }
+  .plot { position: relative; flex: 1; min-height: 0; border-radius: 12px; background: var(--panel); border: 1px solid var(--line); overflow: hidden; touch-action: none; }
+  #chart { position: absolute; inset: 8px 6px 4px 10px; width: calc(100% - 16px); height: calc(100% - 12px); }
+  #chartMsg { position: absolute; inset: 0; display: grid; place-items: center; padding: 20px; text-align: center; color: var(--muted); font-size: 14px; }
+  .fine { margin: 7px 2px 0; font-size: 11.5px; color: var(--muted); line-height: 1.35; }
+  .link { padding: 0; border: 0; background: none; color: var(--soft); text-decoration: underline; font-size: inherit; min-height: 0; }
+
+  .side { display: flex; flex-direction: column; gap: 8px; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+  .card { padding: 10px 12px; border-radius: 12px; background: var(--card); border: 1px solid var(--line); }
+  .stats { display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; font-size: 13px; }
+  .stats dt { color: var(--muted); }
+  .stats dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
+  .card h2 { margin: 0 0 6px; font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  #wallet p { margin: 0 0 4px; font-size: 13px; color: var(--soft); }
+  #wallet .big { font-size: 17px; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
+  #wallet .addr { font: 13px ui-monospace, "DejaVu Sans Mono", monospace; color: var(--text); }
+  .tag { display: inline-block; margin-left: 4px; padding: 1px 6px; border-radius: 6px; font: 600 11px system-ui, sans-serif; background: rgba(61, 220, 151, .14); color: var(--up); }
+  .tag.watch { background: rgba(255, 255, 255, .07); color: var(--muted); }
+  .btn { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 44px; padding: 6px 14px; border-radius: 12px;
+         background: var(--panel); border: 1px solid var(--line); font-weight: 600; }
+  .btn.primary { background: var(--gold); border-color: transparent; color: #241a05; font-size: 16px; min-height: 50px; }
+  .btn:disabled { opacity: .45; cursor: default; }
+  .row { display: flex; gap: 6px; margin-top: 6px; }
+  .mint { font: 11px ui-monospace, "DejaVu Sans Mono", monospace; color: var(--muted); word-break: break-all; user-select: all; -webkit-user-select: all; }
+
+  /* sheets: connect a wallet, buy */
+  .sheet { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: 64px 16px 12px; background: rgba(5, 5, 9, .86); overflow-y: auto; }
+  .sheet > div { position: relative; width: min(740px, 100%); max-height: 100%; overflow-y: auto; overscroll-behavior: contain; padding: 16px 18px; border-radius: 18px;
+                 background: var(--panel); border: 1px solid var(--line); }
+  .sheet h2 { margin: 0 0 8px; padding-right: 90px; font-size: 19px; }
+  .sheet .close { position: absolute; top: 10px; right: 10px; width: auto; min-height: 40px; }
+  .sheet ol, .sheet ul { margin: 0 0 10px; padding-left: 20px; font-size: 14px; color: var(--soft); }
+  .sheet li { margin-bottom: 5px; }
+  .sheet p { margin: 0 0 8px; font-size: 14px; color: var(--soft); }
+  .split { display: flex; gap: 20px; align-items: center; }
+  .code { flex: none; display: grid; place-items: center; width: 236px; height: 236px; border-radius: 12px; background: #fff; }
+  .code a { display: block; }
+  .code img, .code canvas { display: block; width: 216px; height: 216px; image-rendering: pixelated; }
+  .status { color: var(--gold) !important; }
+  .accept { display: flex; align-items: center; gap: 12px; min-height: 48px; margin: 4px 0 10px; padding: 8px 12px; border-radius: 12px; background: var(--card); border: 1px solid var(--line); font-weight: 600; }
+  .accept input { width: 24px; height: 24px; accent-color: var(--gold); flex: none; }
+  @media (max-width: 640px) { .split { flex-direction: column; } }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <img src="icon.svg" alt="">
+    <div class="name"><b>FrunkStore</b>Solana token</div>
+    <div id="price" aria-live="off">…</div>
+    <div class="change" id="change"></div>
+    <div id="live" role="status"><i></i><span id="liveText">Loading</span></div>
+  </header>
+  <div class="body">
+    <section class="left" aria-label="Price chart">
+      <div class="bar">
+        <div class="ranges" id="ranges" role="group" aria-label="Chart range">
+          <button type="button" data-range="1h">1H</button>
+          <button type="button" data-range="6h">6H</button>
+          <button type="button" data-range="1d">1D</button>
+          <button type="button" data-range="1w">1W</button>
+          <button type="button" data-range="all">All</button>
+        </div>
+        <div id="readout"></div>
+      </div>
+      <div class="plot" id="plot">
+        <canvas id="chart" aria-label="Price chart in US dollars" role="img"></canvas>
+        <div id="chartMsg">Loading the chart…</div>
+      </div>
+      <p class="fine">Not financial advice. A high-risk meme token that can fall to zero; frunk.store's owner earns creator rewards from every trade.
+        Prices from DexScreener and GeckoTerminal, up to a minute behind. <button class="link" type="button" id="readRisks">Read the risks</button></p>
+    </section>
+    <aside class="side">
+      <dl class="card stats" aria-label="Market">
+        <dt>Market cap</dt><dd id="mcap">…</dd>
+        <dt>Liquidity</dt><dd id="liquidity">…</dd>
+        <dt>24h volume</dt><dd id="volume">…</dd>
+        <dt>24h trades</dt><dd id="trades">…</dd>
+      </dl>
+      <section class="card" id="wallet" aria-labelledby="walletTitle">
+        <h2 id="walletTitle">Your wallet</h2>
+        <div id="walletOff">
+          <p>See your balance here. Signed-in wallets with enough tokens also unlock Holders early access.</p>
+          <button class="btn" type="button" id="connect">Connect wallet</button>
+        </div>
+        <div id="walletOn" hidden>
+          <p><span class="addr" id="addr"></span><span class="tag" id="kind"></span></p>
+          <p class="big" id="tokens">…</p>
+          <p id="worth"></p>
+          <p id="holders" hidden></p>
+          <div class="row"><button class="btn" type="button" id="disconnect">Disconnect</button></div>
+        </div>
+      </section>
+      <button class="btn primary" type="button" id="buy">Buy on your phone</button>
+      <p class="mint" aria-label="Token address">9T1DbbiKfhfubEabDj5SWSMzBuyU4tJHkpSgR51Tpump</p>
+    </aside>
+  </div>
+</main>
+
+<section class="sheet" id="connectSheet" hidden aria-labelledby="connectTitle" role="dialog">
+  <div>
+    <h2 id="connectTitle">Connect your wallet</h2>
+    <button class="btn close" type="button" data-close>Close</button>
+    <div class="split">
+      <div class="code" id="connectCode" aria-hidden="true"></div>
+      <div>
+        <ol>
+          <li>Scan this code with your phone's camera.</li>
+          <li>Open the page in Phantom or Solflare and sign in. That only signs a message: no transaction, nothing leaves your wallet.</li>
+          <li>Using a pump.fun account or another wallet? Paste its address on the page instead, to see its balance here (view only).</li>
+        </ol>
+        <p class="status" id="connectStatus" aria-live="polite">Getting a code…</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="sheet" id="buySheet" hidden aria-labelledby="buyTitle" role="dialog">
+  <div>
+    <h2 id="buyTitle">Before you buy</h2>
+    <button class="btn close" type="button" data-close>Close</button>
+    <div id="buyRead">
+      <ul id="risks"></ul>
+      <label class="accept"><input type="checkbox" id="accept"> I've read this, I accept the risks, and I'm parked.</label>
+      <button class="btn primary" type="button" id="showBuy" disabled>Show the code for my phone</button>
+    </div>
+    <div id="buyCode" hidden>
+      <div class="split">
+        <div class="code" id="buyQr" aria-hidden="true"></div>
+        <div>
+          <ol>
+            <li>Scan this code with your phone's camera.</li>
+            <li>The page opens the token in Phantom or on pump.fun. You pick the amount and approve it there, in your own wallet.</li>
+            <li>Check the token address ends in <b>…R51Tpump</b> before you approve.</li>
+          </ol>
+          <p>Nothing is bought on this screen, and frunk.store never sees your wallet's keys.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="sheet" id="risksSheet" hidden aria-labelledby="risksTitle" role="dialog">
+  <div>
+    <h2 id="risksTitle">The risks</h2>
+    <button class="btn close" type="button" data-close>Close</button>
+    <ul id="risksOnly"></ul>
+  </div>
+</section>
+
+<script type="module" src="token.js"></script>
+<script src="/sw-register.js"></script>
+</body>
+</html>

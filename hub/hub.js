@@ -85,8 +85,10 @@ function el(tag, attrs = {}, ...children) {
 }
 
 // Apps marked holders (early access for FrunkStore token holders) aren't on
-// the grid: the Holders app lists them and asks the hub to open one
-const listed = () => catalog.apps.filter(app => !app.holders);
+// the grid: the Holders app lists them and asks the hub to open one. Apps
+// marked unlisted open from elsewhere on the page (the token's chart, from
+// the footer).
+const listed = () => catalog.apps.filter(app => !app.holders && !app.unlisted);
 
 function renderGrid() {
   const shown = listed().filter(app => filter === 'all' || app.tags.includes(filter));
@@ -328,6 +330,8 @@ document.getElementById('copyToken').addEventListener('click', async e => {
   }
   setTimeout(() => { btn.textContent = t('copy'); }, 2000);
 });
+
+document.getElementById('openToken').addEventListener('click', () => launch('token'));
 
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
 // The page stays hidden (the head's i18n-wait) until its language is in

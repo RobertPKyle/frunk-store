@@ -76,7 +76,7 @@ async function openFromHub(name) {
 await check('hub lists every catalog app', async () => {
   await page.goto(base + '/');
   await page.waitForSelector('.card');
-  const expected = (await (await fetch(base + '/catalog.json')).json()).apps.filter(app => !app.holders).length;
+  const expected = (await (await fetch(base + '/catalog.json')).json()).apps.filter(app => !app.holders && !app.unlisted).length;
   const n = await page.locator('.card').count();
   if (n !== expected) throw new Error(`expected ${expected} cards, got ${n}`);
   if (!(await page.evaluate(() => crossOriginIsolated))) throw new Error('hub not cross-origin isolated');
@@ -668,7 +668,10 @@ async function holderPhone(apps, tokens) {
   const { message } = await post('nonce', { address });
   const session = await post('login', { message, signature: sign(null, Buffer.from(message), privateKey).toString('base64') });
   if (!session.token) throw new Error(`phone sign-in: ${session.error}`);
-  return { link: lid => post('link', { token: session.token, lid }), setTokens };
+  return {
+    link: lid => post('link', { token: session.token, lid }), setTokens, address,
+    sign: text => sign(null, Buffer.from(text), privateKey).toString('base64'),
+  };
 }
 
 // The holder's phone that unlocks the test browsers, made when first needed
@@ -1737,6 +1740,86 @@ await check('holders lock again when the wallet sells', async () => {
   await page.frames().find(f => f.url().includes('/holders/')).evaluate(() => sessionStorage.removeItem('holders.checked'));
   await openFromHub(/Holders/);
   await appFrame().locator('#holdersLock .status').filter({ hasText: 'holds 10 FrunkStore tokens' }).waitFor({ timeout: 10000 });
+});
+
+await check('token chart, wallet and buying on the phone from the hub footer', async () => {
+  await page.goto(base + '/');
+  await page.waitForSelector('.card');
+  if (await page.locator('#grid .card h2').filter({ hasText: 'FrunkStore Token' }).count()) throw new Error('the token screen is on the grid');
+  await page.locator('#openToken').click();
+  await page.waitForURL(/\/app\/token$/);
+  await page.waitForSelector('#loading', { state: 'hidden' });
+  const app = appFrame();
+  // live numbers from DexScreener and GeckoTerminal, through /api/token
+  await app.locator('#price').filter({ hasText: /^\$\d/ }).waitFor({ timeout: 20000 });
+  await app.locator('#chartMsg').waitFor({ state: 'hidden', timeout: 45000 });   // a busy chart source is asked again after 30 s
+  await app.getByRole('button', { name: '1H', exact: true }).click();
+  await app.locator('#readout').filter({ hasText: / Vol / }).waitFor({ timeout: 45000 });
+  const lit = await app.locator('#chart').evaluate(c => {
+    const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+    let n = 0;
+    for (let i = 3; i < d.length; i += 4) if (d[i]) n++;
+    return n / (d.length / 4);
+  });
+  if (lit < 0.01) throw new Error(`chart nearly empty (${(lit * 100).toFixed(2)}% drawn)`);
+  console.log(`     ${await app.locator('#price').textContent()} ${await app.locator('#change').textContent()}, mcap ${await app.locator('#mcap').textContent()}`);
+
+  // Buying: the risks first, then a code to the phone page
+  await app.getByRole('button', { name: 'Buy on your phone' }).click();
+  if (await app.locator('#risks li').count() < 6) throw new Error('the risks are missing');
+  if (!(await app.getByRole('button', { name: 'Show the code for my phone' }).isDisabled())) throw new Error('the code shows before the risks are accepted');
+  await app.locator('#accept').check();
+  await app.getByRole('button', { name: 'Show the code for my phone' }).click();
+  const buyLink = await app.locator('#buyQr a').getAttribute('href');
+  if (!buyLink.endsWith('/token/phone/?buy')) throw new Error(`buy code is ${buyLink}`);
+  await page.screenshot({ path: shots + 'token-buy.png' });
+  await app.locator('#buySheet [data-close]').click();
+
+  // Connecting: a code to the phone page; a signed-in holder's wallet shows its balance and unlocks Holders
+  await app.getByRole('button', { name: 'Connect wallet' }).click();
+  const code = new URL(await app.locator('#connectCode a').getAttribute('href'));
+  if (code.pathname !== '/token/phone/' || !code.searchParams.get('c')) throw new Error(`connect code is ${code}`);
+  await page.screenshot({ path: shots + 'token-connect.png' });
+  if (!dev) return;
+  const holderWallet = await holderPhone(appsBase, 150000);
+  const post = async (op, data) => (await fetch(`${appsBase}/api/token?op=${op}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) })).json();
+  const cid = code.searchParams.get('c');
+  const { message } = await post('nonce', { address: holderWallet.address, cid });
+  if (!message?.includes('Connect this wallet to the FrunkStore token screen')) throw new Error(`nonce: ${JSON.stringify(message)}`);
+  const linked = await post('connect', { cid, message, signature: holderWallet.sign(message) });
+  if (!linked.ok || !linked.holders) throw new Error(`connect: ${JSON.stringify(linked)}`);
+  await app.locator('#tokens').filter({ hasText: '150,000 FrunkStore' }).waitFor({ timeout: 10000 });
+  if (await app.locator('#kind').textContent() !== 'Signed in') throw new Error('not shown as signed in');
+  await app.locator('#holders').filter({ hasText: 'unlocked' }).waitFor();
+  await page.screenshot({ path: shots + 'token.png' });
+
+  // The phone page: watching an address without signing, and the buying links after the risks
+  const phone = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, hasTouch: true, isMobile: true });
+  phone.on('pageerror', e => errors.push(`token phone pageerror: ${e.message}`));
+  try {
+    const watched = await holderPhone(appsBase, 150000);
+    await watched.setTokens(2500);
+    const car = await post('connect-open', {});
+    await phone.goto(`${appsBase}/token/phone/?c=${car.cid}`);
+    if (await phone.locator('#buy').isVisible()) throw new Error('buying shows on the connect page');
+    const phantom = await phone.getByRole('link', { name: 'Open in Phantom' }).getAttribute('href');
+    if (!phantom.includes(encodeURIComponent(`?c=${car.cid}`))) throw new Error('Phantom link drops the car code');
+    await phone.locator('#address').fill(watched.address);
+    await phone.getByRole('button', { name: 'Show it on my car' }).click();
+    await phone.locator('#connectMsg').filter({ hasText: 'Connected: 2,500 FrunkStore' }).waitFor({ timeout: 5000 });
+    const got = await post('connect-poll', { cid: car.cid, secret: car.secret });
+    if (got.address !== watched.address || got.signed || got.pass) throw new Error(`watch-only poll: ${JSON.stringify(got)}`);
+
+    await phone.goto(`${appsBase}/token/phone/?buy`);
+    await phone.locator('#market b').waitFor({ timeout: 20000 });
+    if (await phone.locator('#phantomSwap').isVisible()) throw new Error('buy links show before the risks are accepted');
+    await phone.locator('#accept').check();
+    const swap = await phone.getByRole('link', { name: 'Buy in Phantom' }).getAttribute('href');
+    if (swap !== 'https://phantom.app/ul/v1/swap?buy=solana%3A101%2Faddress%3A9T1DbbiKfhfubEabDj5SWSMzBuyU4tJHkpSgR51Tpump') throw new Error(`Phantom swap link is ${swap}`);
+    await phone.screenshot({ path: shots + 'token-phone.png', fullPage: true });
+  } finally {
+    await phone.close();
+  }
 });
 
 await check('holders vote from a phone', async () => {

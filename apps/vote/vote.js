@@ -3,11 +3,8 @@
 //
 // Opened from a car's QR code (?link=…), signing in also unlocks early
 // access on that car.
-//
-// Wallets are found through the Wallet Standard, which Phantom, Solflare,
-// Backpack and others use, both as browser extensions and inside their
-// apps' own browsers. A phone's ordinary browser has none, so the page
-// offers to open itself in a wallet app instead.
+
+import { base64, cancelled, findWallets, short, walletLinks } from '../_shared/wallets.js';
 
 const $ = id => document.getElementById(id);
 const API = '/api/vote';
@@ -36,73 +33,25 @@ async function call(op, data) {
   return out;
 }
 
-const short = a => `${a.slice(0, 4)}…${a.slice(-4)}`;
 const amount = n => n.toLocaleString(undefined, { maximumFractionDigits: 2 });
-const base64 = bytes => btoa(String.fromCharCode(...bytes));
 
 // ---------- wallets ----------
 
-const wallets = [];
-const registry = {
-  register(...found) {
-    for (const w of found) {
-      if (w.features['solana:signMessage'] && w.features['standard:connect'] && w.chains.some(c => c.startsWith('solana:')) && !wallets.includes(w)) wallets.push(w);
-    }
-    showWallets();
-    return () => {};
-  },
-};
-addEventListener('wallet-standard:register-wallet', e => { try { e.detail(registry); } catch {} });
-dispatchEvent(new CustomEvent('wallet-standard:app-ready', { detail: registry }));
-
-// Older wallets only put themselves on window
-function legacy() {
-  const p = window.phantom?.solana || window.solflare || window.solana;
-  return p && p.signMessage && p.connect ? p : null;
-}
-
-function showWallets() {
-  const list = wallets.map(w => [w.name, () => signIn(standardSigner(w))]);
-  if (!list.length && legacy()) list.push(['Sign in with your wallet', () => signIn(legacySigner(legacy()))]);
-  $('wallets').replaceChildren(...list.map(([name, go], i) => {
+function showWallets(list) {
+  $('wallets').replaceChildren(...list.map(({ name, signer }, i) => {
     const b = document.createElement('button');
     b.type = 'button';
     b.className = `btn${i ? '' : ' primary'}`;
-    b.textContent = wallets.length ? `Sign in with ${name}` : name;
-    b.onclick = go;
+    b.textContent = name ? `Sign in with ${name}` : 'Sign in with your wallet';
+    b.onclick = () => signIn(signer);
     return b;
   }));
   $('noWallet').hidden = list.length > 0;
 }
 
-// Signers: connect() gives the address, sign(text) the signature's bytes
-function standardSigner(w) {
-  let account;
-  return {
-    async connect() {
-      ({ accounts: [account] } = await w.features['standard:connect'].connect());
-      if (!account) throw new Error('The wallet didn\'t share an account.');
-      return account.address;
-    },
-    async sign(text) {
-      const [out] = await w.features['solana:signMessage'].signMessage({ account, message: new TextEncoder().encode(text) });
-      return out.signature;
-    },
-  };
-}
-
-function legacySigner(p) {
-  return {
-    async connect() { return (await p.connect()).publicKey?.toString() || p.publicKey.toString(); },
-    async sign(text) { return (await p.signMessage(new TextEncoder().encode(text), 'utf8')).signature; },
-  };
-}
-
-// Links that open this page inside a wallet app's own browser
-const here = encodeURIComponent(location.origin + location.pathname + location.search);
-const origin = encodeURIComponent(location.origin);
-$('phantom').href = `https://phantom.app/ul/browse/${here}?ref=${origin}`;
-$('solflare').href = `https://solflare.com/ul/v1/browse/${here}?ref=${origin}`;
+const links = walletLinks();
+$('phantom').href = links.phantom;
+$('solflare').href = links.solflare;
 
 // ---------- signing in ----------
 
@@ -120,8 +69,7 @@ async function signIn(signer) {
     render();
     await unlockCar();
   } catch (e) {
-    // a wallet's "rejected" errors are the person saying no
-    say(/reject|denied|cancel/i.test(e.message) ? 'Sign-in cancelled.' : e.message);
+    say(cancelled(e) ? 'Sign-in cancelled.' : e.message);
   } finally {
     busy = false;
   }
@@ -247,5 +195,5 @@ $('send').onclick = async () => {
 };
 
 if (carLink) $('car').hidden = false;
-showWallets();
+findWallets(showWallets);
 load().then(unlockCar);

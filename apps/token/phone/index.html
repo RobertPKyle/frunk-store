@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FrunkStore token · frunk.store</title>
+<meta name="description" content="Connect a wallet to the FrunkStore token screen in your car, or buy the token in your own wallet app.">
+<style>
+  :root { --bg: #0b0b12; --card: #1b1b28; --line: rgba(190, 180, 255, .15); --text: #ecebf5; --muted: #9592ab; --soft: #c9c6dc;
+          --gold: #ffc65c; --up: #3ddc97; --down: #ff5d73; --ok: #8fe0a0; --bad: #ff9f8a; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); font: 17px/1.45 system-ui, -apple-system, sans-serif; }
+  main { max-width: 560px; margin: 0 auto; padding: 28px 16px 40px; }
+  h1 { font-size: 24px; margin: 0 0 6px; }
+  h2 { font-size: 13px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin: 26px 2px 10px; }
+  .lede { color: var(--muted); margin: 0 0 18px; }
+  button, .btn { font: inherit; color: inherit; cursor: pointer; }
+  .btn { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 54px; margin-bottom: 10px; padding: 8px 16px;
+         border-radius: 14px; border: 1px solid var(--line); background: var(--card); text-decoration: none; font-weight: 600; }
+  .btn.primary { background: var(--gold); border-color: transparent; color: #241a05; font-size: 18px; }
+  .btn:disabled { opacity: .5; cursor: default; }
+  .note { font-size: 14px; color: var(--muted); margin: 6px 2px 12px; }
+  .msg { margin: 0 0 12px; color: var(--bad); }
+  .msg.ok { color: var(--ok); }
+  .msg:empty { display: none; }
+  input[type=text] { width: 100%; min-height: 52px; margin-bottom: 10px; padding: 10px 14px; border-radius: 12px; border: 1px solid var(--line);
+                     background: var(--card); color: var(--text); font: 15px ui-monospace, "DejaVu Sans Mono", monospace; }
+  .market { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: baseline; padding: 12px 14px; border-radius: 12px; background: var(--card); border: 1px solid var(--line); }
+  .market b { font-size: 22px; font-variant-numeric: tabular-nums; }
+  .market .up { color: var(--up); } .market .down { color: var(--down); }
+  .market small { color: var(--muted); font-size: 14px; }
+  ul.risks { margin: 0 0 12px; padding-left: 20px; font-size: 15px; color: var(--soft); }
+  ul.risks li { margin-bottom: 7px; }
+  .accept { display: flex; align-items: center; gap: 12px; min-height: 54px; margin: 0 0 12px; padding: 10px 14px; border-radius: 14px;
+            background: var(--card); border: 1px solid var(--line); font-weight: 600; }
+  .accept input { width: 26px; height: 26px; flex: none; accent-color: var(--gold); }
+  .mint { display: flex; gap: 10px; align-items: center; padding: 10px 14px; border-radius: 12px; background: var(--card); border: 1px solid var(--line); margin-bottom: 10px; }
+  .mint code { flex: 1; font-size: 13px; overflow-wrap: anywhere; user-select: all; -webkit-user-select: all; }
+  .mint button { flex: none; min-height: 40px; padding: 4px 14px; border-radius: 10px; border: 1px solid var(--line); background: transparent; }
+  .fine { margin-top: 30px; font-size: 14px; color: var(--muted); }
+  .fine p { margin: 0 0 8px; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <section id="connect" hidden aria-labelledby="connectTitle">
+    <h1 id="connectTitle">Connect your wallet</h1>
+    <p class="lede">Your car's FrunkStore screen shows the wallet's balance. A signed-in wallet holding enough tokens also unlocks Holders early access on the car.</p>
+    <div id="wallets"></div>
+    <div id="noWallet" hidden>
+      <p class="note">To sign in, open this page in your wallet app:</p>
+      <a class="btn" id="phantom" href="#">Open in Phantom</a>
+      <a class="btn" id="solflare" href="#">Open in Solflare</a>
+    </div>
+    <p class="note">Signing in asks your wallet to sign a message. That only proves the wallet is yours: it costs nothing, sends no transaction and can't move anything.</p>
+
+    <h2 id="watchTitle">Or watch an address</h2>
+    <p class="note">For a pump.fun account or any wallet that can't open this page: paste its address. The car shows its balance, view only; it doesn't unlock Holders.</p>
+    <input type="text" id="address" placeholder="Wallet address" autocomplete="off" autocapitalize="off" spellcheck="false" aria-labelledby="watchTitle">
+    <button class="btn" id="watch" type="button">Show it on my car</button>
+    <p class="msg" id="connectMsg" role="status"></p>
+  </section>
+
+  <section id="buy" aria-labelledby="buyTitle">
+    <h1 id="buyTitle">Buy FrunkStore</h1>
+    <p class="lede">The community token of frunk.store, on Solana. You buy it in your own wallet app; this page only opens it there.</p>
+    <div class="market" id="market" aria-live="polite"><small>Loading the price…</small></div>
+
+    <h2>Before you buy</h2>
+    <ul class="risks" id="risks"></ul>
+    <label class="accept"><input type="checkbox" id="accept"> I've read this and I accept the risks.</label>
+    <div id="buyLinks" hidden>
+      <a class="btn primary" id="phantomSwap" href="#">Buy in Phantom</a>
+      <a class="btn" id="pumpfun" href="#">Buy on pump.fun</a>
+      <p class="note">Another wallet? Swap SOL for this token address:</p>
+      <div class="mint"><code id="mint"></code><button type="button" id="copy">Copy</button></div>
+    </div>
+  </section>
+
+  <div class="fine">
+    <p>frunk.store will never ask for your recovery phrase or ask you to approve a transaction. If anything does, it isn't us.</p>
+    <p>Not affiliated with Tesla, pump.fun, Phantom, Solflare or any exchange. Prices from DexScreener.</p>
+    <p><a href="https://frunk.store/" style="color: inherit">frunk.store</a></p>
+  </div>
+</main>
+<script type="module" src="phone.js"></script>
+</body>
+</html>

@@ -29,88 +29,31 @@
 // changed ballot never leaves a count behind. Suggestions go to a list
 // for the site's owner to read (tools/votes.mjs); they aren't shown.
 
-import { createPublicKey, randomBytes, verify } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 import { fail, hash, json, limited, redis } from './_lib.js';
+import { DEV, MIN, amount, balance, isAddress, issuePass, signedBy, signInMessage } from './_solana.js';
 import list from '../vote/ideas.json' with { type: 'json' };
 
-export const MINT = '9T1DbbiKfhfubEabDj5SWSMzBuyU4tJHkpSgR51Tpump';
-const RPC = process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com';
-// Tokens a wallet needs to vote; set in the project's environment
-const MIN = +(process.env.VOTE_MIN_TOKENS || 100000);
 const PICKS = 3;                  // ideas per ballot
 const NONCE_TTL = 10 * 60;        // seconds to sign the message
 const SESSION_TTL = 24 * 3600;
 const MAX_SUGGESTION = 280;
 const SUGGESTIONS_PER_DAY = 3;    // per wallet
 const LINK_TTL = 15 * 60;         // seconds the car's code stays good
-const PASS_TTL = 30 * 86400;      // a car stays unlocked this long, while its wallet holds tokens
 
 const IDEAS = list.ideas.map(i => i.id);
 
-// ---------- Solana ----------
-
-const ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
-
-// A base58 string's bytes, or null
-function base58(s) {
-  if (typeof s !== 'string' || !s || s.length > 64) return null;
-  let n = 0n;
-  for (const c of s) {
-    const d = ALPHABET.indexOf(c);
-    if (d < 0) return null;
-    n = n * 58n + BigInt(d);
-  }
-  const bytes = [];
-  for (; n > 0n; n >>= 8n) bytes.unshift(Number(n & 0xffn));
-  for (const c of s) { if (c !== '1') break; bytes.unshift(0); }
-  return Buffer.from(bytes);
-}
-
-// A wallet address is a 32-byte ed25519 public key
-const isAddress = a => base58(a)?.length === 32;
-
-function signedBy(address, message, signature) {
-  const key = createPublicKey({ key: { kty: 'OKP', crv: 'Ed25519', x: base58(address).toString('base64url') }, format: 'jwk' });
-  return signature.length === 64 && verify(null, Buffer.from(message), key, signature);
-}
-
-// The wallet's FrunkStore tokens, across all its token accounts. The local
-// dev server (FRUNK_DEV) without an RPC set uses made-up balances, set with
-// op=dev-balance, so tests don't need real tokens.
-const DEV = process.env.FRUNK_DEV === '1' && !process.env.SOLANA_RPC_URL;
-async function balance(address) {
-  if (DEV) return +((await redis(['GET', `dev:balance:${address}`]))[0] || 0);
-  const res = await fetch(RPC, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      jsonrpc: '2.0', id: 1, method: 'getTokenAccountsByOwner',
-      params: [address, { mint: MINT }, { encoding: 'jsonParsed', commitment: 'confirmed' }],
-    }),
-  });
-  if (!res.ok) throw new Error(`rpc HTTP ${res.status}`);
-  const { result, error } = await res.json();
-  if (error) throw new Error(`rpc ${error.code}`);
-  return result.value.reduce((sum, a) => sum + (+a.account.data.parsed.info.tokenAmount.uiAmountString || 0), 0);
-}
-
 // ---------- sessions ----------
 
-// The Sign In With Solana message for this site; wallets show it as a sign-in
-function message(host, address, nonce, now) {
-  return `${host} wants you to sign in with your Solana account:\n${address}\n\n` +
-    'Sign in to vote on what frunk.store builds next. This only proves you own this wallet: it costs nothing and sends no transaction.\n\n' +
-    `URI: https://${host}/vote/\nVersion: 1\nChain ID: mainnet\nNonce: ${nonce}\n` +
-    `Issued At: ${new Date(now).toISOString()}\nExpiration Time: ${new Date(now + NONCE_TTL * 1000).toISOString()}`;
-}
+const message = (host, address, nonce, now) => signInMessage({
+  host, address, nonce, now, ttl: NONCE_TTL, path: '/vote/', statement: 'Sign in to vote on what frunk.store builds next.',
+});
 
 async function wallet(token) {
   if (typeof token !== 'string' || !/^[A-Za-z0-9_-]{32}$/.test(token)) return null;
   const [address] = await redis(['GET', `vote:s:${hash(token)}`]);
   return address;
 }
-
-const amount = n => n.toLocaleString('en-US', { maximumFractionDigits: 6 });
 
 const body = async request => {
   try { return await request.json(); } catch { return {}; }
@@ -220,8 +163,8 @@ async function linkPoll(request) {
   const entry = JSON.parse(raw);
   if (entry.secret !== hash(secret)) return fail(403, 'Not this code.');
   if (!entry.address) return json({ waiting: true });
-  const pass = randomBytes(24).toString('base64url');
-  await redis(['SET', `vote:p:${hash(pass)}`, entry.address, 'EX', PASS_TTL], ['DEL', `vote:l:${lid}`]);
+  const pass = await issuePass(entry.address);
+  await redis(['DEL', `vote:l:${lid}`]);
   return json({ pass, balance: entry.tokens });
 }
 

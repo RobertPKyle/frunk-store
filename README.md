@@ -625,6 +625,32 @@ to the cache again.
   stays unlocked. The car-side answers are always 200, so the car's console
   stays clean. This gates the pages, not the files: the engines and games
   are ordinary static files, and the source is public.
+- `apps/token` and `apps/api/token.js`: FrunkStore Token, opened from the
+  "Live chart, wallet & buy" button under the token's address in the hub's
+  footer (catalog `"unlisted": true`, so it's off the grid). It shows the
+  price, the day's numbers and a candle chart (1H to All, a finger on the
+  chart reads a candle), refreshed every 30 seconds. `op=market` takes the
+  price and numbers from DexScreener's deepest pool and the candles from
+  GeckoTerminal, fills hours without trades with flat candles, and is cached
+  on Vercel's CDN for 30 seconds; longer ranges' candles are reused for a
+  few minutes, and when a source is busy, the instance's last answer is used.
+  GeckoTerminal's free API allows about 30 requests a minute per IP, shared
+  by everything on Vercel's IPs; set `COINGECKO_API_KEY` (a free CoinGecko
+  demo key) on frunk-apps to fetch the same candles from CoinGecko's
+  on-chain API on the key's own quota. Connecting a wallet works like the holders' unlock: the car
+  shows a code to `/token/phone/?c=<id>`, where the phone signs a Sign In With
+  Solana message (no transaction) or pastes an address to watch, view only,
+  for a pump.fun account or any wallet that can't sign there. A signed-in
+  wallet holding `VOTE_MIN_TOKENS` also gets the car a holders' pass. The
+  car keeps the address and checks its balance every minute
+  (`op=wallet`). Buying never happens on the car or through frunk.store: the
+  car shows the risks (`apps/token/terms.js`, also on the phone) and a code
+  to `/token/phone/?buy`, which, after the risks are accepted there too,
+  links to Phantom's swap screen (`phantom.app/ul/v1/swap`, token prefilled)
+  and the token's pump.fun page, and shows the address to copy for other
+  wallets. The site never builds or asks for a transaction. Shared Solana
+  helpers are in `apps/api/_solana.js`, wallet discovery for phone pages in
+  `apps/_shared/wallets.js`.
 - `apps/chess`: the Lichess daily chess puzzle, playable on the board. Tap a
   piece, then a highlighted square; the opponent's reply is played
   automatically and only the best move is accepted. Next puzzle fetches a

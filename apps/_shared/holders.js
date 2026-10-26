@@ -47,6 +47,15 @@ export async function qr(el, link, size) {
   new QRCode(a, { text: link, width: size, height: size, correctLevel: QRCode.CorrectLevel.M });
 }
 
+// Keeps a pass this screen just got; the token screen gets one too when a
+// holder's wallet connects there
+export function savePass(pass) {
+  local.set(localStorage, PASS, pass);
+  local.set(sessionStorage, CHECKED, String(Date.now()));
+}
+
+export const hasPass = () => !!local.get(localStorage, PASS);
+
 // Forgets this screen's pass and shows the locked screen
 export function lockHolders() {
   local.set(localStorage, PASS, null);
@@ -112,8 +121,7 @@ function lockScreen(what, reason) {
         if (r?.expired) return code();   // a fresh code
         if (!r?.pass) return;
         clearInterval(timer);
-        local.set(localStorage, PASS, r.pass);
-        local.set(sessionStorage, CHECKED, String(Date.now()));
+        savePass(r.pass);
         box.remove();
         style.remove();
         resolve();
