@@ -103,6 +103,7 @@
     "blocks": { "name": "方塊建造家", "tagline": "在 Minecraft Classic 風格的方塊世界裡蓋出任何東西：創造模式、飛行，世界會在遊玩時自動儲存。" },
     "adventure": { "name": "冒險遊戲", "tagline": "ScummVM 上的經典點擊式冒險遊戲：七款免費遊戲，或從手機傳送你擁有的遊戲。" },
     "text": { "name": "文字冒險", "tagline": "Infocom 的經典 Zork I、II、III，現已開源。點選單字組成指令，或直接輸入。" },
+    "ascii": { "name": "ASCII 冒險", "tagline": "Scott Miller 1987 至 1990 年的 Kroz 系列，現已開源：七部文字模式冒險，有寶石、鞭子和怪物。點按即可行走。" },
     "puzzles": { "name": "邏輯謎題", "tagline": "Simon Tatham 的 40 款經典邏輯謎題，從 Solo（數獨）到 Mines、Net，任何尺寸都有無窮無盡的新盤面。" },
     "chess": { "name": "西洋棋謎題", "tagline": "在螢幕上解 Lichess 每日西洋棋謎題。" },
     "terrarium": { "tagline": "你不在時也持續生活的水族箱。餵食牠們，看著牠們演化。作者：Jason Goldfeder。" }

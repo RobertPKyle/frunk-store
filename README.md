@@ -612,6 +612,38 @@ to the cache again.
   and RESTORE use one more slot per game. Players add .z1-.z8 and .zblorb
   files (zipped or not) from their phone or from files. A move takes about
   15 ms with the CPU slowed 4.5x. Not yet tried in the car.
+- `apps/ascii`: ASCII Quests. Scott Miller's Kroz games (Apogee,
+  1987-1990): Caverns of Kroz II, Dungeons of Kroz II, Return to Kroz,
+  Temple of Kroz, The Final Crusade of Kroz, Kingdom of Kroz II and The Lost
+  Adventures of Kroz, built from the Turbo Pascal source Apogee released
+  under the GPL (version 2 or later) in 2009. Apogee's compiled games are
+  freeware with all rights reserved, so they're never used. `npm run
+  build:kroz` (`tools/build-kroz.mjs`) fetches the source at a fixed commit
+  of github.com/tangentforks/kroz (an unchanged import of Apogee's
+  krozfree.zip) and translates each game, unchanged, to
+  `apps/ascii/games/<id>.js` with `tools/kroz/pascal.mjs`, this site's own
+  translator for the Turbo Pascal 5 the games use (units, include files,
+  records, sets, shortstrings, typed files, var parameters, `with`, `goto`,
+  and Turbo Pascal's habits: integers wrap to their size, `for` counters
+  keep their last value, arrays aren't bounds-checked). It also writes
+  `apps/ascii/kroz-src.tar.gz`, the source that goes with the games, and
+  `apps/ascii/font.js` from the Linux kernel's 8x16 VGA font (GPL-2.0). The
+  output is committed. Each game runs in a worker on `apps/ascii/runtime.js`:
+  an 80x25 text screen with Turbo Pascal's Crt behaviour (windows,
+  scrolling, blinking), the BIOS keyboard, the PC speaker (an AudioWorklet,
+  `speaker.js`) and files for saves and high scores (IndexedDB `ascii`). The
+  games pace themselves by CPU speed (the main loop counts to 800 between
+  monster moves), so every runtime call costs time on a made-up clock set
+  to roughly a PC AT, and the worker sleeps (Atomics.wait on shared memory)
+  when that clock runs ahead; Speed scales it. The two questions every game
+  asks first (colour or monochrome, slow or fast PC) are answered by the
+  runtime. The page draws the screen from shared memory, turns each
+  question on screen into answer buttons, takes the name for the high
+  scores in a text box, and walks the player one step toward a tap (held
+  taps keep walking, repeating at the BIOS's 11 keys a second); keyboard
+  and controller work too. Kroz saves the state at the start of the level,
+  as it always did. Measured with the CPU slowed 4.5x: 60 fps and about 30
+  ms of main-thread work a second. Not yet tried in the car.
 - `apps/send` and `apps/api/transfer.js`: "Get games from phone", for Retro
   Console, Freedoom, Blasphemer, Adventure Games, Text Adventures and
   LibreQuake (the car side is `apps/_shared/phone.js`; Freedoom adds
@@ -756,6 +788,7 @@ npm run build:sms                       # Gearsystem for Retro Console (needs Do
 npm run build:pce                       # Geargrafx for Retro Console (needs Docker); output is committed, rerun only to update it
 npm run build:lynx                      # Gearlynx for Retro Console (needs Docker); output is committed, rerun only to update it
 npm run build:townpatrol                # Town Patrol's Lynx cartridge from source (needs Docker); output is committed
+npm run build:kroz                      # ASCII Quests' Kroz games from Apogee's GPL source; output is committed
 npm run build:md                        # clownmdemu for Retro Console (needs Docker); output is committed, rerun only to update it
 npm run build:n64                       # n64js for Retro Console (needs npx to fetch Bun); output is committed, rerun only to update it
 npm run dev                             # hub on localhost:5173, apps on 127.0.0.1:5174

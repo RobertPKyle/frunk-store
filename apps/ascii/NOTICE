@@ -1,0 +1,31 @@
+ASCII Quests (apps/ascii)
+
+The games (games/*.js)
+  Caverns of Kroz II, Dungeons of Kroz II, Kingdom of Kroz II, Return to
+  Kroz, Temple of Kroz, The Final Crusade of Kroz and The Lost Adventures of
+  Kroz, by Scott Miller; published by Apogee Software (1987-1990).
+  Copyright (C) 1987, 2009 Apogee Software, Ltd. In March 2009 Apogee
+  released their source code under the GNU General Public License, version
+  2 or later (COPYING here; GNU.TXT in the source archive).
+  The source comes from Apogee's krozfree.zip, as imported unchanged into
+  https://github.com/tangentforks/kroz (commit
+  5d080fb4f2440f704e57a5bc5e73ba080c1a1d8d), folder source/ only. The
+  games' Pascal files are unchanged; frunk.store's translator
+  (tools/kroz/pascal.mjs) turns each game into JavaScript. The complete
+  source for the files in games/, with the translator and the build
+  script, is kroz-src.tar.gz next to this file. The compiled games in the
+  same zip are freeware with all rights reserved and aren't used.
+  "Kroz" is a registered trademark of Apogee Software, Ltd. ASCII Quests
+  and frunk.store aren't affiliated with or endorsed by Apogee Software or
+  3D Realms.
+
+The runtime (runtime.js, worker.js, speaker.js, ascii.js)
+  frunk.store's own: a text screen, keyboard, PC speaker and files that
+  behave like Turbo Pascal's Crt unit on a PC, for the translated games.
+  Released under the GNU General Public License, version 2 or later, like
+  the games.
+
+The font (font.js)
+  The Linux kernel's 8x16 VGA console font, lib/fonts/font_8x16.c at tag
+  v6.12 (https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git),
+  GPL-2.0. Converted to base64 by tools/build-kroz.mjs.

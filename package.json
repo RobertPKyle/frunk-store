@@ -17,6 +17,7 @@
     "build:pce": "node tools/build-geargrafx.mjs",
     "build:lynx": "node tools/build-gearlynx.mjs",
     "build:townpatrol": "node tools/build-townpatrol.mjs",
+    "build:kroz": "node tools/build-kroz.mjs",
     "build:md": "node tools/build-clownmdemu.mjs",
     "build:n64": "node tools/build-n64js.mjs",
     "build:battleship": "node tools/build-battleship.mjs",

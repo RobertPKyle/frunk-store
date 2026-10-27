@@ -55,3 +55,4 @@ apps/fheroes2/engine/fheroes2.js
 apps/fheroes2/engine/fheroes2.wasm
 apps/fheroes2/engine/fheroes2.data
 apps/fheroes2/engine/*-src.tar.gz
+tools/.kroz-build

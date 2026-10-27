@@ -1260,6 +1260,81 @@ await check('text adventures takes story files from a phone', async () => {
   await appFrame().locator('#mine .game').waitFor({ state: 'detached', timeout: 5000 });
 });
 
+await check('ascii quests plays Kroz from Apogee\'s GPL source: walks by touch, saves, dies and keeps a high score', async () => {
+  await openFromHub(/ASCII Quests/);
+  const frame = () => page.frames().find(f => f.url().includes('/ascii/'));
+  const app = appFrame();
+  const state = () => frame().evaluate(() => window.asciiState());
+  const prompt = () => app.locator('#prompt').evaluate(e => (e.hidden ? '' : e.textContent));
+  const answer = async label => { await app.locator('#prompt button', { hasText: label }).click(); await page.waitForTimeout(600); };
+  const until = async (what, fn, ms = 20000) => {
+    for (const t = Date.now(); Date.now() - t < ms; await page.waitForTimeout(150)) { const v = await fn(); if (v) return v; }
+    const last = (await state())?.text.split('\n')[24].replace(/[^ -~]/g, '.').trim();
+    throw new Error(`no ${what}; screen asks "${await prompt()}", bottom line "${last}"`);
+  };
+  await app.locator('.game').filter({ hasText: 'Return to Kroz' }).click();
+  // The runtime answers colour and PC speed itself; the rest are buttons
+  await until('difficulty question', async () => (await prompt()).includes('Advanced'));
+  await answer('Advanced');
+  const start = await until('first level', async () => {
+    const s = await state();
+    if (s?.px) return s;
+    const p = await prompt();
+    if (p.includes('Begin')) await answer('Begin');
+    else if (p.includes('Continue')) await answer('Continue');
+    return null;
+  }, 40000);
+  // The level waits for a key once its opening flash is over
+  const text = await until('the level\'s first key', async () => { const s = await state(); return s.text.includes('Press any key to begin this level') && s.text; });
+  if (!['Score', 'Level', 'Gems', 'Whips', 'Teleports'].every(w => text.includes(w))) throw new Error('level 1 isn\'t on screen');
+  // A tap steps toward it, a held key walks
+  const box = await app.locator('#screen').boundingBox();
+  const at = (x, y) => [box.x + (x - 0.5) / 80 * box.width, box.y + (y - 0.5) / 25 * box.height];
+  await page.touchscreen.tap(...at(start.px + 6, start.py));
+  await until('a step right', async () => (await state()).px === start.px + 1, 3000);
+  await page.keyboard.press('ArrowDown');
+  await until('a step down', async () => (await state()).py === start.py + 1, 3000);
+  // Saving writes the game's own file
+  await app.locator('.side button', { hasText: 'Save' }).click();
+  await until('save question', async () => (await prompt()).includes('Yes'), 5000);
+  await answer('Yes');
+  const files = () => frame().evaluate(() => new Promise(r => {
+    const q = indexedDB.open('ascii');
+    q.onsuccess = () => { const g = q.result.transaction('files').objectStore('files').getAll(IDBKeyRange.bound('return/', 'return/￿')); g.onsuccess = () => { q.result.close(); r(g.result); }; };
+  }));
+  await until('the save file', async () => (await frame().evaluate(() => new Promise(r => {
+    const q = indexedDB.open('ascii');
+    q.onsuccess = () => { const g = q.result.transaction('files').objectStore('files').getAllKeys(); g.onsuccess = () => { q.result.close(); r(g.result); }; };
+  }))).includes('return/RETURN.SAV'), 5000);
+  // Whip what comes close, then let the creatures take every gem; a
+  // score that places asks for a name
+  for (let i = 0; i < 6; i++) { await app.locator('.side button', { hasText: 'Whip' }).click(); await page.waitForTimeout(400); }
+  const end = await until('the end of the game', async () => {
+    const s = await state();
+    if (s?.line) return 'name';
+    const p = await prompt();
+    if (p.includes('Yes') && s.text.includes('HIGH SCORE')) return 'table';
+    if (p.includes('Continue')) await answer('Continue');
+    return null;
+  }, 90000);
+  if (end === 'name') {
+    await app.locator('#lineText').fill('CAR TESTER');
+    await app.locator('#line button').click();
+    await until('another game question', async () => (await prompt()).includes('Yes'));
+    const table = await files();
+    if (!JSON.stringify(table).includes('CAR TESTER')) throw new Error('the high score wasn\'t kept');
+    if (!(await state()).text.includes('CAR TESTER')) throw new Error('the high score isn\'t on screen');
+  }
+  // No more games: the game signs off and the list comes back
+  await answer('No');
+  await until('the list of games', async () => {
+    if (await app.locator('#library').isVisible()) return true;
+    if ((await prompt()).includes('Continue')) await answer('Continue');
+    return false;
+  });
+  await page.screenshot({ path: shots + 'ascii.png' });
+});
+
 await check('librequake plays with touch and a controller and resumes from its autosave', async () => {
   await openFromHub(/LibreQuake/);
   const frame = () => page.frames().find(f => f.url().includes('/quake/'));

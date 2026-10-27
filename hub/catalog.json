@@ -320,6 +320,18 @@
       ]
     },
     {
+      "id": "ascii",
+      "name": "ASCII Quests",
+      "tagline": "Scott Miller's Kroz games, 1987 to 1990, now open source: seven text-mode quests of gems, whips and creatures. Tap to walk.",
+      "path": "/ascii/",
+      "icon": "/ascii/icon.svg",
+      "tags": [
+        "Game",
+        "Touch",
+        "Offline"
+      ]
+    },
+    {
       "id": "puzzles",
       "name": "Logic Puzzles",
       "tagline": "Forty classic logic puzzles by Simon Tatham, from Solo (sudoku) to Mines and Net, with endless new boards in every size.",

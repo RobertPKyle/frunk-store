@@ -103,6 +103,7 @@
     "blocks": { "name": "ブロックビルダー", "tagline": "Minecraft Classic 風のブロックの世界で何でも作ろう：クリエイティブモード、飛行、プレイ中に自動保存されるワールド。" },
     "adventure": { "name": "アドベンチャーゲーム", "tagline": "ScummVM で遊ぶ名作ポイント＆クリックアドベンチャー：無料ゲーム 7 本、またはスマホから送った手持ちのゲーム。" },
     "text": { "name": "テキストアドベンチャー", "tagline": "Infocom の名作 Zork I・II・III。現在はオープンソースです。単語をタップしてコマンドを作るか、入力してください。" },
+    "ascii": { "name": "ASCIIクエスト", "tagline": "スコット・ミラーのKrozシリーズ（1987〜1990年）がオープンソースに。宝石とムチとモンスターのテキストモード冒険7作。タップで移動。" },
     "puzzles": { "name": "ロジックパズル", "tagline": "Simon Tathamによる定番ロジックパズル40種。Solo(数独)からMines、Netまで、どのサイズでも新しい盤面が無限に作られます。" },
     "chess": { "name": "チェスパズル", "tagline": "Lichess のデイリーチェスパズルを画面で解こう。" },
     "terrarium": { "tagline": "留守のあいだも生き続ける水槽。エサをあげて、進化を見守ろう。作：Jason Goldfeder。" }
