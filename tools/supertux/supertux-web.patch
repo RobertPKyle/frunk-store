@@ -1,0 +1,230 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index d9a110b..058352b 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -164,6 +164,9 @@ option(USE_SYSTEM_SDL2_TTF "Build SuperTux with system SDL2_TTF" OFF)
+ 
+ # Find dependencies
+ include(SuperTux/AddPackage)
++if(EMSCRIPTEN)
++  include(SuperTux/WebDeps)
++endif()
+ 
+ add_package(TARGET PNG
+   PKG PNG PKG_USE PNG::PNG PKG_CONFIG libpng REQUIRED)
+@@ -397,7 +400,7 @@ if(WIN32)
+ endif()
+ 
+ if(EMSCRIPTEN)
+-  target_link_options(supertux2 PUBLIC -sEXPORTED_FUNCTIONS=['_main','_set_resolution','_save_config','_onDownloadProgress','_onDownloadFinished','_onDownloadError','_onDownloadAborted','_getExceptionMessage'] PUBLIC -sEXPORTED_RUNTIME_METHODS=['ccall','cwrap'])
++  target_link_options(supertux2 PUBLIC -sEXPORTED_FUNCTIONS=['_main','_set_resolution','_save_config','_onDownloadProgress','_onDownloadFinished','_onDownloadError','_onDownloadAborted','_getExceptionMessage'] PUBLIC -sEXPORTED_RUNTIME_METHODS=['ccall','cwrap','FS','IDBFS','addRunDependency','removeRunDependency'])
+ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+   # This option makes symbol names available for libc's backtrace().
+   target_link_options(supertux2 PUBLIC -rdynamic)
+diff --git a/external/simplesquirrel/CMakeLists.txt b/external/simplesquirrel/CMakeLists.txt
+index c93f422..c26e92e 100644
+--- a/external/simplesquirrel/CMakeLists.txt
++++ b/external/simplesquirrel/CMakeLists.txt
+@@ -37,7 +37,12 @@ link_directories(${CMAKE_LIBRARY_PATH})
+ # Add our library
+ add_library(${PROJECT_NAME}_static STATIC ${SOURCES} ${HEADERS})
+ add_library(${PROJECT_NAME}-static ALIAS ${PROJECT_NAME}_static)
+-add_library(${PROJECT_NAME} SHARED ${SOURCES} ${HEADERS})
++if(EMSCRIPTEN)
++  # no shared libraries on the web
++  add_library(${PROJECT_NAME} STATIC ${SOURCES} ${HEADERS})
++else()
++  add_library(${PROJECT_NAME} SHARED ${SOURCES} ${HEADERS})
++endif()
+ 
+ if(SSQ_USE_SQ_SUBMODULE)
+   target_link_libraries(${PROJECT_NAME}_static PUBLIC squirrel_static sqstdlib_static)
+diff --git a/mk/cmake/SuperTux/Emscripten.cmake b/mk/cmake/SuperTux/Emscripten.cmake
+index 58b9f6b..ce534c9 100644
+--- a/mk/cmake/SuperTux/Emscripten.cmake
++++ b/mk/cmake/SuperTux/Emscripten.cmake
+@@ -3,8 +3,12 @@ set(IS_EMSCRIPTEN_BUILD ON)
+ set(SQ_DISABLE_INSTALLER YES)
+ set(SSQ_BUILD_INSTALL NO)
+ 
+-set(EM_USE_FLAGS "-sDISABLE_EXCEPTION_CATCHING=0 -sUSE_SDL=2 -sUSE_SDL_IMAGE=2 -sSDL2_IMAGE_FORMATS='[\"png\",\"jpg\"]' -sUSE_VORBIS=1")
+-set(EM_LINK_FLAGS " -sINITIAL_MEMORY=134217728 -sALLOW_MEMORY_GROWTH=1 -sMAXIMUM_MEMORY=536870912 -sERROR_ON_UNDEFINED_SYMBOLS=0 --preload-file ${BUILD_CONFIG_DATA_DIR} --use-preload-plugins -lidbfs.js")
++# frunk.store: WebAssembly exceptions and JSPI. The page reads the game's
++# files on demand and the wasm stack waits for them (JSPI), which can't
++# happen across the JavaScript frames that Emscripten's JS exception
++# handling puts on the stack. The data isn't preloaded: the page mounts it.
++set(EM_USE_FLAGS "-fwasm-exceptions -sUSE_SDL=2 -sUSE_SDL_IMAGE=2 -sSDL2_IMAGE_FORMATS='[\"png\",\"jpg\"]' -sUSE_VORBIS=1")
++set(EM_LINK_FLAGS " -sINITIAL_MEMORY=67108864 -sALLOW_MEMORY_GROWTH=1 -sMAXIMUM_MEMORY=536870912 -sERROR_ON_UNDEFINED_SYMBOLS=0 -sJSPI -sENVIRONMENT=web -lidbfs.js")
+ if(ENABLE_OPENGL)
+   set(EM_LINK_FLAGS "${EM_LINK_FLAGS} -sFULL_ES2")
+   set(HAVE_OPENGL ON CACHE BOOL "")
+diff --git a/mk/cmake/SuperTux/WebDeps.cmake b/mk/cmake/SuperTux/WebDeps.cmake
+new file mode 100644
+index 0000000..42aa2b9
+--- /dev/null
++++ b/mk/cmake/SuperTux/WebDeps.cmake
+@@ -0,0 +1,17 @@
++# The libraries Emscripten has as ports, as targets add_package() finds
++# ready-made (it skips a package whose target exists)
++foreach(port PNG:-sUSE_LIBPNG=1 ZLIB:-sUSE_ZLIB=1 Freetype:-sUSE_FREETYPE=1)
++  string(REPLACE ":" ";" port "${port}")
++  list(GET port 0 name)
++  list(GET port 1 flag)
++  add_library(${name} INTERFACE IMPORTED)
++  set_target_properties(${name} PROPERTIES
++    INTERFACE_COMPILE_OPTIONS "${flag}"
++    INTERFACE_LINK_LIBRARIES "${flag}")
++endforeach()
++
++# PhysFS, built for the web next to the game (add_package() would ask
++# pkg-config for it)
++find_package(PhysFS CONFIG REQUIRED)
++add_library(PhysFS INTERFACE IMPORTED)
++set_target_properties(PhysFS PROPERTIES INTERFACE_LINK_LIBRARIES PhysFS::PhysFS-static)
+diff --git a/src/supertux/main.cpp b/src/supertux/main.cpp
+index e8200a1..09fe6bc 100644
+--- a/src/supertux/main.cpp
++++ b/src/supertux/main.cpp
+@@ -251,9 +251,10 @@ void PhysfsSubsystem::find_mount_datadir()
+     log_warning << "Couldn't add '" << m_datadir << "' to PhysFS searchpath: " << physfsutil::get_last_error() << std::endl;
+   }
+ #else
+-  if (!PHYSFS_mount(BUILD_CONFIG_DATA_DIR, nullptr, 1))
++  // frunk.store: the page mounts the game's data at /data
++  if (!PHYSFS_mount("/data", nullptr, 1))
+   {
+-    log_warning << "Couldn't add '" << BUILD_CONFIG_DATA_DIR << "' to PhysFS searchpath: " << physfsutil::get_last_error() << std::endl;
++    log_warning << "Couldn't add '/data' to PhysFS searchpath: " << physfsutil::get_last_error() << std::endl;
+   }
+ #endif
+ }
+@@ -500,6 +501,9 @@ SDLSubsystem::SDLSubsystem()
+ 
+ #ifdef __ANDROID__
+   g_config->mobile_controls = SDL_GetNumTouchDevices() > 0;
++#elif defined(__EMSCRIPTEN__)
++  // frunk.store: the page says whether this is a touch screen
++  g_config->mobile_controls = EM_ASM_INT({ return Module.touchControls ? 1 : 0; }, 0);
+ #endif
+ 
+   if (TTF_Init() < 0)
+@@ -792,8 +796,13 @@ Main::run(int argc, char** argv)
+ 
+ #ifdef __ANDROID__
+     m_physfs_subsystem.reset(new PhysfsSubsystem(nullptr, args.datadir, SDL_AndroidGetExternalStoragePath()));
++#else
++#ifdef __EMSCRIPTEN__
++    // frunk.store: PhysFS needs a program path where it can't look one up
++    m_physfs_subsystem.reset(new PhysfsSubsystem("/supertux2", args.datadir, args.userdir));
+ #else
+     m_physfs_subsystem.reset(new PhysfsSubsystem(nullptr, args.datadir, args.userdir));
++#endif
+ #endif
+     m_physfs_subsystem->print_search_path();
+ 
+diff --git a/src/supertux/menu/main_menu.cpp b/src/supertux/menu/main_menu.cpp
+index be73fb7..ba6d2ec 100644
+--- a/src/supertux/menu/main_menu.cpp
++++ b/src/supertux/menu/main_menu.cpp
+@@ -56,9 +56,9 @@ MainMenu::MainMenu()
+   // TODO: Manage to build OpenSSL for Emscripten so we can build CURL so we can
+   //       build the add-ons so we can re-enable them.
+   //       Also see src/addon/downloader.*pp
++  // frunk.store: no add-ons or file uploads in the car's browser
++#ifndef __EMSCRIPTEN__
+   add_submenu(_("Add-ons"), MenuStorage::ADDON_MENU);
+-#ifdef __EMSCRIPTEN__
+-  add_submenu(_("Manage Assets"), MenuStorage::ASSET_MENU);
+ #endif
+   add_submenu(_("Options"), MenuStorage::OPTIONS_MENU);
+   // The level editor is not mobile friendly; hide for now
+@@ -66,8 +66,9 @@ MainMenu::MainMenu()
+   add_entry(MNID_LEVELEDITOR, _("Level Editor"));
+ #endif
+   add_entry(MNID_CREDITS, _("Credits"));
+-#if !defined(STEAM_BUILD) && !defined(GOOGLE_PLAY)
++#if !defined(STEAM_BUILD) && !defined(GOOGLE_PLAY) && !defined(__EMSCRIPTEN__)
+   // Links to external purchases are not allowed on Steam or Google Play, including donations
++  // (frunk.store: and the car's browser can't open links from the game)
+   add_entry(MNID_DONATE, _("Donate"));
+ #endif
+ #ifndef REMOVE_QUIT_BUTTON
+diff --git a/src/supertux/screen_manager.cpp b/src/supertux/screen_manager.cpp
+index 5190cc5..21b2578 100644
+--- a/src/supertux/screen_manager.cpp
++++ b/src/supertux/screen_manager.cpp
+@@ -51,6 +51,13 @@
+ #ifdef __EMSCRIPTEN__
+ #include <emscripten.h>
+ #include <emscripten/html5.h>
++
++// frunk.store: the main loop runs inside main() and waits here, with JSPI,
++// for the page's next animation frame, so that a frame can also wait for
++// the game's files (the page reads them on demand)
++EM_ASYNC_JS(void, web_wait_frame, (), {
++  await Module.nextFrame();
++});
+ #endif
+ 
+ struct ScreenManager::FPS_Stats
+@@ -629,9 +636,11 @@ void ScreenManager::loop_iter()
+   bool always_draw = g_debug.draw_redundant_frames || g_config->frame_prediction;
+ 
+   if (elapsed_time < seconds_per_step && !always_draw) {
++#ifndef __EMSCRIPTEN__
+     // Sleep a bit because not enough time has passed since the previous
+     // logical game step
+     SDL_Delay(static_cast<Uint32>(1000.0f * (seconds_per_step - elapsed_time)));
++#endif
+     return;
+   }
+ 
+@@ -701,24 +710,16 @@ void ScreenManager::loop_iter()
+ #endif
+ }
+ 
+-#ifdef __EMSCRIPTEN__
+-static void g_loop_iter() {
+-  auto screen_manager = ScreenManager::current();
+-  screen_manager->loop_iter();
+-}
+-#endif
+-
+ void
+ ScreenManager::run()
+ {
+   Integration::init_all();
+ 
+   handle_screen_switch();
+-#ifdef __EMSCRIPTEN__
+-  emscripten_set_main_loop(g_loop_iter, -1, 1);
+-#else
+   while (!m_screen_stack.empty()) {
++#ifdef __EMSCRIPTEN__
++    web_wait_frame();
++#endif
+     loop_iter();
+   }
+-#endif
+ }
+diff --git a/version.cmake b/version.cmake
+index 3dfdec8..c0e725a 100644
+--- a/version.cmake
++++ b/version.cmake
+@@ -2,14 +2,5 @@
+ # See mk/cmake/SuperTux/BuildVersion.cmake
+ 
+ set(SUPERTUX_PACKAGE_VERSION_TAG "v0.7.0")
+-if(ON)
+-  set(SUPERTUX_PACKAGE_VERSION "v0.7.0")
+-  set(SUPERTUX_VERSION_STRING "v0.7.0")
+-else()
+-  if(NOT 0 EQUAL 0)
+-    set(SUPERTUX_PACKAGE_VERSION "dev c11dfb2 (v0-7-0)")
+-  else()
+-    set(SUPERTUX_PACKAGE_VERSION "dev v0.7.0 - c11dfb2 (v0-7-0)")
+-  endif()
+-  set(SUPERTUX_VERSION_STRING "v0-7-0-c11dfb2")
+-endif()
++set(SUPERTUX_PACKAGE_VERSION "v0.7.0")
++set(SUPERTUX_VERSION_STRING "v0.7.0")

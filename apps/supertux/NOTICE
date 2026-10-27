@@ -1,0 +1,58 @@
+SuperTux (apps/supertux)
+
+Game (engine/)
+  SuperTux 0.7.0, by the SuperTux Development Team and contributors.
+  License: GNU General Public License, version 3 or later
+  (engine/LICENSE.txt).
+  Source: https://github.com/SuperTux/supertux, release v0.7.0
+  (SuperTux-v0.7.0-Source.tar.gz), with frunk.store's changes for the
+  browser in engine/supertux-web.patch (also tools/supertux/supertux-web.patch
+  in https://github.com/RobertPKyle/frunk-store, whose
+  tools/build-supertux.mjs builds it). The patched source the build came
+  from, without the data folder (published as is in data/, see below), is
+  engine/supertux-0.7.0-web-src.tar.gz.
+  The changes: the game's main loop waits for the page's next animation
+  frame inside main(), with JSPI, instead of Emscripten's main loop, so a
+  frame can also wait for the game's files, which the page reads on demand;
+  WebAssembly exceptions instead of Emscripten's JavaScript ones (JSPI
+  can't wait across JavaScript frames); the data is mounted by the page at
+  /data rather than preloaded; PhysicsFS gets a program path, which it
+  can't look up on the web; the page says whether to show the on-screen
+  controls; no Add-ons, Manage Assets or Donate entries on the title menu
+  (no add-on downloads, file uploads or outside links in the car); the
+  Emscripten ports the build uses stand in for vcpkg's packages; and the
+  version is set to v0.7.0.
+  Built with the menus SuperTux uses on phones (HIDE_NONMOBILE_OPTIONS: no
+  level editor, resolution or cursor options) and without networking.
+
+  Libraries compiled into it:
+  - PhysicsFS 3.2.0, by Ryan C. Gordon and contributors: zlib license.
+    Source: engine/physfs-3.2.0.tar.gz (https://github.com/icculus/physfs).
+  - {fmt} 11.2.0, by Victor Zverovich and contributors: MIT license.
+    Source: engine/fmt-11.2.0.tar.gz (https://github.com/fmtlib/fmt).
+  - GLM 1.0.1, by G-Truc Creation: MIT license (The Happy Bunny license
+    also offered). Source: engine/glm-1.0.1.tar.gz (https://github.com/g-truc/glm).
+  - In SuperTux's own source tree (external/): SDL_ttf, tinygettext and
+    SDL_SavePNG (zlib), Squirrel, SimpleSquirrel and findlocale (MIT),
+    sexp-cpp (GPL-3.0), obstack (LGPL-2.1, from the GNU C Library) and
+    partio_zip (BSD 3-Clause).
+  - Emscripten's ports: SDL2, SDL2_image, libpng, zlib, FreeType, libogg
+    and libvorbis, under their own licenses (zlib, libpng, FreeType
+    Project License, BSD), and Emscripten's runtime (MIT and
+    University of Illinois/NCSA).
+
+Data (data/)
+  SuperTux 0.7.0's data folder, unchanged, from the same release: the
+  levels, worlds, scripts, art, music, sounds, fonts and translations by
+  the SuperTux artists, musicians, level designers and translators, under
+  the GPL (version 2 or 3 or later), Creative Commons Attribution-ShareAlike
+  and Attribution, and other free licenses, file by file as data/LICENSES.txt
+  (the game's AUTHORS, ACKNOWLEDGEMENTS.txt and credits) records; the fonts
+  are under the SIL Open Font License or Apache License 2.0 (data/*LICENSE*).
+  It is packed for streaming by tools/supertux/pack.mjs: the files one
+  after another (in the order data/index.json lists them, with their sizes)
+  cut into 1 MB blocks, data/<version>/<n>.bin, some gzipped (.bin.gz).
+  Joining the blocks in order (ungzipping the .gz ones) and cutting the
+  result by the sizes in index.json gives back every file.
+
+frunk.store is not affiliated with or endorsed by the SuperTux project.

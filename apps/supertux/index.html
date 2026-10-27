@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>SuperTux</title>
+<style>
+  :root { --bg: #0b1420; --panel: #112031; --card: #17293d; --line: rgba(160, 205, 240, .16); --text: #eef6fc; --muted: #9db4c8;
+          --accent: #f2b233; --accent2: #8fd0f0; --danger: #d9694a; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 16px/1.4 system-ui, sans-serif; overflow: hidden;
+               -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; touch-action: none; }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  .btn { min-height: 44px; padding: 8px 16px; border-radius: 12px; background: var(--card); border: 1px solid var(--line); white-space: nowrap; }
+  .btn.primary { background: var(--accent); border-color: transparent; color: #1f1503; font-weight: 700; }
+  .btn.armed { background: var(--danger); border-color: transparent; color: #fff; }
+  .btn:disabled { opacity: .5; cursor: default; }
+  [hidden] { display: none !important; }
+
+  /* ---------- start ---------- */
+  #start { display: flex; flex-direction: column; height: 100%; }
+  /* left padding keeps clear of the hub's Apps button */
+  header { display: flex; align-items: center; gap: 10px; min-height: 60px; padding: 8px 12px 8px 110px; border-bottom: 1px solid var(--line); }
+  header h1 { margin: 0; font-size: 18px; font-weight: 600; flex: 1; }
+  .scroll { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 14px 16px 20px; touch-action: pan-y; }
+  .hero { display: flex; gap: 16px; align-items: center; max-width: 720px; padding: 16px; border-radius: 16px; background: var(--panel); border: 1px solid var(--line); }
+  .hero img { width: 84px; height: 84px; flex: none; }
+  .hero p { margin: 0 0 12px; color: #d3e3ef; }
+  h2 { margin: 18px 2px 8px; font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .note { font-size: 13px; color: var(--muted); margin: 6px 2px; max-width: 60em; }
+  #status:empty { display: none; }
+  #status { margin: 10px 2px 0; color: var(--text); }
+  .legal { margin-top: 18px; font-size: 12px; color: var(--muted); user-select: text; -webkit-user-select: text; max-width: 60em; }
+  .legal p { margin: 4px 0; }
+
+  /* ---------- overlays ---------- */
+  .overlay { position: fixed; inset: 0; z-index: 5; display: grid; place-items: center; padding: 64px 16px 16px; background: rgba(5, 10, 16, .9); }
+  .sheet { display: flex; flex-direction: column; max-width: 560px; padding: 18px; border-radius: 18px; background: var(--panel); border: 1px solid var(--line); }
+  .sheet h2 { margin: 0 0 8px; font-size: 19px; color: var(--text); letter-spacing: 0; text-transform: none; }
+  .sheet p { margin: 0 0 10px; font-size: 15px; color: #d3e3ef; overflow-wrap: anywhere; }
+
+  /* ---------- loading ---------- */
+  #loading { position: fixed; inset: 0; z-index: 4; display: grid; place-content: center; gap: 14px; text-align: center; background: var(--bg); padding: 16px; }
+  #loading b { font-size: 20px; }
+  #loadText { color: var(--muted); font-size: 15px; }
+  progress { width: min(320px, 80vw); height: 8px; accent-color: var(--accent); }
+
+  /* ---------- player ---------- */
+  #player { position: fixed; inset: 0; display: grid; grid-template-rows: 60px minmax(0, 1fr); grid-template-columns: minmax(0, 1fr); background: #000; }
+  .bar { display: flex; align-items: center; gap: 8px; padding: 8px 10px 8px 110px; background: var(--panel); border-bottom: 1px solid var(--line); }
+  .bar b { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #wait { font-size: 13px; color: var(--muted); white-space: nowrap; }
+  .screen { position: relative; min-height: 0; min-width: 0; overflow: hidden; }
+  /* the canvas must have no border or padding, or the game's touches land off */
+  #canvas { position: absolute; inset: 0; display: block; width: 100% !important; height: 100% !important; border: 0; padding: 0; background: #000; outline: none; }
+
+  @media (max-width: 640px) {
+    .bar .btn { padding: 8px 10px; }
+    .hero img { width: 60px; height: 60px; }
+  }
+</style>
+</head>
+<body>
+<section id="start">
+  <header>
+    <h1>SuperTux</h1>
+    <button class="btn primary" id="play" type="button">Play</button>
+  </header>
+  <div class="scroll">
+    <div class="hero">
+      <img src="icon.svg" alt="">
+      <div>
+        <p>Tux's jump-and-run adventure across Icy Island and the Rooted Forest, plus two bonus islands: about a hundred levels to run, slide and stomp through.</p>
+        <div class="row">
+          <button class="btn primary" id="play2" type="button">Play</button>
+          <span class="note" id="kept" style="margin:0"></span>
+        </div>
+        <p class="note" id="status" aria-live="polite"></p>
+      </div>
+    </div>
+
+    <h2>Game data</h2>
+    <div class="row">
+      <button class="btn" id="all" type="button">Download everything</button>
+      <button class="btn" id="forget" type="button">Remove</button>
+    </div>
+    <p class="note">The game is about 300 MB. It downloads only what you play, a few MB per level, and keeps it on the car for next time. Download everything first if you'll be somewhere without a connection.</p>
+
+    <div class="legal">
+      <p>Controls on the screen: the pad at the bottom left moves Tux, the arrow at the bottom right jumps, the star next to it runs and fires (hold it to carry things), and the button at the top left pauses; tap the menus to pick. A controller works too: the D-pad or left stick moves, A jumps, X runs and fires, B goes back in menus and Start pauses. On a keyboard, the arrows move, Space jumps, Ctrl runs, Enter picks and Escape pauses. Options has a size setting for the controls on the screen. Your progress and options are saved on this car as you play.</p>
+      <p>Game: SuperTux 0.7.0 by the SuperTux Development Team and contributors (GNU GPL version 3 or later), compiled to WebAssembly with small changes for the browser: /supertux/engine/supertux-web.patch, built by tools/build-supertux.mjs in github.com/RobertPKyle/frunk-store; the source is at /supertux/engine/. Art, music and levels: by the SuperTux artists and musicians under the GPL, CC BY-SA and other free licenses, listed in /supertux/data/LICENSES.txt. See /supertux/NOTICE.</p>
+      <p>Early access for FrunkStore token holders. frunk.store is not affiliated with or endorsed by the SuperTux project. Play only while parked.</p>
+    </div>
+  </div>
+</section>
+
+<section id="loading" hidden aria-live="polite">
+  <b>SuperTux</b>
+  <span id="loadText"></span>
+  <progress id="loadBar" max="1" value="0" hidden></progress>
+</section>
+
+<section id="failed" class="overlay" hidden aria-labelledby="failedTitle">
+  <div class="sheet">
+    <h2 id="failedTitle">The game stopped</h2>
+    <p id="failedText"></p>
+    <div class="row"><button class="btn primary" id="failedOk" type="button">Start again</button></div>
+  </div>
+</section>
+
+<section id="player" hidden>
+  <div class="bar">
+    <b>SuperTux</b>
+    <span id="wait" hidden>Loading…</span>
+    <button class="btn" id="soundBtn" type="button">Sound on</button>
+    <button class="btn" id="quitBtn" type="button">Quit</button>
+  </div>
+  <div class="screen" id="screen">
+    <canvas id="canvas" tabindex="-1" oncontextmenu="event.preventDefault()"></canvas>
+  </div>
+</section>
+
+<script src="/probe/qrcode.min.js"></script>
+<script type="module" src="supertux.js"></script>
+<script src="/sw-register.js"></script>
+</body>
+</html>

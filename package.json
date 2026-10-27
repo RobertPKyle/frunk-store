@@ -11,6 +11,7 @@
     "build:fheroes2": "node tools/build-fheroes2.mjs",
     "build:openarena": "node tools/build-openarena.mjs",
     "build:blocks": "node tools/build-blocks.mjs",
+    "build:supertux": "node tools/build-supertux.mjs",
     "build:craft4k": "node tools/build-craft4k.mjs",
     "build:puzzles": "node tools/build-puzzles.mjs",
     "build:sms": "node tools/build-gearsystem.mjs",

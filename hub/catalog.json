@@ -179,7 +179,7 @@
     {
       "id": "holders",
       "name": "Holders",
-      "tagline": "Early access for FrunkStore token holders: Craft 4K, fheroes2 (Heroes II), Freedoom, LibreQuake, OpenArena, OpenTTD, and Genesis and TurboGrafx-16 games, plus a vote on what's next. Unlock with your phone's wallet.",
+      "tagline": "Early access for FrunkStore token holders: SuperTux, Craft 4K, fheroes2 (Heroes II), Freedoom, LibreQuake, OpenArena, OpenTTD, and Genesis and TurboGrafx-16 games, plus a vote on what's next. Unlock with your phone's wallet.",
       "path": "/holders/",
       "icon": "/holders/icon.svg",
       "tags": [
@@ -268,6 +268,19 @@
       "tags": [
         "Game",
         "Offline"
+      ],
+      "holders": true
+    },
+    {
+      "id": "supertux",
+      "name": "SuperTux",
+      "tagline": "Tux's jump-and-run adventure across Icy Island and the Rooted Forest, plus two bonus islands: about a hundred levels. Touch or controller.",
+      "path": "/supertux/",
+      "icon": "/supertux/icon.svg",
+      "tags": [
+        "Game",
+        "Controller",
+        "Touch"
       ],
       "holders": true
     },

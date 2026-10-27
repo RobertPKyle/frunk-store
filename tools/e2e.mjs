@@ -745,7 +745,7 @@ await check('holders unlock with a phone and play Genesis and PC Engine games', 
   }
   await page.goto(base + '/');
   await page.waitForSelector('.card');
-  for (const name of ['Craft 4K', 'fheroes2', 'Freedoom', 'LibreQuake', 'OpenTTD', 'OpenArena', 'Genesis & PC Engine']) {
+  for (const name of ['SuperTux', 'Craft 4K', 'fheroes2', 'Freedoom', 'LibreQuake', 'OpenTTD', 'OpenArena', 'Genesis & PC Engine']) {
     if (await page.locator('#grid .card h2').filter({ hasText: new RegExp(`^${name}$`) }).count()) throw new Error(`${name} is on the grid`);
   }
 
@@ -763,7 +763,7 @@ await check('holders unlock with a phone and play Genesis and PC Engine games', 
   if (!linked.ok) throw new Error(`link: ${linked.error}`);
   await appFrame().locator('#apps .app').first().waitFor({ timeout: 10000 });
   const tiles = (await appFrame().locator('#apps .app b').allTextContents()).join(', ');
-  if (tiles !== 'Genesis & PC Engine, fheroes2, Craft 4K, Freedoom, LibreQuake, OpenArena, OpenTTD') throw new Error(`menu lists ${tiles}`);
+  if (tiles !== 'Genesis & PC Engine, SuperTux, fheroes2, Craft 4K, Freedoom, LibreQuake, OpenArena, OpenTTD') throw new Error(`menu lists ${tiles}`);
   await appFrame().locator('#voteQr a[href$="/vote/"]').waitFor();
 
   await openFromHub(/PC Engine/);
@@ -1333,6 +1333,60 @@ await check('ascii quests plays Kroz from Apogee\'s GPL source: walks by touch, 
     return false;
   });
   await page.screenshot({ path: shots + 'ascii.png' });
+});
+
+await check('supertux (holders) streams its data, starts the story by touch, saves when left and loads the save again', async () => {
+  await openFromHub(/SuperTux/);
+  const frame = () => page.frames().find(f => f.url().includes('/supertux/'));
+  const app = appFrame();
+  const SAVE = '/home/web_user/.local/share/supertux2/profile1/world1.stsg';
+  const until = async (what, fn, ms = 30000) => {
+    for (const t = Date.now(); Date.now() - t < ms; await page.waitForTimeout(250)) if (await fn()) return;
+    throw new Error(`no ${what}; game log: ${(await frame().evaluate(() => window.supertuxLog.slice(-3).join(' | '))) || 'empty'}`);
+  };
+  const saved = () => frame().evaluate(path => window.Module.FS.analyzePath(path).exists, SAVE);
+  const stats = () => frame().evaluate(() => window.supertuxStats());
+  await app.locator('#play').click();
+  await app.locator('#player').waitFor({ timeout: 120000 });
+  await until('frames', async () => (await stats()).frames > 30);
+  // Every file the title screen reads came with the first download
+  const boot = await stats();
+  if (boot.waits) throw new Error(`the title screen waited for data ${boot.waits} times`);
+  // A tap on Start Game (the menu's first item, in the middle of the screen)
+  const box = await app.locator('#canvas').boundingBox();
+  await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
+  // Skip the intro; the world map writes the story's save
+  await until('the world map\'s save', async () => {
+    if (await saved()) return true;
+    await page.keyboard.down('Escape');
+    await page.waitForTimeout(150);
+    await page.keyboard.up('Escape');
+    await page.waitForTimeout(1500);
+    return false;
+  }, 60000);
+  await page.screenshot({ path: shots + 'supertux.png' });
+  // Leaving through the hub writes the save to the game's IndexedDB (IDBFS)
+  await page.click('#home');
+  await page.waitForSelector('#runner', { state: 'hidden' });
+  await openFromHub(/SuperTux/);
+  const kept = await frame().evaluate(path => new Promise(resolve => {
+    const req = indexedDB.open('/home/web_user/.local/share/supertux2');
+    req.onsuccess = () => {
+      if (!req.result.objectStoreNames.contains('FILE_DATA')) { req.result.close(); return resolve(false); }
+      const get = req.result.transaction('FILE_DATA').objectStore('FILE_DATA').getKey(path);
+      get.onsuccess = () => { req.result.close(); resolve(get.result === path); };
+    };
+    req.onerror = () => resolve(false);
+  }), SAVE);
+  if (!kept) throw new Error('the save wasn\'t kept when the app closed');
+  // The blocks came from IndexedDB this time, and the save is back
+  await app.locator('#play').click();
+  await app.locator('#player').waitFor({ timeout: 60000 });
+  await until('the save, loaded', saved, 10000);
+  const again = await stats();
+  if (again.fetched) throw new Error(`downloaded ${again.fetched} blocks again`);
+  await app.locator('#quitBtn').click();
+  await app.locator('#start').waitFor({ timeout: 10000 });
 });
 
 await check('librequake plays with touch and a controller and resumes from its autosave', async () => {

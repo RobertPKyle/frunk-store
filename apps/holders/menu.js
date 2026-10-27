@@ -11,6 +11,7 @@ import { holdersGate, lockHolders, qr, voteLink } from '../_shared/holders.js';
 
 const APPS = [
   { id: 'pce', title: 'Genesis & PC Engine', path: '/retro/?edition=holders', icon: '/retro/icon.svg', about: 'Mega Drive / Genesis and TurboGrafx-16 games: free homebrew, or cartridges you own.' },
+  { id: 'supertux', title: 'SuperTux', path: '/supertux/', about: 'Tux\'s jump-and-run adventure across Icy Island and the Rooted Forest: about a hundred levels.' },
   { id: 'fheroes2', title: 'fheroes2', path: '/fheroes2/', about: 'Heroes of Might and Magic II from your own copy, on the open-source fheroes2 engine.' },
   { id: 'craft4k', title: 'Craft 4K', path: '/craft4k/', about: 'Notch\'s Minecraft4k rebuilt in C++: break, build and watch the sun set.' },
   { id: 'doom', title: 'Freedoom', path: '/doom/', about: 'The classic Doom engine with the free Freedoom games, or Doom games you own.' },

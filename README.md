@@ -475,6 +475,48 @@ to the cache again.
   (the bots' game code runs in the qvm interpreter: 5 bots took 550, so the
   page offers up to 4), starting in about 8 seconds. Not yet tried in the
   car.
+- `apps/supertux`: SuperTux 0.7.0 (GPL-3.0-or-later), in Holders, compiled to
+  WebAssembly by `npm run build:supertux` (`tools/build-supertux.mjs`: the
+  release's source tarball checked against its SHA-256, plus
+  `tools/supertux/supertux-web.patch`, CMake in Docker from
+  `tools/supertux/Dockerfile`, emsdk 4.0.10 with the game's Emscripten ports
+  built into the image; PhysicsFS 3.2.0, {fmt} 11.2.0 and GLM 1.0.1 are
+  built from their release tarballs first; about 50 s; 6.5 MB of wasm, 2 MB
+  gzipped). Built with the phone menus (no level editor) and without
+  networking; the patch drops the Add-ons, Manage Assets and Donate entries.
+  The data is 326 MB, more than the car's tab can hold (it dies at about
+  500 MB), so `tools/supertux/pack.mjs` packs every file into one stream of
+  1 MB blocks (`data/<version>/<n>.bin`, gzipped where that saves a tenth:
+  287 MB stored) with `data/index.json` listing the files and sizes. The
+  page mounts every file at `/data` with its size and no contents, and
+  wraps the engine's `fd_read` import in `WebAssembly.Suspending` (JSPI): a
+  read whose blocks aren't in memory suspends the game's wasm stack while
+  they come from IndexedDB (`supertux`, every block ever fetched) or the
+  network, and 48 blocks stay in memory. That needs the whole game on one
+  suspendable stack, so the patch runs the main loop inside `main()` and
+  waits for each animation frame through an `EM_ASYNC_JS` import
+  (`Module.nextFrame`) instead of `emscripten_set_main_loop`, and the build
+  uses WebAssembly exceptions (Emscripten's JavaScript exceptions put JS
+  frames on the stack, which JSPI can't suspend). Calls from the page into
+  the game (resizing, saving the options) don't wait. `tools/supertux/boot.txt`
+  lists the files the game reads in the browser (`?trace=1`,
+  `window.supertuxTrace()`), in order: `[start]` (to the title screen,
+  25 MB, downloaded six blocks at a time before the game runs) and
+  `[next]` (the intro, the first world map and its first level, 15 MB,
+  downloaded two at a time in the background); they go first in the
+  stream, so a fresh start reaches the first level without waiting on a
+  read. Rerun a trace when the data changes. Saves and options live in
+  IDBFS at `/home/web_user/.local/share/supertux2` (synced at most every
+  2 s, and when the page is hidden or the hub's close handshake asks).
+  The page filters the car's duplicate controllers like the Half-Life
+  port does, and tells the game to show its own touch controls on touch
+  screens (`?touch=1`/`?touch=0` overrides). "Download everything" fills
+  IndexedDB for offline play; "Remove" empties it. The data blocks get an
+  immutable cache header and the service worker skips them. Measured with
+  the CPU slowed 4.5x: 60 fps in the first level, about 550 ms/s of
+  main-thread work (the title screen about 740). The engine and data
+  aren't in git, so run it before deploying `apps`. Not yet tried in the
+  car.
 - `apps/blocks`: Block Builder. ClassiCube 1.3.8 (BSD-3-Clause), a
   clean-room Minecraft Classic compatible game, compiled to WebAssembly by
   `npm run build:blocks` (`tools/build-blocks.mjs`: a fixed ClassiCube
@@ -680,7 +722,7 @@ to the cache again.
   idea. On the dev server without `SOLANA_RPC_URL`, balances are made up
   (`op=dev-balance`) so the e2e check can vote with a test wallet.
 - `apps/holders` and `apps/_shared/holders.js`: Holders, early access for
-  wallets holding at least `VOTE_MIN_TOKENS` FrunkStore tokens: Craft 4K,
+  wallets holding at least `VOTE_MIN_TOKENS` FrunkStore tokens: SuperTux, Craft 4K,
   fheroes2, Freedoom, LibreQuake, OpenArena, OpenTTD, and the Mega Drive / Genesis and PC Engine (Retro Console opened as
   `/retro/?edition=holders`, which shows only the consoles in `EARLY` in
   `retro.js`; the ordinary edition leaves those out, and each edition lists
@@ -782,6 +824,7 @@ npm run build:openttd                   # OpenTTD engine + its free base sets (n
 npm run build:fheroes2                  # fheroes2 engine for Heroes II (needs Docker); run before deploying apps
 npm run build:openarena                 # Quake III engine + OpenArena (needs Docker); run before deploying apps
 npm run build:blocks                    # ClassiCube engine + its textures, font and sounds (needs Docker); run before deploying apps
+npm run build:supertux                  # SuperTux engine + its data as streaming blocks (needs Docker); run before deploying apps
 npm run build:craft4k                   # Minecraft4k-CPP for Craft 4K (needs Docker); output is committed, rerun only to update it
 npm run build:puzzles                   # Simon Tatham's Puzzles + their help and icons (needs Docker and Chrome); run before deploying apps
 npm run build:sms                       # Gearsystem for Retro Console (needs Docker); output is committed, rerun only to update it
