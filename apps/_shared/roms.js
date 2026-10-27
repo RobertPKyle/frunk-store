@@ -17,6 +17,8 @@ export const SYSTEMS = {
   // clownmdemu has no bank switching, so the 5 MB Super Street Fighter II is out
   md: { name: 'Mega Drive / Genesis', exts: ['md', 'gen', 'bin', 'smd'], max: 4 * MB },
   n64: { name: 'Nintendo 64', exts: ['z64', 'n64', 'v64'], max: 64 * MB },
+  // .lnx with its header, .lyx without, .o homebrew; two 512 KB banks at most
+  lynx: { name: 'Atari Lynx', exts: ['lnx', 'lyx', 'o'], max: MB + 64 },
 };
 
 export const GAME_EXTS = Object.values(SYSTEMS).flatMap(s => s.exts);
@@ -67,6 +69,11 @@ export function systemOf(bytes, name = '') {
   // (.z64 as on the cartridge, .v64 with byte pairs swapped, .n64 with each
   // four reversed); n64js puts them right
   if (bytes.length >= 0x1000 && [[0x80, 0x37, 0x12, 0x40], [0x37, 0x80, 0x40, 0x12], [0x40, 0x12, 0x37, 0x80]].some(sig => at(bytes, 0, sig))) return 'n64';
+  // Lynx: "LYNX" opens a .lnx, "BS93" sits at 6 in homebrew; a .lyx is the
+  // bare cartridge, whole kilobytes
+  if (bytes.length > 64 && at(bytes, 0, [0x4c, 0x59, 0x4e, 0x58, 0x00])) return 'lynx';
+  if (bytes.length > 10 && at(bytes, 6, [0x42, 0x53, 0x39, 0x33])) return 'lynx';
+  if (ext(name) === 'lyx' && bytes.length >= 65536 && bytes.length % 1024 === 0) return 'lynx';
   return null;
 }
 
@@ -289,4 +296,28 @@ export function quakePath(name, bytes) {
 export async function findQuakeFile(name, bytes) {
   if (isZip(bytes)) return { name };
   return quakePath(name, bytes) ? { name } : null;
+}
+
+// ---------- Heroes of Might and Magic II (fheroes2) ----------
+// The game's files go in folders fheroes2 knows: data (HEROES2.AGG, and
+// HEROES2X.AGG for The Price of Loyalty), maps (.mp2, .mx2) and music
+// (.ogg, .mp3 or .flac, as in the GOG copy's MUSIC folder). Anything else
+// in a copy (the videos, the Windows program) is left out. Files are known
+// by their names, which the AGG files and maps keep in every copy.
+export const MAX_HEROES_FILE = 80e6;   // what one phone code carries
+
+// Where a file goes ('data/heroes2.agg', 'maps/broken.mp2'...), or null
+export function heroesPath(name) {
+  const file = name.replace(/^.*\//, '').toLowerCase();
+  if (file === 'heroes2.agg' || file === 'heroes2x.agg') return `data/${file}`;
+  if (/\.(mp2|mx2)$/.test(file)) return `maps/${file}`;
+  if (/\.(ogg|mp3|flac)$/.test(file)) return `music/${file}`;   // fheroes2 knows the tracks by their names
+  return null;
+}
+
+// Checks a file the player picked (zips are checked on the car):
+// { name } when it may be part of the game, or null
+export async function findHeroesFile(name, bytes) {
+  if (isZip(bytes)) return { name };
+  return heroesPath(name) && bytes.length ? { name } : null;
 }

@@ -15,7 +15,7 @@ import { cleanName } from './roms.js';
 const $ = id => document.getElementById(id);
 
 // app: which app the phone page checks files for ('retro', 'doom',
-// 'heretic', 'adventure', 'text' or 'quake').
+// 'heretic', 'adventure', 'text', 'quake' or 'fheroes2').
 // save(name, bytes): saves one file; resolves to its title, or null when it
 // isn't a file this app plays. notPlayable() says why, after a null.
 // onSaved(): called after each saved file. onClose(): called when the panel

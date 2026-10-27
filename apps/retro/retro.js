@@ -1,7 +1,7 @@
 // Retro Console: NES (jsnes), Game Boy / Color / Advance (mGBA), Master
-// System / Game Gear / SG-1000 (Gearsystem), PC Engine / TurboGrafx-16
-// (Geargrafx), Mega Drive / Genesis (clownmdemu) and Nintendo 64 (n64js)
-// emulators with free
+// System / Game Gear / SG-1000 (Gearsystem), Atari Lynx (Gearlynx), PC
+// Engine / TurboGrafx-16 (Geargrafx), Mega Drive / Genesis (clownmdemu) and
+// Nintendo 64 (n64js) emulators with free
 // homebrew games built in, plus games the player loads from their own files. Loaded files are kept in this screen's IndexedDB and never leave
 // it.
 //
@@ -13,7 +13,7 @@
 //
 // Input comes from up to two gamepads, the on-screen buttons and the
 // keyboard; each frame they're merged and handed to the running core
-// (nes.js, gba.js, sms.js, pce.js, md.js or n64.js) as sets of button
+// (nes.js, gba.js, sms.js, lynx.js, pce.js, md.js or n64.js) as sets of button
 // names, plus the players' analog sticks for the N64.
 
 import { holdersGate } from '../_shared/holders.js';
@@ -22,6 +22,7 @@ import { MAX_FILE, SYSTEMS, cleanName, findGame, isColor, maybeGame } from '../_
 import { createNes } from './nes.js';
 import { createGba } from './gba.js';
 import { createSms } from './sms.js';
+import { createLynx } from './lynx.js';
 import { createPce } from './pce.js';
 import { createMd } from './md.js';
 import { createN64 } from './n64.js';
@@ -66,6 +67,11 @@ const GAMES = [
     id: 'cheril', title: 'Cheril Perils Classic', by: 'The Mojon Twins, 2018', file: 'games/cheril.sg', system: 'sg',
     about: 'Guide Cheril from screen to screen, jumping on the creatures in her way. Button 1 starts, 2 jumps.',
     license: 'GNU LGPL 3', source: 'games/cheril-perils-sg1000-src.tar.gz',
+  },
+  {
+    id: 'treejumper', title: 'TreeJumper', by: 'OldAtAtari, 2023', file: 'games/treejumper.lnx', system: 'lynx',
+    about: 'Run through the forest and jump the trees that come at you; three falls and the game is over. A jumps, the D-pad moves.',
+    license: 'GNU GPL 3', source: 'games/treejumper-src.tar.gz',
   },
   {
     id: 'blox', title: 'Blox', by: 'David Shadoff, 1999', file: 'games/blox.pce', system: 'pce',
@@ -144,7 +150,7 @@ async function addFiles(files) {
   }
   msg.textContent = added
     ? `Added ${added} game${added === 1 ? '' : 's'}.${skipped ? ` Skipped ${skipped} file${skipped === 1 ? '' : 's'} that weren't games.` : ''}`
-    : files.length ? `No game files (${HOLDERS ? '.md, .gen, .bin, .smd, .pce' : '.nes, .gb, .gbc, .gba, .sms, .gg, .sg'} or .zip) found there.` : '';
+    : files.length ? `No game files (${HOLDERS ? '.md, .gen, .bin, .smd, .pce' : '.nes, .gb, .gbc, .gba, .sms, .gg, .sg, .lnx, .lyx, .o'} or .zip) found there.` : '';
   renderMine();
 }
 
@@ -478,18 +484,21 @@ addEventListener('blur', () => keyboard.clear());
 
 const cores = {
   nes: createNes($('screen')), gba: createGba($('gbaScreen')), sms: createSms($('smsScreen')), pce: createPce($('pceScreen')),
-  md: createMd($('mdScreen')), n64: createN64($('display')),
+  md: createMd($('mdScreen')), n64: createN64($('display')), lynx: createLynx($('lynxScreen')),
 };
-const CORE = { nes: 'nes', gb: 'gba', gba: 'gba', sms: 'sms', gg: 'sms', sg: 'sms', pce: 'pce', md: 'md', n64: 'n64' };
+const CORE = { nes: 'nes', gb: 'gba', gba: 'gba', sms: 'sms', gg: 'sms', sg: 'sms', pce: 'pce', md: 'md', n64: 'n64', lynx: 'lynx' };
 
 // Sega's pads have buttons 1 and 2 where B and A are, and Start is the
 // Master System's Pause button; the PC Engine's have II and I there, and
 // Run. The Mega Drive's A, B and C take Y (shown only for it), B and A.
 // The N64's A and B take B and Y, with its own C buttons, Z and the
-// D-pad as its stick (see n64.js).
-const LABELS = { sms: ['1', '2', 'Pause'], gg: ['1', '2', 'Start'], sg: ['1', '2', 'Pause'], pce: ['II', 'I', 'Run'], md: ['B', 'C', 'Start', 'A'], n64: ['A', 'A', 'Start', 'B', 'Z'] };
+// D-pad as its stick (see n64.js). The Lynx's Option 1 and 2 take L and R.
+const LABELS = { sms: ['1', '2', 'Pause'], gg: ['1', '2', 'Start'], sg: ['1', '2', 'Pause'], pce: ['II', 'I', 'Run'], md: ['B', 'C', 'Start', 'A'], n64: ['A', 'A', 'Start', 'B', 'Z'],
+  lynx: ['B', 'A', 'Pause', 'Y', 'Select', 'Option 1', 'Option 2'] };
 function labelButtons(system) {
-  const [b, a, start, y = 'Y', select = 'Select'] = LABELS[system] || ['B', 'A', 'Start'];
+  const [b, a, start, y = 'Y', select = 'Select', l = 'L', r = 'R'] = LABELS[system] || ['B', 'A', 'Start'];
+  document.querySelector('#player [data-b=l]').textContent = l;
+  document.querySelector('#player [data-b=r]').textContent = r;
   document.querySelector('#player [data-b=select]').textContent = select;
   document.querySelector('#player [data-b=b]').textContent = b;
   document.querySelector('#player [data-b=a]').textContent = a;
@@ -720,7 +729,7 @@ function showShelf() {
   renderContinue();
 }
 
-$('fileInput').accept = HOLDERS ? '.md,.gen,.bin,.smd,.pce,.zip' : '.nes,.gb,.gbc,.gba,.sms,.gg,.sg,.zip';
+$('fileInput').accept = HOLDERS ? '.md,.gen,.bin,.smd,.pce,.zip' : '.nes,.gb,.gbc,.gba,.sms,.gg,.sg,.lnx,.lyx,.o,.zip';
 if (HOLDERS) {
   document.title = 'Genesis & PC Engine · frunk.store';
   holdersGate('Mega Drive / Genesis and PC Engine games').then(showShelf);

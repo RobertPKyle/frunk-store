@@ -124,11 +124,13 @@
   #player.pad .side { display: none; }
   #player.pad .screen { grid-column: 1 / -1; }
   .shoulder { min-width: 96px; font-size: 15px; font-weight: 700; color: var(--text); }
-  #player:not([data-system=gba], [data-system=n64]) .shoulder { display: none; }
+  #player:not([data-system=gba], [data-system=n64], [data-system=lynx]) .shoulder { display: none; }
   /* Sega's consoles have no Select */
   #player:is([data-system=sms], [data-system=gg], [data-system=sg]) [data-b=select] { visibility: hidden; }
   /* the Mega Drive's Mode button is only on the six-button pad, so it stays on controllers */
   #player[data-system=md] [data-b=select] { visibility: hidden; }
+  /* the Lynx's Option 1 and 2 are the top buttons */
+  #player[data-system=lynx] [data-b=select] { visibility: hidden; }
 
   @media (max-width: 640px) {
     html, body { overflow: auto; }
@@ -158,17 +160,17 @@
       <button class="btn" id="addFiles" type="button">Add game files</button>
       <button class="btn" id="addFolder" type="button">Add a folder</button>
     </div>
-    <input id="fileInput" type="file" accept=".nes,.gb,.gbc,.gba,.sms,.gg,.sg,.pce,.md,.gen,.bin,.smd,.zip" multiple hidden>
+    <input id="fileInput" type="file" accept=".nes,.gb,.gbc,.gba,.sms,.gg,.sg,.lnx,.lyx,.o,.pce,.md,.gen,.bin,.smd,.zip" multiple hidden>
     <input id="folderInput" type="file" webkitdirectory multiple hidden>
     <p class="note" id="addMsg" aria-live="polite"></p>
     <div class="games" id="mine"></div>
     <p class="note owned"><b>Only load games you legally own</b>, such as copies you made from your own cartridges. frunk.store doesn't provide, sell or share commercial games, and never keeps yours: they're stored only on this screen. You're responsible for the files you load.</p>
 
     <div class="legal">
-      <p data-only="retro">Plays NES, Game Boy, Game Boy Color, Game Boy Advance, Master System, Game Gear and SG-1000 games (.nes, .gb, .gbc, .gba, .sms, .gg, .sg, also zipped). Mega Drive / Genesis and PC Engine / TurboGrafx-16 games are in early access for FrunkStore token holders, on the Holders card. Games remember your progress: they pick up where you left off, and Reset starts over (keeping in-game saves).</p>
+      <p data-only="retro">Plays NES, Game Boy, Game Boy Color, Game Boy Advance, Master System, Game Gear, SG-1000 and Atari Lynx games (.nes, .gb, .gbc, .gba, .sms, .gg, .sg, .lnx, .lyx, .o, also zipped). Mega Drive / Genesis and PC Engine / TurboGrafx-16 games are in early access for FrunkStore token holders, on the Holders card. Games remember your progress: they pick up where you left off, and Reset starts over (keeping in-game saves).</p>
       <p data-only="holders">Plays Mega Drive / Genesis cartridges (.md, .gen, .bin, .smd) and PC Engine / TurboGrafx-16 HuCard games (.pce), also zipped. Mega CD, 32X and PC Engine CD games aren't supported, nor are the few Mega Drive games that save to EEPROM chips or are bigger than 4 MB (Super Street Fighter II). Games remember your progress: they pick up where you left off, and Reset starts over (keeping in-game saves). The FrunkStore token isn't an investment; frunk.store will never ask for your recovery phrase or a transaction.</p>
-      <p>Controls: a USB or Bluetooth controller, the on-screen buttons, or a keyboard (arrows, Z = B, X = A, Q = L, W = R, Enter = Start, Shift = Select). On Sega's consoles, B is button 1, A is button 2, and Start is the Master System's Pause button. On the PC Engine, B is II, A is I, and Start is Run. On the Mega Drive, a controller's left, bottom and right buttons are A, B and C (keys A, Z and X); the six-button pad's X, Y and Z are L, the top button and R, and Mode is Select. With a controller, the on-screen buttons hide to make the game bigger; touch the screen to bring them back. Switching the controller off pauses the game, and Start resumes it.</p>
-      <p>Emulators: jsnes (Apache License 2.0) for NES, mGBA (Mozilla Public License 2.0, source at github.com/thenick775/mgba) for Game Boy, Gearsystem (GNU GPL 3 or later, source at frunk-apps.vercel.app/retro/sms/gearsystem-web-src.tar.gz) for Sega's consoles, Geargrafx (GNU GPL 3 or later, source at frunk-apps.vercel.app/retro/pce/geargrafx-web-src.tar.gz) for the PC Engine, clownmdemu (GNU AGPL 3 or later, source at frunk-apps.vercel.app/retro/md/clownmdemu-web-src.tar.gz) for the Mega Drive. The free games are by their authors, under the licenses shown on each card; source code is kept next to each game.</p>
+      <p>Controls: a USB or Bluetooth controller, the on-screen buttons, or a keyboard (arrows, Z = B, X = A, Q = L, W = R, Enter = Start, Shift = Select). On Sega's consoles, B is button 1, A is button 2, and Start is the Master System's Pause button. On the PC Engine, B is II, A is I, and Start is Run. On the Mega Drive, a controller's left, bottom and right buttons are A, B and C (keys A, Z and X); the six-button pad's X, Y and Z are L, the top button and R, and Mode is Select. On the Lynx, Start is Pause, and Option 1 and 2 are the top buttons (L and R on a controller; Select is Option 1 too). With a controller, the on-screen buttons hide to make the game bigger; touch the screen to bring them back. Switching the controller off pauses the game, and Start resumes it.</p>
+      <p>Emulators: jsnes (Apache License 2.0) for NES, mGBA (Mozilla Public License 2.0, source at github.com/thenick775/mgba) for Game Boy, Gearsystem (GNU GPL 3 or later, source at frunk-apps.vercel.app/retro/sms/gearsystem-web-src.tar.gz) for Sega's consoles, Geargrafx (GNU GPL 3 or later, source at frunk-apps.vercel.app/retro/pce/geargrafx-web-src.tar.gz) for the PC Engine, clownmdemu (GNU AGPL 3 or later, source at frunk-apps.vercel.app/retro/md/clownmdemu-web-src.tar.gz) for the Mega Drive, Gearlynx (GNU GPL 3 or later, source at frunk-apps.vercel.app/retro/lynx/gearlynx-web-src.tar.gz) for the Atari Lynx. The Lynx starts without Atari's boot ROM: a stand-in modeled on Handy's (K. Wilkins, zlib license) loads each game. The free games are by their authors, under the licenses shown on each card; source code is kept next to each game.</p>
       <p>Not affiliated with or endorsed by Nintendo, Sega, NEC or Konami. Play only while parked.</p>
     </div>
   </div>
@@ -224,6 +226,7 @@
     <canvas id="smsScreen" width="256" height="192" hidden></canvas>
     <canvas id="pceScreen" width="256" height="224" hidden></canvas>
     <canvas id="mdScreen" width="320" height="224" hidden></canvas>
+    <canvas id="lynxScreen" width="160" height="102" hidden></canvas>
     <!-- n64js finds its canvas by this id -->
     <canvas id="display" width="320" height="240" hidden></canvas>
     <div id="paused" hidden>Paused<small>Tap here or press Start to resume</small></div>

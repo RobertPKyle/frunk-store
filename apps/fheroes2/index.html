@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>fheroes2</title>
+<style>
+  :root { --bg: #0d0b07; --panel: #17130b; --card: #221b10; --line: rgba(228, 196, 120, .15); --text: #f3ecdc; --muted: #a8997a;
+          --accent: #d9a33b; --accent2: #b9d26a; --ok: #9bd88f; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 16px/1.4 system-ui, sans-serif; overflow: hidden;
+               -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; touch-action: none; }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  .btn { min-height: 44px; padding: 8px 16px; border-radius: 12px; background: var(--card); border: 1px solid var(--line); white-space: nowrap; }
+  .btn.primary { background: var(--accent); border-color: transparent; color: #1f1503; font-weight: 700; }
+  .btn:disabled { opacity: .45; cursor: default; }
+  [hidden] { display: none !important; }
+
+  /* ---------- library ---------- */
+  #library { display: flex; flex-direction: column; height: 100%; }
+  /* left padding keeps clear of the hub's Apps button */
+  header { display: flex; align-items: center; gap: 10px; min-height: 60px; padding: 8px 12px 8px 110px; border-bottom: 1px solid var(--line); }
+  header h1 { margin: 0; font-size: 18px; font-weight: 600; flex: 1; }
+  .scroll { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 12px 16px 20px; touch-action: pan-y; }
+  h2 { margin: 10px 2px 8px; font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .files { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+  .file { display: flex; flex-direction: column; gap: 2px; padding: 12px 14px; border-radius: 14px; background: var(--card); border: 1px solid var(--line); }
+  .file b { font-size: 16px; }
+  .file small { color: var(--muted); font-size: 13px; }
+  .file.missing { border-style: dashed; background: transparent; }
+  .file.missing b { color: var(--muted); }
+  .add { display: flex; gap: 8px; flex-wrap: wrap; margin: 4px 0 6px; align-items: center; }
+  .note { font-size: 13px; color: var(--muted); margin: 6px 2px; max-width: 60em; }
+  #addMsg:empty, #status:empty { display: none; }
+  #status { margin: 0 2px 10px; color: var(--text); }
+  .btn.busy { opacity: .6; }
+  .legal { margin-top: 18px; font-size: 12px; color: var(--muted); user-select: text; -webkit-user-select: text; }
+  .legal p { margin: 4px 0; }
+  .owned { padding: 10px 12px; border-radius: 12px; background: #261d0c; border: 1px solid rgba(217, 163, 59, .35); color: #e5dbc4; }
+  .owned b { color: var(--text); }
+
+  /* ---------- overlays: terms, phone, errors ---------- */
+  .overlay { position: fixed; inset: 0; z-index: 5; display: grid; place-items: center; padding: 64px 16px 16px; background: rgba(9, 7, 4, .9); }
+  .sheet { display: flex; gap: 22px; align-items: center; max-width: 680px; padding: 18px; border-radius: 18px; background: var(--panel); border: 1px solid var(--line); }
+  .sheet.terms { flex-direction: column; align-items: stretch; gap: 0; max-width: 560px; }
+  .terms h2 { margin: 0 0 8px; font-size: 19px; color: var(--text); letter-spacing: 0; text-transform: none; }
+  .terms p { margin: 0 0 10px; font-size: 15px; color: #ddd2bb; overflow-wrap: anywhere; }
+  .qr { flex: none; display: grid; place-items: center; width: 236px; height: 236px; border-radius: 12px; background: #fff; }
+  .qr a { display: block; }
+  .qr img, .qr canvas { display: block; width: 216px; height: 216px; image-rendering: pixelated; }
+  .steps h2 { margin: 0 0 6px; font-size: 19px; color: var(--text); letter-spacing: 0; text-transform: none; }
+  .steps ol { margin: 0 0 10px; padding-left: 20px; font-size: 15px; color: #ddd2bb; }
+  #transferStatus { margin: 0 0 6px; font-size: 14px; color: var(--muted); }
+  #received { list-style: none; margin: 0 0 10px; padding: 0; max-height: 110px; overflow-y: auto; font-size: 14px; }
+  #received li::before { content: '✓ '; color: var(--ok); }
+  #received li.bad::before { content: '✕ '; color: var(--accent); }
+  #received li.busy::before { content: '… '; color: var(--muted); }
+  @media (max-width: 640px) { .sheet { flex-direction: column; } }
+
+  /* ---------- loading ---------- */
+  #loading { position: fixed; inset: 0; z-index: 4; display: grid; place-content: center; gap: 14px; text-align: center; background: var(--bg); }
+  #loading b { font-size: 20px; }
+  #loadText { color: var(--muted); font-size: 15px; }
+  .meter { width: min(360px, 80vw); height: 8px; border-radius: 4px; background: var(--card); overflow: hidden; }
+  .meter i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .2s; }
+
+  /* ---------- player ---------- */
+  #player { position: fixed; inset: 0; display: grid; grid-template-rows: 60px minmax(0, 1fr); grid-template-columns: minmax(0, 1fr); background: #000; }
+  .bar { display: flex; align-items: center; gap: 8px; padding: 8px 10px 8px 110px; background: var(--panel); border-bottom: 1px solid var(--line); }
+  .bar b { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* SDL sizes the canvas's pixels to its box; fheroes2 fits its picture in */
+  .screen { position: relative; min-height: 0; min-width: 0; overflow: hidden; }
+  #canvas { display: block; width: 100%; height: 100%; background: #000; touch-action: none; }
+  #hint { position: absolute; left: 50%; top: 10px; transform: translateX(-50%); padding: 6px 12px; border-radius: 10px; background: rgba(23, 19, 11, .9);
+          border: 1px solid var(--line); font-size: 14px; color: var(--text); pointer-events: none; width: max-content; max-width: calc(100% - 32px); text-align: center; }
+
+  @media (max-width: 640px) {
+    .bar .btn { padding: 8px 10px; }
+  }
+</style>
+</head>
+<body>
+<section id="library">
+  <header>
+    <h1>fheroes2</h1>
+    <button class="btn primary" id="playBtn" type="button" disabled>Play</button>
+  </header>
+  <div class="scroll">
+    <p class="note" id="status" aria-live="polite"></p>
+    <p class="note" style="color: var(--text)">Heroes of Might and Magic II on fheroes2, the open-source remake of its engine: build your towns, lead your heroes across the map and fight turn-based battles, against the computer. It plays your own copy of the game.</p>
+
+    <h2 style="margin-top:20px">Your game files</h2>
+    <div class="add">
+      <button class="btn primary" id="fromPhone" type="button">Get files from phone</button>
+      <button class="btn" id="addFiles" type="button">Add game files</button>
+      <button class="btn" id="removeAll" type="button" hidden>Remove all</button>
+    </div>
+    <input id="fileInput" type="file" accept=".agg,.mp2,.mx2,.ogg,.mp3,.flac,.zip" multiple hidden>
+    <p class="note" id="addMsg" aria-live="polite"></p>
+    <div class="files" id="files"></div>
+    <p class="note">From a copy you own (such as Heroes of Might and Magic 2: Gold from GOG), send HEROES2.AGG and HEROES2X.AGG from its DATA folder, the maps (.MP2 and .MX2) from its MAPS folder and, if you like, the music from its MUSIC folder. A .zip of the DATA and MAPS folders works too (in the Files app, select both, long-press and choose Compress); the whole game folder, with its videos, is too big for one code. HEROES2.AGG alone plays The Succession Wars; HEROES2X.AGG adds The Price of Loyalty. Each phone code takes up to 80 MB: send the music with a second code.</p>
+    <p class="note owned"><b>Only load games you legally own.</b> frunk.store doesn't provide, sell or share commercial games, and never keeps yours: they're stored only on this screen. You're responsible for the files you load.</p>
+
+    <div class="legal">
+      <p>Controls: tap to click, drag to scroll the map. Touch with a second finger while the first is down for the right mouse button, which shows what something is (hold it). A mouse and keyboard work as on a computer. Save from the game's own menu; the game also saves itself every turn (AUTOSAVE in its list of saves). Saves and settings stay on this screen.</p>
+      <p>Engine: fheroes2 1.1.17 by the fheroes2 Resurrection team (GNU GPL 2 or later), compiled to WebAssembly unmodified with its own Emscripten build. Source: /fheroes2/engine/fheroes2-1.1.17-src.tar.gz, built by tools/build-fheroes2.mjs in github.com/RobertPKyle/frunk-store; see /fheroes2/NOTICE.</p>
+      <p>frunk.store and fheroes2 are not affiliated with or endorsed by Ubisoft, 3DO or New World Computing. Heroes of Might and Magic is a trademark of Ubisoft Entertainment. Play only while parked.</p>
+    </div>
+  </div>
+</section>
+
+<section id="terms" class="overlay" hidden aria-labelledby="termsTitle">
+  <div class="sheet terms">
+    <h2 id="termsTitle">Your own game</h2>
+    <p>Only load Heroes of Might and Magic II files you legally own, such as the files from a copy you bought. Downloading or sharing games you don't own can break copyright law.</p>
+    <p>frunk.store doesn't provide, sell or share commercial games. Files you load stay on this screen; when you send them from your phone they're encrypted and deleted from our server as soon as the car picks them up.</p>
+    <p>You're responsible for the files you load.</p>
+    <div class="add">
+      <button class="btn primary" id="termsOk" type="button">I own my games</button>
+      <button class="btn" id="termsCancel" type="button">Cancel</button>
+    </div>
+  </div>
+</section>
+
+<section id="transfer" class="overlay" hidden aria-labelledby="transferTitle">
+  <div class="sheet">
+    <div class="qr" id="qr" aria-hidden="true"></div>
+    <div class="steps">
+      <h2 id="transferTitle">Get files from phone</h2>
+      <ol>
+        <li>Scan this code with your phone's camera.</li>
+        <li>On the page that opens, choose HEROES2.AGG, HEROES2X.AGG and the maps (or a .zip of the DATA and MAPS folders).</li>
+        <li>They show up here in a few seconds. Up to 80 MB per code.</li>
+      </ol>
+      <p id="transferStatus" aria-live="polite">Getting a code…</p>
+      <ul id="received"></ul>
+      <button class="btn primary" id="transferDone" type="button">Done</button>
+    </div>
+  </div>
+</section>
+
+<section id="loading" hidden aria-live="polite">
+  <b id="loadTitle"></b>
+  <div class="meter"><i id="loadBar"></i></div>
+  <span id="loadText"></span>
+</section>
+
+<section id="failed" class="overlay" hidden aria-labelledby="failedTitle">
+  <div class="sheet terms">
+    <h2 id="failedTitle">The game stopped</h2>
+    <p id="failedText"></p>
+    <div class="add"><button class="btn primary" id="failedOk" type="button">Back</button></div>
+  </div>
+</section>
+
+<section id="player" hidden>
+  <div class="bar">
+    <b id="title">fheroes2</b>
+    <button class="btn" id="soundBtn" type="button">Sound on</button>
+    <button class="btn" id="quitBtn" type="button">Quit</button>
+  </div>
+  <div class="screen">
+    <canvas id="canvas" oncontextmenu="event.preventDefault()"></canvas>
+    <div id="hint" hidden></div>
+  </div>
+</section>
+
+<script src="/probe/qrcode.min.js"></script>
+<script type="module" src="fheroes2.js"></script>
+<script src="/sw-register.js"></script>
+</body>
+</html>

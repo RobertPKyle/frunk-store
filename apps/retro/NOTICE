@@ -29,6 +29,18 @@ Third-party components
   (BSD), minivorbis (BSD 3-Clause), JSON for Modern C++ (MIT) and qon (MIT),
   with their license texts in pce/THIRD-PARTY.txt.
 
+- Gearlynx 1.2.36, copyright 2025 Ignacio Sanchez, GNU GPL version 3 or
+  later (lynx/gearlynx.js and lynx/gearlynx.wasm, compiled with a small
+  front end, web.cpp, under the same license, and a patch,
+  gearlynx-web.patch, that lets web.cpp's stand-in boot ROM call out
+  through the unused register $FD97; license text in lynx/LICENSE; the
+  complete source, patched, with the patch and the build script, in
+  lynx/gearlynx-web-src.tar.gz). From https://github.com/drhelius/Gearlynx
+  at commit 838af17e9948bb6215a3ab7c9d45aba4355fe0fb. It includes miniz
+  (MIT), with its license text in lynx/THIRD-PARTY.txt. The stand-in boot
+  ROM's start-up is modeled on Handy's high-level boot ROM, copyright 2004
+  K. Wilkins, zlib license (https://github.com/libretro/libretro-handy).
+
 - clownmdemu (emulation core), copyright Clownacy, GNU Affero GPL version 3
   or later (md/clownmdemu.js and md/clownmdemu.wasm, compiled unmodified
   with a small front end, web.c, under the same license; license text in

@@ -1,0 +1,42 @@
+diff --git a/src/media.h b/src/media.h
+index 64626d9..1f43574 100644
+--- a/src/media.h
++++ b/src/media.h
+@@ -83,6 +83,7 @@ public:
+     bool GetAudin();
+     u16 GetHomebrewBootAddress();
+     int DecryptEpyxLoader(u8* output, int max_size);
++    int DecryptLoader(u8* result, const u8* encrypted, int length) { return DecryptFrame(result, encrypted, length); }
+     const char* GetFilePath();
+     const char* GetFileDirectory();
+     const char* GetFileName();
+diff --git a/src/mikey.h b/src/mikey.h
+index 863b0d2..4e4123a 100644
+--- a/src/mikey.h
++++ b/src/mikey.h
+@@ -41,6 +41,10 @@ class Profiler;
+ struct GLYNX_Trace_Entry;
+ enum GLYNX_Trace_Type : u8;
+ 
++// Called when the CPU writes the unused register 0xFD97, which a stand-in
++// boot ROM (in place of Atari's) uses to have the host do its work
++extern void (*g_glynx_rom_hook)(void);
++
+ class Mikey
+ {
+ public:
+diff --git a/src/mikey_inline.h b/src/mikey_inline.h
+index d4d233f..f580fa6 100644
+--- a/src/mikey_inline.h
++++ b/src/mikey_inline.h
+@@ -528,6 +528,10 @@ INLINE void Mikey::Write(u16 address, u8 value)
+                 TraceDebugMessageEvent(address, value);
+             break;
+ #endif
++        case 0xFD97:              // unused: a stand-in boot ROM calls out through it
++            if (!debug && g_glynx_rom_hook)
++                g_glynx_rom_hook();
++            break;
+         default:
+             //assert(false && "Unhandled Mikey Write Address");
+             DebugMikey("Register WRITE called with unknown address: %04X, value: %02X", address, value);

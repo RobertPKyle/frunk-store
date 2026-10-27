@@ -157,7 +157,7 @@
     {
       "id": "retro",
       "name": "Retro Console",
-      "tagline": "Play homebrew games, or NES, Game Boy, GBA, Master System and Game Gear games you own sent from your phone, with a controller or on screen.",
+      "tagline": "Play homebrew games, or NES, Game Boy, GBA, Master System, Game Gear and Atari Lynx games you own sent from your phone, with a controller or on screen.",
       "path": "/retro/",
       "icon": "/retro/icon.svg",
       "tags": [
@@ -179,7 +179,7 @@
     {
       "id": "holders",
       "name": "Holders",
-      "tagline": "Early access for FrunkStore token holders: Craft 4K, Freedoom, LibreQuake, OpenArena, OpenTTD, and Genesis and TurboGrafx-16 games, plus a vote on what's next. Unlock with your phone's wallet.",
+      "tagline": "Early access for FrunkStore token holders: Craft 4K, fheroes2 (Heroes II), Freedoom, LibreQuake, OpenArena, OpenTTD, and Genesis and TurboGrafx-16 games, plus a vote on what's next. Unlock with your phone's wallet.",
       "path": "/holders/",
       "icon": "/holders/icon.svg",
       "tags": [
@@ -253,6 +253,18 @@
       "tagline": "Build a transport empire with trains, trucks, ships and planes. The open-source Transport Tycoon, made for touch.",
       "path": "/openttd/",
       "icon": "/openttd/icon.svg",
+      "tags": [
+        "Game",
+        "Offline"
+      ],
+      "holders": true
+    },
+    {
+      "id": "fheroes2",
+      "name": "fheroes2",
+      "tagline": "Heroes of Might and Magic II from your own copy, on the open-source fheroes2 engine: towns, heroes and turn-based battles, by touch.",
+      "path": "/fheroes2/",
+      "icon": "/fheroes2/icon.svg",
       "tags": [
         "Game",
         "Offline"

@@ -1,0 +1,21 @@
+Third-party components
+======================
+
+- fheroes2 1.1.17, copyright the fheroes2 Resurrection team, GNU GPL
+  version 2 or later (engine/fheroes2.js, engine/fheroes2.wasm and
+  engine/fheroes2.data, compiled unmodified with the project's own
+  Emscripten build, Makefile.emscripten, by tools/build-fheroes2.mjs in
+  https://github.com/RobertPKyle/frunk-store; license text in
+  engine/LICENSE; the complete source in
+  engine/fheroes2-1.1.17-src.tar.gz). From https://github.com/ihhub/fheroes2
+  at commit 2685c2188b541660f1ce261b554c3e92f79b1775. The build includes
+  SDL2 (zlib license), SDL2_mixer (zlib license, with its MIDI, MP3 and Ogg
+  Vorbis decoders) and zlib (zlib license), from Emscripten's ports, and
+  libsmacker (GNU LGPL 2.1 or later), which comes with fheroes2's source.
+  engine/fheroes2.data holds fheroes2's own files: its data file,
+  translations, maps and the Timidity instruments for MIDI music, as
+  found in its source.
+
+The game's own files (Heroes of Might and Magic II) aren't part of this
+app: players load them from a copy they own. Heroes of Might and Magic is
+a trademark of Ubisoft Entertainment.

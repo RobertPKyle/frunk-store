@@ -130,7 +130,19 @@ to the cache again.
   unmodified) compiled to WebAssembly by `npm run build:sms`
   (`tools/build-gearsystem.mjs` with `tools/gearsystem/web.cpp`, in Docker;
   the output in `apps/retro/sms/` is committed, with its source as
-  `gearsystem-web-src.tar.gz`). PC Engine / TurboGrafx-16 HuCard games (in
+  `gearsystem-web-src.tar.gz`). Atari Lynx games run the same way on
+  Gearlynx 1.2.36 (GPL-3.0-or-later), built by `npm run build:lynx`
+  (`tools/build-gearlynx.mjs` with `tools/gearlynx/web.cpp` and
+  `tools/gearlynx/gearlynx-web.patch`; output and source in
+  `apps/retro/lynx/`). The Lynx starts every cartridge from Atari's
+  512-byte boot ROM, which isn't free to ship, so `web.cpp` loads a
+  stand-in of its own: each routine is a write to the unused Mikey register
+  $FD97, which the patch hands to C code that selects cartridge blocks and
+  decrypts and runs the cartridge's loader, modeled on Handy's high-level
+  boot ROM (K. Wilkins, zlib). The free Lynx games are TreeJumper (GPL-3,
+  the cartridge from its repo) and Town Patrol (MIT code, 0x72's CC0 art),
+  which `npm run build:townpatrol` compiles from source with cc65 and
+  sprpck. PC Engine / TurboGrafx-16 HuCard games (in
   the holders edition only, see Holders below) run
   the same way on Geargrafx 1.8.4 (GPL-3.0-or-later, unmodified), built by
   `npm run build:pce` (`tools/build-geargrafx.mjs` with
@@ -145,8 +157,8 @@ to the cache again.
   `apps/retro/md/`). Genesis Plus GX and PicoDrive were ruled out: their
   licenses forbid use in a commercial activity, which a token-gated section
   is. clownmdemu has no EEPROM saves and no bank switching (so nothing over
-  4 MB), and leaves out the Mega CD here. All three run in workers
-  (`sms-worker.js`, `pce-worker.js`, `md-worker.js`, sharing
+  4 MB), and leaves out the Mega CD here. All four run in workers
+  (`sms-worker.js`, `lynx-worker.js`, `pce-worker.js`, `md-worker.js`, sharing
   `gear-worker.js`) the way jsnes runs in its own (the page side is
   `worker-core.js`). The Nintendo 64 is switched off (2026-10-22, after
   two car tests at about a sixth of full speed): `OFF` in `retro.js` keeps
@@ -213,16 +225,17 @@ to the cache again.
   controller plays as player 2. Moving n64js off the page's main thread
   took the test cartridge's page load from 812 to 5 ms a second with the
   CPU slowed 4.5x. Gearsystem takes about 0.5 ms a frame on a desktop
-  (2.2 ms with the CPU slowed 4.5x), Geargrafx 1.5 ms (6.7 ms slowed),
+  (2.2 ms with the CPU slowed 4.5x), Gearlynx 1.4 ms, Geargrafx 1.5 ms (6.7 ms slowed),
   clownmdemu 1.4 ms (7.7 ms slowed). The console is picked from the file's
   header (Sega's 8-bit consoles' and the PC Engine's by name, .sms, .gg, .sg
   or .pce, since SG-1000 games and HuCards carry no header; the "TMR SEGA"
   header settles Master System against Game Gear; Mega Drive games need
   "SEGA" at 0x100 and a .md, .gen, .bin or .smd name, and .smd copier dumps
-  are unscrambled), and zipped games are unzipped in the browser
+  are unscrambled; Lynx games by their "LYNX" or homebrew "BS93" header, or
+  a .lyx name for bare cartridges), and zipped games are unzipped in the browser
   (`apps/_shared/roms.js`). Every game keeps its battery save and a
   resume snapshot in IndexedDB (mGBA's files for Game Boy, databases "nes",
-  "sms", "pce" and "md" for the worker cores; a PC Engine game's battery save is
+  "sms", "lynx", "pce" and "md" for the worker cores; a PC Engine game's battery save is
   its 2 KB of backup RAM, and a Mega Drive snapshot is about 1.1 MB, as the
   core's state includes the Mega CD's memory),
   so it picks up where it left off; Reset starts over and keeps the battery
@@ -380,6 +393,35 @@ to the cache again.
   WebSocket proxy. Measured with the CPU slowed 4.5x: 60 fps, about 180 ms of
   main-thread work a second in a new game and 270 while dragging the map,
   with sound and music on. Not yet tried in the car.
+- `apps/fheroes2`: fheroes2 1.1.17 (GPL-2.0-or-later), the open-source
+  engine for Heroes of Might and Magic II, in the Holders section. `npm run
+  build:fheroes2` (`tools/build-fheroes2.mjs`) compiles it unmodified with
+  its own `Makefile.emscripten` (SDL2, Asyncify, IDBFS) in Docker
+  (`tools/fheroes2/Dockerfile`: emsdk 4.0.10 plus gettext) to
+  `apps/fheroes2/engine/` (10 MB wasm, 12 MB data package with the engine's
+  own files, and the source as `fheroes2-1.1.17-src.tar.gz`); none of it is
+  in git, so run it before deploying `apps`. The game's files aren't free,
+  so players bring their own from the phone (`?app=fheroes2`) or the file
+  picker: HEROES2.AGG (needed), HEROES2X.AGG (The Price of Loyalty), maps
+  (.mp2, .mx2) and music, sorted by `heroesPath` in `apps/_shared/roms.js`
+  and kept in IndexedDB (database `fheroes2`). The free demo (h2demo.zip)
+  lets anyone share it but not sell it, so it isn't offered here; archive.org
+  sends no CORS headers, so the car couldn't fetch it there anyway. The
+  build has no module wrapper: the page sets a global `Module` (canvas,
+  `locateFile` for the data package, a `preRun` that writes the game's files
+  to `/h2`, mounts IDBFS at `/fheroes2` as `HOME`, and writes a first
+  fheroes2.cfg with the intro off and an autosave at the start of each
+  turn) and adds the script. fheroes2 handles touch itself (one finger is
+  the left button, a second finger the right one) and syncs IDBFS whenever
+  it writes a file; the page syncs again when hidden, on the hub's close
+  handshake and on Quit, and goes back to the library when the game's own
+  Quit leaves the canvas at 0×0. The canvas gets whole CSS pixels: in a
+  cross-origin frame at a 1.53 pixel ratio its box came out fractional and
+  SDL missed every tap. Measured with the CPU slowed 4.5x: about 100 ms of
+  main-thread work a second on the adventure map and 150 during the
+  computer's turn. The e2e check needs the demo's HEROES2.AGG and
+  BROKENA.MP2 in `roms/h2demo/` (not in git) and skips without them. Not yet
+  tried in the car.
 - `apps/openarena`: OpenArena. The Quake III engine ioquake3 (GPL-2.0-or-later)
   compiled to WebAssembly by `npm run build:openarena`
   (`tools/build-openarena.mjs`: a fixed ioq3 commit plus
@@ -607,7 +649,7 @@ to the cache again.
   (`op=dev-balance`) so the e2e check can vote with a test wallet.
 - `apps/holders` and `apps/_shared/holders.js`: Holders, early access for
   wallets holding at least `VOTE_MIN_TOKENS` FrunkStore tokens: Craft 4K,
-  Freedoom, LibreQuake, OpenArena, OpenTTD, and the Mega Drive / Genesis and PC Engine (Retro Console opened as
+  fheroes2, Freedoom, LibreQuake, OpenArena, OpenTTD, and the Mega Drive / Genesis and PC Engine (Retro Console opened as
   `/retro/?edition=holders`, which shows only the consoles in `EARLY` in
   `retro.js`; the ordinary edition leaves those out, and each edition lists
   only its own consoles' games and continues its own last game). Those
@@ -705,12 +747,15 @@ npm run build:doom                      # Doom and Heretic engines + Freedoom an
 npm run build:scummvm                   # ScummVM engine + free adventures (needs Docker); run before deploying apps
 npm run build:quake                     # Quake engine + LibreQuake (needs Docker); run before deploying apps
 npm run build:openttd                   # OpenTTD engine + its free base sets (needs Docker); run before deploying apps
+npm run build:fheroes2                  # fheroes2 engine for Heroes II (needs Docker); run before deploying apps
 npm run build:openarena                 # Quake III engine + OpenArena (needs Docker); run before deploying apps
 npm run build:blocks                    # ClassiCube engine + its textures, font and sounds (needs Docker); run before deploying apps
 npm run build:craft4k                   # Minecraft4k-CPP for Craft 4K (needs Docker); output is committed, rerun only to update it
 npm run build:puzzles                   # Simon Tatham's Puzzles + their help and icons (needs Docker and Chrome); run before deploying apps
 npm run build:sms                       # Gearsystem for Retro Console (needs Docker); output is committed, rerun only to update it
 npm run build:pce                       # Geargrafx for Retro Console (needs Docker); output is committed, rerun only to update it
+npm run build:lynx                      # Gearlynx for Retro Console (needs Docker); output is committed, rerun only to update it
+npm run build:townpatrol                # Town Patrol's Lynx cartridge from source (needs Docker); output is committed
 npm run build:md                        # clownmdemu for Retro Console (needs Docker); output is committed, rerun only to update it
 npm run build:n64                       # n64js for Retro Console (needs npx to fetch Bun); output is committed, rerun only to update it
 npm run dev                             # hub on localhost:5173, apps on 127.0.0.1:5174

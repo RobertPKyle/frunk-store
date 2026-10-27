@@ -38,6 +38,8 @@ apps/puzzles/icons
 apps/puzzles/puzzles.json
 tools/.gearsystem-build
 tools/.geargrafx-build
+tools/.gearlynx-build
+tools/.townpatrol-build
 tools/.clownmdemu-build
 tools/.craft4k-build
 tools/.n64js-build
@@ -48,3 +50,8 @@ tools/.tic80-build
 apps/tic80/players
 apps/tic80/games
 apps/tic80/games.json
+tools/.fheroes2-build
+apps/fheroes2/engine/fheroes2.js
+apps/fheroes2/engine/fheroes2.wasm
+apps/fheroes2/engine/fheroes2.data
+apps/fheroes2/engine/*-src.tar.gz

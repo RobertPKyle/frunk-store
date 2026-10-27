@@ -49,7 +49,7 @@ async function check(name, fn) {
   try { await fn(); console.log(`ok   ${name}`); }
   catch (e) {
     if (e.message.startsWith('SKIP: ')) { console.log(`skip ${name}\n     ${e.message.slice(6)}`); return; }
-    failed++; console.log(`FAIL ${name}\n     ${process.env.VERBOSE ? e.message : e.message.split('\n')[0]}`); }
+    failed++; console.log(`FAIL ${name}\n     ${process.env.VERBOSE === "2" ? e.stack : process.env.VERBOSE ? e.message : e.message.split("\n")[0]}`); }
 }
 const appFrame = () => page.frameLocator('#frame');
 const dev = base.includes('localhost');
@@ -652,6 +652,66 @@ await check('retro console plays Game Gear, Master System and SG-1000 games', as
   await page.screenshot({ path: shots + 'retro-sms.png' });
 });
 
+await check('retro console plays Atari Lynx games without Atari\'s boot ROM', async () => {
+  await openFromHub(/Retro Console/);
+  const frame = () => page.frames().find(f => f.url().includes('/retro/'));
+  const screen = appFrame().locator('#lynxScreen');
+  const lit = async () => page.evaluate(async png => {
+    const img = await createImageBitmap(new Blob([new Uint8Array(png)], { type: 'image/png' }));
+    const c = new OffscreenCanvas(img.width, img.height).getContext('2d');
+    c.drawImage(img, 0, 0);
+    const d = c.getImageData(0, 0, img.width, img.height).data;
+    let n = 0;
+    for (let i = 0; i < d.length; i += 4) if (d[i] + d[i + 1] + d[i + 2] > 60) n++;
+    return Math.round(n / (img.width * img.height) * 100);
+  }, [...await screen.screenshot()]);
+  // TreeJumper's cartridge starts with an encrypted loader, which the stand-in boot ROM decrypts
+  await appFrame().locator('#free .game').filter({ hasText: 'TreeJumper' }).click();
+  await appFrame().locator('#fps').filter({ hasText: /fps/ }).waitFor({ timeout: 15000 });
+  await page.waitForTimeout(2000);
+  const fps = parseInt(await appFrame().locator('#fps').textContent());
+  if (!(fps >= 50)) throw new Error(`TreeJumper running at ${fps} fps`);
+  const box = await screen.boundingBox();
+  if (Math.abs(box.width / box.height - 160 / 102) > 0.03) throw new Error(`Lynx screen is ${box.width}x${box.height}`);
+  const shown = (await appFrame().locator('.shoulder, [data-b=b], [data-b=a], .pill[data-b=start]').allTextContents()).join(' ');
+  if (shown !== 'Option 1 Option 2 B A Pause') throw new Error(`Lynx buttons read "${shown}"`);
+  // Input reaches the game: A leaves the title for the forest
+  const title = await screen.screenshot();
+  await appFrame().locator('[data-b=a]').click();
+  await page.waitForTimeout(1500);
+  if ((await screen.screenshot()).equals(title)) throw new Error('A did nothing in TreeJumper');
+  const playing = await lit();
+  if (playing < 5) throw new Error(`TreeJumper screen mostly black (${playing}%)`);
+  // Leaving saves a resume snapshot, and the game picks up there, past the title
+  await appFrame().getByRole('button', { name: 'Games' }).click();
+  const saved = await frame().evaluate(() => new Promise(r => {
+    const q = indexedDB.open('lynx', 1);
+    q.onsuccess = () => { const g = q.result.transaction('saves').objectStore('saves').get('free-treejumper.lynx'); g.onsuccess = () => r(g.result?.state?.length || 0); };
+    q.onerror = () => r(0);
+  }));
+  if (!saved) throw new Error('no resume snapshot saved for TreeJumper');
+  await appFrame().getByRole('button', { name: 'Continue TreeJumper' }).click();
+  await appFrame().locator('#player').waitFor({ state: 'visible', timeout: 10000 });
+  await page.waitForTimeout(1000);
+  if ((await lit()) < 5) throw new Error('TreeJumper did not resume where it left off');
+  // A player's own cartridge is known by its header, whatever its name
+  await appFrame().getByRole('button', { name: 'Games' }).click();
+  const picker = page.waitForEvent('filechooser');
+  await appFrame().getByRole('button', { name: 'Add game files' }).click();
+  const terms = appFrame().getByRole('button', { name: 'I own my games' });
+  if (await terms.isVisible()) await terms.click();
+  await (await picker).setFiles([
+    { name: 'jumper.lnx', mimeType: 'application/octet-stream', buffer: readFileSync(new URL('../apps/retro/games/treejumper.lnx', import.meta.url)) },
+  ]);
+  await appFrame().locator('#mine .game').filter({ hasText: 'jumper' }).waitFor({ timeout: 5000 });
+  const kind = (await appFrame().locator('#mine .game').filter({ hasText: 'jumper' }).locator('small').textContent()).split(' · ')[0];
+  if (kind !== 'Atari Lynx') throw new Error(`own cartridge reads as ${kind}`);
+  await appFrame().getByRole('button', { name: 'Remove jumper' }).click();
+  await appFrame().getByRole('button', { name: 'Remove jumper' }).click();
+  console.log(`     TreeJumper ${fps} fps, ${playing}% lit`);
+  await page.screenshot({ path: shots + 'retro-lynx.png' });
+});
+
 // Plays a holder's phone without a browser: signs in to the vote with an
 // ed25519 key of its own, holding the given made-up balance (dev server only)
 async function holderPhone(apps, tokens) {
@@ -685,7 +745,7 @@ await check('holders unlock with a phone and play Genesis and PC Engine games', 
   }
   await page.goto(base + '/');
   await page.waitForSelector('.card');
-  for (const name of ['Craft 4K', 'Freedoom', 'LibreQuake', 'OpenTTD', 'OpenArena', 'Genesis & PC Engine']) {
+  for (const name of ['Craft 4K', 'fheroes2', 'Freedoom', 'LibreQuake', 'OpenTTD', 'OpenArena', 'Genesis & PC Engine']) {
     if (await page.locator('#grid .card h2').filter({ hasText: new RegExp(`^${name}$`) }).count()) throw new Error(`${name} is on the grid`);
   }
 
@@ -703,7 +763,7 @@ await check('holders unlock with a phone and play Genesis and PC Engine games', 
   if (!linked.ok) throw new Error(`link: ${linked.error}`);
   await appFrame().locator('#apps .app').first().waitFor({ timeout: 10000 });
   const tiles = (await appFrame().locator('#apps .app b').allTextContents()).join(', ');
-  if (tiles !== 'Genesis & PC Engine, Craft 4K, Freedoom, LibreQuake, OpenArena, OpenTTD') throw new Error(`menu lists ${tiles}`);
+  if (tiles !== 'Genesis & PC Engine, fheroes2, Craft 4K, Freedoom, LibreQuake, OpenArena, OpenTTD') throw new Error(`menu lists ${tiles}`);
   await appFrame().locator('#voteQr a[href$="/vote/"]').waitFor();
 
   await openFromHub(/PC Engine/);
@@ -1384,6 +1444,90 @@ await check('openttd plays with touch, saves when left and continues', async () 
   if (v4.join() !== v3.join()) throw new Error(`continued at ${v4.join()}, left at ${v3.join()}`);
   await appFrame().getByRole('button', { name: 'Quit' }).click();
   await appFrame().locator('#library').waitFor({ state: 'visible', timeout: 15000 });
+});
+
+// The game's files aren't free: this needs the Heroes II demo (HEROES2.AGG
+// and BROKENA.MP2 from h2demo.zip) in roms/h2demo/, which git leaves out
+await check('fheroes2 plays the player\'s Heroes II files by touch and keeps its saves', async () => {
+  const demo = new URL('../roms/h2demo/', import.meta.url);
+  try { statSync(new URL('HEROES2.AGG', demo)); } catch { throw new Error('SKIP: no Heroes II demo files in roms/h2demo/'); }
+  if (!dev) throw new Error('SKIP: early access for holders, which only the dev server can unlock');
+  // The hub opens it from the Holders menu (unlocked by the holders check, or here)
+  await page.goto(base + '/app/holders');
+  const menuLock = appFrame().locator('#holdersLock .code a');
+  await Promise.race([menuLock.waitFor({ timeout: 10000 }), appFrame().locator('#apps .app').first().waitFor({ timeout: 10000 })]);
+  if (await menuLock.isVisible()) {
+    await (await holderNow()).link(new URL(await menuLock.getAttribute('href')).searchParams.get('link'));
+    await appFrame().locator('#apps .app').first().waitFor({ timeout: 10000 });
+  }
+  await openFromHub(/fheroes2/);
+  await appFrame().locator('#playBtn[disabled]').waitFor({ timeout: 15000 });
+  // The game itself is played on its own page: the test browser emulates
+  // the car's 1.53 pixel ratio for the hub only (its cross-origin frame
+  // reports 1), and SDL misses taps in that mix. With a real 1.53 ratio
+  // (Chrome's --force-device-scale-factor), taps work in the frame too.
+  const game = await browser.newPage({ viewport: { width: 773, height: 601 }, deviceScaleFactor: 1.53, hasTouch: true });
+  game.on('pageerror', e => errors.push(`fheroes2 page: ${e.message}`));
+  try {
+    await game.goto(`${appsBase}/fheroes2/`);
+    const lock = game.locator('#holdersLock .code a');
+    await Promise.race([lock.waitFor({ timeout: 10000 }), game.locator('#playBtn').waitFor({ timeout: 10000 })]);
+    if (await lock.isVisible()) await (await holderNow()).link(new URL(await lock.getAttribute('href')).searchParams.get('link'));
+    await game.locator('#playBtn').waitFor({ timeout: 15000 });
+    if (!await game.locator('#playBtn').isDisabled()) throw new Error('Play is on before any game files');
+    const picker = game.waitForEvent('filechooser');
+    await game.getByRole('button', { name: 'Add game files' }).click();
+    const terms = game.getByRole('button', { name: 'I own my games' });
+    if (await terms.isVisible()) await terms.click();
+    await (await picker).setFiles([
+      { name: 'HEROES2.AGG', mimeType: 'application/octet-stream', buffer: readFileSync(new URL('HEROES2.AGG', demo)) },
+      { name: 'BROKENA.MP2', mimeType: 'application/octet-stream', buffer: readFileSync(new URL('BROKENA.MP2', demo)) },
+      { name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from('not a game file') },
+    ]);
+    await game.locator('#playBtn:not([disabled])').waitFor({ timeout: 30000 });
+    const tiles = (await game.locator('#files .file small').allTextContents()).join(' | ');
+    if (!/^The Succession Wars · 41 MB \| Optional: The Price of Loyalty \| 1 map/.test(tiles)) throw new Error(`files read ${tiles}`);
+    await game.locator('#playBtn').click();
+    await game.locator('#player').waitFor({ state: 'visible', timeout: 60000 });
+    await game.waitForTimeout(4000);
+    // The game's 640x480 picture, scaled into the canvas
+    const box = await game.locator('#canvas').boundingBox();
+    const s = Math.min(box.width / 640, box.height / 480);
+    const tap = async (x, y, wait = 1500) => {
+      await game.touchscreen.tap(box.x + (box.width - 640 * s) / 2 + x * s, box.y + (box.height - 480 * s) / 2 + y * s);
+      await game.waitForTimeout(wait);
+    };
+    const shot = () => game.locator('#canvas').screenshot();
+    const first = await shot();
+    // First start: language, the touch greeting and resolution (OKAY on
+    // each), then New Game, the demo's warning, Standard Game and OKAY on its
+    // one map
+    await tap(215, 409);
+    if ((await shot()).equals(first)) throw new Error('a tap did nothing on the language list');
+    await tap(319, 426);
+    await tap(215, 372, 2500);
+    await tap(520, 229);
+    await tap(319, 341, 1000);
+    await tap(525, 73, 2500);
+    await tap(194, 418, 6000);
+    await game.screenshot({ path: shots + 'fheroes2.png' });
+    // A new game saves itself at the start of its first turn; Quit copies it to IndexedDB
+    await game.getByRole('button', { name: 'Quit' }).click();
+    await game.locator('#library').waitFor({ state: 'visible', timeout: 15000 });
+    const saves = await game.evaluate(() => new Promise(r => {
+      const q = indexedDB.open('/fheroes2');
+      q.onsuccess = () => {
+        if (!q.result.objectStoreNames.contains('FILE_DATA')) return r([]);
+        const g = q.result.transaction('FILE_DATA').objectStore('FILE_DATA').getAllKeys();
+        g.onsuccess = () => r(g.result.filter(k => k.includes('/files/save/')));
+      };
+      q.onerror = () => r([]);
+    }));
+    if (!saves.some(k => /autosave/i.test(k))) throw new Error(`no autosave kept (${saves.join(', ') || 'no saves'})`);
+    console.log(`     saves: ${saves.map(k => k.replace(/^.*\//, '')).join(', ')}`);
+  } finally {
+    await game.close();
+  }
 });
 
 await check('openarena plays a bot match with touch and a controller, and keeps the game', async () => {

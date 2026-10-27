@@ -1,12 +1,12 @@
 // Runs one of Ignacio Sanchez's emulators, Gearsystem (Master System, Game
-// Gear and SG-1000; sms-worker.js) or Geargrafx (PC Engine; pce-worker.js),
-// on its own thread, like nes-worker.js does jsnes: it paces itself by the
-// screen's refreshes, draws to the canvas (handed over as an
-// OffscreenCanvas), sends sound straight to the page's AudioWorklet and
-// keeps saves in IndexedDB. The two share their shape: each is compiled with
-// a small front end (tools/gearsystem/web.cpp, tools/geargrafx/web.cpp)
-// whose functions differ only in their prefix. The messages are listed in
-// worker-core.js.
+// Gear and SG-1000; sms-worker.js), Geargrafx (PC Engine; pce-worker.js) or
+// Gearlynx (Atari Lynx; lynx-worker.js), on its own thread, like
+// nes-worker.js does jsnes: it paces itself by the screen's refreshes, draws
+// to the canvas (handed over as an OffscreenCanvas), sends sound straight to
+// the page's AudioWorklet and keeps saves in IndexedDB. They share their
+// shape: each is compiled with a small front end (tools/gearsystem/web.cpp,
+// tools/geargrafx/web.cpp, tools/gearlynx/web.cpp) whose functions differ
+// only in their prefix. The messages are listed in worker-core.js.
 //
 // Progress is kept in IndexedDB (database named after the core), keyed by
 // the game's file name: the battery save of games that have one (copied
@@ -21,8 +21,10 @@ const BATCH = 512;
 // prefix: its functions' prefix; keys: the emulator's key for each bit the
 // page sends (0 for none); hz: frame rate for each value load returns;
 // aspect: optional, how wide the last picture looks next to its height
-// (when the console's pixels aren't square), else its own width
-export function runCore({ db, load: importCore, prefix, keys: KEYS, hz: RATES, aspect }) {
+// (when the console's pixels aren't square), else its own width; frameMs:
+// optional, how long a frame lasts now, in milliseconds (0 when unknown),
+// for a console whose games set their own frame rate
+export function runCore({ db, load: importCore, prefix, keys: KEYS, hz: RATES, aspect, frameMs: gameFrameMs }) {
 
 // ---------- saves (IndexedDB) ----------
 
@@ -98,6 +100,10 @@ function takeSound() {
 function runFrame(draw) {
   const size = fn.frame(draw ? 1 : 0);
   takeSound();
+  if (gameFrameMs) {
+    const ms = gameFrameMs(fn);
+    if (ms >= 8 && ms <= 50) frameMs = ms;
+  }
   if (!draw) return;
   const w = size >>> 16, h = size & 0xffff;
   const looks = aspect ? aspect(fn) : w;
