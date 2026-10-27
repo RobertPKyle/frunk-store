@@ -1,0 +1,85 @@
+diff --git a/scripts/genie.lua b/scripts/genie.lua
+index fa4a5bb6..b6e945db 100644
+--- a/scripts/genie.lua
++++ b/scripts/genie.lua
+@@ -1111,7 +1111,8 @@ configuration { "asmjs" }
+ 		"-s USE_SDL_TTF=3",
+ 		"-s DEFAULT_LIBRARY_FUNCS_TO_INCLUDE=\"['\\$$ERRNO_CODES']\"",
+ 		"-s EXPORTED_FUNCTIONS=\"['_main', '_malloc', '__ZN15running_machine30emscripten_get_running_machineEv', '__ZN15running_machine17emscripten_get_uiEv', '__ZN15running_machine20emscripten_get_soundEv', '__ZN15mame_ui_manager12set_show_fpsEb', '__ZNK15mame_ui_manager8show_fpsEv', '__ZN13sound_manager4muteEbh', '__ZN15running_machine15emscripten_saveEPKc', '__ZN15running_machine15emscripten_loadEPKc', '__ZN15running_machine21emscripten_hard_resetEv', '__ZN15running_machine21emscripten_soft_resetEv', '__ZN15running_machine15emscripten_exitEv']\"",
+-		"-s EXPORTED_RUNTIME_METHODS=\"['cwrap']\"",
++		"-s EXPORTED_RUNTIME_METHODS=\"['cwrap','FS','IDBFS','addRunDependency','removeRunDependency']\"",
++		"-lidbfs.js",
+ 		"-s ERROR_ON_UNDEFINED_SYMBOLS=0",
+ 		"-s STACK_SIZE=5MB",
+ 		"-s MAX_WEBGL_VERSION=2",
+diff --git a/src/emu/machine.cpp b/src/emu/machine.cpp
+index 2298119b..72c4cb6c 100644
+--- a/src/emu/machine.cpp
++++ b/src/emu/machine.cpp
+@@ -1400,9 +1400,16 @@ void running_machine::emscripten_main_loop()
+ 		device_scheduler * scheduler;
+ 		scheduler = &(machine->scheduler());
+ 
+-		// Emscripten will call this function at 60Hz, so step the simulation
+-		// forward for the amount of time that has passed since the last frame
+-		const attotime frametime(0,HZ_TO_ATTOSECONDS(60));
++		// Emscripten calls this once per animation frame: step the simulation
++		// forward for the real time that has passed since the last call
++		// (frunk.store: the browser's frame rate isn't always 60 Hz, and the
++		// car's can drop below it), at most a tenth of a second
++		static double last_ms = 0;
++		const double now_ms = emscripten_get_now();
++		double step = last_ms > 0 ? (now_ms - last_ms) / 1000.0 : 1.0 / 60;
++		last_ms = now_ms;
++		if (step < 0 || step > 0.1) step = step < 0 ? 0 : 0.1;
++		const attotime frametime = attotime::from_double(step);
+ 		const attotime stoptime(scheduler->time() + frametime);
+ 
+ 		while (!machine->m_paused && !machine->scheduled_event_pending() && scheduler->time() < stoptime)
+@@ -1423,7 +1430,14 @@ void running_machine::emscripten_main_loop()
+ 	// cancel the emscripten loop if the system has been told to exit
+ 	if (machine->exit_pending())
+ 	{
++		// frunk.store: save the NVRAM and configuration as run() would after
++		// its loop (which on the web never returns), then tell the page
++		machine->sound().ui_mute(true);
++		if (machine->options().nvram_save())
++			machine->nvram_save();
++		machine->m_configuration->save_settings();
+ 		emscripten_cancel_main_loop();
++		EM_ASM({ if (Module.onMameExit) Module.onMameExit(); });
+ 	}
+ }
+ 
+@@ -1467,4 +1481,19 @@ void running_machine::emscripten_load(const char *name) {
+ 	emscripten_running_machine->schedule_load(name);
+ }
+ 
++// frunk.store: saves the NVRAM (high scores, settings) and configuration at
++// once, for a page that's being left and won't get another frame
++void running_machine::emscripten_save_nvram() {
++	running_machine *machine = emscripten_running_machine;
++	if (!machine || machine->exit_pending())
++		return;
++	if (machine->options().nvram_save())
++		machine->nvram_save();
++	machine->m_configuration->save_settings();
++}
++
++extern "C" EMSCRIPTEN_KEEPALIVE void web_save() {
++	running_machine::emscripten_save_nvram();
++}
++
+ #endif /* defined(__EMSCRIPTEN__) */
+diff --git a/src/emu/machine.h b/src/emu/machine.h
+index e75b5a9f..6e5fc841 100644
+--- a/src/emu/machine.h
++++ b/src/emu/machine.h
+@@ -360,6 +360,7 @@ public:
+ 	static void emscripten_soft_reset();
+ 	static void emscripten_save(const char *name);
+ 	static void emscripten_load(const char *name);
++	static void emscripten_save_nvram();
+ #endif
+ };
+ 

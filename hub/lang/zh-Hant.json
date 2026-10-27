@@ -91,6 +91,7 @@
     "pitstop": { "name": "充電歇腳", "tagline": "充電站步行範圍內的廁所、咖啡、餐飲與商店，並標示目前是否營業。" },
     "speedtest": { "name": "網速測試", "tagline": "車上的網路現在有多快？測量下載、上傳與延遲，Wi-Fi 或 LTE 都可以。" },
     "probe": { "name": "車機效能測試", "tagline": "看看這台車的瀏覽器能做到什麼。" },
+    "arcade": { "name": "街機", "tagline": "MAME 上的 20 款 1977 至 1986 年街機遊戲，由原作者透過 mamedev.org 免費開放：Robby Roto、Gridlee、Targ、Super Tank 等，從手機傳送即可遊玩。" },
     "tic80": { "name": "迷你遊戲", "tagline": "在幻想主機 TIC-80 上玩九款免費復古遊戲，也能玩從手機傳來的 .tic 卡帶。可用觸控或手把。" },
     "retro": { "name": "復古遊戲機", "tagline": "玩自製遊戲，或從手機傳送你擁有的 NES、Game Boy、GBA、Master System、Game Gear 與 Atari Lynx 遊戲，用控制器或螢幕操作。" },
     "token": { "name": "FrunkStore 代幣", "tagline": "社群代幣的即時價格圖表、你的錢包餘額，以及在手機上購買的方式。" },

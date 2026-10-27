@@ -144,6 +144,17 @@
       ]
     },
     {
+      "id": "arcade",
+      "name": "Arcade",
+      "tagline": "Twenty arcade games from 1977 to 1986 on MAME, free from their makers through mamedev.org: Robby Roto, Gridlee, Targ, Super Tank and more, sent from your phone.",
+      "path": "/arcade/",
+      "icon": "/arcade/icon.svg",
+      "tags": [
+        "Game",
+        "Controller"
+      ]
+    },
+    {
       "id": "tic80",
       "name": "Tiny Games",
       "tagline": "Nine free retro games on the TIC-80 fantasy console, plus any .tic carts you send from your phone. Touch or controller.",

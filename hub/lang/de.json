@@ -91,6 +91,7 @@
     "pitstop": { "name": "Boxenstopp", "tagline": "Toiletten, Kaffee, Essen und Läden in Gehweite der Ladesäule, mit allem, was gerade geöffnet hat." },
     "speedtest": { "name": "Speedtest", "tagline": "Wie schnell ist das Internet im Auto gerade? Download, Upload und Ping, über WLAN oder LTE." },
     "probe": { "name": "Auto-Benchmark", "tagline": "Sieh dir an, was der Browser dieses Autos kann." },
+    "arcade": { "name": "Spielhalle", "tagline": "Zwanzig Arcade-Spiele von 1977 bis 1986 mit MAME, von ihren Machern über mamedev.org freigegeben: Robby Roto, Gridlee, Targ, Super Tank und mehr, vom Handy geschickt." },
     "tic80": { "name": "Mini-Spiele", "tagline": "Neun kostenlose Retro-Spiele auf der Fantasy-Konsole TIC-80, dazu .tic-Carts, die du vom Handy schickst. Mit Touch oder Controller." },
     "retro": { "name": "Retro-Konsole", "tagline": "Spiel Homebrew-Spiele oder eigene NES-, Game-Boy-, GBA-, Master-System-, Game-Gear- und Atari-Lynx-Spiele, die du vom Handy schickst, mit Controller oder auf dem Bildschirm." },
     "token": { "name": "FrunkStore-Token", "tagline": "Live-Kurschart des Community-Tokens, das Guthaben deiner Wallet und eine Möglichkeit, ihn auf dem Handy zu kaufen." },

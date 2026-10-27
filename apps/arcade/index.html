@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Arcade</title>
+<style>
+  :root { --bg: #0c0a14; --panel: #15121f; --card: #1e1a2b; --line: rgba(220, 190, 255, .14); --text: #f1ecfa; --muted: #a59cb8;
+          --accent: #ff4fa3; --accent2: #ffd23f; --ok: #6fe0a5; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 16px/1.4 system-ui, sans-serif; overflow: hidden;
+               -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; touch-action: none; }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  a { color: var(--accent2); }
+  .btn { min-height: 44px; padding: 8px 16px; border-radius: 12px; background: var(--card); border: 1px solid var(--line); white-space: nowrap; }
+  .btn.primary { background: var(--accent); border-color: transparent; color: #22041a; font-weight: 700; }
+  [hidden] { display: none !important; }
+
+  /* ---------- library ---------- */
+  #library { display: flex; flex-direction: column; height: 100%; }
+  /* left padding keeps clear of the hub's Apps button */
+  header { display: flex; align-items: center; gap: 10px; min-height: 60px; padding: 8px 12px 8px 110px; border-bottom: 1px solid var(--line); }
+  header h1 { margin: 0; font-size: 18px; font-weight: 600; flex: 1; }
+  #continue { max-width: 50%; overflow: hidden; text-overflow: ellipsis; }
+  .scroll { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 12px 16px 20px; touch-action: pan-y; }
+  h2 { margin: 16px 2px 8px; font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .intro { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; padding: 14px; border-radius: 14px; background: var(--panel); border: 1px solid var(--line); max-width: 760px; }
+  .intro p { margin: 0; flex: 1 1 320px; color: #d9d1e8; font-size: 15px; }
+  .games { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+  .game { display: flex; flex-direction: column; gap: 3px; text-align: left; padding: 12px 14px; border-radius: 14px; background: var(--card); border: 1px solid var(--line); min-height: 104px; }
+  .game b { font-size: 17px; }
+  .game small { color: var(--muted); font-size: 12px; }
+  .game span { font-size: 13px; color: #cfc7de; }
+  .game em { margin-top: auto; padding-top: 4px; font-style: normal; font-size: 13px; font-weight: 700; color: var(--accent2); }
+  .game.ready em { color: var(--ok); }
+  .game:not(.ready) { opacity: .82; }
+  #status:empty { display: none; }
+  #status { margin: 10px 2px 0; }
+  .note { font-size: 13px; color: var(--muted); margin: 6px 2px; max-width: 60em; }
+  .legal { margin-top: 18px; font-size: 12px; color: var(--muted); user-select: text; -webkit-user-select: text; max-width: 60em; }
+  .legal p { margin: 4px 0; }
+
+  /* ---------- overlays ---------- */
+  .overlay { position: fixed; inset: 0; z-index: 5; display: grid; place-items: center; padding: 64px 16px 16px; background: rgba(8, 6, 14, .92); overflow-y: auto; }
+  .sheet { display: flex; gap: 20px; align-items: center; max-width: 720px; padding: 18px; border-radius: 18px; background: var(--panel); border: 1px solid var(--line); }
+  .qr { flex: none; display: grid; place-items: center; width: 236px; height: 236px; border-radius: 12px; background: #fff; }
+  .qr a { display: block; }
+  .qr img, .qr canvas { display: block; width: 216px; height: 216px; image-rendering: pixelated; }
+  .steps h2 { margin: 0 0 6px; font-size: 19px; color: var(--text); letter-spacing: 0; text-transform: none; }
+  .steps ol { margin: 0 0 10px; padding-left: 20px; font-size: 15px; color: #d9d1e8; }
+  #transferStatus { margin: 0 0 6px; font-size: 14px; color: var(--muted); }
+  #received { list-style: none; margin: 0 0 10px; padding: 0; max-height: 110px; overflow-y: auto; font-size: 14px; }
+  #received li::before { content: '✓ '; color: var(--ok); }
+  #received li.bad::before { content: '✕ '; color: var(--accent); }
+  #received li.busy::before { content: '… '; color: var(--muted); }
+  .msg { flex-direction: column; align-items: stretch; max-width: 560px; }
+  .msg h2 { margin: 0 0 8px; font-size: 19px; color: var(--text); letter-spacing: 0; text-transform: none; }
+  .msg p { margin: 0 0 10px; font-size: 15px; color: #d9d1e8; overflow-wrap: anywhere; }
+  @media (max-width: 640px) { .sheet:not(.msg) { flex-direction: column; } }
+
+  /* ---------- player ---------- */
+  #player { position: fixed; inset: 0; display: grid; grid-template-columns: 136px minmax(0, 1fr) 136px; grid-template-rows: 60px minmax(0, 1fr); background: #000; }
+  .bar { grid-column: 1 / 4; display: flex; align-items: center; gap: 8px; padding: 8px 10px 8px 110px; background: var(--panel); border-bottom: 1px solid var(--line); }
+  .bar b { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .screen { grid-column: 2; grid-row: 2; position: relative; min-width: 0; min-height: 0; }
+  /* the canvas must have no border or padding, or the game's touches land off */
+  #canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; border: 0; padding: 0; background: #000; outline: none; }
+  .side { grid-row: 2; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; padding: 6px; }
+  .side.left { grid-column: 1; }
+  .side.right { grid-column: 3; }
+  .dpad { position: relative; width: 124px; height: 124px; border-radius: 50%; background: #1d1929; border: 1px solid var(--line); }
+  .dpad i { position: absolute; background: #3b3450; border-radius: 6px; }
+  .dpad .h { left: 14px; right: 14px; top: 50%; height: 40px; margin-top: -20px; }
+  .dpad .v { top: 14px; bottom: 14px; left: 50%; width: 40px; margin-left: -20px; }
+  .dpad.up .v { box-shadow: inset 0 40px 0 -8px rgba(255, 79, 163, .75); }
+  .dpad.down .v { box-shadow: inset 0 -40px 0 -8px rgba(255, 79, 163, .75); }
+  .dpad.left .h { box-shadow: inset 40px 0 0 -8px rgba(255, 79, 163, .75); }
+  .dpad.right .h { box-shadow: inset -40px 0 0 -8px rgba(255, 79, 163, .75); }
+  .fire { display: grid; grid-template-columns: repeat(2, 56px); gap: 10px; }
+  .fire button { width: 56px; height: 56px; border-radius: 50%; border: 0; background: var(--accent); color: #22041a; font-size: 18px; font-weight: 800; }
+  .fire button:only-child { grid-column: 1 / -1; justify-self: center; width: 64px; height: 64px; }
+  .pills { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+  .pill { min-height: 42px; min-width: 56px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--line); background: #1d1929; font-size: 14px; font-weight: 700; color: var(--text); }
+  .pill.coin { background: var(--accent2); color: #2a2000; border-color: transparent; }
+  .fire button.on, .pill.on { filter: brightness(1.4); transform: scale(.94); }
+  /* a controller is in use: the game takes the on-screen controls' room */
+  #player.pad .side { display: none; }
+  #player.pad .screen { grid-column: 1 / -1; }
+  #hint { position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); padding: 6px 12px; border-radius: 10px; background: rgba(21, 18, 31, .9);
+          border: 1px solid var(--line); font-size: 14px; pointer-events: none; white-space: nowrap; }
+  #loading { position: fixed; inset: 0; z-index: 4; display: grid; place-content: center; gap: 12px; text-align: center; background: var(--bg); }
+  #loading b { font-size: 20px; }
+  #loadText { color: var(--muted); }
+</style>
+</head>
+<body>
+<section id="library">
+  <header>
+    <h1>Arcade</h1>
+    <button class="btn primary" id="continue" type="button" hidden></button>
+    <button class="btn" id="fromPhone" type="button">Get games from phone</button>
+  </header>
+  <div class="scroll">
+    <div class="intro">
+      <p>Twenty arcade games from 1977 to 1986 whose makers let them be played free. mamedev.org may give them out only from its own site, so each one comes from there to your phone, then to this screen: tap Get games from phone, scan the code, and the page on your phone links every game.</p>
+    </div>
+    <p class="note" id="status" aria-live="polite"></p>
+    <h2>Games</h2>
+    <div class="games" id="games"></div>
+    <div id="otherBox" hidden>
+      <h2>Other games you sent</h2>
+      <div class="games" id="others"></div>
+    </div>
+    <div class="legal">
+      <p>Controls on the screen: the pad moves (or turns a dial, paddle or trackball), the round buttons are the game's buttons, Coin puts in a credit and Start starts. With a controller: D-pad or stick moves, the face buttons are buttons 1 to 4, Select puts in a coin and Start starts. On a keyboard: arrows, Ctrl, Alt, Space and Shift for buttons 1 to 4, 5 for a coin and 1 to start. Games keep their high scores and settings on this car where the game saves them.</p>
+      <p>Emulator: MAME 0.289 by the MAMEdev team and contributors (GNU GPL 2 or later), with only these games' drivers, compiled to WebAssembly with small changes for this page: /arcade/engine/mame-web.patch, built by tools/build-mame.mjs in github.com/RobertPKyle/frunk-store; the source is /arcade/engine/mame-0.289-web-src.tar.xz. See /arcade/NOTICE.</p>
+      <p>The games: their ROM images are released for free, non-commercial use by their owners through mamedev.org (www.mamedev.org/roms), and are never stored or passed on by frunk.store; you download them from mamedev.org yourself. MAME is a trademark of MAMEdev.org; frunk.store is not affiliated with or endorsed by MAMEdev or the games' owners. Play only while parked.</p>
+    </div>
+  </div>
+</section>
+
+<section id="transfer" class="overlay" hidden aria-labelledby="transferTitle">
+  <div class="sheet">
+    <div class="qr" id="qr" aria-hidden="true"></div>
+    <div class="steps">
+      <h2 id="transferTitle">Get games from phone</h2>
+      <ol>
+        <li>Scan this code with your phone's camera.</li>
+        <li>On the page that opens, tap a game: mamedev.org opens. Tick the box and download it.</li>
+        <li>Back on the page, choose the downloaded .zip files. They appear here in a few seconds.</li>
+      </ol>
+      <p id="transferStatus" aria-live="polite">Getting a code…</p>
+      <ul id="received"></ul>
+      <button class="btn primary" id="transferDone" type="button">Done</button>
+    </div>
+  </div>
+</section>
+
+<section id="failed" class="overlay" hidden aria-labelledby="failedTitle">
+  <div class="sheet msg">
+    <h2 id="failedTitle">The game stopped</h2>
+    <p id="failedText"></p>
+    <div><button class="btn primary" id="failedOk" type="button">Back to games</button></div>
+  </div>
+</section>
+
+<section id="loading" hidden aria-live="polite">
+  <b id="loadTitle"></b>
+  <span id="loadText">Starting…</span>
+</section>
+
+<section id="player" hidden>
+  <div class="bar">
+    <b id="title"></b>
+    <button class="btn" id="soundBtn" type="button">Sound on</button>
+    <button class="btn" id="quitBtn" type="button">Games</button>
+  </div>
+  <div class="side left">
+    <div class="dpad" id="dpad"><i class="h"></i><i class="v"></i></div>
+    <div class="pills"><button class="pill coin" type="button" data-b="coin">Coin</button></div>
+  </div>
+  <div class="screen" id="screen">
+    <canvas id="canvas" tabindex="-1" oncontextmenu="event.preventDefault()"></canvas>
+    <div id="hint" hidden></div>
+  </div>
+  <div class="side right">
+    <div class="pills" id="throttle" hidden><button class="pill" type="button" data-b="fast">Fast</button><button class="pill" type="button" data-b="slow">Slow</button></div>
+    <div class="fire" id="fire"></div>
+    <div class="pills"><button class="pill" type="button" data-b="start">Start</button></div>
+  </div>
+</section>
+
+<script src="/probe/qrcode.min.js"></script>
+<script type="module" src="arcade.js"></script>
+<script src="/sw-register.js"></script>
+</body>
+</html>

@@ -1,0 +1,37 @@
+Arcade (apps/arcade)
+
+Emulator (engine/)
+  MAME 0.289, by the MAMEdev team and contributors.
+  License: GNU General Public License, version 2 or later, for MAME as a
+  whole (engine/COPYING); many of its files are also under the BSD 3-Clause
+  license, and the third-party libraries it includes keep their own
+  licenses, which are in the source tarball below.
+  Source: https://github.com/mamedev/mame, tag mame0289 (commit
+  f34f02505e32c1993c6a782b6814232cbfc74e36), with frunk.store's changes for
+  the browser in engine/mame-web.patch (also tools/mame/mame-web.patch in
+  https://github.com/RobertPKyle/frunk-store, whose tools/build-mame.mjs
+  builds it with Emscripten 6.0.11). The source files the build compiled,
+  with MAME's build scripts and the patch applied, are
+  engine/mame-0.289-web-src.tar.xz.
+  Only the drivers of the games below are built in: exidy/circus,
+  exidy/carpolo, exidy/exidy, exidy/starfire, exidy/victory, exidy/vertigo,
+  bally/astrocde, bally/gridlee, videogames/supertnk, videogames/looping
+  and williams/williams.
+  The changes: each animation frame runs the machine for the real time that
+  has passed (at most a tenth of a second) rather than a fixed 1/60 s; the
+  NVRAM and settings are saved when the machine exits on the web, where
+  MAME's own exit path never runs, and web_save() saves them at once for a
+  page that's being left; and the build exports the file system and links
+  IndexedDB storage for them.
+
+Games
+  None are included. Their ROM images are released by their owners for
+  free, non-commercial use through mamedev.org
+  (https://www.mamedev.org/roms/), which alone may distribute them. Each
+  player downloads them there and sends them to their own car; frunk.store
+  never stores or passes them on, and the phone transfer that carries them
+  is encrypted end to end and deleted on arrival.
+
+MAME is a registered trademark of MAMEdev.org. frunk.store is not affiliated
+with or endorsed by MAMEdev.org or the games' owners. All game names and
+trademarks belong to their owners.

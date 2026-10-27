@@ -4,7 +4,7 @@
 //   node tools/e2e.mjs                       # against `npm run dev`
 //   node tools/e2e.mjs https://frunk.store   # against production
 import { chromium } from 'playwright-core';
-import { mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { n64TestRom } from './n64-test-rom.mjs';
 
 const base = process.argv[2] || 'http://localhost:5173';
@@ -1106,6 +1106,57 @@ await check('adventure games takes game folders from a phone', async () => {
   await appFrame().getByRole('button', { name: 'Remove Nippon Safes, Inc.' }).click();
   await appFrame().getByRole('button', { name: 'Remove Nippon Safes, Inc.' }).click();
   await appFrame().locator('#mine .game').waitFor({ state: 'detached', timeout: 5000 });
+});
+
+await check('arcade takes a game from mamedev.org by phone, plays it with Coin and Start and keeps its NVRAM', async () => {
+  // Robby Roto's free ROM, as a player would download it (frunk.store never
+  // holds one); a phone names a second download "robby (1).zip"
+  const rom = shots + 'robby (1).zip';
+  if (!existsSync(rom)) {
+    const res = await fetch('https://www.mamedev.org/roms/robby/robby.zip').catch(() => null);
+    if (!res?.ok) throw new Error('SKIP: mamedev.org is out of reach');
+    writeFileSync(rom, Buffer.from(await res.arrayBuffer()));
+  }
+  await openFromHub(/Arcade/);
+  const frame = () => page.frames().find(f => f.url().includes('/arcade/'));
+  await appFrame().getByRole('button', { name: 'Get games from phone' }).click();
+  await appFrame().locator('#transferStatus').filter({ hasText: 'Waiting' }).waitFor({ timeout: 10000 });
+  const link = await appFrame().locator('#qr a').getAttribute('href');
+  if (!link.includes('?app=arcade')) throw new Error(`phone link doesn't ask for arcade games: ${link}`);
+  const phone = await browser.newPage({ viewport: { width: 390, height: 800 }, isMobile: true, hasTouch: true });
+  await phone.goto(link);
+  // the phone page links each game's page on mamedev.org
+  const links = await phone.locator('#links a').evaluateAll(as => as.map(a => a.href));
+  if (links.length !== 20 || !links.every(h => h.startsWith('https://www.mamedev.org/roms/'))) throw new Error(`phone links: ${links.length}`);
+  const [pick] = await Promise.all([phone.waitForEvent('filechooser'), phone.getByRole('button', { name: 'Choose games' }).click()]);
+  await pick.setFiles([rom]);
+  await phone.locator('#files li.ok').waitFor({ timeout: 20000 });
+  await phone.close();
+  await appFrame().locator('#received li:not(.bad):not(.busy)').filter({ hasText: 'Robby Roto' }).waitFor({ timeout: 20000 });
+  await appFrame().getByRole('button', { name: 'Done' }).click();
+  // the game is ready under MAME's name for it, and starts
+  await appFrame().locator('.game.ready').filter({ hasText: 'Robby Roto' }).click();
+  await frame().waitForFunction(() => window.JSMESS?.running, null, { timeout: 60000 });
+  const tap = async sel => {
+    const b = await appFrame().locator(sel).boundingBox();
+    await page.touchscreen.tap(b.x + b.width / 2, b.y + b.height / 2);
+  };
+  await page.waitForTimeout(2000);
+  await tap('[data-b=coin]');
+  await page.waitForTimeout(1500);
+  await tap('[data-b=start]');
+  await page.waitForTimeout(3000);
+  // Games: MAME writes the game's NVRAM, and it's kept in IndexedDB
+  await tap('#quitBtn');
+  await appFrame().locator('#library').waitFor({ state: 'visible', timeout: 15000 });
+  const kept = await frame().evaluate(() => new Promise(r => {
+    const q = indexedDB.open('/mame');
+    q.onsuccess = () => { const g = q.result.transaction('FILE_DATA').objectStore('FILE_DATA').getAllKeys(); g.onsuccess = () => r(g.result); };
+    q.onerror = () => r([]);
+  }));
+  if (!kept.includes('/mame/nvram/robby/nvram')) throw new Error(`no NVRAM kept: ${kept.join(', ')}`);
+  await appFrame().getByRole('button', { name: 'Play Robby Roto' }).waitFor({ timeout: 5000 });
+  await page.screenshot({ path: shots + 'arcade.png' });
 });
 
 await check('adventure games plays with touch and a controller and resumes from its autosave', async () => {

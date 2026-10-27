@@ -61,3 +61,5 @@ tools/.kroz-build
 tools/.supertux-build
 apps/supertux/engine
 apps/supertux/data
+tools/.mame-build
+apps/arcade/engine

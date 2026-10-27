@@ -475,6 +475,36 @@ to the cache again.
   (the bots' game code runs in the qvm interpreter: 5 bots took 550, so the
   page offers up to 4), starting in about 8 seconds. Not yet tried in the
   car.
+- `apps/arcade`: Arcade. MAME 0.289 (GPL-2.0-or-later) compiled to
+  WebAssembly by `npm run build:mame` (`tools/build-mame.mjs`: tag
+  mame0289 at a fixed commit plus `tools/mame/mame-web.patch`, MAME's own
+  Emscripten build in Docker `emscripten/emsdk:6.0.11`, because MAME's
+  SDL3 front end needs Emscripten's SDL3_ttf port; about 4 minutes; 39 MB of
+  wasm, 6.6 MB gzipped) with only the 11 drivers of the 20 games in
+  `apps/arcade/games.js`: the ones mamedev.org gives away for free,
+  non-commercial use. Their terms let only mamedev.org distribute them, so
+  none is hosted here: the phone page (`/send/?app=arcade`) links each
+  game's page on mamedev.org, the player downloads the zip there and sends
+  it, and the car keeps it in IndexedDB (`arcade`, store `roms`) under
+  MAME's set name (a phone's "robby (1).zip" becomes `robby`). Left out:
+  the Video Klein poker machines (gambling, with a casino button panel)
+  and two clone sets whose parents mamedev.org doesn't offer. MAME runs
+  with `-video accel` (its default OpenGL renderer calls functions WebGL
+  doesn't have), `-nothrottle` (MAME's own throttle spun the main thread at
+  100%; the page's frames pace it) and `-joystickprovider none`: the page
+  reads the touch pad, buttons and controllers (the car's duplicate pads
+  filtered) and sends MAME's default keys (arrows, Ctrl, Alt, Space, Shift,
+  5 coin, 1 start, A/Z for Star Fire's lever). The patch steps each frame
+  by real time instead of a fixed 1/60 s, saves NVRAM and settings on the
+  web (MAME's exit path never runs there) and adds `web_save()`, which the
+  page calls on Games, when hidden and on the hub's close handshake; they
+  live in IDBFS at `/mame`. The build also packs every file the compiler
+  read (from the build's dependency files) plus the build scripts into
+  `engine/mame-0.289-web-src.tar.xz` (9 MB) for the GPL. All 20 games
+  start; FAX and Top Gunner show their own power-on self-tests first.
+  Measured with the CPU slowed 4.5x: 250-390 ms/s of main-thread work.
+  The engine isn't in git, so run the build before deploying `apps`. Not
+  yet tried in the car.
 - `apps/supertux`: SuperTux 0.7.0 (GPL-3.0-or-later), in Holders, compiled to
   WebAssembly by `npm run build:supertux` (`tools/build-supertux.mjs`: the
   release's source tarball checked against its SHA-256, plus
@@ -833,6 +863,7 @@ npm run build:fheroes2                  # fheroes2 engine for Heroes II (needs D
 npm run build:openarena                 # Quake III engine + OpenArena (needs Docker); run before deploying apps
 npm run build:blocks                    # ClassiCube engine + its textures, font and sounds (needs Docker); run before deploying apps
 npm run build:supertux                  # SuperTux engine + its data as streaming blocks (needs Docker); run before deploying apps
+npm run build:mame                      # MAME with Arcade's drivers + its source tarball (needs Docker); run before deploying apps
 npm run build:craft4k                   # Minecraft4k-CPP for Craft 4K (needs Docker); output is committed, rerun only to update it
 npm run build:puzzles                   # Simon Tatham's Puzzles + their help and icons (needs Docker and Chrome); run before deploying apps
 npm run build:sms                       # Gearsystem for Retro Console (needs Docker); output is committed, rerun only to update it

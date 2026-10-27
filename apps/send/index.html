@@ -20,6 +20,8 @@
   #files li b { flex: none; font-weight: 600; color: var(--muted); }
   #files li.ok b { color: var(--ok); }
   #files li.bad b { color: var(--bad); }
+  #links { list-style: none; margin: -8px 0 22px; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  #links a { display: block; padding: 10px 12px; border-radius: 12px; background: var(--card); border: 1px solid var(--line); color: var(--text); text-decoration: none; font-size: 15px; }
   #msg { margin: 16px 0 0; color: var(--bad); }
   #msg:empty { display: none; }
   .fine { margin-top: 26px; font-size: 14px; color: var(--muted); }
@@ -30,6 +32,7 @@
 <main>
   <h1>Send games to your car</h1>
   <p class="lede" id="lede">Pick game files on this phone: NES (.nes), Game Boy (.gb, .gbc), Game Boy Advance (.gba), Master System (.sms), Game Gear (.gg), SG-1000 (.sg), Atari Lynx (.lnx, .lyx, .o), PC Engine / TurboGrafx-16 (.pce) or Mega Drive / Genesis (.md, .gen, .bin, .smd), zipped or not. They appear on the car screen in a few seconds.</p>
+  <ul id="links" hidden></ul>
   <button id="choose" type="button">Choose games</button>
   <input id="input" type="file" multiple hidden>
   <p id="msg" role="alert"></p>
