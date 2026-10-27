@@ -101,7 +101,7 @@
     "openttd": { "tagline": "기차, 트럭, 배, 비행기로 운송 제국을 건설하세요. 터치에 맞게 만든 오픈 소스 Transport Tycoon." },
     "openarena": { "tagline": "Quake III 엔진에서 봇과 벌이는 빠른 아레나 슈팅: 아레나 10개가 담긴 무료 게임, 화면이나 컨트롤러로 즐기세요." },
     "blocks": { "name": "블록 빌더", "tagline": "Minecraft Classic 스타일의 블록 세상에서 무엇이든 지어 보세요: 크리에이티브 모드, 비행, 플레이하는 동안 저장되는 월드." },
-    "adventure": { "name": "어드벤처 게임", "tagline": "ScummVM으로 즐기는 고전 포인트 앤 클릭 어드벤처: 무료 게임 7개, 또는 휴대폰에서 보낸 직접 소유한 게임." },
+    "adventure": { "name": "어드벤처 게임", "tagline": "ScummVM으로 즐기는 고전 포인트 앤 클릭 어드벤처: 무료 게임 12개, 또는 휴대폰에서 보낸 직접 소유한 게임." },
     "text": { "name": "텍스트 어드벤처", "tagline": "Infocom의 고전 Zork I, II, III. 이제 오픈 소스입니다. 단어를 탭해서 명령을 만들거나 직접 입력하세요." },
     "ascii": { "name": "ASCII 퀘스트", "tagline": "스콧 밀러의 Kroz 시리즈(1987~1990)가 오픈 소스로. 보석, 채찍, 괴물이 가득한 텍스트 모드 모험 7편. 탭해서 이동하세요." },
     "puzzles": { "name": "논리 퍼즐", "tagline": "Simon Tatham의 고전 논리 퍼즐 40종. Solo(스도쿠)부터 Mines, Net까지, 어떤 크기로든 새 판이 끝없이 나옵니다." },

@@ -584,19 +584,27 @@ to the cache again.
   compiled to WebAssembly by `npm run build:scummvm`
   (`tools/build-scummvm.mjs`: the v2026.4.0 tag plus
   `tools/scummvm/scummvm-web.patch`, Emscripten 4.0.10 in Docker with
-  pkg-config added by `tools/scummvm/Dockerfile`, libmad for MP3). One
-  static build with 23 engines (the free games' plus LucasArts SCUMM and
+  pkg-config added by `tools/scummvm/Dockerfile`, libmad for MP3, libmikmod
+  for SLUDGE games' tracker music and libvpx for their WebM movies; each
+  library's source tarball goes next to the engine). One
+  static build with 25 engines (the free games' plus LucasArts SCUMM and
   Humongous, Sierra AGI and SCI, Revolution, Westwood, Coktel, Adventure
   Soft and others); 31 MB of wasm, about 9 MB compressed. Static rather
   than ScummVM's plugin build: the same speed, but one file the browser
   caches compiled, against side modules compiled on every start. The script
   also copies the engine data (themes, engine tables) to `data/` with the
-  `index.json` ScummVM's web file system reads, and fetches seven freeware
+  `index.json` ScummVM's web file system reads, and fetches twelve free
   games from downloads.scummvm.org, checked against SHA-256, unmodified into
   `games/` (Beneath a Steel Sky and Flight of the Amazon Queen floppy
   versions, Lure of the Temptress, Drascula with its music pack, Sołtys,
   Sfinx, Nippon Safes; each zip carries its license, which allows free
-  distribution). The wasm and the games aren't in git, so run it before
+  distribution; the SLUDGE games The Secret of Tremendous Corporation,
+  LGPL-3.0 code and CC BY-SA 4.0 art, and Out Of Order, Frasse and the Peas
+  of Kejick and Nathan's Second Chance, freeware whose terms allow sharing
+  them whole and free; and Mystery House, public domain, typed commands).
+  Left out: Mandy (forbids any profit), the SLUDGE games whose packages state
+  no terms, God of Thunder, The Griffon Legend, DreamWeb (mature) and the big
+  CD versions. The wasm and the games aren't in git, so run it before
   deploying `apps`. The GPL source offer points at ScummVM's tag plus the
   patch (copied next to the engine) and this repo, under GPLv3 section
   6(d); `apps/adventure/NOTICE` has the details. Games are unzipped in the

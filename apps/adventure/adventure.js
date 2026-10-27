@@ -60,6 +60,27 @@ const FREE = [
     id: 'nippon', title: 'Nippon Safes, Inc.', maker: 'Dynabyte, 1992', zips: [['nippon-1.0.zip', 1977894]],
     about: 'Play three bumbling crooks, each with a story of their own, in a comic caper.',
   },
+  {
+    id: 'outoforder', title: 'Out Of Order', maker: 'Hungry Software, 2003', zips: [['outoforder.zip', 10606154]],
+    about: 'Comedy sci-fi starring a guy in silly slippers: thirty hand-drawn rooms, made by one person over three years.',
+  },
+  {
+    id: 'tsotc', title: 'The Secret of Tremendous Corporation', maker: 'Sebastian Krzyszkowiak, Konrad Burandt and Paweł Radej',
+    zips: [['tsotc-v6.zip', 34612275]],
+    about: 'A game-jam comedy grown into a full adventure about a very secretive company. Its high-resolution art is heavy work: it may run slowly on older cars.',
+  },
+  {
+    id: 'frasse', title: 'Frasse and the Peas of Kejick', maker: 'Rikard Peterson', zips: [['frasse-1.04.zip', 12769570]],
+    about: 'A comedy adventure by one of the developers who later carried on the SLUDGE engine itself.',
+  },
+  {
+    id: 'nsc', title: 'Nathan\'s Second Chance', maker: 'Upper Orbit Software', zips: [['nsc.zip', 7883785]],
+    about: 'A comedy adventure that eases you in with a little tutorial in its opening chapter.',
+  },
+  {
+    id: 'mysthous', title: 'Mystery House', maker: 'On-Line Systems (later Sierra), 1980', zips: [['MYSTHOUS.zip', 59353]],
+    about: 'The first graphic adventure: the guests in an old mansion turn up dead one by one. Type commands like GO NORTH (tap Type for the keyboard).',
+  },
 ];
 const download = g => g.zips.reduce((n, [, size]) => n + size, 0);
 

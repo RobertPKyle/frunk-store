@@ -19,6 +19,10 @@ Third-party components
 
   The build includes libmad 0.15.1b (GNU GPL version 2 or later; source in
   engine/libmad-0.15.1b.tar.gz, from https://www.underbit.com/products/mad/),
+  libmikmod 3.3.15 (GNU LGPL version 2 or later; source in
+  engine/libmikmod-3.3.15.tar.gz, from https://mikmod.sourceforge.net/),
+  libvpx 1.15.2 (BSD 3-Clause, VP8 decoding only; source in
+  engine/libvpx-1.15.2.tar.gz, from https://chromium.googlesource.com/webm/libvpx),
   and, from Emscripten's ports, SDL 3.2.4 (zlib License), libogg and
   libvorbis (BSD 3-Clause), zlib (zlib License) and libpng (libpng
   License).
@@ -42,6 +46,26 @@ Third-party components
   Their licenses allow free distribution with the license and copyright
   notices intact, and forbid charging for the games; frunk.store charges
   nothing for them.
+
+- SLUDGE games, as distributed by the ScummVM project, each zip unmodified:
+  - The Secret of Tremendous Corporation (version 6), by Sebastian
+    Krzyszkowiak, Konrad Burandt and Paweł Radej (tsotc-v6.zip): its makers
+    publish its code under the GNU LGPL version 3 and its art and sound
+    under Creative Commons Attribution-ShareAlike 4.0
+    (https://dos.itch.io/the-secret-of-tremendous-corporation).
+  - Out Of Order, copyright 2000-2003 Tim Furnish / Hungry Software
+    (outoforder.zip): freely distributable as a whole, free of charge, by
+    its author's terms (quoted in Debian's out-of-order package).
+  - Frasse and the Peas of Kejick 1.04, copyright 2003-2007 Rikard Peterson
+    (frasse-1.04.zip): may be given away as packaged, not sold
+    (Readme.rtf inside).
+  - Nathan's Second Chance 1.0.3, Upper Orbit Software (nsc.zip):
+    "copyrighted freeware", distributable with all its files together
+    (Read Me.html inside).
+
+- Mystery House (1980), by Roberta and Ken Williams for On-Line Systems,
+  later Sierra On-Line, released into the public domain (MYSTHOUS.zip,
+  the Apple II disk image as distributed by the ScummVM project).
 
 ScummVM and frunk.store are not affiliated with or endorsed by the makers of
 the games. All game names and trademarks belong to their owners.

@@ -311,7 +311,7 @@
     {
       "id": "adventure",
       "name": "Adventure Games",
-      "tagline": "Classic point-and-click adventures on ScummVM: seven free games, or ones you own sent from your phone.",
+      "tagline": "Classic point-and-click adventures on ScummVM: twelve free games, or ones you own sent from your phone.",
       "path": "/adventure/",
       "icon": "/adventure/icon.svg",
       "tags": [

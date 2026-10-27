@@ -1171,6 +1171,32 @@ await check('adventure games plays with touch and a controller and resumes from 
   await appFrame().locator('#library').waitFor({ state: 'visible', timeout: 10000 });
 });
 
+await check('adventure games starts the SLUDGE games and Mystery House', async () => {
+  await openFromHub(/Adventure Games/);
+  const frame = () => page.frames().find(f => f.url().includes('/adventure/'));
+  for (const name of ['Out Of Order', 'The Secret of Tremendous Corporation', 'Frasse and the Peas of Kejick', 'Nathan\'s Second Chance', 'Mystery House']) {
+    await appFrame().locator('#free .game').filter({ hasText: name }).first().click();
+    // ScummVM names the game it recognised in the window title
+    const t0 = Date.now();
+    let title = '';
+    while (Date.now() - t0 < 90000) {
+      title = await frame().evaluate(() => document.title).catch(() => '');
+      if (title && title !== 'Adventure Games' && !/^ScummVM\b/.test(title)) break;
+      if (await appFrame().locator('#failed').isVisible().catch(() => false)) throw new Error(`${name}: ${await appFrame().locator('#failed').innerText()}`);
+      await page.waitForTimeout(500);
+    }
+    if (!title || title === 'Adventure Games' || /^ScummVM\b/.test(title)) throw new Error(`${name} wasn't recognised`);
+    // and it keeps running and drawing
+    await page.waitForTimeout(6000);
+    if (await appFrame().locator('#failed').isVisible()) throw new Error(`${name}: ${await appFrame().locator('#failed').innerText()}`);
+    await appFrame().locator('#canvas').screenshot({ path: `${shots}adventure-${name.split(' ')[0].toLowerCase()}.png` });
+    // (after a screenshot, Playwright's clicks may stop reaching the app's
+    // frame in headless Chrome, so Games is pressed from inside it)
+    await frame().evaluate(() => document.getElementById('quitBtn').click());
+    await appFrame().locator('#library').waitFor({ state: 'visible', timeout: 15000 });
+  }
+});
+
 await check('text adventures plays zork by tapping words, undoes and picks up where it was left', async () => {
   await openFromHub(/Text Adventures/);
   const frame = () => page.frames().find(f => f.url().includes('/text/'));
