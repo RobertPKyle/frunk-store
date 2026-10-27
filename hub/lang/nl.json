@@ -62,7 +62,10 @@
     "unofficial": "Onofficieel. Niet verbonden aan Tesla, Inc. Gebruik apps alleen als de auto geparkeerd staat.",
     "frameTitle": "App",
     "home": "‹ Apps",
-    "homeLabel": "Terug naar de apps"
+    "homeLabel": "Terug naar de apps",
+    "badgeNew": "Nieuw",
+    "badgeUpdated": "Bijgewerkt",
+    "slowLoad": "Nog aan het laden. Bij een zwak signaal kan dit even duren."
   },
   "tags": {
     "Game": "Game",

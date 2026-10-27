@@ -7,6 +7,7 @@
       "tagline": "Can your Tesla brain? A 20-second test of the car's computer, ranked against other Teslas, phones and PCs.",
       "path": "/brain/",
       "icon": "/brain/icon.svg",
+      "added": "2026-10-23",
       "tags": [
         "Tool"
       ]
@@ -149,6 +150,7 @@
       "tagline": "Twenty arcade games from 1977 to 1986 on MAME, free from their makers through mamedev.org: Robby Roto, Gridlee, Targ, Super Tank and more, sent from your phone.",
       "path": "/arcade/",
       "icon": "/arcade/icon.svg",
+      "added": "2026-10-27",
       "tags": [
         "Game",
         "Controller"
@@ -160,6 +162,7 @@
       "tagline": "Nine free retro games on the TIC-80 fantasy console, plus any .tic carts you send from your phone. Touch or controller.",
       "path": "/tic80/",
       "icon": "/tic80/icon.svg",
+      "added": "2026-10-23",
       "tags": [
         "Game",
         "Controller"
@@ -171,6 +174,7 @@
       "tagline": "Play homebrew games, or NES, Game Boy, GBA, Master System, Game Gear and Atari Lynx games you own sent from your phone, with a controller or on screen.",
       "path": "/retro/",
       "icon": "/retro/icon.svg",
+      "updated": "2026-10-26",
       "tags": [
         "Game",
         "Controller"
@@ -193,6 +197,7 @@
       "tagline": "Early access for FrunkStore token holders: SuperTux, Craft 4K, fheroes2 (Heroes II), Freedoom, LibreQuake, OpenArena, OpenTTD, and Genesis and TurboGrafx-16 games, plus a vote on what's next. Unlock with your phone's wallet.",
       "path": "/holders/",
       "icon": "/holders/icon.svg",
+      "updated": "2026-10-27",
       "tags": [
         "Game",
         "Controller"
@@ -325,6 +330,7 @@
       "tagline": "Classic point-and-click adventures on ScummVM: twelve free games, or ones you own sent from your phone.",
       "path": "/adventure/",
       "icon": "/adventure/icon.svg",
+      "updated": "2026-10-27",
       "tags": [
         "Game",
         "Touch",
@@ -349,6 +355,7 @@
       "tagline": "Scott Miller's Kroz games, 1987 to 1990, now open source: seven text-mode quests of gems, whips and creatures. Tap to walk.",
       "path": "/ascii/",
       "icon": "/ascii/icon.svg",
+      "added": "2026-10-27",
       "tags": [
         "Game",
         "Touch",
@@ -384,6 +391,7 @@
       "tagline": "An aquarium that keeps living while you're away. Feed it, watch it evolve. By Jason Goldfeder.",
       "path": "/terrarium/",
       "icon": "/terrarium/icon.svg",
+      "added": "2026-10-23",
       "tags": [
         "Camp Mode",
         "Offline"

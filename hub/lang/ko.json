@@ -62,7 +62,10 @@
     "unofficial": "비공식 사이트입니다. Tesla, Inc.와 관련이 없습니다. 앱은 주차 중에만 사용하세요.",
     "frameTitle": "앱",
     "home": "‹ 앱",
-    "homeLabel": "앱 목록으로 돌아가기"
+    "homeLabel": "앱 목록으로 돌아가기",
+    "badgeNew": "신규",
+    "badgeUpdated": "업데이트",
+    "slowLoad": "아직 불러오는 중입니다. 신호가 약하면 느릴 수 있습니다."
   },
   "tags": {
     "Game": "게임",

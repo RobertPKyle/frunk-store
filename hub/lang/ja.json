@@ -62,7 +62,10 @@
     "unofficial": "非公式サイトです。Tesla, Inc. とは関係ありません。アプリは駐車中にのみ使ってください。",
     "frameTitle": "アプリ",
     "home": "‹ アプリ",
-    "homeLabel": "アプリ一覧に戻る"
+    "homeLabel": "アプリ一覧に戻る",
+    "badgeNew": "新着",
+    "badgeUpdated": "更新",
+    "slowLoad": "読み込み中です。電波が弱いと時間がかかることがあります。"
   },
   "tags": {
     "Game": "ゲーム",

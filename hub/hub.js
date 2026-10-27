@@ -10,6 +10,8 @@ const filterRow = document.getElementById('filters');
 const runner = document.getElementById('runner');
 let frame = document.getElementById('frame');
 const loading = document.getElementById('loading');
+const slowLoad = document.getElementById('slowLoad');
+let slowTimer;
 
 let catalog;
 let appsOrigin;
@@ -30,6 +32,8 @@ const store = {
 const FILTERS = [['all', 'filterAll'], ['Game', 'filterGames'], ['Camp Mode', 'filterCamp'], ['Road Trip', 'filterRoad'], ['Tool', 'filterTools']];
 let filter = store.get('filter', 'all');
 const RECENT = 3;          // apps in the Recent row: as many as fit across the car's screen
+const NEWS_DAYS = 14;      // how long an app's "added" or "updated" date in the catalog earns it a badge
+const SLOW_LOAD = 8000;    // ms before the spinner says the app is still loading
 
 // Local dev (tools/dev.mjs) serves apps on the next port. 127.0.0.1 is a
 // different site from localhost, which mirrors production isolation.
@@ -90,10 +94,21 @@ function el(tag, attrs = {}, ...children) {
 // the footer).
 const listed = () => catalog.apps.filter(app => !app.holders && !app.unlisted);
 
+// A "New" or "Updated" badge while the catalog's date for it is recent, until
+// the app is opened after that date
+function badge(app) {
+  const [key, date] = app.updated ? ['badgeUpdated', app.updated] : app.added ? ['badgeNew', app.added] : [];
+  if (!date) return [];
+  const since = Date.parse(date + 'T00:00');
+  if (!(Date.now() - since < NEWS_DAYS * 86400_000) || store.get('opened', {})[app.id] >= since) return [];
+  return [el('span', { class: 'badge' }, t(key))];
+}
+
 function renderGrid() {
   const shown = listed().filter(app => filter === 'all' || app.tags.includes(filter));
   grid.replaceChildren(...shown.map(app => {
-    const card = el('button', { class: 'card', type: 'button' },
+    const card = el('button', { class: 'card', type: 'button', 'data-app': app.id },
+      ...badge(app),
       el('img', { src: appsOrigin + app.icon, alt: '', width: 64, height: 64 }),
       el('h2', {}, appName(app)),
       el('p', {}, appTagline(app)),
@@ -138,7 +153,26 @@ function renderRecent() {
 
 function remember(id) {
   store.set('recent', [id, ...store.get('recent', []).filter(r => r !== id)].slice(0, 12));
+  store.set('opened', { ...store.get('opened', {}), [id]: Date.now() });
+  grid.querySelector(`[data-app="${id}"] .badge`)?.remove();
 }
+
+// A game played with a controller never touches the screen, so the hub keeps
+// the screen on while a game is open. The browser lets go of the lock
+// whenever the page is hidden; it's asked for again when the page shows.
+let awake = false, lock = null;
+async function stayAwake(on) {
+  awake = on;
+  if (!on) { lock?.release().catch(() => {}); lock = null; return; }
+  if (lock || document.hidden || !navigator.wakeLock) return;
+  try {
+    const next = await navigator.wakeLock.request('screen');
+    if (!awake || lock) { next.release().catch(() => {}); return; }   // closed, or asked twice, meanwhile
+    lock = next;
+    next.addEventListener('release', () => { if (lock === next) lock = null; });
+  } catch {}
+}
+document.addEventListener('visibilitychange', () => stayAwake(awake));
 
 // A tap on an app. Someone who used full screen last time gets it again:
 // it can only be asked for during a tap, so this is the first chance.
@@ -170,9 +204,13 @@ function openApp(id, { push }) {
     pushedHistory = true;
   }
   loading.hidden = false;
+  slowLoad.hidden = true;
+  clearTimeout(slowTimer);
+  slowTimer = setTimeout(() => { slowLoad.hidden = false; }, SLOW_LOAD);
   opened++;
   saveOnClose = false;
   remember(id);
+  stayAwake(app.tags.includes('Game'));
   freshFrame();
   frame.src = appsOrigin + app.path;
   runner.hidden = false;
@@ -182,6 +220,8 @@ function openApp(id, { push }) {
 function closeApp() {
   runner.hidden = true;
   document.title = 'frunk.store';
+  clearTimeout(slowTimer);
+  stayAwake(false);
   renderRecent();
   // unload the app so it stops using CPU and memory
   const unload = () => freshFrame();
@@ -286,19 +326,30 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && !langMenu.hidden) { showLangMenu(false); langBtn.focus(); }
 });
 
+// With no app list (no connection on the first visit), it tries again every
+// few seconds and as soon as the browser says it's back online
+let retry, fetching = false;
 async function init() {
-  grid.replaceChildren(...Array.from({ length: 3 }, () => el('div', { class: 'skeleton' })));
+  if (catalog || fetching) return;
+  fetching = true;
+  const err = document.getElementById('catalogError');
+  clearTimeout(retry);
+  if (err.hidden) grid.replaceChildren(...Array.from({ length: 3 }, () => el('div', { class: 'skeleton' })));
   try {
     const res = await fetch('/catalog.json');
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     catalog = await res.json();
   } catch (e) {
     grid.replaceChildren();
-    const err = document.getElementById('catalogError');
     err.hidden = false;
     err.textContent = t('catalogError').replace('{error}', e.message);
+    retry = setTimeout(init, 10000);
     return;
+  } finally {
+    fetching = false;
   }
+  err.hidden = true;
+  removeEventListener('online', init);
   appsOrigin = resolveAppsOrigin(catalog.appsOrigin);
   renderRecent();
   renderFilters();
@@ -338,4 +389,5 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').cat
 loadLang(lang)
   .then(next => { dict = next; }, () => { lang = 'en'; })
   .finally(() => { applyLang(); root.classList.remove('i18n-wait'); });
+addEventListener('online', init);
 init();

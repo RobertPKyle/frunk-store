@@ -62,7 +62,10 @@
     "unofficial": "非官方网站，与 Tesla, Inc. 没有任何关系。请只在停车时使用应用。",
     "frameTitle": "应用",
     "home": "‹ 返回",
-    "homeLabel": "返回应用列表"
+    "homeLabel": "返回应用列表",
+    "badgeNew": "新",
+    "badgeUpdated": "更新",
+    "slowLoad": "仍在加载，信号较弱时可能会比较慢。"
   },
   "tags": {
     "Game": "游戏",

@@ -134,6 +134,33 @@ await check('hub shows recent apps and filters by category', async () => {
   await page.waitForSelector('#runner', { state: 'hidden' });
 });
 
+await check('hub badges a new app until it is opened', async () => {
+  // Brick Breaker made new today, so the check doesn't depend on the catalog's real dates
+  const today = new Date().toLocaleDateString('sv');
+  // on the context, so it reaches the hub's service worker too
+  await page.context().route('**/catalog.json', async route => {
+    const catalog = await (await route.fetch()).json();
+    catalog.apps.find(app => app.id === 'breakout').added = today;
+    route.fulfill({ json: catalog });
+  });
+  try {
+    await page.evaluate(() => localStorage.removeItem('hub.opened'));
+    await page.reload();
+    const card = page.locator('#grid .card[data-app="breakout"]');
+    await card.locator('.badge', { hasText: 'New' }).waitFor({ timeout: 3000 });
+    await card.click();
+    await page.waitForSelector('#loading', { state: 'hidden' });
+    await page.click('#home');
+    await page.waitForSelector('#runner', { state: 'hidden' });
+    if (await card.locator('.badge').count()) throw new Error('badge still shown after opening');
+    await page.reload();
+    await page.waitForSelector('#grid .card');
+    if (await card.locator('.badge').count()) throw new Error('badge back after a reload');
+  } finally {
+    await page.context().unroute('**/catalog.json');
+  }
+});
+
 await check('hub switches language and remembers it', async () => {
   const zh = await (await fetch(base + '/lang/zh-Hant.json')).json();
   await page.goto(base + '/');

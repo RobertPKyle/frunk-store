@@ -62,7 +62,10 @@
     "unofficial": "Uoffisiell. Ikke tilknyttet Tesla, Inc. Bruk apper bare når bilen står parkert.",
     "frameTitle": "App",
     "home": "‹ Apper",
-    "homeLabel": "Tilbake til appene"
+    "homeLabel": "Tilbake til appene",
+    "badgeNew": "Ny",
+    "badgeUpdated": "Oppdatert",
+    "slowLoad": "Laster fortsatt. Svakt signal kan gjøre dette tregt."
   },
   "tags": {
     "Game": "Spill",

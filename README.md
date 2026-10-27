@@ -23,6 +23,13 @@ its lede, and chips that filter the grid by tag (Game, Camp Mode, Road Trip,
 Tool); both are kept in the hub's localStorage, along with whether full
 screen was on, so the next tap on an app turns it back on.
 
+An app's catalog entry can carry `"added"` or `"updated"` with a date
+(`YYYY-MM-DD`). For 14 days after it, the app's card shows a New or Updated
+badge, until it's opened after that date. Set `added` on a new app and
+`updated` when an app gains something worth a second look (new games, a new
+console). While an app tagged Game is open, the hub keeps the screen on with
+a wake lock, since play with a controller never touches the screen.
+
 The hub's own text comes in English, Traditional and Simplified Chinese,
 German, Norwegian, Dutch, Japanese and Korean (the apps stay in English). The
 language button in the header switches it; until someone picks one, the hub

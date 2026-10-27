@@ -27,4 +27,6 @@ export const EN_UI = {
   filterTools: 'Tools',
   copied: 'Copied',
   selected: 'Selected',
+  badgeNew: 'New',
+  badgeUpdated: 'Updated',
 };

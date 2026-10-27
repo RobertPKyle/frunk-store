@@ -62,7 +62,10 @@
     "unofficial": "Inoffiziell. Nicht mit Tesla, Inc. verbunden. Apps nur im Stand verwenden.",
     "frameTitle": "App",
     "home": "‹ Apps",
-    "homeLabel": "Zurück zu den Apps"
+    "homeLabel": "Zurück zu den Apps",
+    "badgeNew": "Neu",
+    "badgeUpdated": "Aktualisiert",
+    "slowLoad": "Lädt noch. Bei schwachem Empfang kann das dauern."
   },
   "tags": {
     "Game": "Spiel",
