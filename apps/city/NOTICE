@@ -1,0 +1,37 @@
+City Builder (apps/city)
+
+City simulation (engine/)
+  micropolisJS, by Graeme McCutcheon and contributors: a JavaScript port of
+  Micropolis, the open-source release of the 1989 city simulator by Will
+  Wright and Maxis, which Don Hopkins prepared for One Laptop per Child.
+  License: GNU General Public License, version 3 (engine/COPYING), with the
+  additional terms in engine/LICENSE, which every copy must carry.
+  Source: https://github.com/graememcc/micropolisJS, commit
+  f13a1624d111d235e804bd80f48ba7c9f66a8e0f, in
+  engine/micropolisJS-src.tar.gz together with frunk.store's changes
+  (micropolis-web.patch, also tools/city/micropolis-web.patch in
+  https://github.com/RobertPKyle/frunk-store, whose tools/build-city.mjs
+  builds engine/engine.js from them).
+  This is a modified version. The changes: the query tool hands its findings
+  to the page instead of writing into micropolisJS's own window; each object
+  keeps its own event listeners (they were shared by every object of a kind,
+  so a second city, or a second plane, heard the first one's events); the
+  census reads the city's own budget (it read a page element of the same
+  name); and an unused import that doesn't exist is gone. Only the
+  simulation, map, tools, sprites and map generator are bundled: micropolisJS's
+  windows, canvas, input and jQuery are left out.
+  The tile and sprite graphics (engine/tiles.png, engine/sprites.png) come
+  with micropolisJS under the same terms.
+
+  Micropolis is a registered trademark of Micropolis Corporation (Micropolis
+  GmbH) and is licensed here as a courtesy of the owner under the Micropolis
+  Public Name License (engine/MicropolisPublicNameLicense.md,
+  https://www.micropolis.com). The game here is called City Builder; the
+  name Micropolis is used only to credit where the simulation comes from.
+  SimCity is a trademark of Electronic Arts; this program has no affiliation
+  with Electronic Arts, which disclaims all warranties (see engine/LICENSE).
+
+The rest of apps/city (the page, its map drawing, touch and controller
+controls, saves and the icon.svg) is part of frunk.store, and is free
+software under the same GNU General Public License, version 3, as it makes
+up one program with the simulation.

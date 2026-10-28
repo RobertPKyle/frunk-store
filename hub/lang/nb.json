@@ -105,6 +105,7 @@
     "openttd": { "tagline": "Bygg et transportimperium med tog, lastebiler, skip og fly. Transport Tycoon med åpen kildekode, laget for berøring." },
     "openarena": { "tagline": "Rask arenaskyting mot boter på Quake III-motoren: et gratis spill med ti arenaer, på skjermen eller med kontroller." },
     "blocks": { "name": "Klossebygger", "tagline": "Bygg hva du vil i en klosseverden i Minecraft Classic-stil: kreativ modus, flyging og verdener som lagres mens du spiller." },
+    "city": { "name": "Bybygger", "tagline": "Grunnlegg en by og la den vokse fra landsby til megalopolis: soner, veier, strøm, skatter og katastrofer, i den klassiske bysimuleringen fra 1989, nå med åpen kildekode." },
     "adventure": { "name": "Eventyrspill", "tagline": "Klassiske pek-og-klikk-eventyr på ScummVM: tolv gratis spill, eller spill du eier, sendt fra telefonen." },
     "text": { "name": "Teksteventyr", "tagline": "Zork I, II og III, Infocom-klassikerne, nå med åpen kildekode. Trykk på ord for å lage kommandoer, eller skriv." },
     "ascii": { "name": "ASCII-eventyr", "tagline": "Scott Millers Kroz-spill fra 1987 til 1990, nå med åpen kildekode: sju teksteventyr med edelsteiner, pisker og monstre. Trykk for å gå." },

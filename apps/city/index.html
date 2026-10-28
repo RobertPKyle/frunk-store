@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>City Builder</title>
+<style>
+  :root { --bg: #0a0c0a; --panel: #121612; --card: #1a201a; --line: rgba(190, 255, 190, .14); --text: #ecf2ea; --muted: #9aa898;
+          --accent: #8be08b; --money: #ffd166; --bad: #ff6b6b; --good: #8be08b; --info: #7cc7ff; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 16px/1.4 system-ui, sans-serif; overflow: hidden;
+               -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  .btn { min-height: 44px; padding: 8px 16px; border-radius: 12px; background: var(--card); border: 1px solid var(--line); white-space: nowrap; }
+  .btn.primary { background: var(--accent); border-color: transparent; color: #0d1f0d; font-weight: 700; }
+  .btn.danger { color: var(--bad); }
+  .btn:disabled { opacity: .45; cursor: default; }
+  [hidden] { display: none !important; }
+
+  /* ---------- the list of cities ---------- */
+  #home { display: flex; flex-direction: column; height: 100%; }
+  /* left padding keeps clear of the hub's Apps button */
+  header { display: flex; align-items: center; gap: 10px; min-height: 60px; padding: 8px 12px 8px 110px; border-bottom: 1px solid var(--line); }
+  header h1 { margin: 0; font-size: 18px; font-weight: 600; flex: 1; }
+  .scroll { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 12px 16px 20px; touch-action: pan-y; }
+  h2 { margin: 10px 2px 8px; font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .cities { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+  .city { display: flex; gap: 12px; align-items: center; text-align: left; padding: 10px 12px; border-radius: 14px; background: var(--card); border: 1px solid var(--line); min-height: 96px; }
+  .city canvas { flex: none; width: 96px; height: 80px; border-radius: 8px; image-rendering: pixelated; background: #000; }
+  .city div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .city b { font-size: 17px; color: var(--accent); overflow: hidden; text-overflow: ellipsis; }
+  .city small { color: var(--muted); font-size: 13px; }
+  .city.new { justify-content: center; font-weight: 700; color: var(--accent); border-style: dashed; }
+  .empty { color: var(--muted); font-size: 15px; margin: 4px 2px 0; }
+  .howto { max-width: 60em; margin: 4px 2px 0; font-size: 14px; color: #d6dfd3; }
+  .howto p { margin: 0 0 8px; }
+  .legal { margin-top: 18px; font-size: 12px; color: var(--muted); user-select: text; -webkit-user-select: text; max-width: 60em; }
+  .legal p { margin: 4px 0; }
+  .legal a { color: var(--muted); }
+
+  /* ---------- sheets ---------- */
+  .overlay { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: 12px 12px 12px 12px; background: rgba(4, 6, 4, .78); }
+  .sheet { display: flex; flex-direction: column; gap: 10px; width: min(560px, 100%); max-height: 100%; overflow-y: auto; overscroll-behavior: contain;
+           padding: 16px 18px; border-radius: 18px; background: var(--panel); border: 1px solid var(--line); }
+  .sheet h3 { margin: 0; font-size: 19px; font-weight: 650; }
+  .sheet p { margin: 0; font-size: 15px; color: #d6dfd3; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .row.end { justify-content: flex-end; }
+  .seg { display: flex; border-radius: 12px; border: 1px solid var(--line); overflow: hidden; }
+  .seg button { flex: 1; min-height: 44px; padding: 6px 12px; background: var(--card); border: 0; border-left: 1px solid var(--line); }
+  .seg button:first-child { border-left: 0; }
+  .seg button.on { background: var(--accent); color: #0d1f0d; font-weight: 700; }
+  label.field { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); }
+  input[type=text] { min-height: 46px; padding: 8px 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); color: var(--text);
+                     font: 600 17px system-ui, sans-serif; user-select: text; -webkit-user-select: text; }
+  #newMap { width: 100%; max-width: 360px; aspect-ratio: 6 / 5; align-self: center; border-radius: 10px; image-rendering: pixelated; background: #000; }
+  .stats { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; font-size: 15px; }
+  .stats dt { color: var(--muted); }
+  .stats dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
+  .slider { display: grid; grid-template-columns: 74px 1fr 128px; gap: 10px; align-items: center; font-size: 15px; }
+  .slider output { text-align: right; font-variant-numeric: tabular-nums; color: #d6dfd3; font-size: 14px; }
+  input[type=range] { width: 100%; height: 36px; accent-color: var(--accent); }
+  .sum { display: flex; justify-content: space-between; font-size: 15px; font-variant-numeric: tabular-nums; }
+  .sum b { color: var(--money); }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .toggle { display: flex; justify-content: space-between; align-items: center; gap: 12px; min-height: 48px; font-size: 15px; }
+  .toggle small { display: block; color: var(--muted); font-size: 13px; }
+  #overview { display: block; width: 100%; max-width: 480px; aspect-ratio: 6 / 5; align-self: center; border-radius: 10px; image-rendering: pixelated; background: #000; touch-action: none; }
+  .layers { display: flex; flex-wrap: wrap; gap: 6px; }
+  .layers button { min-height: 38px; padding: 4px 12px; border-radius: 10px; background: var(--card); border: 1px solid var(--line); font-size: 14px; }
+  .layers button.on { border-color: var(--accent); color: var(--accent); }
+
+  /* ---------- the game ---------- */
+  #game { position: fixed; inset: 0; display: grid; grid-template-columns: 110px minmax(0, 1fr); grid-template-rows: 52px minmax(0, 1fr); background: #000; }
+  /* the tool column: the hub's Apps button sits in its top 60px */
+  #tools { grid-row: 1 / 3; display: grid; grid-template-columns: 1fr 1fr; grid-auto-rows: 50px; align-content: start; gap: 4px;
+           padding: 64px 6px 6px; background: var(--panel); border-right: 1px solid var(--line); overflow-y: auto; scrollbar-width: none; }
+  #tools::-webkit-scrollbar { display: none; }
+  .tool { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; padding: 2px 0 1px;
+          border-radius: 10px; background: var(--card); border: 1px solid var(--line); font-size: 11px; color: var(--muted); min-width: 0; }
+  .tool canvas { width: 30px; height: 30px; image-rendering: pixelated; }
+  .tool .glyph { display: grid; place-items: center; width: 30px; height: 30px; font-size: 21px; color: var(--info); }
+  .tool.on { border-color: var(--tc, var(--accent)); box-shadow: 0 0 0 2px var(--tc, var(--accent)) inset; color: var(--text); }
+  .tool.poor { opacity: .45; }
+  #bar { display: flex; align-items: center; gap: 8px; padding: 0 8px 0 12px; background: var(--panel); border-bottom: 1px solid var(--line); min-width: 0; }
+  #bar .who { display: flex; flex-direction: column; min-width: 0; flex: 1 1 auto; line-height: 1.15; }
+  #bar .who b { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #bar .who small { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .num { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.15; font-variant-numeric: tabular-nums; flex: none; }
+  .num b { font-size: 15px; }
+  .num small { font-size: 11px; color: var(--muted); }
+  #funds { color: var(--money); }
+  #rci { flex: none; width: 54px; height: 40px; }
+  #bar .icon { flex: none; min-width: 44px; height: 40px; padding: 0 10px; border-radius: 10px; background: var(--card); border: 1px solid var(--line); font-size: 14px; font-weight: 600; }
+  #pauseBtn.paused { color: var(--money); border-color: var(--money); }
+  #view { position: relative; min-width: 0; min-height: 0; overflow: hidden; }
+  #map { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; }
+  #hint { position: absolute; left: 8px; top: 8px; right: 8px; display: flex; justify-content: center; pointer-events: none; }
+  #hint span { padding: 5px 12px; border-radius: 10px; background: rgba(10, 14, 10, .82); border: 1px solid var(--line); font-size: 14px; color: #d6dfd3; }
+  #zoom { position: absolute; right: 8px; bottom: 8px; display: flex; flex-direction: column; gap: 6px; }
+  #zoom button { width: 48px; height: 48px; border-radius: 12px; background: rgba(18, 22, 18, .88); border: 1px solid var(--line); font-size: 22px; line-height: 1; }
+  #zoom #mapBtn { font-size: 13px; font-weight: 700; }
+  #toasts { position: absolute; left: 8px; bottom: 8px; right: 66px; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; pointer-events: none; }
+  .toast { display: flex; align-items: center; gap: 10px; max-width: 100%; padding: 7px 8px 7px 12px; border-radius: 12px; background: rgba(14, 18, 14, .92);
+           border: 1px solid var(--line); border-left: 4px solid var(--info); font-size: 14px; pointer-events: auto; animation: rise .2s ease-out; }
+  .toast.bad { border-left-color: var(--bad); }
+  .toast.good { border-left-color: var(--good); }
+  .toast button { flex: none; min-height: 34px; padding: 2px 12px; border-radius: 9px; background: var(--card); border: 1px solid var(--line); font-size: 13px; font-weight: 600; }
+  @keyframes rise { from { transform: translateY(8px); opacity: 0; } }
+  #query { position: absolute; top: 8px; right: 8px; width: 230px; padding: 10px 12px; border-radius: 14px; background: rgba(14, 18, 14, .94); border: 1px solid var(--line); }
+  #query h4 { margin: 0 0 6px; font-size: 16px; color: var(--info); }
+  #query .stats { font-size: 14px; }
+
+  /* tall screens: the tools go under the map */
+  @media (max-aspect-ratio: 1/1) {
+    #game { grid-template-columns: minmax(0, 1fr); grid-template-rows: 52px minmax(0, 1fr) auto; }
+    #bar { padding-left: 110px; }
+    #tools { grid-row: 3; grid-template-columns: none; grid-auto-flow: column; grid-template-rows: 50px 50px; grid-auto-columns: 58px; padding: 6px;
+             border-right: 0; border-top: 1px solid var(--line); overflow-x: auto; overflow-y: hidden; }
+  }
+</style>
+</head>
+<body>
+<section id="home">
+  <header>
+    <h1>City Builder</h1>
+  </header>
+  <div class="scroll">
+    <h2>Your cities</h2>
+    <div class="cities" id="cities"></div>
+
+    <h2 style="margin-top:20px">How to play</h2>
+    <div class="howto">
+      <p>You're the mayor of an empty piece of land. Zone it for homes (R), shops and offices (C) and factories (I), join the zones with roads, and bring in electricity from a power plant with power lines. People move in when the zones have power and a road, and the city grows from there. Taxes pay for the roads, police and fire departments.</p>
+      <p>Pick a tool. Tap the map to place a zone or building. Roads, rail, power lines, parks and the bulldozer are drawn with one finger. Look tells you about a spot. Drag to move around the map (with two fingers while a drawing tool is picked), and pinch or use + and − to zoom. Map shows the whole city with pollution, crime, land value and more.</p>
+      <p>The bars next to the money show what the city wants more of: residential, commercial or industrial. Watch the messages at the bottom: they say what your citizens need. Budget sets the tax rate and spending; Evaluation says what people think of you.</p>
+      <p>On a controller: the stick or D-pad moves the cursor, A builds (hold it to draw), B is Look, the shoulder buttons change tools, Y and X zoom, Start pauses.</p>
+      <p>Your cities are saved on this screen every game year and whenever you leave.</p>
+    </div>
+
+    <div class="legal">
+      <p>City Builder runs the city simulation of micropolisJS by Graeme McCutcheon, a JavaScript port of Micropolis, the open-source release of the 1989 city simulator by Will Wright and Maxis that Don Hopkins prepared for One Laptop per Child. micropolisJS is free software under the GNU General Public License, version 3, with additional terms; City Builder is a modified version of it, with its own map, controls and saves, and is free software under the same license. Source: frunk-apps.vercel.app/city/engine/micropolisJS-src.tar.gz, and the rest of the page in this app's own files.</p>
+      <p>Micropolis is a registered trademark of <a href="https://www.micropolis.com" target="_blank" rel="noopener">Micropolis Corporation (Micropolis GmbH)</a> and is licensed here as a courtesy of the owner under the Micropolis Public Name License (/city/engine/MicropolisPublicNameLicense.md). SimCity is a trademark of Electronic Arts. City Builder and frunk.store aren't affiliated with Micropolis GmbH, Electronic Arts or the micropolisJS authors. See /city/NOTICE. Play only while parked.</p>
+    </div>
+  </div>
+</section>
+
+<section id="newCity" class="overlay" hidden aria-labelledby="newTitle">
+  <form class="sheet" id="newForm">
+    <h3 id="newTitle">New city</h3>
+    <canvas id="newMap" width="360" height="300" aria-label="The land for the new city"></canvas>
+    <div class="row"><button class="btn" type="button" id="newOther">Different land</button></div>
+    <label class="field">City name
+      <input id="newName" type="text" maxlength="15" autocomplete="off" autocapitalize="words" spellcheck="false" enterkeyhint="done">
+    </label>
+    <div class="seg" id="newLevel" role="radiogroup" aria-label="Difficulty">
+      <button type="button" data-level="0" class="on">Easy</button>
+      <button type="button" data-level="1">Medium</button>
+      <button type="button" data-level="2">Hard</button>
+    </div>
+    <p id="newAbout"></p>
+    <div class="row end">
+      <button class="btn" type="button" id="newCancel">Cancel</button>
+      <button class="btn primary" type="submit">Found the city</button>
+    </div>
+  </form>
+</section>
+
+<section id="ask" class="overlay" hidden aria-labelledby="askTitle">
+  <div class="sheet">
+    <h3 id="askTitle"></h3>
+    <p id="askText"></p>
+    <div class="row end" id="askButtons"></div>
+  </div>
+</section>
+
+<section id="game" hidden>
+  <div id="tools" role="toolbar" aria-label="Tools"></div>
+  <div id="bar">
+    <div class="who"><b id="cityName"></b><small id="cityDate"></small></div>
+    <div class="num"><b id="funds"></b><small>funds</small></div>
+    <div class="num"><b id="pop"></b><small id="cls"></small></div>
+    <canvas id="rci" width="108" height="80" aria-label="Demand for residential, commercial and industrial zones"></canvas>
+    <button class="icon" type="button" id="pauseBtn"></button>
+    <button class="icon" type="button" id="speedBtn"></button>
+    <button class="icon" type="button" id="menuBtn">Menu</button>
+  </div>
+  <div id="view">
+    <canvas id="map" aria-label="The city"></canvas>
+    <div id="hint" hidden><span id="hintText"></span></div>
+    <div id="query" hidden></div>
+    <div id="toasts" aria-live="polite"></div>
+    <div id="zoom">
+      <button type="button" id="mapBtn" aria-label="Whole map">Map</button>
+      <button type="button" id="zoomIn" aria-label="Zoom in">+</button>
+      <button type="button" id="zoomOut" aria-label="Zoom out">−</button>
+    </div>
+  </div>
+</section>
+
+<section id="menu" class="overlay" hidden aria-labelledby="menuTitle">
+  <div class="sheet">
+    <h3 id="menuTitle">Menu</h3>
+    <div class="grid2">
+      <button class="btn" type="button" data-open="budget">Budget</button>
+      <button class="btn" type="button" data-open="evaluation">Evaluation</button>
+      <button class="btn" type="button" data-open="overviewSheet">Map</button>
+      <button class="btn" type="button" data-open="disasters">Disasters</button>
+      <button class="btn" type="button" data-open="settings">Settings</button>
+      <button class="btn" type="button" id="quitBtn">Save and leave</button>
+    </div>
+    <div class="row end"><button class="btn primary" type="button" data-close>Back to the city</button></div>
+  </div>
+</section>
+
+<section id="budget" class="overlay" hidden aria-labelledby="budgetTitle">
+  <form class="sheet" id="budgetForm">
+    <h3 id="budgetTitle">Budget</h3>
+    <p id="budgetNote" hidden></p>
+    <div class="slider"><span>Taxes</span><input type="range" id="taxRate" min="0" max="20" step="1"><output id="taxOut"></output></div>
+    <div class="slider"><span>Roads</span><input type="range" id="roadRate" min="0" max="100" step="1"><output id="roadOut"></output></div>
+    <div class="slider"><span>Fire</span><input type="range" id="fireRate" min="0" max="100" step="1"><output id="fireOut"></output></div>
+    <div class="slider"><span>Police</span><input type="range" id="policeRate" min="0" max="100" step="1"><output id="policeOut"></output></div>
+    <div class="sum"><span>Taxes collected last year</span><b id="taxesCollected"></b></div>
+    <div class="sum"><span>Spending this year</span><b id="spending"></b></div>
+    <div class="sum"><span>Funds</span><b id="budgetFunds"></b></div>
+    <div class="row end">
+      <button class="btn" type="button" id="budgetCancel">Cancel</button>
+      <button class="btn primary" type="submit">OK</button>
+    </div>
+  </form>
+</section>
+
+<section id="evaluation" class="overlay" hidden aria-labelledby="evalTitle">
+  <div class="sheet">
+    <h3 id="evalTitle">Evaluation</h3>
+    <p id="evalOpinion"></p>
+    <p id="evalProblems"></p>
+    <dl class="stats" id="evalStats"></dl>
+    <div class="row end"><button class="btn primary" type="button" data-close>OK</button></div>
+  </div>
+</section>
+
+<section id="disasters" class="overlay" hidden aria-labelledby="disTitle">
+  <div class="sheet">
+    <h3 id="disTitle">Disasters</h3>
+    <p>Set one off on purpose. There's no undo.</p>
+    <div class="grid2" id="disList">
+      <button class="btn" type="button" data-disaster="fire">Fire</button>
+      <button class="btn" type="button" data-disaster="flood">Flood</button>
+      <button class="btn" type="button" data-disaster="tornado">Tornado</button>
+      <button class="btn" type="button" data-disaster="monster">Monster</button>
+      <button class="btn" type="button" data-disaster="crash">Plane crash</button>
+      <button class="btn" type="button" data-disaster="meltdown" id="disMeltdown">Meltdown</button>
+    </div>
+    <div class="row end"><button class="btn primary" type="button" data-close>Close</button></div>
+  </div>
+</section>
+
+<section id="settings" class="overlay" hidden aria-labelledby="setTitle">
+  <div class="sheet">
+    <h3 id="setTitle">Settings</h3>
+    <div class="toggle"><span>Disasters<small>Fires, floods, tornadoes and monsters now and then</small></span><div class="seg" data-setting="disasters"><button type="button" data-v="1">On</button><button type="button" data-v="0">Off</button></div></div>
+    <div class="toggle"><span>Auto budget<small>Pay for everything each year while the money lasts</small></span><div class="seg" data-setting="autoBudget"><button type="button" data-v="1">On</button><button type="button" data-v="0">Off</button></div></div>
+    <div class="toggle"><span>Auto bulldoze<small>Clear trees and rubble when building, for $1 a tile</small></span><div class="seg" data-setting="autoBulldoze"><button type="button" data-v="1">On</button><button type="button" data-v="0">Off</button></div></div>
+    <div class="row end">
+      <button class="btn danger" type="button" id="deleteBtn">Delete this city</button>
+      <button class="btn primary" type="button" data-close>Done</button>
+    </div>
+  </div>
+</section>
+
+<section id="overviewSheet" class="overlay" hidden aria-labelledby="ovTitle">
+  <div class="sheet">
+    <h3 id="ovTitle">Map</h3>
+    <div class="layers" id="layers"></div>
+    <canvas id="overview" width="480" height="400" aria-label="The whole city. Tap a spot to go there."></canvas>
+    <p id="ovLegend"></p>
+    <div class="row end"><button class="btn primary" type="button" data-close>Close</button></div>
+  </div>
+</section>
+
+<script type="module" src="city.js"></script>
+<script src="/sw-register.js"></script>
+</body>
+</html>

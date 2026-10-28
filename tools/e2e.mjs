@@ -1464,6 +1464,149 @@ await check('ascii quests plays Kroz from Apogee\'s GPL source: walks by touch, 
   await page.screenshot({ path: shots + 'ascii.png' });
 });
 
+await check('city builder founds a city by touch and a controller, grows it, budgets, saves when left and reopens it', async () => {
+  await openFromHub(/City Builder/);
+  const frame = () => page.frames().find(f => f.url().includes('/city/'));
+  const app = appFrame();
+  const state = () => frame().evaluate(() => window.cityTest.state());
+  const tile = (x, y) => frame().evaluate(([x, y]) => window.cityTest.tile(x, y), [x, y]);
+  await app.locator('.city.new').click();
+  // land with no water in the middle, so everything below fits
+  for (let i = 0; i < 30 && !(await frame().evaluate(() => window.cityTest.newDry())); i++) await app.locator('#newOther').click();
+  await app.locator('#newName').fill('E2E Town');
+  await app.locator('#newForm button[type=submit]').click();
+  await app.locator('#game').waitFor();
+  const map = await app.locator('#map').boundingBox();
+  const at = async (x, y) => {
+    const p = await frame().evaluate(([x, y]) => window.cityTest.screen(x, y), [x, y]);
+    return [map.x + p.x, map.y + p.y];
+  };
+  const tool = id => app.locator(`.tool[data-tool=${id}]`).click();
+  const tap = async (x, y) => { await page.touchscreen.tap(...await at(x, y)); await page.waitForTimeout(80); };
+  const cdp = await page.context().newCDPSession(page);
+  const touch = (type, points) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: points.map(([x, y], id) => ({ x, y, id })) });
+  const drag = async (from, to, steps = 10) => {
+    const a = await at(...from), b = await at(...to);
+    await touch('touchStart', [a]);
+    for (let i = 1; i <= steps; i++) {
+      await touch('touchMove', [[a[0] + (b[0] - a[0]) * i / steps, a[1] + (b[1] - a[1]) * i / steps]]);
+      await page.waitForTimeout(16);
+    }
+    await touch('touchEnd', []);
+    await page.waitForTimeout(80);
+  };
+  let s = await state();
+  if (s.name !== 'E2E Town' || s.funds !== 20000) throw new Error(`new city: ${JSON.stringify(s)}`);
+  await app.locator('#pauseBtn').click();   // build while paused, so nothing grows yet
+  const cx = Math.floor(s.view.x / 16), cy = Math.floor(s.view.y / 16);
+  // clear the trees, then a coal plant with homes, shops and factories in a
+  // row beside it (zones pass power to each other) and a road along them
+  await tool('bulldozer');
+  for (let y = cy - 5; y <= cy + 3; y++) await drag([cx - 8, y], [cx + 7, y], 8);
+  await tool('coal');
+  await tap(cx - 6, cy - 3);
+  await tool('residential');
+  await tap(cx - 2, cy - 1);
+  await tool('commercial');
+  await tap(cx + 1, cy - 1);
+  await tool('industrial');
+  await tap(cx + 4, cy - 1);
+  await tool('road');
+  await drag([cx - 8, cy + 1], [cx + 7, cy + 1], 14);
+  await tool('wire');
+  await drag([cx - 2, cy + 3], [cx + 3, cy + 3], 5);
+  const built = { coal: await tile(cx - 6, cy - 3), res: await tile(cx - 2, cy - 1), com: await tile(cx + 1, cy - 1), ind: await tile(cx + 4, cy - 1) };
+  if (built.coal !== 750 || built.res !== 244 || built.com !== 427 || built.ind !== 616) throw new Error(`buildings: ${JSON.stringify(built)}`);
+  for (let x = cx - 8; x <= cx + 7; x++) {
+    const v = await tile(x, cy + 1);
+    if (v < 64 || v >= 208) throw new Error(`no road at ${x - cx}: tile ${v}`);
+  }
+  for (let x = cx - 2; x <= cx + 3; x++) {
+    const v = await tile(x, cy + 3);
+    if (v < 208 || v > 222) throw new Error(`no power line at ${x - cx}: tile ${v}`);
+  }
+  s = await state();
+  if (s.funds >= 20000 - 3000 - 300 - 150) throw new Error(`building cost nothing: ${s.funds}`);
+  // Look tells what's on a spot
+  await tool('query');
+  await tap(cx - 2, cy - 1);
+  if (!/Residential/.test((await state()).query || '')) throw new Error(`Look: ${(await state()).query}`);
+  // two fingers apart zoom in around them
+  const z0 = (await state()).view.zoom;
+  const c = await at(cx, cy);
+  await touch('touchStart', [[c[0] - 30, c[1]], [c[0] + 30, c[1]]]);
+  for (let i = 1; i <= 6; i++) { await touch('touchMove', [[c[0] - 30 - i * 8, c[1]], [c[0] + 30 + i * 8, c[1]]]); await page.waitForTimeout(16); }
+  await touch('touchEnd', []);
+  const z1 = (await state()).view.zoom;
+  if (!(z1 > z0 * 1.5)) throw new Error(`pinch zoom ${z0} -> ${z1}`);
+  await app.locator('#zoomOut').click();
+  // a controller: the shoulder button changes tool, the D-pad moves the cursor, A held draws
+  await frame().evaluate(() => {
+    const pad = { connected: true, axes: [0, 0, 0, 0], buttons: Array.from({ length: 17 }, () => ({ pressed: false, value: 0 })) };
+    navigator.getGamepads = () => [pad];
+    window.padSet = (b, on) => Object.assign(pad.buttons[b], { pressed: on, value: on ? 1 : 0 });
+  });
+  const press = async (b, ms = 120) => {
+    await frame().evaluate(b => padSet(b, true), b);
+    await page.waitForTimeout(ms);
+    await frame().evaluate(b => padSet(b, false), b);
+    await page.waitForTimeout(120);
+  };
+  await press(5);
+  await press(5);
+  if ((await state()).tool !== 'road') throw new Error(`RB twice from Look gave ${(await state()).tool}`);
+  // the cursor starts mid-screen: take it to the cleared row between the road and the power line
+  const from = (await state()).cursor;
+  for (let i = from.x; i > cx - 8; i--) await press(14);
+  for (let i = from.y; i < cy + 2; i++) await press(13);
+  for (let i = from.y; i > cy + 2; i--) await press(12);
+  const to = (await state()).cursor;
+  if (to.x !== cx - 8 || to.y !== cy + 2) throw new Error(`controller cursor at ${to.x - cx},${to.y - cy}`);
+  const before = (await state()).funds;
+  await frame().evaluate(() => padSet(0, true));
+  await page.waitForTimeout(120);
+  for (let i = 0; i < 3; i++) await press(15);
+  await frame().evaluate(() => padSet(0, false));
+  if ((await state()).funds !== before - 40) throw new Error(`controller road cost ${before - (await state()).funds}, not $40`);
+  if (await tile(cx - 5, cy + 2) < 64 || await tile(cx - 5, cy + 2) >= 208) throw new Error('no road from the controller');
+  // five years on: people move in
+  await app.locator('#pauseBtn').click();
+  await frame().evaluate(() => window.cityTest.run(16 * 48 * 5));
+  s = await state();
+  if (s.date.year < 1905 || !(s.pop > 0)) throw new Error(`after five years: ${JSON.stringify(s)}`);
+  // the budget sets the tax
+  await app.locator('#menuBtn').click();
+  await app.locator('[data-open=budget]').click();
+  await app.locator('#taxRate').fill('9');
+  if ((await app.locator('#taxOut').textContent()) !== '9%') throw new Error('tax slider readout');
+  await app.locator('#budgetForm button[type=submit]').click();
+  if ((await state()).tax !== 9) throw new Error(`tax is ${(await state()).tax}`);
+  // the whole map, with a layer
+  await app.locator('#mapBtn').click();
+  await app.locator('#layers button', { hasText: 'Pollution' }).click();
+  if (!/dirtier/.test(await app.locator('#ovLegend').textContent())) throw new Error('pollution layer legend');
+  await app.locator('#overviewSheet [data-close]').click();
+  await page.screenshot({ path: shots + 'city.png' });
+  // the Apps button saves the city; it's on the list when the app opens again
+  const year = (await state()).date.year;
+  await page.click('#home');
+  await page.waitForSelector('#runner', { state: 'hidden' });
+  await openFromHub(/City Builder/);
+  const card = app.locator('.city').filter({ hasText: 'E2E Town' });
+  if (!/[1-9][\d,]* people/.test(await card.textContent())) throw new Error(`list: ${await card.textContent()}`);
+  await card.click();
+  await app.locator('#game').waitFor();
+  s = await state();
+  if (s.date.year !== year || await tile(cx - 6, cy - 3) !== 750) throw new Error(`reopened: ${JSON.stringify(s)}`);
+  // and it can be deleted
+  await app.locator('#menuBtn').click();
+  await app.locator('[data-open=settings]').click();
+  await app.locator('#deleteBtn').click();
+  await app.locator('#askButtons button', { hasText: 'Delete' }).click();
+  await app.locator('#home').waitFor();
+  if (await app.locator('.city').filter({ hasText: 'E2E Town' }).count()) throw new Error('not deleted');
+});
+
 await check('supertux (holders) streams its data, starts the story by touch, saves when left and loads the save again', async () => {
   await openFromHub(/SuperTux/);
   const frame = () => page.frames().find(f => f.url().includes('/supertux/'));

@@ -749,6 +749,36 @@ clear them to make room.
   and controller work too. Kroz saves the state at the start of the level,
   as it always did. Measured with the CPU slowed 4.5x: 60 fps and about 30
   ms of main-thread work a second. Not yet tried in the car.
+- `apps/city`: City Builder. The city simulation of micropolisJS (Graeme
+  McCutcheon's JavaScript port of Micropolis, the 1989 city simulator's
+  open-source release; GPL-3.0 with additional terms). `npm run build:city`
+  (`tools/build-city.mjs`) fetches micropolisJS at a fixed commit, applies
+  `tools/city/micropolis-web.patch` and bundles only the simulation, map,
+  tools, sprites and map generator with esbuild into
+  `apps/city/engine/engine.js` (not minified), next to the tile and sprite
+  graphics, upstream's licence files and `micropolisJS-src.tar.gz` (the
+  source with the patch). The output is committed. The patch fixes three
+  upstream bugs the jQuery front end hid: event listeners were shared by
+  every object of a kind, the census read a page element named `budget`,
+  and the boat sprite imported a name that doesn't exist; the query tool
+  also returns its findings instead of writing into micropolisJS's window.
+  The name license for "Micropolis" allows non-commercial use only, so the
+  app is called City Builder and names Micropolis only in its credits. The
+  page (`city.js`) is its own front end for the car: the whole map is kept
+  on one 1920x1600 canvas, redrawn tile by tile where tiles change, and
+  drawn to the screen with one scaled `drawImage` plus the sprites; tools
+  are picked on the left (under the map on tall screens), zones and
+  buildings go where a finger taps, roads, rail, power lines, parks and
+  the bulldozer follow a finger (along a 4-connected line, so fast drags
+  join up) after 90 ms or 10 px, so a second finger can turn it into a move;
+  pinch and the + and − buttons zoom from 0.5x to 4x. Controllers move a
+  tile cursor (A builds, held to draw; B looks; shoulders change tool).
+  Map shows the city with power, pollution, crime, land value, traffic,
+  population and police and fire coverage. Cities (up to eight) are kept in
+  localStorage, 40 to 70 KB each, saved every game year, when the page is
+  hidden and when the hub's Apps button closes it (`save-on-close`). A
+  simulation step takes about 30 µs with the CPU slowed 4.5x, and the page
+  holds 60 fps there. Not yet tried in the car.
 - `apps/send` and `apps/api/transfer.js`: "Get games from phone", for Retro
   Console, Freedoom, Blasphemer, Adventure Games, Text Adventures and
   LibreQuake (the car side is `apps/_shared/phone.js`; Freedoom adds

@@ -1,0 +1,199 @@
+diff --git a/src/boatSprite.js b/src/boatSprite.js
+index 0575bfe..257f526 100644
+--- a/src/boatSprite.js
++++ b/src/boatSprite.js
+@@ -16,7 +16,6 @@ import { SHIP_CRASHED, SOUND_HONKHONK } from './messages.ts';
+ import { MiscUtils } from './miscUtils.js';
+ import { Random } from './random.ts';
+ import { SPRITE_SHIP } from './spriteConstants.ts';
+-import { SpriteConstants } from './spriteConstants.ts';
+ import { SpriteUtils } from './spriteUtils.js';
+ import * as TileValues from "./tileValues.ts";
+ 
+diff --git a/src/eventEmitter.js b/src/eventEmitter.js
+index f7fbd59..a4e7935 100644
+--- a/src/eventEmitter.js
++++ b/src/eventEmitter.js
+@@ -15,10 +15,18 @@ import { Config } from './config.js';
+ 
+ // Decorate the given object, by adding {add|remove}EventListener methods, and an internal '_emitEvent' method
+ var EventEmitter = function(obj) {
+-  var events = {};
++  // Each object keeps its own listeners. (They used to be shared by every
++  // instance of a constructor, so a second game, or a second sprite of a
++  // kind, heard the first one's events.)
++  var listenersOf = function(self) {
++    if (!Object.prototype.hasOwnProperty.call(self, '_listeners'))
++      Object.defineProperty(self, '_listeners', {value: {}});
++    return self._listeners;
++  };
+ 
+ 
+   var addListener = function(event, listener) {
++    var events = listenersOf(this);
+     if (!(event in events))
+       events[event] = [];
+ 
+@@ -29,6 +37,7 @@ var EventEmitter = function(obj) {
+ 
+ 
+   var removeListener = function(event, listener) {
++    var events = listenersOf(this);
+     if (!(event in events))
+       events[event] = [];
+ 
+@@ -40,6 +49,7 @@ var EventEmitter = function(obj) {
+ 
+ 
+   var emitEvent = function(event, value) {
++    var events = listenersOf(this);
+     if (event === undefined) {
+       if (!Config.debug)
+         console.warn('Sending undefined event!');
+diff --git a/src/queryTool.js b/src/queryTool.js
+index c8d118e..b12d48f 100644
+--- a/src/queryTool.js
++++ b/src/queryTool.js
+@@ -11,8 +11,6 @@
+  *
+  */
+ 
+-import $ from "jquery";
+-
+ import { BaseTool } from './baseTool.js';
+ import { Config } from './config.js';
+ import { EventEmitter } from './eventEmitter.js';
+@@ -28,18 +26,14 @@ var QueryTool = EventEmitter(makeTool(function(map) {
+ 
+ QueryTool.prototype.classifyPopulationDensity = function(x, y, blockMaps) {
+   var density = blockMaps.populationDensityMap.worldGet(x, y);
+-  if (Config.debug || Config.queryDebug)
+-    $('#queryDensityRaw').text(density);
+   density = density >> 6;
+   density = density & 3;
+-  $('#queryDensity').text(Text.densityStrings[density]);
++  this.info.density = Text.densityStrings[density];
+ };
+ 
+ 
+ QueryTool.prototype.classifyLandValue = function(x, y, blockMaps) {
+    var landValue = blockMaps.landValueMap.worldGet(x, y);
+-   if (Config.debug || Config.queryDebug)
+-     $('#queryLandValueRaw').text(landValue);
+ 
+    var i = 0;
+    if (landValue >= 150)
+@@ -50,50 +44,44 @@ QueryTool.prototype.classifyLandValue = function(x, y, blockMaps) {
+      i = 1;
+ 
+    var text = Text.landValueStrings[i];
+-   $('#queryLandValue').text(text);
++   this.info.landValue = text;
+ };
+ 
+ 
+ QueryTool.prototype.classifyCrime = function(x, y, blockMaps) {
+   var crime = blockMaps.crimeRateMap.worldGet(x, y);
+-  if (Config.debug || Config.queryDebug)
+-    $('#queryCrimeRaw').text(crime);
+   crime = crime >> 6;
+   crime = crime & 3;
+-  $('#queryCrime').text(Text.crimeStrings[crime]);
++  this.info.crime = Text.crimeStrings[crime];
+ };
+ 
+ 
+ QueryTool.prototype.classifyPollution = function(x, y, blockMaps) {
+   var pollution = blockMaps.pollutionDensityMap.worldGet(x, y);
+-  if (Config.debug || Config.queryDebug)
+-    $('#queryPollutionRaw').text(pollution);
+   pollution = pollution >> 6;
+   pollution = pollution & 3;
+-  $('#queryPollution').text(Text.pollutionStrings[pollution]);
++  this.info.pollution = Text.pollutionStrings[pollution];
+ };
+ 
+ 
+ QueryTool.prototype.classifyRateOfGrowth = function(x, y, blockMaps) {
+   var rate = blockMaps.rateOfGrowthMap.worldGet(x, y);
+-  if (Config.debug || Config.queryDebug)
+-    $('#queryRateRaw').text(rate);
+   rate = rate >> 6;
+   rate = rate & 3;
+-  $('#queryRate').text(Text.rateStrings[rate]);
++  this.info.growth = Text.rateStrings[rate];
+ };
+ 
+ 
+ QueryTool.prototype.classifyDebug = function(x, y, blockMaps) {
+   if (!Config.debug && !Config.queryDebug)
+     return;
+-  $('#queryFireStationRaw').text(blockMaps.fireStationMap.worldGet(x, y));
+-  $('#queryFireStationEffectRaw').text(blockMaps.fireStationEffectMap.worldGet(x, y));
+-  $('#queryPoliceStationRaw').text(blockMaps.policeStationMap.worldGet(x, y));
+-  $('#queryPoliceStationEffectRaw').text(blockMaps.policeStationEffectMap.worldGet(x, y));
+-  $('#queryTerrainDensityRaw').text(blockMaps.terrainDensityMap.worldGet(x, y));
+-  $('#queryTrafficDensityRaw').text(blockMaps.trafficDensityMap.worldGet(x, y));
+-  $('#queryComRateRaw').text(blockMaps.cityCentreDistScoreMap.worldGet(x, y));
++  this.info.rawFireStation = blockMaps.fireStationMap.worldGet(x, y);
++  this.info.rawFireStationEffect = blockMaps.fireStationEffectMap.worldGet(x, y);
++  this.info.rawPoliceStation = blockMaps.policeStationMap.worldGet(x, y);
++  this.info.rawPoliceStationEffect = blockMaps.policeStationEffectMap.worldGet(x, y);
++  this.info.rawTerrainDensity = blockMaps.terrainDensityMap.worldGet(x, y);
++  this.info.rawTrafficDensity = blockMaps.trafficDensityMap.worldGet(x, y);
++  this.info.rawComRate = blockMaps.cityCentreDistScoreMap.worldGet(x, y);
+ };
+ 
+ 
+@@ -117,24 +105,25 @@ QueryTool.prototype.classifyZone = function(x, y) {
+       break;
+   }
+ 
+-  $('#queryZoneType').text(Text.zoneTypes[index]);
++  this.info.zone = Text.zoneTypes[index];
+ };
+ 
+ 
+ QueryTool.prototype.doTool = function(x, y, blockMaps) {
++  this.info = {x: x, y: y};
+   var text = 'Position (' + x + ', ' + y + ')';
+   text += ' TileValue: ' + this._map.getTileValue(x, y);
+ 
+   if (Config.debug || Config.queryDebug) {
+     var tile = this._map.getTile(x, y);
+-    $('#queryTile').text([x,y].join(', '));
+-    $('#queryTileValue').text(tile.getValue());
+-    $('#queryTileBurnable').text(tile.isCombustible() ? '\u2714' : '\u2718');
+-    $('#queryTileBulldozable').text(tile.isBulldozable() ? '\u2714' : '\u2718');
+-    $('#queryTileCond').text(tile.isConductive() ? '\u2714' : '\u2718');
+-    $('#queryTileAnim').text(tile.isAnimated() ? '\u2714' : '\u2718');
+-    $('#queryTilePowered').text(tile.isPowered() ? '\u2714' : '\u2718');
+-    $('#queryTileZone').text(tile.isZone() ? '\u2714' : '\u2718');
++    this.info.tile = [x,y].join(', ');
++    this.info.tileValue = tile.getValue();
++    this.info.tileBurnable = tile.isCombustible() ? '\u2714' : '\u2718';
++    this.info.tileBulldozable = tile.isBulldozable() ? '\u2714' : '\u2718';
++    this.info.tileCond = tile.isConductive() ? '\u2714' : '\u2718';
++    this.info.tileAnim = tile.isAnimated() ? '\u2714' : '\u2718';
++    this.info.tilePowered = tile.isPowered() ? '\u2714' : '\u2718';
++    this.info.tileZone = tile.isZone() ? '\u2714' : '\u2718';
+   }
+ 
+   this.classifyZone(x, y);
+diff --git a/src/simulation.js b/src/simulation.js
+index 0acb67c..600df2a 100644
+--- a/src/simulation.js
++++ b/src/simulation.js
+@@ -340,10 +340,10 @@ var simulate = function(simData) {
+ 
+     case 9:
+       if (this._cityTime % CENSUS_FREQUENCY_10 === 0)
+-        this._census.take10Census(budget);
++        this._census.take10Census(this.budget);
+ 
+       if (this._cityTime % CENSUS_FREQUENCY_120 === 0)
+-        this._census.take120Census(budget);
++        this._census.take120Census();
+ 
+       if (this._cityTime % TAX_FREQUENCY === 0)  {
+         this.budget.collectTax(this._gameLevel, this._census);

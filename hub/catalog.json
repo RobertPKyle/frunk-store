@@ -325,6 +325,21 @@
       ]
     },
     {
+      "id": "city",
+      "name": "City Builder",
+      "tagline": "Found a city and grow it from a village to a megalopolis: zones, roads, power, taxes and disasters, in the classic 1989 city simulation, now open source.",
+      "path": "/city/",
+      "icon": "/city/icon.svg",
+      "added": "2026-10-28",
+      "tags": [
+        "Game",
+        "Camp Mode",
+        "Touch",
+        "Controller",
+        "Offline"
+      ]
+    },
+    {
       "id": "adventure",
       "name": "Adventure Games",
       "tagline": "Classic point-and-click adventures on ScummVM: twelve free games, or ones you own sent from your phone.",
