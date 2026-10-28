@@ -167,28 +167,27 @@ clear them to make room.
   boot ROM (K. Wilkins, zlib). The free Lynx games are TreeJumper (GPL-3,
   the cartridge from its repo) and Town Patrol (MIT code, 0x72's CC0 art),
   which `npm run build:townpatrol` compiles from source with cc65 and
-  sprpck. PC Engine / TurboGrafx-16 HuCard games (in
-  the holders edition only, see Holders below) run
+  sprpck. PC Engine / TurboGrafx-16 HuCard games run
   the same way on Geargrafx 1.8.4 (GPL-3.0-or-later, unmodified), built by
   `npm run build:pce` (`tools/build-geargrafx.mjs` with
   `tools/geargrafx/web.cpp`; output and source in `apps/retro/pce/`, with
   the bundled libraries' licenses in `THIRD-PARTY.txt`); CD games are left
   out, as they need Hudson's System Card. Mega Drive / Genesis cartridges
-  (holders edition only, too) run on clownmdemu's emulation core
+  run on clownmdemu's emulation core
   (AGPL-3.0-or-later, unmodified, commit 88ef45a6), built by `npm run
   build:md` (`tools/build-clownmdemu.mjs` with `tools/clownmdemu/web.c`,
   which turns the core's palette-index lines into RGBA and mixes its FM and
   PSG sound into one 44100 Hz stream; output and source in
   `apps/retro/md/`). Genesis Plus GX and PicoDrive were ruled out: their
-  licenses forbid use in a commercial activity, which a token-gated section
-  is. clownmdemu has no EEPROM saves and no bank switching (so nothing over
+  licenses forbid use in a commercial activity, which frunk.store (referral
+  link, token) could count as. clownmdemu has no EEPROM saves and no bank switching (so nothing over
   4 MB), and leaves out the Mega CD here. All four run in workers
   (`sms-worker.js`, `lynx-worker.js`, `pce-worker.js`, `md-worker.js`, sharing
   `gear-worker.js`) the way jsnes runs in its own (the page side is
   `worker-core.js`). The Nintendo 64 is switched off (2026-10-22, after
   two car tests at about a sixth of full speed): `OFF` in `retro.js` keeps
-  its games from being added, listed or continued in either edition, and
-  no text names it (it was tested in the holders edition as "Genesis, PC
+  its games from being added, listed or continued, and no text names it
+  (it was tested in the since-removed holders edition as "Genesis, PC
   Engine & N64", commit ac6afec). Its code stays: Nintendo 64 cartridges run on n64js (MIT, pure JavaScript, commit
   1eb54aa, with `tools/n64js/patches/*.patch` applied), bundled by `npm run build:n64` (`tools/build-n64js.mjs` runs
   Bun's bundler through npx on n64js's sources plus `tools/n64js/web.js`,
@@ -223,8 +222,8 @@ clear them to make room.
   `tools/n64-test-rom.mjs` (double-buffered display lists drawn by n64js's
   Fast3D emulation, controller, tone and EEPROM save; `n64TestRom({
   triangles: 9000 })` makes it heavy, and `work: { code, count }` runs a
-  compiled MIPS function each frame; it now checks the holders edition
-  turns that cartridge away). Dropping WebGL calls that change
+  compiled MIPS function each frame; it now checks Retro Console turns
+  that cartridge away). Dropping WebGL calls that change
   nothing was tried and saved under 10% of the drawing time, so it was left
   out. The patches (each with tests, run with n64js's own suite, `bun
   test`) speed up n64js for the car: its recompiler compiles single-precision
@@ -419,7 +418,7 @@ clear them to make room.
   main-thread work a second in a new game and 270 while dragging the map,
   with sound and music on. Not yet tried in the car.
 - `apps/fheroes2`: fheroes2 1.1.17 (GPL-2.0-or-later), the open-source
-  engine for Heroes of Might and Magic II, in the Holders section. `npm run
+  engine for Heroes of Might and Magic II. `npm run
   build:fheroes2` (`tools/build-fheroes2.mjs`) compiles it unmodified with
   its own `Makefile.emscripten` (SDL2, Asyncify, IDBFS) in Docker
   (`tools/fheroes2/Dockerfile`: emsdk 4.0.10 plus gettext) to
@@ -530,7 +529,7 @@ clear them to make room.
   Measured with the CPU slowed 4.5x: 250-390 ms/s of main-thread work.
   The engine isn't in git, so run the build before deploying `apps`. Not
   yet tried in the car.
-- `apps/supertux`: SuperTux 0.7.0 (GPL-3.0-or-later), in Holders, compiled to
+- `apps/supertux`: SuperTux 0.7.0 (GPL-3.0-or-later), compiled to
   WebAssembly by `npm run build:supertux` (`tools/build-supertux.mjs`: the
   release's source tarball checked against its SHA-256, plus
   `tools/supertux/supertux-web.patch`, CMake in Docker from
@@ -612,7 +611,7 @@ clear them to make room.
   it's first saved. Measured with the CPU slowed 4.5x: a small world starts
   in under a second, 60 fps and about 30 to 60 ms of script a second. Not
   yet tried in the car.
-- `apps/craft4k`: Craft 4K (holders only). Minecraft4k-CPP by TheSunCat
+- `apps/craft4k`: Craft 4K. Minecraft4k-CPP by TheSunCat
   (GPL-3.0), a C++ remake of Notch's 2010 Minecraft4k that ray-marches a
   512x64x512 block world on the GPU, compiled to WebAssembly by
   `npm run build:craft4k` (`tools/build-craft4k.mjs`: the commit that
@@ -814,26 +813,6 @@ clear them to make room.
   `vercel env pull` in `apps/`), which also shows the tokens behind each
   idea. On the dev server without `SOLANA_RPC_URL`, balances are made up
   (`op=dev-balance`) so the e2e check can vote with a test wallet.
-- `apps/holders` and `apps/_shared/holders.js`: Holders, early access for
-  wallets holding at least `VOTE_MIN_TOKENS` FrunkStore tokens: SuperTux, Craft 4K,
-  fheroes2, Freedoom, LibreQuake, OpenArena, OpenTTD, and the Mega Drive / Genesis and PC Engine (Retro Console opened as
-  `/retro/?edition=holders`, which shows only the consoles in `EARLY` in
-  `retro.js`; the ordinary edition leaves those out, and each edition lists
-  only its own consoles' games and continues its own last game). Those
-  apps are marked `"holders": true` in the hub's catalog, so they're off
-  the grid; the Holders menu lists them and posts `{ frunk: 'open', app }`,
-  and the hub opens the app in the menu's place, so its Apps button and
-  save-on-close work as usual. Each app awaits `holdersGate()` before it
-  starts, so a direct link is locked too. The car has no wallet, so the gate
-  shows a QR code to `/vote/?link=<id>` (`op=link-open`, 15 minutes); the
-  phone signs in there and links the car (`op=link`), and the car's poll
-  (`op=link-poll`) gets a 30-day pass, kept in localStorage and shared by
-  every app. With a pass, an app starts at once and the pass is checked in
-  the background (`op=pass`, at most every 10 minutes per tab); a wallet that
-  sold reloads into the locked screen, and without a connection the screen
-  stays unlocked. The car-side answers are always 200, so the car's console
-  stays clean. This gates the pages, not the files: the engines and games
-  are ordinary static files, and the source is public.
 - `apps/token` and `apps/api/token.js`: FrunkStore Token, opened from the
   "Live chart, wallet & buy" button under the token's address in the hub's
   footer (catalog `"unlisted": true`, so it's off the grid). It shows the
@@ -846,11 +825,10 @@ clear them to make room.
   GeckoTerminal's free API allows about 30 requests a minute per IP, shared
   by everything on Vercel's IPs; set `COINGECKO_API_KEY` (a free CoinGecko
   demo key) on frunk-apps to fetch the same candles from CoinGecko's
-  on-chain API on the key's own quota. Connecting a wallet works like the holders' unlock: the car
+  on-chain API on the key's own quota. Connecting a wallet: the car
   shows a code to `/token/phone/?c=<id>`, where the phone signs a Sign In With
   Solana message (no transaction) or pastes an address to watch, view only,
-  for a pump.fun account or any wallet that can't sign there. A signed-in
-  wallet holding `VOTE_MIN_TOKENS` also gets the car a holders' pass. The
+  for a pump.fun account or any wallet that can't sign there. The
   car keeps the address and checks its balance every minute
   (`op=wallet`). Buying never happens on the car or through frunk.store: the
   car shows the risks (`apps/token/terms.js`, also on the phone) and a code

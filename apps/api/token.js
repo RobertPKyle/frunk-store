@@ -13,22 +13,21 @@
 // their IPs, so with COINGECKO_API_KEY set (a free CoinGecko demo key) the
 // same candles come from CoinGecko's on-chain API, on the key's own quota.
 //
-// The car has no wallet, so a phone connects one for it, like the holders'
-// unlock in vote.js: the car opens a code and shows it as a QR code to
-// /token/phone/?c=<cid>. The phone either signs in (a Sign In With Solana
-// message, no transaction) or names an address to watch, for wallets that
-// can't sign on a phone page (a pump.fun account). A signed-in wallet
-// holding enough tokens also gets the car a holders' pass.
+// The car has no wallet, so a phone connects one for it: the car opens a
+// code and shows it as a QR code to /token/phone/?c=<cid>. The phone either
+// signs in (a Sign In With Solana message, no transaction) or names an
+// address to watch, for wallets that can't sign on a phone page (a pump.fun
+// account).
 //
 //   POST ?op=connect-open                      car -> { cid, secret, ttl }
 //   POST ?op=nonce { address, cid }            phone -> { message } to sign
-//   POST ?op=connect { cid, message, signature }   phone, signed -> { ok, tokens, holders }
+//   POST ?op=connect { cid, message, signature }   phone, signed -> { ok, tokens }
 //   POST ?op=connect { cid, address }          phone, watch only -> { ok, tokens }
-//   POST ?op=connect-poll { cid, secret }      car -> { waiting }, { expired } or { address, signed, pass? }
+//   POST ?op=connect-poll { cid, secret }      car -> { waiting }, { expired } or { address, signed }
 
 import { randomBytes } from 'node:crypto';
 import { fail, hash, json, limited, redis } from './_lib.js';
-import { MIN, MINT, balance, isAddress, issuePass, signedBy, signInMessage, solBalance } from './_solana.js';
+import { MINT, balance, isAddress, signedBy, signInMessage, solBalance } from './_solana.js';
 
 const NONCE_TTL = 10 * 60;        // seconds to sign the message
 const CODE_TTL = 15 * 60;         // seconds the car's code stays good
@@ -197,9 +196,8 @@ async function connect(request) {
     return fail(400, 'That isn\'t a Solana wallet address.');
   }
   const tokens = await balance(address);
-  const holders = signed && tokens >= MIN;
-  await redis(['SET', `token:c:${cid}`, JSON.stringify({ ...found.entry, address, signed, holders }), 'EX', found.ttl]);
-  return json({ ok: true, tokens, holders, min: MIN });
+  await redis(['SET', `token:c:${cid}`, JSON.stringify({ ...found.entry, address, signed }), 'EX', found.ttl]);
+  return json({ ok: true, tokens });
 }
 
 async function connectPoll(request) {
@@ -212,7 +210,7 @@ async function connectPoll(request) {
   if (entry.secret !== hash(secret)) return json({ expired: true });
   if (!entry.address) return json({ waiting: true });
   await redis(['DEL', `token:c:${cid}`]);
-  return json({ address: entry.address, signed: entry.signed, ...(entry.holders && { pass: await issuePass(entry.address) }) });
+  return json({ address: entry.address, signed: entry.signed });
 }
 
 async function handle(request) {

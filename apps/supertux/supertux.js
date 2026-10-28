@@ -17,11 +17,6 @@
 // The game keeps its saves and options in /home/web_user/.local/share/supertux2,
 // mounted from IndexedDB (IDBFS) and written back now and then, when the
 // page is hidden and when it's left (the hub's Apps button asks first).
-import { holdersGate } from '../_shared/holders.js';
-
-// Early access for FrunkStore token holders: nothing starts until this
-// screen is unlocked from a holder's phone
-await holdersGate('SuperTux');
 
 (() => {
 

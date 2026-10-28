@@ -5,18 +5,13 @@
 // homebrew games built in, plus games the player loads from their own files. Loaded files are kept in this screen's IndexedDB and never leave
 // it.
 //
-// The Holders menu opens this page as ?edition=holders: early access for
-// FrunkStore token holders, for now the Mega Drive / Genesis and the PC
-// Engine, which the ordinary edition leaves out. It waits behind the holders' wall
-// (../_shared/holders.js) until a holder's phone unlocks the screen. The
-// Nintendo 64 core is switched off (see OFF): too slow in the car.
+// The Nintendo 64 core is switched off (see OFF): too slow in the car.
 //
 // Input comes from up to two gamepads, the on-screen buttons and the
 // keyboard; each frame they're merged and handed to the running core
 // (nes.js, gba.js, sms.js, lynx.js, pce.js, md.js or n64.js) as sets of button
 // names, plus the players' analog sticks for the N64.
 
-import { holdersGate } from '../_shared/holders.js';
 import { phonePanel } from '../_shared/phone.js';
 import { MAX_FILE, SYSTEMS, cleanName, findGame, isColor, maybeGame } from '../_shared/roms.js';
 import { createNes } from './nes.js';
@@ -91,14 +86,11 @@ const settings = {
   set(key, value) { try { localStorage.setItem('retro.' + key, JSON.stringify(value)); } catch {} },
 };
 
-const HOLDERS = document.documentElement.dataset.edition === 'holders';
-const EARLY = new Set(['pce', 'md', 'n64']);           // consoles only in the holders edition
-// Consoles switched off in both editions: their games aren't added, listed
-// or continued (any already added stay stored). The N64 ran at about a
-// sixth of full speed in the car (2026-10-22).
+// Consoles switched off: their games aren't added, listed or continued (any
+// already added stay stored). The N64 ran at about a sixth of full speed in
+// the car (2026-10-22).
 const OFF = new Set(['n64']);
-const inEdition = system => !OFF.has(system) && EARLY.has(system) === HOLDERS;
-const LAST = HOLDERS ? 'holdersLast' : 'last';  // each edition continues its own game
+const playable = system => !OFF.has(system);
 
 // ---------- your games (IndexedDB) ----------
 
@@ -127,10 +119,10 @@ const putRom = rom => store('readwrite', s => s.put(rom));
 const deleteRom = id => store('readwrite', s => s.delete(id));
 
 // Checks and saves one game (unzipping it if needed); returns its title, or
-// null when it isn't a game this edition plays
+// null when it isn't a game this plays
 async function saveGame(name, file) {
   const game = await findGame(name, file);
-  if (!game || !inEdition(game.system)) return null;
+  if (!game || !playable(game.system)) return null;
   const { system, bytes: data } = game;
   const title = cleanName(name);
   await putRom({ id: `${title}|${data.length}`, title, system, size: data.length, added: Date.now(), data });
@@ -151,7 +143,7 @@ async function addFiles(files) {
   }
   msg.textContent = added
     ? `Added ${added} game${added === 1 ? '' : 's'}.${skipped ? ` Skipped ${skipped} file${skipped === 1 ? '' : 's'} that weren't games.` : ''}`
-    : files.length ? `No game files (${HOLDERS ? '.md, .gen, .bin, .smd, .pce' : '.nes, .gb, .gbc, .gba, .sms, .gg, .sg, .lnx, .lyx, .o'} or .zip) found there.` : '';
+    : files.length ? 'No game files (.nes, .gb, .gbc, .gba, .sms, .gg, .sg, .lnx, .lyx, .o, .pce, .md, .gen, .bin, .smd or .zip) found there.' : '';
   renderMine();
 }
 
@@ -171,8 +163,7 @@ function ownGames(then) {
 
 const phone = phonePanel({
   app: 'retro', save: saveGame, onSaved: renderMine,
-  notPlayable: () => HOLDERS ? 'only Mega Drive / Genesis and PC Engine games play here'
-    : 'not a game this plays (Mega Drive / Genesis and PC Engine games play on the Holders card)',
+  notPlayable: () => 'not a game this plays',
 });
 
 function pick(inputId) {
@@ -216,7 +207,7 @@ function card(title, lines, onPlay) {
 }
 
 function renderFree() {
-  $('free').replaceChildren(...GAMES.filter(g => inEdition(g.system)).map(g => card(g.title, [
+  $('free').replaceChildren(...GAMES.filter(g => playable(g.system)).map(g => card(g.title, [
     ['small', `${SYSTEMS[g.system].name} · ${g.by}`],
     ['p', g.about],
     ['small', `License: ${g.license}. Source: frunk-apps.vercel.app/retro/${g.source}`],
@@ -224,7 +215,7 @@ function renderFree() {
 }
 
 async function renderMine() {
-  const roms = (await listRoms()).filter(r => inEdition(r.system || 'nes')).sort((a, b) => a.title.localeCompare(b.title));
+  const roms = (await listRoms()).filter(r => playable(r.system || 'nes')).sort((a, b) => a.title.localeCompare(b.title));
   $('mine').replaceChildren(...roms.map(r => {
     const wrap = document.createElement('div');
     wrap.className = 'wrap';
@@ -248,13 +239,13 @@ async function renderMine() {
 
 // The last game played, to pick up from the top of the library
 async function renderContinue() {
-  const last = settings.get(LAST, null);
+  const last = settings.get('last', null);
   const btn = $('continue');
   btn.hidden = true;
   if (!last) return;
-  const free = last.free && GAMES.find(g => g.id === last.free && inEdition(g.system));
+  const free = last.free && GAMES.find(g => g.id === last.free && playable(g.system));
   const found = last.mine && await getRom(last.mine).catch(() => null);
-  const mine = found && inEdition(found.system || 'nes') ? found : null;
+  const mine = found && playable(found.system || 'nes') ? found : null;
   if (!free && !mine) return;
   btn.textContent = `Continue ${free ? free.title : mine.title}`;
   btn.onclick = () => free ? playUrl(free, btn) : playStored(mine.id, btn, mine.title);
@@ -678,7 +669,7 @@ function playUrl(game, btn) {
       return;
     }
     if (await play(game.title, game.system, bytes, saveName(`free-${game.id}`, game.system, bytes))) {
-      settings.set(LAST, { free: game.id });
+      settings.set('last', { free: game.id });
     }
   });
 }
@@ -687,14 +678,14 @@ function playStored(id, btn, title) {
   return startGame(btn, title, async () => {
     const rom = await getRom(id).catch(() => null);
     const system = rom && (rom.system || 'nes');
-    if (!rom || !SYSTEMS[system] || !inEdition(system)) {
+    if (!rom || !SYSTEMS[system] || !playable(system)) {
       status('');
       renderMine();
       renderContinue();
       return;
     }
     if (await play(rom.title, system, rom.data, saveName(rom.id, system, rom.data))) {
-      settings.set(LAST, { mine: rom.id });
+      settings.set('last', { mine: rom.id });
     }
   });
 }
@@ -722,16 +713,8 @@ $('addFiles').onclick = () => ownGames(() => pick('fileInput'));
 $('fromPhone').onclick = () => ownGames(phone.show);
 $('addFolder').onclick = () => ownGames(() => pick('folderInput'));
 
-// ---------- holders ----------
+// ---------- start ----------
 
-function showShelf() {
-  renderFree();
-  renderMine();
-  renderContinue();
-}
-
-$('fileInput').accept = HOLDERS ? '.md,.gen,.bin,.smd,.pce,.zip' : '.nes,.gb,.gbc,.gba,.sms,.gg,.sg,.lnx,.lyx,.o,.zip';
-if (HOLDERS) {
-  document.title = 'Genesis & PC Engine · frunk.store';
-  holdersGate('Mega Drive / Genesis and PC Engine games').then(showShelf);
-} else showShelf();
+renderFree();
+renderMine();
+renderContinue();

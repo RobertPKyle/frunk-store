@@ -10,7 +10,7 @@
 
 import { draw, price } from './chart.js';
 import { fillRisks } from './terms.js';
-import { hasPass, qr, savePass } from '../_shared/holders.js';
+import { qr } from '../_shared/qr.js';
 
 const $ = id => document.getElementById(id);
 const REFRESH = 30_000;          // the CDN caches market answers this long
@@ -143,8 +143,6 @@ function showWallet() {
   const d = walletData?.address === wallet.address ? walletData : null;
   $('tokens').textContent = d ? `${count(d.tokens)} FrunkStore` : '…';
   $('worth').textContent = d ? `≈ ${usd(market ? d.tokens * market.price : null)} · ${count(d.sol)} SOL` : '';
-  $('holders').hidden = !hasPass();
-  $('holders').textContent = '★ Holders early access is unlocked on this car.';
 }
 
 async function loadWallet() {
@@ -210,7 +208,6 @@ async function connectCode(gen) {
     if (!r.address) { sheetTimer = setTimeout(poll, 2500); return; }
     wallet = { address: r.address, signed: !!r.signed };
     local.set('token.wallet', wallet);
-    if (r.pass) savePass(r.pass);
     walletData = null;
     closeSheets();
     showWallet();

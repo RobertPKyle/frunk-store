@@ -54,29 +54,18 @@ async function check(name, fn) {
 const appFrame = () => page.frameLocator('#frame');
 const dev = base.includes('localhost');
 const appsBase = dev ? 'http://127.0.0.1:5174' : 'https://frunk-apps.vercel.app';
-// Apps for FrunkStore token holders aren't on the grid: they open from the
-// Holders menu, once this browser is unlocked (see the holders checks). The
-// made-up balances that unlock it exist only on the dev server.
 async function openFromHub(name) {
   await page.goto(base + '/');
   await page.waitForSelector('.card');
-  // by title: the Holders card's tagline names the apps inside it
-  const card = page.locator('#grid .card').filter({ has: page.locator('h2', { hasText: name }) });
-  if (await card.count()) {
-    await card.click();
-  } else {
-    if (!dev) throw new Error('SKIP: early access for holders, which only the dev server can unlock');
-    await page.locator('#grid').getByRole('button', { name: /Holders/ }).click();
-    await appFrame().locator('#apps .app').filter({ hasText: name }).click();
-    await page.waitForURL(/\/app\/(?!holders)[\w-]+$/);
-  }
+  // by title, as a tagline may name other apps
+  await page.locator('#grid .card').filter({ has: page.locator('h2', { hasText: name }) }).click();
   await page.waitForSelector('#loading', { state: 'hidden' });
 }
 
 await check('hub lists every catalog app', async () => {
   await page.goto(base + '/');
   await page.waitForSelector('.card');
-  const expected = (await (await fetch(base + '/catalog.json')).json()).apps.filter(app => !app.holders && !app.unlisted).length;
+  const expected = (await (await fetch(base + '/catalog.json')).json()).apps.filter(app => !app.unlisted).length;
   const n = await page.locator('.card').count();
   if (n !== expected) throw new Error(`expected ${expected} cards, got ${n}`);
   if (!(await page.evaluate(() => crossOriginIsolated))) throw new Error('hub not cross-origin isolated');
@@ -205,8 +194,7 @@ await check('every language has every string', async () => {
         else if (shape(file.ui[key]) !== shape(en[key])) problems.push(`${code}: ${key} has "${shape(file.ui[key])}", English has "${shape(en[key])}"`);
       }
       for (const key of Object.keys(file.ui)) if (!(key in en)) problems.push(`${code}: unused ${key}`);
-      // early-access apps show only in the Holders menu, in English
-      for (const app of catalog.apps) if (!app.holders && !file.apps[app.id]?.tagline) problems.push(`${code}: no tagline for ${app.id}`);
+      for (const app of catalog.apps) if (!file.apps[app.id]?.tagline) problems.push(`${code}: no tagline for ${app.id}`);
       for (const tag of tags) if (!file.tags[tag]) problems.push(`${code}: no tag ${tag}`);
     }
     return problems;
@@ -739,8 +727,8 @@ await check('retro console plays Atari Lynx games without Atari\'s boot ROM', as
   await page.screenshot({ path: shots + 'retro-lynx.png' });
 });
 
-// Plays a holder's phone without a browser: signs in to the vote with an
-// ed25519 key of its own, holding the given made-up balance (dev server only)
+// Plays a token holder's phone without a browser: signs in to the vote with
+// an ed25519 key of its own, holding the given made-up balance (dev server only)
 async function holderPhone(apps, tokens) {
   const { generateKeyPairSync, sign } = await import('node:crypto');
   const { publicKey, privateKey } = generateKeyPairSync('ed25519');
@@ -756,45 +744,21 @@ async function holderPhone(apps, tokens) {
   const session = await post('login', { message, signature: sign(null, Buffer.from(message), privateKey).toString('base64') });
   if (!session.token) throw new Error(`phone sign-in: ${session.error}`);
   return {
-    link: lid => post('link', { token: session.token, lid }), setTokens, address,
+    setTokens, address,
     sign: text => sign(null, Buffer.from(text), privateKey).toString('base64'),
   };
 }
 
-// The holder's phone that unlocks the test browsers, made when first needed
-let holder = null;
-const holderNow = async () => holder || (holder = await holderPhone(appsBase, 150000));
-await check('holders unlock with a phone and play Genesis and PC Engine games', async () => {
-  // The ordinary Retro Console leaves the PC Engine and Mega Drive out, and the hub's grid the early-access apps
-  await openFromHub(/Retro Console/);
-  for (const game of ['Blox', 'KłełeAtoms']) {
-    if (await appFrame().locator('#free .game').filter({ hasText: game }).count()) throw new Error(`${game} is in the ordinary Retro Console`);
-  }
+await check('retro console plays Genesis and PC Engine games, and the former early-access apps are on the grid', async () => {
   await page.goto(base + '/');
   await page.waitForSelector('.card');
-  for (const name of ['SuperTux', 'Craft 4K', 'fheroes2', 'Freedoom', 'LibreQuake', 'OpenTTD', 'OpenArena', 'Genesis & PC Engine']) {
-    if (await page.locator('#grid .card h2').filter({ hasText: new RegExp(`^${name}$`) }).count()) throw new Error(`${name} is on the grid`);
+  for (const name of ['SuperTux', 'Craft 4K', 'fheroes2', 'Freedoom', 'LibreQuake', 'OpenTTD', 'OpenArena']) {
+    if (!await page.locator('#grid .card h2').filter({ hasText: new RegExp(`^${name}$`) }).count()) throw new Error(`${name} isn't on the grid`);
   }
+  if (await page.locator('#grid .card h2').filter({ hasText: /^Holders$/ }).count()) throw new Error('the Holders card is still on the grid');
 
-  // Holders is locked until a phone links it; so is an early-access app opened directly
-  for (const path of ['/app/doom', '/app/holders']) {
-    await page.goto(base + path);
-    await appFrame().locator('#holdersLock .code a').waitFor({ timeout: 10000 });
-  }
-  if (await appFrame().locator('#apps .app').count()) throw new Error('the menu shows while locked');
-  const link = new URL(await appFrame().locator('#holdersLock .code a').getAttribute('href'));
-  if (link.pathname !== '/vote/' || !link.searchParams.get('link')) throw new Error(`lock code is ${link}`);
-  if (!dev) return;
-
-  const linked = await (await holderNow()).link(link.searchParams.get('link'));
-  if (!linked.ok) throw new Error(`link: ${linked.error}`);
-  await appFrame().locator('#apps .app').first().waitFor({ timeout: 10000 });
-  const tiles = (await appFrame().locator('#apps .app b').allTextContents()).join(', ');
-  if (tiles !== 'Genesis & PC Engine, SuperTux, fheroes2, Craft 4K, Freedoom, LibreQuake, OpenArena, OpenTTD') throw new Error(`menu lists ${tiles}`);
-  await appFrame().locator('#voteQr a[href$="/vote/"]').waitFor();
-
-  await openFromHub(/PC Engine/);
-  if (await appFrame().locator('#free .game').filter({ hasText: 'Thwaite' }).count()) throw new Error('NES games show with the PC Engine');
+  await openFromHub(/Retro Console/);
+  await appFrame().locator('#free .game').filter({ hasText: 'Thwaite' }).waitFor();
   const frame = () => page.frames().find(f => f.url().includes('/retro/'));
   const screen = appFrame().locator('#pceScreen');
   await appFrame().locator('#free .game').filter({ hasText: 'Blox' }).click();
@@ -892,13 +856,7 @@ await check('holders unlock with a phone and play Genesis and PC Engine games', 
   await page.waitForTimeout(1500);
   if (!(parseInt(await appFrame().locator('#fps').textContent()) >= 50)) throw new Error('the .smd game isn\'t running');
   await appFrame().getByRole('button', { name: 'Games' }).click();
-  await page.screenshot({ path: shots + 'holders.png' });
-  // The ordinary Retro Console doesn't list the HuCard
-  await openFromHub(/Retro Console/);
-  await appFrame().locator('#free .game').first().waitFor();
-  for (const name of ['falling', 'atoms', 'n64 test']) {
-    if (await appFrame().locator('#mine .game').filter({ hasText: name }).count()) throw new Error(`${name} shows in the ordinary Retro Console`);
-  }
+  await page.screenshot({ path: shots + 'retro-sega-nec.png' });
   console.log(`     Blox ${fps} fps, snapshot ${saved} bytes; KłełeAtoms ${mdFps} fps, snapshot ${mdSaved} bytes`);
 });
 
@@ -1471,8 +1429,6 @@ await check('city builder founds a city by touch and a controller, grows it, bud
   const state = () => frame().evaluate(() => window.cityTest.state());
   const tile = (x, y) => frame().evaluate(([x, y]) => window.cityTest.tile(x, y), [x, y]);
   await app.locator('.city.new').click();
-  // land with no water in the middle, so everything below fits
-  for (let i = 0; i < 30 && !(await frame().evaluate(() => window.cityTest.newDry())); i++) await app.locator('#newOther').click();
   await app.locator('#newName').fill('E2E Town');
   await app.locator('#newForm button[type=submit]').click();
   await app.locator('#game').waitFor();
@@ -1498,7 +1454,16 @@ await check('city builder founds a city by touch and a controller, grows it, bud
   let s = await state();
   if (s.name !== 'E2E Town' || s.funds !== 20000) throw new Error(`new city: ${JSON.stringify(s)}`);
   await app.locator('#pauseBtn').click();   // build while paused, so nothing grows yet
-  const cx = Math.floor(s.view.x / 16), cy = Math.floor(s.view.y / 16);
+  // everything below goes on land without water, which the view moves to
+  const spot = await frame().evaluate(() => window.cityTest.land(18, 12));
+  if (!spot) throw new Error('no dry land on this map');
+  const cx = spot.x, cy = spot.y;
+  // no fires or tornadoes in the way of the growth below
+  await app.locator('#menuBtn').click();
+  await app.locator('[data-open=settings]').click();
+  await app.locator('[data-setting=disasters] button', { hasText: 'Off' }).click();
+  if (!(await app.locator('[data-setting=disasters] button.on').textContent()).includes('Off')) throw new Error('disasters setting');
+  await app.locator('#settings [data-close]').click();
   // clear the trees, then a coal plant with homes, shops and factories in a
   // row beside it (zones pass power to each other) and a road along them
   await tool('bulldozer');
@@ -1607,7 +1572,7 @@ await check('city builder founds a city by touch and a controller, grows it, bud
   if (await app.locator('.city').filter({ hasText: 'E2E Town' }).count()) throw new Error('not deleted');
 });
 
-await check('supertux (holders) streams its data, starts the story by touch, saves when left and loads the save again', async () => {
+await check('supertux streams its data, starts the story by touch, saves when left and loads the save again', async () => {
   await openFromHub(/SuperTux/);
   const frame = () => page.frames().find(f => f.url().includes('/supertux/'));
   const app = appFrame();
@@ -1852,15 +1817,6 @@ await check('openttd plays with touch, saves when left and continues', async () 
 await check('fheroes2 plays the player\'s Heroes II files by touch and keeps its saves', async () => {
   const demo = new URL('../roms/h2demo/', import.meta.url);
   try { statSync(new URL('HEROES2.AGG', demo)); } catch { throw new Error('SKIP: no Heroes II demo files in roms/h2demo/'); }
-  if (!dev) throw new Error('SKIP: early access for holders, which only the dev server can unlock');
-  // The hub opens it from the Holders menu (unlocked by the holders check, or here)
-  await page.goto(base + '/app/holders');
-  const menuLock = appFrame().locator('#holdersLock .code a');
-  await Promise.race([menuLock.waitFor({ timeout: 10000 }), appFrame().locator('#apps .app').first().waitFor({ timeout: 10000 })]);
-  if (await menuLock.isVisible()) {
-    await (await holderNow()).link(new URL(await menuLock.getAttribute('href')).searchParams.get('link'));
-    await appFrame().locator('#apps .app').first().waitFor({ timeout: 10000 });
-  }
   await openFromHub(/fheroes2/);
   await appFrame().locator('#playBtn[disabled]').waitFor({ timeout: 15000 });
   // The game itself is played on its own page: the test browser emulates
@@ -1871,9 +1827,6 @@ await check('fheroes2 plays the player\'s Heroes II files by touch and keeps its
   game.on('pageerror', e => errors.push(`fheroes2 page: ${e.message}`));
   try {
     await game.goto(`${appsBase}/fheroes2/`);
-    const lock = game.locator('#holdersLock .code a');
-    await Promise.race([lock.waitFor({ timeout: 10000 }), game.locator('#playBtn').waitFor({ timeout: 10000 })]);
-    if (await lock.isVisible()) await (await holderNow()).link(new URL(await lock.getAttribute('href')).searchParams.get('link'));
     await game.locator('#playBtn').waitFor({ timeout: 15000 });
     if (!await game.locator('#playBtn').isDisabled()) throw new Error('Play is on before any game files');
     const picker = game.waitForEvent('filechooser');
@@ -1944,19 +1897,8 @@ await check('openarena plays a bot match with touch and a controller, and keeps 
     p.on('console', m => { if (m.type() === 'error') errors.push(`openarena console: ${m.text()}`); });
     const app = () => p.frameLocator('#frame');
     const frame = () => p.frames().find(f => f.url().includes('/openarena/'));
-    // OpenArena is early access for holders, and this browser keeps its own
-    // storage: the holder's phone unlocks it once, like a second car
-    let unlocked = false;
     const open = async () => {
-      if (!dev) throw new Error('SKIP: early access for holders, which only the dev server can unlock');
       await p.goto(base + '/app/openarena');
-      if (!unlocked) {
-        const code = app().locator('#holdersLock .code a');
-        await code.waitFor({ timeout: 10000 });
-        await (await holderNow()).link(new URL(await code.getAttribute('href')).searchParams.get('link'));
-        await code.waitFor({ state: 'detached', timeout: 10000 });
-        unlocked = true;
-      }
       await p.waitForSelector('#loading', { state: 'hidden' });
     };
     const cdp = await p.context().newCDPSession(p);
@@ -2301,17 +2243,6 @@ await check('hub and a cached app open offline and on a slow connection', async 
   }
 });
 
-await check('holders lock again when the wallet sells', async () => {
-  if (!dev) throw new Error('SKIP: needs the dev server\'s made-up balances');
-  if (!holder) throw new Error('the holders unlock check failed');
-  await holder.setTokens(10);
-  // the pass is checked at most every 10 minutes; start that clock over
-  await openFromHub(/Holders/);
-  await page.frames().find(f => f.url().includes('/holders/')).evaluate(() => sessionStorage.removeItem('holders.checked'));
-  await openFromHub(/Holders/);
-  await appFrame().locator('#holdersLock .status').filter({ hasText: 'holds 10 FrunkStore tokens' }).waitFor({ timeout: 10000 });
-});
-
 await check('token chart, wallet and buying on the phone from the hub footer', async () => {
   await page.goto(base + '/');
   await page.waitForSelector('.card');
@@ -2345,7 +2276,7 @@ await check('token chart, wallet and buying on the phone from the hub footer', a
   await page.screenshot({ path: shots + 'token-buy.png' });
   await app.locator('#buySheet [data-close]').click();
 
-  // Connecting: a code to the phone page; a signed-in holder's wallet shows its balance and unlocks Holders
+  // Connecting: a code to the phone page; a signed-in wallet shows its balance
   await app.getByRole('button', { name: 'Connect wallet' }).click();
   const code = new URL(await app.locator('#connectCode a').getAttribute('href'));
   if (code.pathname !== '/token/phone/' || !code.searchParams.get('c')) throw new Error(`connect code is ${code}`);
@@ -2357,10 +2288,9 @@ await check('token chart, wallet and buying on the phone from the hub footer', a
   const { message } = await post('nonce', { address: holderWallet.address, cid });
   if (!message?.includes('Connect this wallet to the FrunkStore token screen')) throw new Error(`nonce: ${JSON.stringify(message)}`);
   const linked = await post('connect', { cid, message, signature: holderWallet.sign(message) });
-  if (!linked.ok || !linked.holders) throw new Error(`connect: ${JSON.stringify(linked)}`);
+  if (!linked.ok) throw new Error(`connect: ${JSON.stringify(linked)}`);
   await app.locator('#tokens').filter({ hasText: '150,000 FrunkStore' }).waitFor({ timeout: 10000 });
   if (await app.locator('#kind').textContent() !== 'Signed in') throw new Error('not shown as signed in');
-  await app.locator('#holders').filter({ hasText: 'unlocked' }).waitFor();
   await page.screenshot({ path: shots + 'token.png' });
 
   // The phone page: watching an address without signing, and the buying links after the risks
@@ -2378,7 +2308,7 @@ await check('token chart, wallet and buying on the phone from the hub footer', a
     await phone.getByRole('button', { name: 'Show it on my car' }).click();
     await phone.locator('#connectMsg').filter({ hasText: 'Connected: 2,500 FrunkStore' }).waitFor({ timeout: 5000 });
     const got = await post('connect-poll', { cid: car.cid, secret: car.secret });
-    if (got.address !== watched.address || got.signed || got.pass) throw new Error(`watch-only poll: ${JSON.stringify(got)}`);
+    if (got.address !== watched.address || got.signed) throw new Error(`watch-only poll: ${JSON.stringify(got)}`);
 
     await phone.goto(`${appsBase}/token/phone/?buy`);
     await phone.locator('#market b').waitFor({ timeout: 20000 });
@@ -2469,16 +2399,6 @@ await check('holders vote from a phone', async () => {
     if (total.startsWith('0 ')) throw new Error(`after reload: "${total}"`);
     const first = await boxes.first().locator('input').getAttribute('value');
     if (!picks.includes(first)) throw new Error(`list not sorted by votes: ${first} first`);
-
-    // Opened from a car's code, the signed-in phone unlocks that car
-    const post = async (op, data) => (await fetch(`${apps}/api/vote?op=${op}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) })).json();
-    const car = await post('link-open', {});
-    await phone.goto(`${apps}/vote/?link=${car.lid}`);
-    await phone.locator('#car').filter({ hasText: 'Your car is unlocked' }).waitFor({ timeout: 5000 });
-    const { pass } = await post('link-poll', { lid: car.lid, secret: car.secret });
-    if (!pass || !(await post('pass', { pass })).ok) throw new Error('the car got no working pass');
-    // The wallet apps' links keep the car's code
-    if (!(await phone.getByRole('link', { name: 'Open in Phantom', includeHidden: true }).getAttribute('href')).includes(encodeURIComponent(`?link=${car.lid}`))) throw new Error('Phantom link drops the car code');
 
     // Selling the tokens stops the next vote
     await balance(0);

@@ -12,18 +12,6 @@
 //   POST ?op=vote    { token, picks }         -> { balance, picks }
 //   POST ?op=suggest { token, text }          -> { ok }
 //
-// Holders also unlock early access on their car (the Holders card, Retro
-// Console's holders edition). The car has no wallet, so the phone vouches
-// for it: the car opens a link and shows it as a QR code to this page, the
-// phone signs in and links it, and the car gets a pass. The pass names the
-// wallet, and the car shows it each time Holders opens, so the balance is
-// checked again then.
-//
-//   POST ?op=link-open                        car -> { lid, secret, ttl, min }
-//   POST ?op=link    { token, lid }           phone -> { ok }
-//   POST ?op=link-poll { lid, secret }        car -> { waiting }, { expired } or { pass, balance }
-//   POST ?op=pass    { pass }                 car -> { ok, balance } or { ok: false, error }
-//
 // The ideas are in apps/vote/ideas.json. Ballots live in one Redis hash,
 // wallet -> { picks, balance, at }, and results are counted from it, so a
 // changed ballot never leaves a count behind. Suggestions go to a list
@@ -31,7 +19,7 @@
 
 import { randomBytes } from 'node:crypto';
 import { fail, hash, json, limited, redis } from './_lib.js';
-import { DEV, MIN, amount, balance, isAddress, issuePass, signedBy, signInMessage } from './_solana.js';
+import { DEV, MIN, amount, balance, isAddress, signedBy, signInMessage } from './_solana.js';
 import list from '../vote/ideas.json' with { type: 'json' };
 
 const PICKS = 3;                  // ideas per ballot
@@ -39,7 +27,6 @@ const NONCE_TTL = 10 * 60;        // seconds to sign the message
 const SESSION_TTL = 24 * 3600;
 const MAX_SUGGESTION = 280;
 const SUGGESTIONS_PER_DAY = 3;    // per wallet
-const LINK_TTL = 15 * 60;         // seconds the car's code stays good
 
 const IDEAS = list.ideas.map(i => i.id);
 
@@ -129,56 +116,6 @@ async function suggest(request) {
   return json({ ok: true });
 }
 
-// ---------- unlocking a car ----------
-
-const LID = /^[A-Za-z0-9_-]{22}$/;
-const holds = tokens => `This wallet holds ${amount(tokens)} FrunkStore tokens; early access needs ${amount(MIN)}.`;
-
-async function linkOpen(request) {
-  if (await limited('vote-link-open', request, 30, 3600)) return fail(429, 'Too many codes. Try again later.');
-  const lid = randomBytes(16).toString('base64url'), secret = randomBytes(24).toString('base64url');
-  await redis(['SET', `vote:l:${lid}`, JSON.stringify({ secret: hash(secret) }), 'EX', LINK_TTL]);
-  return json({ lid, secret, ttl: LINK_TTL, min: MIN });
-}
-
-async function link(request) {
-  if (await limited('vote-link', request, 30, 3600)) return fail(429, 'Too many tries. Wait a while.');
-  const { token, lid } = await body(request);
-  const address = await wallet(token);
-  if (!address) return fail(401, 'Sign in again.');
-  if (!LID.test(lid || '')) return fail(400, 'That car code is damaged. Scan it again.');
-  const [raw, ttl] = await redis(['GET', `vote:l:${lid}`], ['TTL', `vote:l:${lid}`]);
-  if (!raw || ttl <= 0) return fail(410, 'That car code expired. Show a new one on the car.');
-  const tokens = await balance(address);
-  if (tokens < MIN) return fail(403, holds(tokens));
-  await redis(['SET', `vote:l:${lid}`, JSON.stringify({ ...JSON.parse(raw), address, tokens }), 'EX', ttl]);
-  return json({ ok: true });
-}
-
-async function linkPoll(request) {
-  const { lid, secret } = await body(request);
-  if (!LID.test(lid || '') || typeof secret !== 'string') return fail(400, 'Bad code.');
-  const [raw] = await redis(['GET', `vote:l:${lid}`]);
-  if (!raw) return json({ expired: true });
-  const entry = JSON.parse(raw);
-  if (entry.secret !== hash(secret)) return fail(403, 'Not this code.');
-  if (!entry.address) return json({ waiting: true });
-  const pass = await issuePass(entry.address);
-  await redis(['DEL', `vote:l:${lid}`]);
-  return json({ pass, balance: entry.tokens });
-}
-
-async function checkPass(request) {
-  if (await limited('vote-pass', request, 120, 3600)) return fail(429, 'Too many checks. Wait a while.');
-  // A locked answer is still a 200, so the car's console stays clean
-  const { pass } = await body(request);
-  const [address] = typeof pass === 'string' && /^[A-Za-z0-9_-]{32}$/.test(pass) ? await redis(['GET', `vote:p:${hash(pass)}`]) : [null];
-  if (!address) return json({ ok: false });
-  const tokens = await balance(address);
-  if (tokens < MIN) return json({ ok: false, error: holds(tokens) });
-  return json({ ok: true, balance: tokens });
-}
-
 async function handle(request) {
   const op = new URL(request.url).searchParams.get('op');
   try {
@@ -187,10 +124,6 @@ async function handle(request) {
     if (request.method === 'POST' && op === 'login') return await login(request);
     if (request.method === 'POST' && op === 'vote') return await vote(request);
     if (request.method === 'POST' && op === 'suggest') return await suggest(request);
-    if (request.method === 'POST' && op === 'link-open') return await linkOpen(request);
-    if (request.method === 'POST' && op === 'link') return await link(request);
-    if (request.method === 'POST' && op === 'link-poll') return await linkPoll(request);
-    if (request.method === 'POST' && op === 'pass') return await checkPass(request);
     if (DEV && request.method === 'POST' && op === 'dev-balance') {
       const { address, tokens } = await body(request);
       await redis(['SET', `dev:balance:${address}`, tokens]);

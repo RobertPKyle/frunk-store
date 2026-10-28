@@ -18,11 +18,6 @@
 
 import { phonePanel } from '../_shared/phone.js';
 import { MAX_WAD_FILE, cleanName, findWad, maybeWad } from '../_shared/roms.js';
-import { holdersGate } from '../_shared/holders.js';
-
-// Early access for FrunkStore token holders: nothing starts until this
-// screen is unlocked from a holder's phone
-await holdersGate('Freedoom');
 
 const FREEDOOM = '0.13.0';
 const FREE = [

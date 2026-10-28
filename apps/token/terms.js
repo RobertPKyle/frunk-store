@@ -13,7 +13,7 @@ export function risks(liquidity) {
       'so even small buys and sells move the price a lot, and you may not be able to sell for what you paid.',
     'frunk.store\'s owner didn\'t create this token but collects its creator rewards: a share of the fee on every trade, including yours. ' +
       'So frunk.store gains when people trade it; keep that in mind.',
-    'Holding it gives you no share of frunk.store, its income or its decisions. Holder perks like early access and votes can change or end at any time.',
+    'Holding it gives you no share of frunk.store, its income or its decisions. Holder perks like votes can change or end at any time.',
     'Trades happen in your own wallet app on Solana and can\'t be undone. frunk.store never holds your money, never sees your keys, ' +
       'and will never ask for your recovery phrase or ask you to approve a transaction. If anything does, it isn\'t us.',
     'Copycat tokens use the same name. Before you approve, check that the token address ends in …' + MINT.slice(-8) + '.',

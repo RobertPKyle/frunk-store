@@ -1,15 +1,14 @@
 // Solana helpers shared by the vote (vote.js) and the token screen
-// (token.js): the FrunkStore mint, wallet addresses, signed messages,
-// balances and the holders' car passes.
+// (token.js): the FrunkStore mint, wallet addresses, signed messages and
+// balances.
 
-import { createPublicKey, randomBytes, verify } from 'node:crypto';
-import { hash, redis } from './_lib.js';
+import { createPublicKey, verify } from 'node:crypto';
+import { redis } from './_lib.js';
 
 export const MINT = '9T1DbbiKfhfubEabDj5SWSMzBuyU4tJHkpSgR51Tpump';
 const RPC = process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com';
-// Tokens a wallet needs to vote and for early access; set in the project's environment
+// Tokens a wallet needs to vote; set in the project's environment
 export const MIN = +(process.env.VOTE_MIN_TOKENS || 100000);
-export const PASS_TTL = 30 * 86400;   // a car stays unlocked this long, while its wallet holds tokens
 
 const ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
 
@@ -71,14 +70,6 @@ export async function balance(address) {
 export async function solBalance(address) {
   if (DEV) return 0;
   return (await rpc('getBalance', [address, { commitment: 'confirmed' }])).value / 1e9;
-}
-
-// A car pass for a wallet that holds enough: apps/_shared/holders.js keeps
-// it, and the vote's op=pass checks it
-export async function issuePass(address) {
-  const pass = randomBytes(24).toString('base64url');
-  await redis(['SET', `vote:p:${hash(pass)}`, address, 'EX', PASS_TTL]);
-  return pass;
 }
 
 export const amount = n => n.toLocaleString('en-US', { maximumFractionDigits: 6 });

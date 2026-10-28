@@ -59,8 +59,7 @@ async function connect(how) {
   try {
     const r = await how();
     done = true;
-    say(`Connected: ${amount(r.tokens)} FrunkStore. Your car shows it in a few seconds.` +
-      (r.holders ? ' Holders early access is unlocked on the car too.' : ''), true);
+    say(`Connected: ${amount(r.tokens)} FrunkStore. Your car shows it in a few seconds.`, true);
   } catch (e) {
     say(cancelled(e) ? 'Sign-in cancelled.' : e.message);
   } finally {

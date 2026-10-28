@@ -8,7 +8,6 @@
 // the time of day: every 20 seconds after a change, when the page is hidden
 // and when the hub's close handshake asks.
 
-import { holdersGate } from '../_shared/holders.js';
 import { keepAwake } from '../_shared/awake.js';
 
 const $ = id => document.getElementById(id);
@@ -63,8 +62,6 @@ async function store(mode, fn) {
 const loadWorld = () => store('readonly', s => s.get('world')).catch(() => null);
 
 // ---------- start ----------
-
-await holdersGate('Craft 4K');
 
 let game, saved;
 try {

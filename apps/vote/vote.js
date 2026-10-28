@@ -1,8 +1,5 @@
 // FrunkStore token holders vote on what frunk.store builds next (see
 // apps/api/vote.js). The wallet signs a sign-in message, nothing more.
-//
-// Opened from a car's QR code (?link=…), signing in also unlocks early
-// access on that car.
 
 import { base64, cancelled, findWallets, short, walletLinks } from '../_shared/wallets.js';
 
@@ -16,7 +13,6 @@ const stored = {
 };
 
 let ideas = [], counts = {}, voters = 0, session = stored.get(), busy = false;
-const carLink = new URLSearchParams(location.search).get('link');
 
 function say(text, ok = false) {
   $('msg').textContent = text;
@@ -67,26 +63,10 @@ async function signIn(signer) {
     stored.set(session);
     say('Signed in. Pick up to three ideas, then save.', true);
     render();
-    await unlockCar();
   } catch (e) {
     say(cancelled(e) ? 'Sign-in cancelled.' : e.message);
   } finally {
     busy = false;
-  }
-}
-
-// Links the car that showed this page's code; once per page load
-let linked = false;
-async function unlockCar() {
-  if (!carLink || !session || linked) return;
-  try {
-    await call('link', { token: session.token, lid: carLink });
-    linked = true;
-    $('car').textContent = 'Your car is unlocked. Holders opens on its screen in a few seconds.';
-    $('car').classList.add('ok');
-  } catch (e) {
-    $('car').textContent = e.message;
-    $('car').classList.add('bad');
   }
 }
 
@@ -194,6 +174,5 @@ $('send').onclick = async () => {
   }
 };
 
-if (carLink) $('car').hidden = false;
 findWallets(showWallets);
-load().then(unlockCar);
+load();

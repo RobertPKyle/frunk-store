@@ -1184,8 +1184,24 @@ window.cityTest = {
   },
   tile: (x, y) => city.map.getTileValue(x, y),
   screen: (x, y) => ({ x: ((x + 0.5) * T - view.x) * view.zoom + cw / 2, y: ((y + 0.5) * T - view.y) * view.zoom + ch / 2 }),
-  // whether the middle of the land offered for a new city is free of water
-  newDry: () => { const v = newMap.getTileValuesForPainting(40, 35, 40, 30, []); return v.every(t => (t & BIT_MASK) < 2 || (t & BIT_MASK) > 20); },
+  // The middle of the stretch of land without water, w by h tiles, nearest
+  // the middle of the map; the view moves there
+  land: (w, h) => {
+    const raw = rawTiles(city.map);
+    const wet = (x, y) => { const t = raw[y * W + x] & BIT_MASK; return t >= 2 && t <= 20; };
+    let best = null;
+    for (let y = 1; y + h < H; y++) {
+      for (let x = 1; x + w < W; x++) {
+        const d = Math.abs(x + w / 2 - W / 2) + Math.abs(y + h / 2 - H / 2);
+        if (best && d >= best.d) continue;
+        let dry = true;
+        for (let yy = y; dry && yy < y + h; yy++) for (let xx = x; dry && xx < x + w; xx++) dry = !wet(xx, yy);
+        if (dry) best = { x: x + (w >> 1), y: y + (h >> 1), d };
+      }
+    }
+    if (best) { view.x = (best.x + 0.5) * T; view.y = (best.y + 0.5) * T; dirty = true; }
+    return best;
+  },
   run: steps => { for (let i = 0; i < steps; i++) { city.sim._simulate(city.sim._constructSimData()); city.sim._updateTime(); } },
 };
 

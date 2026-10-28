@@ -4,10 +4,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
 <title>Retro Console</title>
-<script>
-  // The Holders menu opens this page as ?edition=holders (see retro.js)
-  document.documentElement.dataset.edition = new URLSearchParams(location.search).get('edition') === 'holders' ? 'holders' : 'retro';
-</script>
 <style>
   :root { --bg: #0b0b12; --panel: #13131d; --card: #1b1b28; --line: rgba(190, 180, 255, .15); --text: #ecebf5; --muted: #9592ab;
           --accent: #ff5d73; --accent2: #ffc65c; --ok: #8fe0a0; }
@@ -18,7 +14,6 @@
   .btn { min-height: 44px; padding: 8px 16px; border-radius: 12px; background: var(--card); border: 1px solid var(--line); white-space: nowrap; }
   .btn.primary { background: var(--accent); border-color: transparent; color: #1a0508; font-weight: 700; }
   [hidden] { display: none !important; }
-  html[data-edition=retro] [data-only=holders], html[data-edition=holders] [data-only=retro] { display: none !important; }
 
 
   /* ---------- library ---------- */
@@ -145,8 +140,7 @@
 <body>
 <section id="library">
   <header>
-    <h1 data-only="retro">Retro Console</h1>
-    <h1 data-only="holders">Genesis &amp; PC Engine · Holders</h1>
+    <h1>Retro Console</h1>
     <button class="btn" id="continue" type="button" hidden></button>
   </header>
   <div class="scroll">
@@ -167,8 +161,7 @@
     <p class="note owned"><b>Only load games you legally own</b>, such as copies you made from your own cartridges. frunk.store doesn't provide, sell or share commercial games, and never keeps yours: they're stored only on this screen. You're responsible for the files you load.</p>
 
     <div class="legal">
-      <p data-only="retro">Plays NES, Game Boy, Game Boy Color, Game Boy Advance, Master System, Game Gear, SG-1000 and Atari Lynx games (.nes, .gb, .gbc, .gba, .sms, .gg, .sg, .lnx, .lyx, .o, also zipped). Mega Drive / Genesis and PC Engine / TurboGrafx-16 games are in early access for FrunkStore token holders, on the Holders card. Games remember your progress: they pick up where you left off, and Reset starts over (keeping in-game saves).</p>
-      <p data-only="holders">Plays Mega Drive / Genesis cartridges (.md, .gen, .bin, .smd) and PC Engine / TurboGrafx-16 HuCard games (.pce), also zipped. Mega CD, 32X and PC Engine CD games aren't supported, nor are the few Mega Drive games that save to EEPROM chips or are bigger than 4 MB (Super Street Fighter II). Games remember your progress: they pick up where you left off, and Reset starts over (keeping in-game saves). The FrunkStore token isn't an investment; frunk.store will never ask for your recovery phrase or a transaction.</p>
+      <p>Plays NES, Game Boy, Game Boy Color, Game Boy Advance, Master System, Game Gear, SG-1000, Atari Lynx, PC Engine / TurboGrafx-16 (HuCards) and Mega Drive / Genesis games (.nes, .gb, .gbc, .gba, .sms, .gg, .sg, .lnx, .lyx, .o, .pce, .md, .gen, .bin, .smd, also zipped). Mega CD, 32X and PC Engine CD games aren't supported, nor are the few Mega Drive games that save to EEPROM chips or are bigger than 4 MB (Super Street Fighter II). Games remember your progress: they pick up where you left off, and Reset starts over (keeping in-game saves).</p>
       <p>Controls: a USB or Bluetooth controller, the on-screen buttons, or a keyboard (arrows, Z = B, X = A, Q = L, W = R, Enter = Start, Shift = Select). On Sega's consoles, B is button 1, A is button 2, and Start is the Master System's Pause button. On the PC Engine, B is II, A is I, and Start is Run. On the Mega Drive, a controller's left, bottom and right buttons are A, B and C (keys A, Z and X); the six-button pad's X, Y and Z are L, the top button and R, and Mode is Select. On the Lynx, Start is Pause, and Option 1 and 2 are the top buttons (L and R on a controller; Select is Option 1 too). With a controller, the on-screen buttons hide to make the game bigger; touch the screen to bring them back. Switching the controller off pauses the game, and Start resumes it.</p>
       <p>Emulators: jsnes (Apache License 2.0) for NES, mGBA (Mozilla Public License 2.0, source at github.com/thenick775/mgba) for Game Boy, Gearsystem (GNU GPL 3 or later, source at frunk-apps.vercel.app/retro/sms/gearsystem-web-src.tar.gz) for Sega's consoles, Geargrafx (GNU GPL 3 or later, source at frunk-apps.vercel.app/retro/pce/geargrafx-web-src.tar.gz) for the PC Engine, clownmdemu (GNU AGPL 3 or later, source at frunk-apps.vercel.app/retro/md/clownmdemu-web-src.tar.gz) for the Mega Drive, Gearlynx (GNU GPL 3 or later, source at frunk-apps.vercel.app/retro/lynx/gearlynx-web-src.tar.gz) for the Atari Lynx. The Lynx starts without Atari's boot ROM: a stand-in modeled on Handy's (K. Wilkins, zlib license) loads each game. The free games are by their authors, under the licenses shown on each card; source code is kept next to each game.</p>
       <p>Not affiliated with or endorsed by Nintendo, Sega, NEC or Konami. Play only while parked.</p>

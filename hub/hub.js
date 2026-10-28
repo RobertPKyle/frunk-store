@@ -88,11 +88,9 @@ function el(tag, attrs = {}, ...children) {
   return node;
 }
 
-// Apps marked holders (early access for FrunkStore token holders) aren't on
-// the grid: the Holders app lists them and asks the hub to open one. Apps
-// marked unlisted open from elsewhere on the page (the token's chart, from
-// the footer).
-const listed = () => catalog.apps.filter(app => !app.holders && !app.unlisted);
+// Apps marked unlisted aren't on the grid: they open from elsewhere on the
+// page (the token's chart, from the footer).
+const listed = () => catalog.apps.filter(app => !app.unlisted);
 
 // A "New" or "Updated" badge while the catalog's date for it is recent, until
 // the app is opened after that date
@@ -242,12 +240,6 @@ function closeApp() {
 addEventListener('message', e => {
   if (e.source !== frame.contentWindow || e.origin !== appsOrigin) return;
   if (e.data?.frunk === 'save-on-close') saveOnClose = true;
-  // The Holders app opens an early-access app in its place, so the Apps
-  // button goes back to the grid and closes that app the usual way
-  if (e.data?.frunk === 'open' && catalog.apps.find(a => a.id === e.data.app)?.holders) {
-    history.replaceState({ app: e.data.app }, '', `/app/${encodeURIComponent(e.data.app)}`);
-    openApp(e.data.app, { push: false });
-  }
   // Brain Test's score card, opened in place of the hub: the app's frame
   // can't open pages itself
   if (e.data?.frunk === 'share' && /^[\w-]{12}$/.test(e.data.id || '')) {

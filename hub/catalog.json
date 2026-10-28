@@ -171,10 +171,10 @@
     {
       "id": "retro",
       "name": "Retro Console",
-      "tagline": "Play homebrew games, or NES, Game Boy, GBA, Master System, Game Gear and Atari Lynx games you own sent from your phone, with a controller or on screen.",
+      "tagline": "Play homebrew games, or NES, Game Boy, GBA, Master System, Game Gear, Atari Lynx, TurboGrafx-16 and Genesis games you own sent from your phone, with a controller or on screen.",
       "path": "/retro/",
       "icon": "/retro/icon.svg",
-      "updated": "2026-10-26",
+      "updated": "2026-10-28",
       "tags": [
         "Game",
         "Controller"
@@ -192,30 +192,6 @@
       "unlisted": true
     },
     {
-      "id": "holders",
-      "name": "Holders",
-      "tagline": "Early access for FrunkStore token holders: SuperTux, Craft 4K, fheroes2 (Heroes II), Freedoom, LibreQuake, OpenArena, OpenTTD, and Genesis and TurboGrafx-16 games, plus a vote on what's next. Unlock with your phone's wallet.",
-      "path": "/holders/",
-      "icon": "/holders/icon.svg",
-      "updated": "2026-10-27",
-      "tags": [
-        "Game",
-        "Controller"
-      ]
-    },
-    {
-      "id": "pce",
-      "name": "Genesis & PC Engine",
-      "tagline": "Mega Drive / Genesis and TurboGrafx-16 games for FrunkStore token holders: free homebrew, or cartridges you own.",
-      "path": "/retro/?edition=holders",
-      "icon": "/retro/icon.svg",
-      "tags": [
-        "Game",
-        "Controller"
-      ],
-      "holders": true
-    },
-    {
       "id": "craft4k",
       "name": "Craft 4K",
       "tagline": "Notch's tiny Minecraft4k rebuilt in C++ and ray-marched on the graphics chip: a big block world with sun shadows, day and night, and mirrors to build with.",
@@ -226,7 +202,7 @@
         "Controller",
         "Touch"
       ],
-      "holders": true
+      "added": "2026-10-28"
     },
     {
       "id": "doom",
@@ -238,7 +214,7 @@
         "Game",
         "Controller"
       ],
-      "holders": true
+      "added": "2026-10-28"
     },
     {
       "id": "heretic",
@@ -261,7 +237,7 @@
         "Game",
         "Controller"
       ],
-      "holders": true
+      "added": "2026-10-28"
     },
     {
       "id": "openttd",
@@ -273,7 +249,7 @@
         "Game",
         "Offline"
       ],
-      "holders": true
+      "added": "2026-10-28"
     },
     {
       "id": "fheroes2",
@@ -285,7 +261,7 @@
         "Game",
         "Offline"
       ],
-      "holders": true
+      "added": "2026-10-28"
     },
     {
       "id": "supertux",
@@ -298,7 +274,7 @@
         "Controller",
         "Touch"
       ],
-      "holders": true
+      "added": "2026-10-28"
     },
     {
       "id": "openarena",
@@ -310,7 +286,7 @@
         "Game",
         "Controller"
       ],
-      "holders": true
+      "added": "2026-10-28"
     },
     {
       "id": "blocks",

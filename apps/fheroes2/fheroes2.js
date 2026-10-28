@@ -22,11 +22,6 @@
 
 import { phonePanel } from '../_shared/phone.js';
 import { MAX_HEROES_FILE, heroesPath, isZip, unzipAll } from '../_shared/roms.js';
-import { holdersGate } from '../_shared/holders.js';
-
-// Early access for FrunkStore token holders: nothing starts until this
-// screen is unlocked from a holder's phone
-await holdersGate('fheroes2');
 
 const HOME = '/fheroes2';
 const DATA = '/h2';
