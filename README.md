@@ -112,10 +112,12 @@ clear them to make room.
   Vercel's CDN caches each spot for a day. Uncached queries are limited to 40
   per IP per hour and 3000 a day overall. The last 6 spots are kept on the
   device for offline use.
-- Distances in Pit Stop, What's Around Me and Sky Events come in miles or
-  kilometres (`apps/_shared/units.js`). The mi/km button next to Here in
-  Pit Stop and What's Around Me switches them for all three apps. Until
-  it's tapped, browsers set to US or UK English get miles.
+- Distances in Pit Stop, What's Around Me and Sky Events, and Weather's
+  wind (mph or km/h), come in miles or kilometres
+  (`apps/_shared/units.js`). The mi/km button next to Here in Pit Stop and
+  What's Around Me switches them for all four apps; Weather's °F/°C button
+  sets only temperature and rain. Until it's tapped, browsers set to US or
+  UK English get miles.
 - `apps/speedtest`: Speed Test. Download, upload, ping, jitter and ping under
   load, measured against Cloudflare's public speed test servers
   (speed.cloudflare.com). Each direction runs for a fixed time on several

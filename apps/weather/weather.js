@@ -4,6 +4,7 @@
 // Sun and Moon times are computed here with the Star Map's astronomy code.
 import { julianDay, localSiderealTime, toHorizon, sun, moon } from '../_shared/astro.js';
 import { followCar, getPlace, pickPlace } from '../_shared/place.js';
+import { useMiles } from '../_shared/units.js';
 import { weatherIcon, weatherName } from './icons.js';
 
 const FORECAST = 'https://api.open-meteo.com/v1/forecast';
@@ -30,8 +31,10 @@ let reload = false;    // the place changed during that fetch
 
 // ---------- units and formatting ----------
 
+// °F/°C also picks inches or mm of rain; wind follows the mi/km choice of
+// Pit Stop and What's Around Me
 const temp = c => `${Math.round(units === 'us' ? c * 9 / 5 + 32 : c)}°`;
-const speed = kmh => units === 'us' ? `${Math.round(kmh * 0.621371)} mph` : `${Math.round(kmh)} km/h`;
+const speed = kmh => useMiles() ? `${Math.round(kmh * 0.621371)} mph` : `${Math.round(kmh)} km/h`;
 const amount = mm => units === 'us' ? `${(mm / 25.4).toFixed(2)} in` : `${mm.toFixed(1)} mm`;
 const compass = deg => ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'][Math.round(deg / 45) % 8];
 

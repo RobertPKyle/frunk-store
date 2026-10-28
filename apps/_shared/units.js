@@ -1,6 +1,7 @@
 // Miles or kilometres for distances, one choice for every app that shows
-// them (Pit Stop, What's Around Me, Sky Events). Until someone picks, it
-// follows the browser's language: miles in the US and the UK.
+// them (Pit Stop, What's Around Me, Sky Events, Weather's wind). Until
+// someone picks, it follows the browser's language: miles in the US and
+// the UK.
 
 const KEY = 'units.distance';
 

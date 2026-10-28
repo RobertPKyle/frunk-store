@@ -263,8 +263,11 @@ await check('star map draws after picking a place', async () => {
 
 await check('weather loads a forecast and tonight\'s sky', async () => {
   await openFromHub(/Weather/);
-  // Change place through the shared picker's search
-  await appFrame().locator('#placeBtn').click();
+  // Change place through the shared picker's search (it opens by itself
+  // when this browser has no place yet)
+  const picker = appFrame().locator('.fp-picker');
+  await Promise.race([picker.waitFor({ timeout: 5000 }), appFrame().locator('#temp').filter({ hasText: /°/ }).waitFor({ timeout: 5000 })]).catch(() => {});
+  if (!(await picker.isVisible())) await appFrame().locator('#placeBtn').click();
   await appFrame().locator('.fp-search').fill('Moab');
   await appFrame().getByRole('button', { name: /Moab.*Utah/ }).click();
   await appFrame().locator('#temp').filter({ hasText: /°/ }).waitFor({ timeout: 15000 });
@@ -273,6 +276,16 @@ await check('weather loads a forecast and tonight\'s sky', async () => {
   const hours = await appFrame().locator('.hr').count(), days = await appFrame().locator('.day').count();
   if (hours < 24 || days !== 7) throw new Error(`expected 24+ hours and 7 days, got ${hours} and ${days}`);
   console.log(`     ${(await appFrame().locator('#temp').textContent())} ${await appFrame().locator('#desc').textContent()}`);
+  // Wind follows the mi/km choice of Pit Stop and What's Around Me, whatever °F/°C says
+  const facts = () => appFrame().locator('#facts').textContent();
+  if (!/\d mph/.test(await facts())) throw new Error(`wind isn't in mph: ${await facts()}`);
+  const frame = page.frames().find(f => f.url().includes('/weather/'));
+  await frame.evaluate(() => localStorage.setItem('units.distance', 'km'));
+  for (let i = 0; i < 2; i++) {
+    await appFrame().locator('#unitBtn').click();
+    if (!/\d km\/h/.test(await facts())) throw new Error(`wind isn't in km/h with ${await appFrame().locator('#unitBtn').textContent()}: ${await facts()}`);
+  }
+  await frame.evaluate(() => localStorage.removeItem('units.distance'));
   await page.screenshot({ path: shots + 'weather.png' });
 });
 
