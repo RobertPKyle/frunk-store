@@ -332,6 +332,15 @@ await check('pit stop lists places with hours and directions', async () => {
   // A spot the CDN hasn't cached waits on OpenStreetMap's busy servers
   await appFrame().locator('.item').first().waitFor({ timeout: 130000 });
   console.log(`     ${await appFrame().locator('#summary').textContent()}`);
+  // Miles or kilometres: the other unit, then back (the choice is shared with the other apps)
+  const unit = await appFrame().locator('#unitsBtn').textContent();
+  const other = unit === 'mi' ? 'km' : 'mi';
+  await appFrame().locator('#unitsBtn').click();
+  await appFrame().locator('#unitsBtn').filter({ hasText: other }).waitFor();
+  await appFrame().locator('#radii').filter({ hasText: other === 'km' ? '1 km' : '½ mi' }).waitFor();
+  await appFrame().locator('.item .dist b').first().filter({ hasText: other === 'km' ? / (m|km)$/ : / (ft|mi)$/ }).waitFor({ timeout: 10000 });
+  await appFrame().locator('#unitsBtn').click();
+  await appFrame().locator('#unitsBtn').filter({ hasText: unit }).waitFor();
   await appFrame().locator('[data-group="food"]').click();
   await appFrame().locator('.item').first().click();
   await appFrame().locator('#detail .qr canvas').waitFor({ state: 'attached', timeout: 5000 });

@@ -3,6 +3,7 @@
 // a QR code that opens walking directions on a phone.
 import { getPlace, herePlace, pickPlace, savePlace } from '../_shared/place.js';
 import { DAYS, openState, parseHours } from './hours.js';
+import { setMiles, useMiles } from '../_shared/units.js';
 
 const CACHE_KEY = 'pitstop.cache';
 const SETTINGS_KEY = 'pitstop.settings';
@@ -12,8 +13,9 @@ const STEP = 0.005;        // the server's location grid, degrees
 const API_RADII = [500, 1000, 2000];
 const DEG = Math.PI / 180;
 
-const US = /-US$/.test(navigator.language);
-const RADII = US
+const US = /-US$/.test(navigator.language);   // 12-hour clock
+let miles = useMiles();
+const radii = () => miles
   ? [['¼ mi', 402], ['½ mi', 805], ['1 mi', 1609]]
   : [['500 m', 500], ['1 km', 1000], ['2 km', 2000]];
 
@@ -80,7 +82,7 @@ function distBearing(lat1, lon1, lat2, lon2) {
 const compass = deg => ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'][Math.round(deg / 45) % 8];
 
 function distance(m) {
-  if (US) {
+  if (miles) {
     const mi = m / 1609.344;
     return mi < 0.1 ? `${Math.round(m * 3.28084 / 50) * 50 || 50} ft` : `${mi.toFixed(1)} mi`;
   }
@@ -174,7 +176,7 @@ function measure() {
 // ---------- list ----------
 
 function visible() {
-  const radius = RADII[settings.radius][1];
+  const radius = radii()[settings.radius][1];
   return places.filter(p => p.dist <= radius && (settings.group === 'all' || group(p) === settings.group))
     .sort((a, b) => a.dist - b.dist);
 }
@@ -198,7 +200,7 @@ function renderList() {
     return b;
   });
   $('list').replaceChildren(...items);
-  const where = RADII[settings.radius][0];
+  const where = radii()[settings.radius][0];
   const what = settings.group === 'all' ? 'places' : GROUPS[settings.group].label.toLowerCase();
   const openNow = list.filter(p => p.state?.open).length;
   $('summary').textContent = list.length
@@ -230,7 +232,7 @@ function draw() {
   if (!place) return;
   // Room for the hub's Apps button above and labels around the edge
   const cx = w / 2, cy = (h + 40) / 2, R = Math.max(40, Math.min(w / 2 - 30, (h - 40) / 2 - 26));
-  const radius = RADII[settings.radius][1];
+  const radius = radii()[settings.radius][1];
 
   ctx.lineWidth = 1;
   ctx.font = '12px system-ui, sans-serif';
@@ -408,7 +410,7 @@ async function load(force = false) {
 }
 
 async function findAndShow(force) {
-  const r = apiRadius(RADII[settings.radius][1]);
+  const r = apiRadius(radii()[settings.radius][1]);
   const key = `${snap(place.lat)},${snap(place.lon)}`;
   const cache = store.get(CACHE_KEY) || [];
   const hit = cache.find(c => c.key === key && c.r >= r);
@@ -496,17 +498,34 @@ function groupChip(id, label, color) {
 $('groupsA').append(...['toilets', 'cafe', 'food'].map(g => groupChip(g, GROUPS[g].label, GROUPS[g].color)));
 $('groupsB').append(...['shop', 'outdoors'].map(g => groupChip(g, GROUPS[g].label, GROUPS[g].color)), groupChip('all', 'All'));
 
-$('radii').append(...RADII.map(([label], i) => {
-  const b = el('button', { className: 'chip', type: 'button', textContent: label });
-  b.setAttribute('aria-pressed', String(i === settings.radius));
-  b.onclick = () => {
-    settings.radius = i;
-    store.set(SETTINGS_KEY, settings);
-    for (const c of $('radii').children) c.setAttribute('aria-pressed', String(c === b));
-    load();
-  };
-  return b;
-}));
+function radiusChips() {
+  $('radii').replaceChildren(...radii().map(([label], i) => {
+    const b = el('button', { className: 'chip', type: 'button', textContent: label });
+    b.setAttribute('aria-pressed', String(i === settings.radius));
+    b.onclick = () => {
+      settings.radius = i;
+      store.set(SETTINGS_KEY, settings);
+      for (const c of $('radii').children) c.setAttribute('aria-pressed', String(c === b));
+      load();
+    };
+    return b;
+  }));
+}
+radiusChips();
+
+// Miles or kilometres: the button shows the one in use
+function showUnits() {
+  $('unitsBtn').textContent = miles ? 'mi' : 'km';
+  $('unitsBtn').setAttribute('aria-label', miles ? 'Distances in miles. Switch to kilometres' : 'Distances in kilometres. Switch to miles');
+}
+showUnits();
+$('unitsBtn').onclick = () => {
+  miles = !miles;
+  setMiles(miles);
+  showUnits();
+  radiusChips();
+  load();
+};
 
 $('placeBtn').onclick = () => pickPlace().then(setPlace);
 $('hereBtn').onclick = locate;

@@ -2,6 +2,7 @@
 // landmarks, trails, historic sites), on a north-up map and a list. Tap one
 // to read the article. Text is rendered as plain text, never as HTML.
 import { getPlace, herePlace, pickPlace, savePlace } from '../_shared/place.js';
+import { setMiles, useMiles } from '../_shared/units.js';
 
 const API = 'https://en.wikipedia.org/w/api.php';
 const CACHE_KEY = 'nearby.cache';
@@ -13,8 +14,8 @@ const MAX_TEXT = 60_000;     // characters kept per cached article
 const GEO_MAX = 10_000;      // geosearch radius limit, m
 const DEG = Math.PI / 180;
 
-const US = /-US$/.test(navigator.language);
-const RADII = US
+let miles = useMiles();
+const radii = () => miles
   ? [['1 mi', 1609], ['6 mi', 9656], ['12 mi', 19312]]
   : [['2 km', 2000], ['10 km', 10_000], ['20 km', 20_000]];
 
@@ -62,7 +63,7 @@ function offset(lat, lon, dist, bearing) {
 const compass = deg => ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'][Math.round(deg / 45) % 8];
 
 function distance(m) {
-  if (US) {
+  if (miles) {
     const mi = m / 1609.344;
     return mi < 0.1 ? `${Math.round(m * 3.28084 / 50) * 50 || 50} ft` : `${mi < 10 ? mi.toFixed(1) : Math.round(mi)} mi`;
   }
@@ -190,7 +191,7 @@ function renderList() {
     return b;
   });
   $('list').replaceChildren(...items);
-  const where = RADII[settings.radius][0];
+  const where = radii()[settings.radius][0];
   $('summary').textContent = pages.length ? `${pages.length} places within ${where}` : '';
 }
 
@@ -215,7 +216,7 @@ function draw() {
   ctx.clearRect(0, 0, w, h);
   // Room for the hub's Apps button above and labels around the edge
   const cx = w / 2, cy = (h + 40) / 2, R = Math.max(40, Math.min(w / 2 - 30, (h - 40) / 2 - 26));
-  const radius = RADII[settings.radius][1];
+  const radius = radii()[settings.radius][1];
 
   ctx.lineWidth = 1;
   ctx.font = '12px system-ui, sans-serif';
@@ -398,7 +399,7 @@ async function load(force = false) {
 }
 
 async function findAndShow(force) {
-  const radius = RADII[settings.radius][1];
+  const radius = radii()[settings.radius][1];
   const key = `${place.lat.toFixed(3)},${place.lon.toFixed(3)}`;
   const cached = store.get(CACHE_KEY);
   const usable = cached && cached.key === key && cached.radius >= radius;
@@ -453,17 +454,34 @@ function locate() {
 
 // ---------- controls ----------
 
-$('radii').append(...RADII.map(([label], i) => {
-  const b = el('button', { className: 'chip', type: 'button', textContent: label });
-  b.setAttribute('aria-pressed', String(i === settings.radius));
-  b.onclick = () => {
-    settings.radius = i;
-    store.set(SETTINGS_KEY, settings);
-    for (const c of $('radii').children) c.setAttribute('aria-pressed', String(c === b));
-    load();
-  };
-  return b;
-}));
+function radiusChips() {
+  $('radii').replaceChildren(...radii().map(([label], i) => {
+    const b = el('button', { className: 'chip', type: 'button', textContent: label });
+    b.setAttribute('aria-pressed', String(i === settings.radius));
+    b.onclick = () => {
+      settings.radius = i;
+      store.set(SETTINGS_KEY, settings);
+      for (const c of $('radii').children) c.setAttribute('aria-pressed', String(c === b));
+      load();
+    };
+    return b;
+  }));
+}
+radiusChips();
+
+// Miles or kilometres: the button shows the one in use
+function showUnits() {
+  $('unitsBtn').textContent = miles ? 'mi' : 'km';
+  $('unitsBtn').setAttribute('aria-label', miles ? 'Distances in miles. Switch to kilometres' : 'Distances in kilometres. Switch to miles');
+}
+showUnits();
+$('unitsBtn').onclick = () => {
+  miles = !miles;
+  setMiles(miles);
+  showUnits();
+  radiusChips();
+  load();
+};
 
 document.querySelectorAll('[data-sort]').forEach(b => {
   b.setAttribute('aria-pressed', String(b.dataset.sort === settings.sort));

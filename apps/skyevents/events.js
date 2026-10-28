@@ -6,6 +6,7 @@
 //
 // Times are milliseconds since 1970. Angles are degrees.
 import { julianDay, localSiderealTime, toHorizon, moon, planet, sunEclipticLongitude } from '../_shared/astro.js';
+import { useMiles } from '../_shared/units.js';
 
 const HOUR = 3600_000, DAY = 86400_000;
 const DEG = Math.PI / 180;
@@ -164,7 +165,7 @@ function moonEvents(t0, t1, lat, lon, eclipseEnd) {
     if (lat >= 0) e.title = `Full ${special.get(e) || MOON_NAMES[d.getMonth()]} Moon`;
     if (m.dist < SUPERMOON_KM) {
       e.title += ' (supermoon)';
-      notes.push(`The Moon is close to Earth (${Math.round(m.dist / 1000) * 1000} km), so it looks a little bigger and brighter than usual.`);
+      notes.push(`The Moon is close to Earth (${useMiles() ? `${(Math.round(m.dist / 1609.344 / 1000) * 1000).toLocaleString('en-US')} miles` : `${(Math.round(m.dist / 1000) * 1000).toLocaleString('en-US')} km`}), so it looks a little bigger and brighter than usual.`);
     }
     const sameMonth = events.find(o => o.phase === 180 && o.t < e.t && new Date(o.t).getMonth() === d.getMonth() && new Date(o.t).getFullYear() === d.getFullYear());
     if (sameMonth) { notes.push('Second full moon this month: a "blue moon".'); e.badge = 'Blue moon'; }
