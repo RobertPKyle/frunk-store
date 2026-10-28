@@ -133,6 +133,7 @@ export function phonePanel({ app, save, onSaved, onClose = () => {}, notPlayable
     item.className = 'busy';
     try {
       const title = await save(name, whole);
+      if (title) navigator.storage?.persist?.().catch(() => {});   // so the browser doesn't clear the player's games to make room
       item.textContent = title || `${name}: ${notPlayable()}`;
       item.className = title ? '' : 'bad';
     } catch {

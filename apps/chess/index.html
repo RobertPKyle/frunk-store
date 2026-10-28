@@ -32,6 +32,9 @@
   .sq.l { background: var(--light); }
   .sq.d { background: var(--dark); }
   .sq svg { width: 100%; height: 100%; pointer-events: none; }
+  /* the move just played, so the opponent's reply is easy to spot */
+  .sq.last.l { background: #f3e27a; }
+  .sq.last.d { background: #d2b544; }
   .sq.sel { box-shadow: inset 0 0 0 3px #f5d442; }
   .sq.hint-src { box-shadow: inset 0 0 0 3px #39c6a0; }
   .sq.hint-dst { box-shadow: inset 0 0 0 3px #39c6a0; }

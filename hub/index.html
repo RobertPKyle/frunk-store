@@ -9,6 +9,10 @@
 <link rel="icon" href="/icon.svg" type="image/svg+xml">
 <link rel="preload" href="/fonts/unbounded-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/hub.css">
+<!-- hub.js asks for these only once it has loaded and run; starting them
+     here saves round trips before the grid shows on a slow connection -->
+<link rel="modulepreload" href="/i18n.js">
+<link rel="preload" href="/catalog.json" as="fetch" crossorigin>
 <script>
   // Picks the language before the page is drawn, so it doesn't flash English
   // first: the saved choice, else the first one the browser asks for that the

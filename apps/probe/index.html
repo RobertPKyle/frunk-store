@@ -12,7 +12,8 @@
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--text); font: 18px/1.4 system-ui, sans-serif; }
   header { padding: 20px 24px; border-bottom: 1px solid var(--line); display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
-  h1 { font-size: 24px; margin: 0; flex: 1; }
+  /* the left margin keeps the title clear of the hub's Apps button */
+  h1 { font-size: 24px; margin: 0 0 0 96px; flex: 1; }
   button { font: inherit; font-size: 20px; padding: 14px 24px; border-radius: 10px; border: 0; background: var(--accent); color: #fff; min-height: 56px; }
   button.secondary { background: var(--line); color: var(--text); }
   main { padding: 16px 24px 48px; display: grid; gap: 16px; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); }

@@ -71,7 +71,8 @@ const STYLE = `
   #holdersLock .code { flex: none; display: grid; place-items: center; width: 236px; height: 236px; border-radius: 12px; background: #fff; }
   #holdersLock .code a { display: block; }
   #holdersLock .code img, #holdersLock .code canvas { display: block; width: 216px; height: 216px; image-rendering: pixelated; }
-  #holdersLock h2 { margin: 0 0 6px; font-size: 19px; }
+  /* set in full, so an app's own heading style (capitals, spacing) doesn't carry over */
+  #holdersLock h2 { margin: 0 0 6px; font-size: 19px; font-weight: 700; color: #ecebf5; text-transform: none; letter-spacing: normal; }
   #holdersLock p { margin: 0 0 8px; font-size: 14px; color: #9592ab; }
   #holdersLock ol { margin: 0 0 10px; padding-left: 20px; font-size: 15px; color: #c9c6dc; }
   @media (max-width: 640px) { #holdersLock .sheet { flex-direction: column; } }

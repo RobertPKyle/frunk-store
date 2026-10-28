@@ -96,6 +96,7 @@ const KIND = path => path === 'data/heroes2.agg' ? 'The Succession Wars' : path 
 
 // A file from the phone or the file picker; a zip may hold the whole game
 async function addFile(name, bytes) {
+  navigator.storage?.persist?.().catch(() => {});   // so the browser doesn't clear the player's games to make room
   if (!isZip(bytes)) {
     const path = await saveFile(name, bytes);
     return path && `${name.replace(/^.*\//, '')}: ${KIND(path)}`;

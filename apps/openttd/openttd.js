@@ -22,6 +22,7 @@
 
 import { MidiPlayer } from './midi.js';
 import { holdersGate } from '../_shared/holders.js';
+import { mbOf, wasmProgress } from '../_shared/engine.js';
 
 // Early access for FrunkStore token holders: nothing starts until this
 // screen is unlocked from a holder's phone
@@ -236,6 +237,11 @@ async function boot(resume) {
   const module = await createOpenTTD({
     canvas: $('canvas'),
     locateFile: path => new URL(`engine/${path}`, location.href).href,
+    instantiateWasm: wasmProgress(new URL('engine/openttd.wasm', location.href).href, {
+      progress: (got, total) => loading('OpenTTD', `Loading the game engine… ${mbOf(got, total)}`, 0.9 + 0.08 * got / total),
+      arrived: () => loading('OpenTTD', 'Starting…', 0.98),
+      failed: e => failed(`The game engine couldn't be loaded (${e.message}). Check the connection and try again.`),
+    }),
     SDL2: audio ? { audioContext: audio } : {},
     print: keep,
     printErr: keep,

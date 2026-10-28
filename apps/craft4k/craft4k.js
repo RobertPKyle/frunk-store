@@ -111,6 +111,7 @@ async function save() {
   dirty = false;
   try {
     await store('readwrite', s => s.put({ seed: saved.seed, edits: list, player, time: clock() }, 'world'));
+    navigator.storage?.persist?.().catch(() => {});   // so the browser doesn't clear the world to make room
   } catch {
     hint('Couldn\'t save the world on this screen');
   }

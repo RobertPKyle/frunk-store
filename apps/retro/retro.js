@@ -134,6 +134,7 @@ async function saveGame(name, file) {
   const { system, bytes: data } = game;
   const title = cleanName(name);
   await putRom({ id: `${title}|${data.length}`, title, system, size: data.length, added: Date.now(), data });
+  navigator.storage?.persist?.().catch(() => {});   // so the browser doesn't clear the player's games to make room
   return title;
 }
 

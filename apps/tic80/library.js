@@ -98,6 +98,7 @@ async function addCart(name, bytes) {
   // the same cart sent twice replaces itself
   const id = `c${[...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))].slice(0, 8).map(b => b.toString(16).padStart(2, '0')).join('')}`;
   await putCart({ id, name, title, author: info.author, desc: info.desc, player: info.player, size: bytes.length, added: Date.now(), bytes });
+  navigator.storage?.persist?.().catch(() => {});   // so the browser doesn't clear the player's games to make room
   return title;
 }
 

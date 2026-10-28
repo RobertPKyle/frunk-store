@@ -77,6 +77,8 @@ export async function followCar(onMove) {
 const CSS = `
 .fp-picker { position: fixed; inset: 0; z-index: 9; display: flex; flex-direction: column; gap: 12px; padding: 20px; background: rgba(2, 4, 10, .95); color: #d6deee; font: 16px/1.4 system-ui, sans-serif; }
 .fp-picker h2 { margin: 0; font-size: 20px; flex: 1; }
+/* clear of the hub's Apps button in the top-left corner */
+.fp-head { min-height: 44px; padding-left: 96px; }
 .fp-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .fp-btn { min-height: 44px; padding: 8px 14px; border-radius: 12px; background: #0d1322; border: 1px solid rgba(140, 170, 230, .25); color: inherit; font: inherit; cursor: pointer; }
 .fp-search { flex: 1; min-width: 200px; min-height: 44px; padding: 8px 14px; border-radius: 12px; background: #0d1322; border: 1px solid rgba(140, 170, 230, .35); color: inherit; font: inherit; }
@@ -104,7 +106,7 @@ export function pickPlace({ required = false } = {}) {
     const geoBtn = el('button', { className: 'fp-btn', type: 'button', textContent: "Use this car's location" });
     const closeBtn = el('button', { className: 'fp-btn', type: 'button', textContent: 'Close', hidden: required });
     const root = el('div', { className: 'fp-picker', role: 'dialog', ariaLabel: 'Choose a location' },
-      el('div', { className: 'fp-row' }, el('h2', { textContent: 'Where are you?' }), closeBtn),
+      el('div', { className: 'fp-row fp-head' }, el('h2', { textContent: 'Where are you?' }), closeBtn),
       el('div', { className: 'fp-row' }, geoBtn, status),
       el('div', { className: 'fp-row' }, search),
       list,

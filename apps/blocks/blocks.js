@@ -270,6 +270,7 @@ function waitForStart(since) {
     $('canvas').focus();
     if (touchFirst) hint('Drag to look around, use the arrows to walk', 5000);
     setInterval(save, AUTOSAVE_MS);
+    navigator.storage?.persist?.().catch(() => {});   // so the browser doesn't clear the worlds to make room
     return;
   }
   if (performance.now() - since > 60000) {

@@ -491,6 +491,16 @@ function failed(message) {
 }
 $('failedOk').onclick = () => { $('failed').hidden = true; };
 
+// A hidden screen holds the game, so monsters don't move while nobody's
+// watching, and its sound, so a note can't drone on
+document.addEventListener('visibilitychange', () => {
+  if (!run) return;
+  Atomics.store(run.ctrl, CTRL.HOLD, document.hidden ? 1 : 0);
+  Atomics.notify(run.ctrl, CTRL.HOLD);
+  if (document.hidden) run.audio?.suspend().catch(() => {});
+  else applySound();
+});
+
 // The hub closes apps at once; nothing here waits to be saved (the games
 // write their files as they go)
 addEventListener('message', e => {

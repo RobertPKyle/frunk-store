@@ -53,9 +53,21 @@ async function serve(dir, port, host) {
     if (dir === 'hub' && /^\/app\/[\w-]+\/?$/.test(path)) path = '/index.html';
     let file = join(root, dir, path);
     try {
-      if ((await stat(file)).isDirectory()) file = join(file, 'index.html');
+      let info = await stat(file);
+      if (info.isDirectory()) info = await stat(file = join(file, 'index.html'));
+      // ETags, 304s and byte ranges as Vercel answers them, which the apps'
+      // service worker and engine downloads rely on
+      const etag = `"${info.size.toString(16)}-${Math.floor(info.mtimeMs).toString(16)}"`;
+      const type = { 'Content-Type': TYPES[extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-store', ETag: etag };
+      if (req.headers['if-none-match'] === etag) { res.writeHead(304, type).end(); return; }
       const body = await readFile(file);
-      res.writeHead(200, { 'Content-Type': TYPES[extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-store' });
+      const range = /^bytes=(\d+)-(\d*)$/.exec(req.headers.range || '');
+      if (range) {
+        const from = +range[1], to = Math.min(range[2] ? +range[2] : body.length - 1, body.length - 1);
+        res.writeHead(206, { ...type, 'Content-Range': `bytes ${from}-${to}/${body.length}` }).end(body.subarray(from, to + 1));
+        return;
+      }
+      res.writeHead(200, type);
       res.end(body);
     } catch {
       res.writeHead(404).end('not found');

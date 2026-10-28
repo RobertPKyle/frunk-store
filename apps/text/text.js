@@ -110,6 +110,7 @@ async function addStory(name, bytes) {
   if (!found) return null;
   const title = cleanName(found.name.replace(/\.(zblorb|blorb|zlb|blb)$/i, ''));
   await putGame({ id: `g:${Date.now()}`, title, size: found.bytes.length, added: Date.now(), bytes: found.bytes });
+  navigator.storage?.persist?.().catch(() => {});   // so the browser doesn't clear the player's games to make room
   return title;
 }
 

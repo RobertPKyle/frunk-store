@@ -24,6 +24,7 @@
 // the minute-by-minute saves are what make sure little is lost.
 // ScummVM can't be restarted within a page, so leaving a game reloads it.
 
+import { mbOf, wasmProgress } from '../_shared/engine.js';
 import { phonePanel } from '../_shared/phone.js';
 import { cleanName, isZip, unzipAll } from '../_shared/roms.js';
 
@@ -436,6 +437,12 @@ async function boot(entry, game, resume) {
     canvas: $('canvas'),
     SDL3: audio ? { audioContext: audio } : {},
     locateFile: file => `engine/${file}`,
+    // ScummVM is 33 MB: its download is shown, not just "Starting…"
+    instantiateWasm: wasmProgress('engine/scummvm.wasm', {
+      progress: (got, total) => loading(entry.title, `Loading the game engine… ${mbOf(got, total)}`, 0.9 + 0.08 * got / total),
+      arrived: () => loading(entry.title, 'Starting…', 0.98),
+      failed: e => failed(`The game engine couldn't be loaded (${e.message}). Check the connection and try again.`),
+    }),
     preRun: [() => {
       const FS = engine.FS;
       for (const f of game.files) {

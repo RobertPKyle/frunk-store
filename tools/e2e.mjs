@@ -1161,9 +1161,17 @@ await check('arcade takes a game from mamedev.org by phone, plays it with Coin a
   await phone.close();
   await appFrame().locator('#received li:not(.bad):not(.busy)').filter({ hasText: 'Robby Roto' }).waitFor({ timeout: 20000 });
   await appFrame().getByRole('button', { name: 'Done' }).click();
-  // the game is ready under MAME's name for it, and starts
+  // the game is ready under MAME's name for it, and starts; the 39 MB
+  // engine shows how much of it has arrived while it loads
+  await frame().evaluate(() => {
+    const text = document.getElementById('loadText');
+    window.loadTexts = [];
+    new MutationObserver(() => window.loadTexts.push(text.textContent)).observe(text, { childList: true, characterData: true, subtree: true });
+  });
   await appFrame().locator('.game.ready').filter({ hasText: 'Robby Roto' }).click();
   await frame().waitForFunction(() => window.JSMESS?.running, null, { timeout: 60000 });
+  const texts = await frame().evaluate(() => window.loadTexts);
+  if (!texts.some(t => /^Loading the arcade… \d+ of \d+ MB$/.test(t))) throw new Error(`no engine progress: ${texts.slice(0, 4).join(' | ')}`);
   const tap = async sel => {
     const b = await appFrame().locator(sel).boundingBox();
     await page.touchscreen.tap(b.x + b.width / 2, b.y + b.height / 2);
@@ -1398,9 +1406,26 @@ await check('ascii quests plays Kroz from Apogee\'s GPL source: walks by touch, 
   await until('a step right', async () => (await state()).px === start.px + 1, 3000);
   await page.keyboard.press('ArrowDown');
   await until('a step down', async () => (await state()).py === start.py + 1, 3000);
-  // Saving writes the game's own file
-  await app.locator('.side button', { hasText: 'Save' }).click();
-  await until('save question', async () => (await prompt()).includes('Yes'), 5000);
+  // A hidden screen holds the game: a key pressed meanwhile waits for it to show again
+  const seen = hidden => frame().evaluate(h => {
+    Object.defineProperty(document, 'hidden', { configurable: true, get: () => h });
+    document.dispatchEvent(new Event('visibilitychange'));
+  }, hidden);
+  await seen(true);
+  await page.waitForTimeout(300);
+  await page.keyboard.press('ArrowDown');
+  await page.waitForTimeout(1000);
+  if ((await state()).py !== start.py + 1) throw new Error('the game moved while its screen was hidden');
+  await seen(false);
+  await until('the held step', async () => (await state()).py === start.py + 2, 3000);
+  // Saving writes the game's own file. Kroz now and then eats a key while a
+  // monster is close, so Save is pressed again if no question comes
+  let pressed = 0;
+  await until('save question', async () => {
+    if ((await prompt()).includes('Yes')) return true;
+    if (Date.now() - pressed > 2000) { await app.locator('.side button', { hasText: 'Save' }).click(); pressed = Date.now(); }
+    return false;
+  }, 9000);
   await answer('Yes');
   const files = () => frame().evaluate(() => new Promise(r => {
     const q = indexedDB.open('ascii');
@@ -2073,6 +2098,31 @@ await check('a place from the car\'s location follows the car', async () => {
   await openFromHub(/Star Map/);
   await appFrame().locator('#placeBtn').filter({ hasText: 'Here (39.7°, -105.0°)' }).waitFor({ timeout: 8000 });
   await page.context().clearPermissions();
+});
+
+await check('an app and the hub\'s icons, seen once, open again with no connection', async () => {
+  // a browser that has never been here: the app's files load before its
+  // service worker runs, and are handed to it once it does
+  const context = await browser.newContext({ viewport: { width: 773, height: 601 }, deviceScaleFactor: 1.53, hasTouch: true });
+  try {
+    const p = await context.newPage();
+    await p.goto(base + '/app/sleep');
+    await p.frameLocator('#frame').locator('.tile').first().waitFor();
+    await p.evaluate(() => navigator.serviceWorker.ready);
+    const app = p.frames().find(f => f.url().includes('/sleep/'));
+    await app.waitForFunction(async () => !!(await caches.match('/_shared/ambient.js')), null, { timeout: 10000 });
+    await context.setOffline(true);
+    await p.goto(base + '/app/sleep');
+    await p.frameLocator('#frame').locator('.tile').first().waitFor({ timeout: 10000 });
+    // and the hub's grid has every app's icon, which the hub's worker fetched when it started
+    await p.goto(base + '/');
+    await p.waitForSelector('#grid .card');
+    await p.waitForFunction(() => [...document.querySelectorAll('#grid .card img')].every(i => i.complete));
+    const missing = await p.locator('#grid .card img').evaluateAll(imgs => imgs.filter(i => !i.naturalWidth).length);
+    if (missing) throw new Error(`${missing} app icons missing offline after one visit`);
+  } finally {
+    await context.close();
+  }
 });
 
 await check('hub and a cached app open offline and on a slow connection', async () => {

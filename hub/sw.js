@@ -10,8 +10,28 @@ const SLOW = 3000;   // ms to wait for the page before using the cached copy
 const fromCache = new Set();
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));
+  e.waitUntil(caches.open(CACHE)
+    .then(c => c.addAll(SHELL).then(() => Promise.race([icons(c), new Promise(r => setTimeout(r, 10000))])))
+    .then(() => self.skipWaiting()));
 });
+
+// The app icons too: on the first visit the grid asks for them before this
+// worker runs, so they'd be missing offline until the next visit. Best
+// effort, and given at most 10 seconds on a slow connection; the hub works
+// without them.
+async function icons(cache) {
+  try {
+    const catalog = await (await cache.match('/catalog.json')).json();
+    // the dev server serves apps on the next port, as hub.js works out
+    const origin = self.location.hostname === 'localhost' ? `http://127.0.0.1:${Number(self.location.port) + 1}` : catalog.appsOrigin;
+    await Promise.all([...new Set(catalog.apps.map(app => app.icon))].map(async icon => {
+      const url = origin + icon;
+      if (await cache.match(url)) return;
+      const res = await fetch(url, { mode: 'cors', credentials: 'omit' });
+      if (res.ok) await cache.put(url, res);
+    }));
+  } catch {}
+}
 
 self.addEventListener('activate', e => {
   e.waitUntil((async () => {

@@ -17,6 +17,7 @@
 //
 // MAME can't be restarted within a page, so leaving a game reloads it.
 
+import { mbOf, wasmProgress } from '../_shared/engine.js';
 import { phonePanel } from '../_shared/phone.js';
 import { BY_SET, GAMES, MAX_ROM_FILE, setName } from './games.js';
 
@@ -163,6 +164,12 @@ async function play(set) {
       '-window', '-resolution', `${w}x${h}`, '-video', 'accel', '-nothrottle', '-skip_gameinfo', '-samplerate', '44100',
       '-joystickprovider', 'none', '-noreadconfig'],
     locateFile: file => `engine/${file}`,
+    // the engine is 39 MB: its download is shown, not just "Starting…"
+    instantiateWasm: wasmProgress('engine/arcade.wasm', {
+      progress: (got, total) => { $('loadText').textContent = `Loading the arcade… ${mbOf(got, total)}`; },
+      arrived: () => { $('loadText').textContent = 'Starting…'; },
+      failed: e => failed(`The arcade couldn't be loaded (${e.message}). Check the connection and try again.`),
+    }),
     print: remember,
     printErr: remember,
     preRun: [M => {

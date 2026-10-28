@@ -16,7 +16,7 @@
 export const crt = { textattr: 7, lastmode: 3, checkbreak: true, directvideo: true, checksnow: false };
 
 // ctrl[] slots, shared with ascii.js
-export const CTRL = { CURX: 0, CURY: 1, CURSOR: 2, BORDER: 3, LINE: 4, PX: 5, PY: 6, SLEEP: 7, SPEED: 8, BUSY: 9 };
+export const CTRL = { CURX: 0, CURY: 1, CURSOR: 2, BORDER: 3, LINE: 4, PX: 5, PY: 6, SLEEP: 7, SPEED: 8, BUSY: 9, HOLD: 10 };
 export const KEY_SLOTS = 64;
 
 let screen = null, ctrl = null, keys = null, audio = null, onFile = () => {}, state = null;
@@ -41,6 +41,11 @@ function pause() {
   flushSound();
   publish();
   if (ctrl[CTRL.SPEED]) speed = ctrl[CTRL.SPEED] / 100;
+  // the page holds the game while its screen is hidden
+  if (Atomics.load(ctrl, CTRL.HOLD)) {
+    while (Atomics.load(ctrl, CTRL.HOLD)) Atomics.wait(ctrl, CTRL.HOLD, 1);
+    caughtUp();
+  }
   const t = now();
   if (vt < t - 60) vt = t - 60;   // never owe more than a moment when the device is slow
   const ahead = vt - t;

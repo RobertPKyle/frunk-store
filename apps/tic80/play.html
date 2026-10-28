@@ -58,6 +58,11 @@ window.AudioContext = window.webkitAudioContext = class extends Real {
 const resume = () => contexts.forEach(c => c.state === 'suspended' && c.resume().catch(() => {}));
 addEventListener('pointerdown', resume, true);
 addEventListener('keydown', resume, true);
+// A hidden screen stops the game (it runs on animation frames), and its
+// sound with it, so the last notes don't keep playing
+document.addEventListener('visibilitychange', () => {
+  for (const c of contexts) (document.hidden ? c.suspend() : c.resume()).catch(() => {});
+});
 
 // The player's options file, in the database its file system is kept in
 // (Emscripten's IDBFS: version 21, store FILE_DATA). The CRT effect is on

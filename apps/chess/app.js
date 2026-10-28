@@ -26,6 +26,7 @@ let busy = false;      // true while the opponent's reply animates in
 let solved = false;
 let solver = 'w';      // the side the player controls; the board stays flipped to it
 let hintLevel = 0;     // 0 = none, 1 = show the piece to move, 2 = show the destination
+let last = null;       // the move just played, { from, to }, tinted on the board
 
 function pieceKey({ type, color }) { return color + type.toUpperCase(); }
 
@@ -54,6 +55,7 @@ function render() {
       const square = b[rr][ff];
       const sq = FILES[ff] + (8 - rr);
       let cls = 'sq ' + ((rr + ff) % 2 === 1 ? 'd' : 'l');
+      if (last && (sq === last.from || sq === last.to)) cls += ' last';
       if (sq === selected) cls += ' sel';
       if (sq === hintFrom) cls += ' hint-src';
       if (sq === hintTo) cls += ' hint-dst';
@@ -78,6 +80,7 @@ function setSub(text) {
 
 function applyMove(m) {
   game.move({ from: m.from, to: m.to, promotion: m.promotion || 'q' });
+  last = { from: m.from, to: m.to };
 }
 
 function finish() {
@@ -151,6 +154,7 @@ function start() {
   busy = false;
   solved = false;
   hintLevel = 0;
+  last = null;
   nextBtn.classList.remove('primary');
   setSub(`Puzzle #${puzzle.id} · ${puzzle.rating} elo`);
   render();

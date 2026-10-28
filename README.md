@@ -49,6 +49,24 @@ Freedoom's and Blasphemer's WADs, Adventure Games' free games,
 LibreQuake's paks and music, OpenTTD's base sets and OpenArena's pk3s are left out, because those apps keep them in IndexedDB, and an unchanged file (same ETag) isn't written
 to the cache again.
 
+The apps' worker asks the server about a file it already holds with that
+ETag (`If-None-Match`), so an unchanged engine costs a 304 even after
+Chrome's own HTTP cache has dropped it. On a browser's very first visit the
+page loads before the worker runs; `apps/sw-register.js` then hands the
+worker the files the page loaded, so even the first app opened works offline
+afterwards. `npm run dev` answers with ETags, 304s and byte ranges as Vercel
+does.
+
+Engines big enough to look stuck while they download (Adventure Games,
+Arcade, OpenTTD) load their wasm through `apps/_shared/engine.js`, which
+counts what has arrived and shows it ("Loading the arcade… 12 of 39 MB").
+Vercel sends the wasm compressed and without its length, so a one-byte range
+request asks for the real size.
+
+Apps that keep a player's own files (games sent from the phone, carts,
+worlds) ask for persistent storage when one is added, so the browser doesn't
+clear them to make room.
+
 ## Sample apps
 
 - `apps/breakout`: WebGL2 game with touch, keyboard, and gamepad input.

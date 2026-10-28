@@ -31,12 +31,47 @@ self.addEventListener('activate', e => {
   })());
 });
 
+// The files a page loaded before this worker ran (sw-register.js sends
+// them on the first visit), fetched into the cache unless they're there
+self.addEventListener('message', e => {
+  if (e.data?.frunk !== 'cache' || !Array.isArray(e.data.urls)) return;
+  e.waitUntil((async () => {
+    const cache = await caches.open(CACHE);
+    for (const href of e.data.urls.slice(0, 200)) {
+      const url = new URL(href, self.location.origin);
+      url.hash = '';
+      if (url.origin !== self.location.origin || url.pathname.startsWith('/api/') || SKIP.test(url.pathname)) continue;
+      if (await cache.match(url.href)) continue;
+      try {
+        const res = await fetch(url.href);
+        if (res.status === 200 && !res.redirected) await cache.put(url.href, res);   // a page may not be answered with a redirect
+      } catch {}
+    }
+  })());
+});
+
 self.addEventListener('fetch', e => {
   const req = e.request;
   const url = new URL(req.url);
   if (req.method !== 'GET' || url.origin !== self.location.origin || url.pathname.startsWith('/api/') || SKIP.test(url.pathname)) return;
   e.respondWith(respond(e, req));
 });
+
+// With a copy here, the server is asked whether the file changed since
+// (If-None-Match), rather than going through the browser's own HTTP cache,
+// which may have let go of a big engine this cache still holds: unchanged
+// costs one round trip instead of the whole download again. Pages and range
+// requests go as they are.
+async function ask(req, cached) {
+  const old = await cached;
+  const tag = old?.headers.get('ETag');
+  if (!tag || req.mode === 'navigate' || req.headers.has('Range')) return fetch(req);
+  const headers = new Headers(req.headers);
+  headers.set('If-None-Match', tag);
+  // no-cors requests may only carry the simplest headers; these are all this origin's own files
+  const res = await fetch(new Request(req, { mode: req.mode === 'no-cors' ? 'same-origin' : req.mode, headers }));
+  return res.status === 304 ? old : res;
+}
 
 async function respond(e, req) {
   const cache = await caches.open(CACHE);
@@ -48,7 +83,7 @@ async function respond(e, req) {
   }
 
   let saved = Promise.resolve();
-  const network = fetch(req).then(async res => {
+  const network = ask(req, cached).then(async res => {
     // Engines are tens of MB; skip writing them again when they haven't changed
     const tag = res.headers.get('ETag'), old = await cached;
     if (res.status === 200 && !(tag && old && old.headers.get('ETag') === tag)) saved = cache.put(req, res.clone());
