@@ -27,6 +27,29 @@ Zork I, Zork II and Zork III (games/)
   Text Adventures and frunk.store aren't affiliated with or endorsed by
   Microsoft, Activision or Infocom.
 
+All Things Devours (games/devours.z5)
+  By Toby Ord ("half sick of shadows"), 2004. Release 3, serial 050325,
+  the post-competition release. Public domain; the author's statement is
+  in games/devours-LICENSE.txt. The story file is unmodified, from:
+    https://ifarchive.org/if-archive/games/zcode/devours.z5
+  Source code: https://ifarchive.org/if-archive/games/source/inform/devours.inf
+  SHA-256:
+    a0b0569c2f57a975f868242b9a1dfe400a75e6aef92d5480eb51c81a3150eb37  devours.z5
+
+Spiritwrak (games/spirit.z5)
+  By D. S. Yu, copyright (C) 1996. Release 3, serial 960606. Free
+  software under the GNU General Public License, version 2 or (at your
+  option) any later version; the license is games/spirit-LICENSE.txt.
+  The story file is unmodified, from:
+    https://ifarchive.org/if-archive/games/zcode/spirit.z5
+  Its source code (release 3) is games/spirit-src.zip, unmodified, from:
+    https://ifarchive.org/if-archive/games/source/inform/spiritw_src.zip
+  SHA-256:
+    258199e5fb7b494d3c6e60cc4fbe466b08f729e90a06753db49f4af7bfdca2d5  spirit.z5
+    518f9b2a4b5416688b25ad312f833f71fdc51666b93774e01ebdb4749a1d3341  spirit-src.zip
+  Spiritwrak is a fan game set in the world of Infocom's Zork and
+  Enchanter games; those names and that world belong to their owner.
+
 Players' own games
   Story files a player adds are kept in that screen's IndexedDB only.
   frunk.store doesn't provide, sell or share commercial games.

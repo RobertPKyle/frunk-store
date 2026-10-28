@@ -331,9 +331,10 @@
     {
       "id": "text",
       "name": "Text Adventures",
-      "tagline": "Zork I, II and III, the Infocom classics, now open source. Tap words to build commands, or type.",
+      "tagline": "Zork I, II and III, the Infocom classics, now open source, plus two more free adventures. Tap words to build commands, or type.",
       "path": "/text/",
       "icon": "/text/icon.svg",
+      "updated": "2026-10-28",
       "tags": [
         "Game",
         "Touch",

@@ -1,6 +1,6 @@
-// Text Adventures: Zork I, II and III (MIT-licensed by Microsoft in 2025)
-// and the player's own Z-machine story files, on this site's interpreter
-// (zmachine.js).
+// Text Adventures: Zork I, II and III (MIT-licensed by Microsoft in 2025),
+// All Things Devours (public domain), Spiritwrak (GPL) and the player's own
+// Z-machine story files, on this site's interpreter (zmachine.js).
 //
 // Built for a car screen: the player doesn't have to type. Verb buttons
 // start a command, tapping a word in the story adds it (only words the
@@ -19,18 +19,27 @@ import { STYLE, ZMachine } from './zmachine.js';
 import { phonePanel } from '../_shared/phone.js';
 import { cleanName, findStory } from '../_shared/roms.js';
 
+// Each one's story file is games/<file>, with its license next to it
 const FREE = [
   {
-    id: 'zork1', title: 'Zork I', subtitle: 'The Great Underground Empire', year: 1980,
+    id: 'zork1', file: 'zork1.z3', title: 'Zork I', subtitle: 'The Great Underground Empire', by: 'Infocom', year: 1980, license: 'MIT License',
     about: 'Below a white house in a forest lie the ruins of an underground empire. Bring its nineteen treasures back to the trophy case. The one that started it all.',
   },
   {
-    id: 'zork2', title: 'Zork II', subtitle: 'The Wizard of Frobozz', year: 1981,
+    id: 'zork2', file: 'zork2.z3', title: 'Zork II', subtitle: 'The Wizard of Frobozz', by: 'Infocom', year: 1981, license: 'MIT License',
     about: 'Deeper in the Empire, more treasures, a dragon, a princess, and the Wizard of Frobozz, who would rather you left.',
   },
   {
-    id: 'zork3', title: 'Zork III', subtitle: 'The Dungeon Master', year: 1982,
+    id: 'zork3', file: 'zork3.z3', title: 'Zork III', subtitle: 'The Dungeon Master', by: 'Infocom', year: 1982, license: 'MIT License',
     about: 'The last test, at the bottom of an endless stair: prove yourself worthy to become the Dungeon Master.',
+  },
+  {
+    id: 'devours', file: 'devours.z5', title: 'All Things Devours', by: 'Toby Ord', year: 2004, license: 'public domain',
+    about: 'Six minutes to plant a bomb in your lab and destroy the time machine prototype before the military can use it. A tight time-travel puzzle with many endings, where one wrong move can doom the plan; Undo helps.',
+  },
+  {
+    id: 'spirit', file: 'spirit.z5', title: 'Spiritwrak', by: 'D. S. Yu', year: 1996, license: 'GPL',
+    about: 'Quendor, 976 GUE: a demon breaks the Rod of the Ancients and scatters its four pieces across the world. A young monk learns spells, rides the subway and sets out to find them. A fan game set in the Zork world.',
   },
 ];
 
@@ -187,8 +196,8 @@ const freeEntry = g => ({ key: g.id, title: g.title, free: g });
 
 async function renderFree() {
   const going = await inProgress();
-  $('free').replaceChildren(...FREE.map(g => card(`${g.title}: ${g.subtitle}`, [
-    ['small', `Infocom, ${g.year} · ${going.has(g.id) ? 'in progress' : 'free, MIT License'}`],
+  $('free').replaceChildren(...FREE.map(g => card(g.subtitle ? `${g.title}: ${g.subtitle}` : g.title, [
+    ['small', `${g.by}, ${g.year} · ${going.has(g.id) ? 'in progress' : `free, ${g.license}`}`],
     ['p', g.about],
   ], b => play(freeEntry(g), b))));
 }
@@ -504,7 +513,7 @@ function failed(message) {
 
 async function storyBytes(entry) {
   if (entry.free) {
-    const res = await fetch(`games/${entry.free.id}.z3`);
+    const res = await fetch(`games/${entry.free.file}`);
     if (!res.ok) throw new Error('the game couldn\'t be downloaded; check the connection');
     return new Uint8Array(await res.arrayBuffer());
   }

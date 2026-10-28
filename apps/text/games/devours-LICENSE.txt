@@ -1,0 +1,18 @@
+All Things Devours, by Toby Ord (as "half sick of shadows"), 2004.
+Release 3 / Serial number 050325, the post-competition release.
+
+The story file devours.z5 is unmodified, from the Interactive Fiction
+Archive: https://ifarchive.org/if-archive/games/zcode/devours.z5
+Its source code is at
+https://ifarchive.org/if-archive/games/source/inform/devours.inf
+
+The author's statement, from the top of devours.inf:
+
+  This program was written by Toby Ord (half sick of shadows) and has been
+  released into the public domain, so you are legally free to be distribute
+  and modify it as you see fit. So long as you do so in good faith and with good
+  taste (or sufficient taste) then you have my blessing.
+
+And from the game's opening banner:
+
+  It is in the public domain and may thus be freely copied or modified.

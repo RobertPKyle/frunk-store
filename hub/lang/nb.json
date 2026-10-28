@@ -109,7 +109,7 @@
     "blocks": { "name": "Klossebygger", "tagline": "Bygg hva du vil i en klosseverden i Minecraft Classic-stil: kreativ modus, flyging og verdener som lagres mens du spiller." },
     "city": { "name": "Bybygger", "tagline": "Grunnlegg en by og la den vokse fra landsby til megalopolis: soner, veier, strøm, skatter og katastrofer, i den klassiske bysimuleringen fra 1989, nå med åpen kildekode." },
     "adventure": { "name": "Eventyrspill", "tagline": "Klassiske pek-og-klikk-eventyr på ScummVM: tolv gratis spill, eller spill du eier, sendt fra telefonen." },
-    "text": { "name": "Teksteventyr", "tagline": "Zork I, II og III, Infocom-klassikerne, nå med åpen kildekode. Trykk på ord for å lage kommandoer, eller skriv." },
+    "text": { "name": "Teksteventyr", "tagline": "Zork I, II og III, Infocom-klassikerne, nå med åpen kildekode, pluss to gratis eventyr til. Trykk på ord for å lage kommandoer, eller skriv." },
     "ascii": { "name": "ASCII-eventyr", "tagline": "Scott Millers Kroz-spill fra 1987 til 1990, nå med åpen kildekode: sju teksteventyr med edelsteiner, pisker og monstre. Trykk for å gå." },
     "puzzles": { "name": "Logikkoppgaver", "tagline": "Førti klassiske logikkoppgaver av Simon Tatham, fra Solo (sudoku) til Mines og Net, med uendelig mange nye brett i alle størrelser." },
     "chess": { "name": "Sjakkoppgave", "tagline": "Løs den daglige sjakkoppgaven fra Lichess på skjermen." },

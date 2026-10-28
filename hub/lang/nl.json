@@ -109,7 +109,7 @@
     "blocks": { "name": "Blokkenbouwer", "tagline": "Bouw wat je wilt in een blokkenwereld in Minecraft Classic-stijl: creatieve modus, vliegen en werelden die opslaan terwijl je speelt." },
     "city": { "name": "Stedenbouwer", "tagline": "Sticht een stad en laat hem groeien van dorp tot megalopolis: zones, wegen, stroom, belastingen en rampen, in de klassieke stadssimulatie uit 1989, nu open source." },
     "adventure": { "name": "Avonturengames", "tagline": "Klassieke point-and-click-avonturen op ScummVM: twaalf gratis games, of games die je bezit, verstuurd vanaf je telefoon." },
-    "text": { "name": "Tekstavonturen", "tagline": "Zork I, II en III, de Infocom-klassiekers, nu open source. Tik op woorden om opdrachten te maken, of typ." },
+    "text": { "name": "Tekstavonturen", "tagline": "Zork I, II en III, de Infocom-klassiekers, nu open source, plus nog twee gratis avonturen. Tik op woorden om opdrachten te maken, of typ." },
     "ascii": { "name": "ASCII-quests", "tagline": "De Kroz-games van Scott Miller uit 1987 tot 1990, nu open source: zeven tekstmodus-avonturen vol edelstenen, zwepen en monsters. Tik om te lopen." },
     "puzzles": { "name": "Logische puzzels", "tagline": "Veertig klassieke logische puzzels van Simon Tatham, van Solo (sudoku) tot Mines en Net, met eindeloos nieuwe borden in elk formaat." },
     "chess": { "name": "Schaakpuzzel", "tagline": "Los de dagelijkse schaakpuzzel van Lichess op je scherm op." },

@@ -109,7 +109,7 @@
     "blocks": { "name": "方块建造家", "tagline": "在 Minecraft Classic 风格的方块世界里搭建任何东西：创造模式、飞行，世界会在游玩时自动保存。" },
     "city": { "name": "城市建造家", "tagline": "建立一座城市，从村庄发展成超级大都市：分区、道路、电力、税收和灾难，1989 年的经典城市模拟，现已开源。" },
     "adventure": { "name": "冒险游戏", "tagline": "ScummVM 上的经典点击式冒险游戏：十二款免费游戏，或从手机发送你拥有的游戏。" },
-    "text": { "name": "文字冒险", "tagline": "Infocom 的经典 Zork I、II、III，现已开源。点选单词组成指令，或直接输入。" },
+    "text": { "name": "文字冒险", "tagline": "Infocom 的经典 Zork I、II、III，现已开源，另有两款免费冒险游戏。点选单词组成指令，或直接输入。" },
     "ascii": { "name": "ASCII 冒险", "tagline": "Scott Miller 1987 至 1990 年的 Kroz 系列，现已开源：七部文字模式冒险，有宝石、鞭子和怪物。点按即可行走。" },
     "puzzles": { "name": "逻辑谜题", "tagline": "Simon Tatham 的 40 款经典逻辑谜题，从 Solo（数独）到 Mines、Net，任何尺寸都有无穷无尽的新盘面。" },
     "chess": { "name": "国际象棋谜题", "tagline": "在屏幕上解 Lichess 每日国际象棋谜题。" },

@@ -1327,6 +1327,27 @@ await check('text adventures plays zork by tapping words, undoes and picks up wh
   await page.screenshot({ path: shots + 'text.png' });
 });
 
+await check('text adventures plays All Things Devours and Spiritwrak', async () => {
+  await openFromHub(/Text Adventures/);
+  const app = appFrame();
+  const story = text => app.locator('#story').filter({ hasText: text }).waitFor({ timeout: 10000 });
+  const devours = app.locator('#free .game').filter({ hasText: 'All Things Devours' });
+  if (!(await devours.textContent()).includes('Toby Ord, 2004 · free, public domain')) throw new Error(`card says "${await devours.textContent()}"`);
+  await devours.click();
+  await story('You have six minutes');
+  await app.locator('#cmd').click();
+  await page.keyboard.type('about');
+  await page.keyboard.press('Enter');
+  await story('more cruel than one might hope');
+  await app.getByRole('button', { name: 'Games' }).click();
+  await app.locator('#free .game').filter({ hasText: 'Spiritwrak' }).click();
+  await story('Monastery Chapel');
+  await app.getByRole('button', { name: 'Wait', exact: true }).click();
+  await story('the year, as you know, is 976 GUE');
+  await app.getByRole('button', { name: 'Games' }).click();
+  await app.locator('#library').waitFor({ state: 'visible', timeout: 5000 });
+});
+
 await check('text adventures takes story files from a phone', async () => {
   await openFromHub(/Text Adventures/);
   writeFileSync(shots + 'not-a-story.z5', 'not a story file');
