@@ -240,6 +240,18 @@
       "added": "2026-10-28"
     },
     {
+      "id": "duke3d",
+      "name": "Duke Nukem 3D",
+      "tagline": "The 1996 shooter's first episode, free, or the full game you own sent from your phone, with a controller or on screen.",
+      "path": "/duke3d/",
+      "icon": "/duke3d/icon.svg",
+      "tags": [
+        "Game",
+        "Controller"
+      ],
+      "added": "2026-10-29"
+    },
+    {
       "id": "openttd",
       "name": "OpenTTD",
       "tagline": "Build a transport empire with trains, trucks, ships and planes. The open-source Transport Tycoon, made for touch.",

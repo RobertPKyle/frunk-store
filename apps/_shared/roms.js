@@ -112,12 +112,15 @@ function* zipEntries(zip) {
     if (v.getUint32(i, true) === 0x06054b50) { end = i; break; }
   }
   if (end < 0) return;
-  let p = v.getUint32(end + 16, true);
+  // A self-extracting zip may have a program in front that its offsets
+  // don't count
+  const shift = end - v.getUint32(end + 12, true) - v.getUint32(end + 16, true);
+  let p = v.getUint32(end + 16, true) + shift;
   for (let n = v.getUint16(end + 10, true); n > 0 && p + 46 <= zip.length; n--) {
     if (v.getUint32(p, true) !== 0x02014b50) return;
     const method = v.getUint16(p + 10, true), packed = v.getUint32(p + 20, true), size = v.getUint32(p + 24, true);
     const nameLen = v.getUint16(p + 28, true), extra = v.getUint16(p + 30, true), comment = v.getUint16(p + 32, true);
-    const local = v.getUint32(p + 42, true);
+    const local = v.getUint32(p + 42, true) + shift;
     const name = new TextDecoder().decode(zip.subarray(p + 46, p + 46 + nameLen));
     p += 46 + nameLen + extra + comment;
     yield { name, method, packed, size, local };
@@ -296,6 +299,45 @@ export function quakePath(name, bytes) {
 export async function findQuakeFile(name, bytes) {
   if (isZip(bytes)) return { name };
   return quakePath(name, bytes) ? { name } : null;
+}
+
+// ---------- Duke Nukem 3D ----------
+// A copy of the full game has DUKE3D.GRP (Ken Silverman's group file, all
+// the game's data), and DUKE.RTS (the Remote Ridicule sounds). The GRP is
+// told apart from the shareware one by its second episode.
+export const MAX_DUKE_FILE = 80e6;   // what one phone code carries
+
+// The names in a GRP, or null when it isn't one
+export function grpFiles(bytes) {
+  if (bytes.length < 16 || String.fromCharCode(...bytes.subarray(0, 12)) !== 'KenSilverman') return null;
+  const v = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const n = v.getUint32(12, true);
+  if (16 + n * 16 > bytes.length) return null;
+  const names = [];
+  for (let i = 0; i < n; i++) {
+    const raw = bytes.subarray(16 + i * 16, 16 + i * 16 + 12);
+    const end = raw.indexOf(0);
+    names.push(String.fromCharCode(...raw.subarray(0, end < 0 ? 12 : end)).toUpperCase());
+  }
+  return names;
+}
+
+// Which file it is ('DUKE3D.GRP' or 'DUKE.RTS'), 'shareware' for the
+// shareware episode's GRP, or null
+export function dukePath(name, bytes) {
+  const file = name.replace(/^.*\//, '').toUpperCase();
+  if (file.endsWith('.RTS') && at(bytes, 0, [0x49, 0x57, 0x41, 0x44])) return 'DUKE.RTS';   // IWAD
+  const names = grpFiles(bytes);
+  if (!names || !names.includes('E1L1.MAP')) return null;
+  return names.includes('E2L1.MAP') ? 'DUKE3D.GRP' : 'shareware';
+}
+
+// Checks a file the player picked (zips are checked on the car):
+// { name } when it may be part of the game, or null
+export async function findDukeFile(name, bytes) {
+  if (isZip(bytes)) return { name };
+  const path = dukePath(name, bytes);
+  return path && path !== 'shareware' ? { name } : null;
 }
 
 // ---------- Heroes of Might and Magic II (fheroes2) ----------

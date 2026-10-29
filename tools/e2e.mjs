@@ -1790,6 +1790,143 @@ await check('librequake takes quake files from a phone', async () => {
   await appFrame().locator('#mine .game').waitFor({ state: 'detached', timeout: 5000 });
 });
 
+await check('duke nukem 3d plays the shareware with touch and a controller and continues', async () => {
+  await openFromHub(/Duke Nukem 3D/);
+  const frame = () => page.frames().find(f => f.url().includes('/duke3d/'));
+  const player = appFrame().locator('#player');
+  const mode = () => player.getAttribute('data-mode');
+  await appFrame().locator('#free .game').click();
+  // First time: downloads the shareware zip (6 MB) and unpacks it, then
+  // the 3D Realms logo
+  await appFrame().locator('#player[data-mode="title"]').waitFor({ timeout: 60000 });
+  const cdp = await page.context().newCDPSession(page);
+  const touch = (type, points) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: points.map(([x, y], id) => ({ x, y, id })) });
+  const tapAt = async (x, y) => { await touch('touchStart', [[x, y]]); await page.waitForTimeout(80); await touch('touchEnd', []); };
+  const tap = async name => {
+    const b = await appFrame().getByRole('button', { name, exact: true }).boundingBox();
+    await tapAt(b.x + b.width / 2, b.y + b.height / 2);
+  };
+  const box = await appFrame().locator('#canvas').boundingBox();
+  // What the game shows, from its canvas (screenshots would make later
+  // taps miss in headless Chrome)
+  const picture = () => frame().evaluate(() => {
+    const c = document.getElementById('canvas');
+    const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+    let h = 0;
+    for (let i = 0; i < d.length; i += 8) h = (h * 31 + d[i]) | 0;
+    return h;
+  });
+  // Taps on the game skip the logos to the main menu; OK three times
+  // picks New Game, the episode and the skill
+  for (let i = 0; i < 8 && await mode() !== 'menu'; i++) { await tapAt(box.x + box.width / 2, box.y + box.height / 2); await page.waitForTimeout(1500); }
+  if (await mode() !== 'menu') throw new Error('taps didn\'t reach the menu');
+  for (let i = 0; i < 3; i++) { await tap('OK'); await page.waitForTimeout(1200); }
+  await appFrame().locator('#player[data-mode="game"]').waitFor({ timeout: 20000 });
+  await page.waitForTimeout(2500);
+  // Menu opens the game's menu, with the arrows pad; Back closes it
+  await tap('Menu');
+  await appFrame().locator('#player[data-mode="menu"]').waitFor({ timeout: 3000 });
+  await tap('Back');
+  await appFrame().locator('#player[data-mode="game"]').waitFor({ timeout: 3000 });
+  await page.waitForTimeout(500);
+  // A finger dragged across the game turns the view
+  const before = await picture();
+  await touch('touchStart', [[box.x + box.width * 0.5, box.y + box.height * 0.3]]);
+  for (let i = 1; i <= 10; i++) { await touch('touchMove', [[box.x + box.width * 0.5 + i * 12, box.y + box.height * 0.3]]); await page.waitForTimeout(30); }
+  await touch('touchEnd', []);
+  await page.waitForTimeout(300);
+  const turned = await picture();
+  if (turned === before) throw new Error('dragging didn\'t turn the view');
+  // The stick walks
+  const stick = await appFrame().locator('#stick').boundingBox();
+  const cx = stick.x + stick.width / 2, cy = stick.y + stick.height / 2;
+  await touch('touchStart', [[cx, cy]]);
+  await touch('touchMove', [[cx, cy - 60]]);
+  await page.waitForTimeout(800);
+  await touch('touchEnd', []);
+  await page.waitForTimeout(300);
+  if (await picture() === turned) throw new Error('the stick didn\'t walk');
+  // Two pads like the car: the controller's raw device and the car's
+  // standard-mapping copy. Start opens the menu, the bottom button closes
+  // it, and D-pad up walks; the on-screen controls hide.
+  await frame().evaluate(() => {
+    const pad = (id, mapping, index) => ({ id, index, mapping, connected: true, timestamp: 0, axes: [0, 0, 0, 0], buttons: Array.from({ length: 17 }, () => ({ pressed: false, value: 0 })) });
+    const pads = [pad('raw', '', 0), pad('Tesla Virtual Gamepad', 'standard', 1)];
+    navigator.getGamepads = () => pads;
+    window.padHold = async (b, ms = 150) => {
+      Object.assign(pads[1].buttons[b], { pressed: true, value: 1 });
+      await new Promise(r => setTimeout(r, ms));
+      for (const p of pads) for (const x of p.buttons) Object.assign(x, { pressed: false, value: 0 });
+      await new Promise(r => setTimeout(r, 300));
+    };
+  });
+  await frame().evaluate(() => padHold(9));
+  await appFrame().locator('#player[data-mode="menu"]').waitFor({ timeout: 3000 });
+  await frame().evaluate(() => padHold(0));
+  await appFrame().locator('#player[data-mode="game"]').waitFor({ timeout: 3000 });
+  await page.waitForTimeout(300);
+  const still = await picture();
+  await frame().evaluate(() => padHold(12, 1000));
+  if (await picture() === still) throw new Error('the D-pad didn\'t walk');
+  if (await appFrame().locator('#stick').isVisible()) throw new Error('on-screen controls still showing with a controller');
+  const fps = parseInt(await appFrame().locator('#fps').textContent());
+  if (!(fps >= 30)) throw new Error(`running at ${fps} fps`);
+  console.log(`     ${fps} fps`);
+  await page.screenshot({ path: shots + 'duke3d.png' });
+  // Closing the app from the hub saves the game as "Continue", and
+  // Continue loads it
+  await page.click('#home');
+  await page.waitForSelector('#runner', { state: 'hidden' });
+  await openFromHub(/Duke Nukem 3D/);
+  const saves = await frame().evaluate(() => new Promise(r => {
+    const q = indexedDB.open('duke3d');
+    q.onsuccess = () => { const g = q.result.transaction('saves').objectStore('saves').get('shareware'); g.onsuccess = () => r((g.result?.files || []).map(f => f.name)); };
+    q.onerror = () => r([]);
+  }));
+  if (!saves.includes('continue.esv')) throw new Error(`no Continue save: ${saves.join(', ')}`);
+  await appFrame().getByRole('button', { name: 'Continue Episode One' }).click();
+  await appFrame().locator('#player[data-mode="game"]').waitFor({ timeout: 30000 });
+  // (a click here would land on the on-screen controls: since the
+  // screenshot, headless Chrome puts clicks in the wrong place)
+  await frame().evaluate(() => document.getElementById('quitBtn').click());
+  await appFrame().locator('#library').waitFor({ state: 'visible', timeout: 10000 });
+});
+
+await check('duke nukem 3d takes the full game from a phone', async () => {
+  await openFromHub(/Duke Nukem 3D/);
+  // Made-up GRPs: the full game's (with a second episode), the
+  // shareware's, and a file that isn't one
+  const grp = names => {
+    const head = Buffer.alloc(16 + 16 * names.length);
+    head.write('KenSilverman');
+    head.writeUInt32LE(names.length, 12);
+    names.forEach((n, i) => { head.write(n, 16 + i * 16); head.writeUInt32LE(0, 16 + i * 16 + 12); });
+    return head;
+  };
+  writeFileSync(shots + 'DUKE3D.GRP', grp(['GAME.CON', 'E1L1.MAP', 'E2L1.MAP']));
+  writeFileSync(shots + 'SHARE.GRP', grp(['GAME.CON', 'E1L1.MAP']));
+  writeFileSync(shots + 'notes.grp', 'not a grp');
+  await appFrame().getByRole('button', { name: 'Get files from phone' }).click();
+  await appFrame().getByRole('button', { name: 'I own my games' }).click();
+  await appFrame().locator('#transferStatus').filter({ hasText: 'Waiting' }).waitFor({ timeout: 10000 });
+  const link = await appFrame().locator('#qr a').getAttribute('href');
+  if (!link.includes('?app=duke3d')) throw new Error(`phone link doesn't ask for Duke Nukem 3D files: ${link}`);
+  const phone = await browser.newPage({ viewport: { width: 390, height: 800 }, isMobile: true, hasTouch: true });
+  await phone.goto(link);
+  const [pick] = await Promise.all([phone.waitForEvent('filechooser'), phone.getByRole('button', { name: 'Choose games' }).click()]);
+  await pick.setFiles([shots + 'DUKE3D.GRP', shots + 'SHARE.GRP', shots + 'notes.grp']);
+  await phone.locator('#files li.ok').waitFor({ timeout: 20000 });
+  await phone.locator('#files li.bad').nth(1).waitFor({ timeout: 5000 });
+  if (await phone.locator('#files li.ok').count() !== 1) throw new Error('the shareware GRP or the non-GRP was sent');
+  await phone.close();
+  await appFrame().locator('#received li:not(.bad):not(.busy)').filter({ hasText: 'Duke Nukem 3D' }).waitFor({ timeout: 20000 });
+  await appFrame().getByRole('button', { name: 'Done' }).click();
+  await appFrame().locator('#mine .game').filter({ hasText: 'Duke Nukem 3D: New game' }).waitFor({ timeout: 5000 });
+  await appFrame().getByRole('button', { name: 'Remove Duke Nukem 3D' }).click();
+  await appFrame().getByRole('button', { name: 'Remove Duke Nukem 3D' }).click();
+  await appFrame().locator('#mine .game').waitFor({ state: 'detached', timeout: 5000 });
+});
+
 await check('openttd plays with touch, saves when left and continues', async () => {
   await openFromHub(/OpenTTD/);
   const frame = () => page.frames().find(f => f.url().includes('/openttd/'));

@@ -46,7 +46,7 @@ the hub's also keeps the app icons). When a page doesn't arrive within 3
 seconds, as on a weak connection, the cached copy is shown and the files that
 page loads come from the cache too, so its code stays from one version.
 Freedoom's and Blasphemer's WADs, Adventure Games' free games,
-LibreQuake's paks and music, OpenTTD's base sets and OpenArena's pk3s are left out, because those apps keep them in IndexedDB, and an unchanged file (same ETag) isn't written
+LibreQuake's paks and music, Duke Nukem 3D's shareware zip, OpenTTD's base sets and OpenArena's pk3s are left out, because those apps keep them in IndexedDB, and an unchanged file (same ETag) isn't written
 to the cache again.
 
 The apps' worker asks the server about a file it already holds with that
@@ -387,6 +387,40 @@ clear them to make room.
   demo; drawing spans is most of it).
   Mission packs and players' own paks are untested beyond the file checks
   (no copies here). Not yet tried in the car.
+- `apps/duke3d`: Duke Nukem 3D. EDuke32 (Duke Nukem 3D's code under the
+  GPL-2.0, Ken Silverman's Build engine under his BUILD license, which
+  allows free distribution only) compiled to WebAssembly by
+  `npm run build:duke3d` (`tools/build-duke3d.mjs`: a pinned upstream
+  commit plus `tools/duke3d/eduke32-web.patch`, whose `web/build.sh` builds
+  it with Emscripten 4.0.10 in Docker; the patched source ships next to the
+  engine in `apps/duke3d/engine/`, with BUILDLIC.TXT). The same script
+  fetches the shareware Episode One (3dduke13SW.zip, checked against its
+  MD5 and SHA-256) to `apps/duke3d/shareware/`, kept exactly as released,
+  as its license asks; the engine and the zip aren't in git, so run it
+  before deploying `apps`. The page downloads the zip the first time,
+  takes DUKE3D.GRP and DUKE.RTS out of it (the zip holds a
+  self-extracting zip; `zipEntries` in `apps/_shared/roms.js` allows for
+  the program in front) and keeps them in IndexedDB (database `duke3d`).
+  Players add DUKE3D.GRP from a full copy they own (told apart from the
+  shareware by its second episode, `dukePath`) and DUKE.RTS. The game's
+  own loops run inside `main()`; with JSPI they wait for the page at the
+  end of each frame (`Module.webFrame`, resolved once per refresh by the
+  page's input loop) and every 50 ms in loops that don't draw
+  (`source/build/src/webhost.cpp`). The page's controls go in through
+  `web_pad` (game functions held, plus forward, sideways, turn and look
+  axes), `web_look` (a dragged finger, as the mouse) and `web_key` (SDL
+  key events for menus, held a few frames since the game reads key
+  states); a button the game clears (the map toggle) stays off until let
+  go. Touches on the game make no mouse events, since the game's menus
+  take clicks. Continue saves to `continue.esv` (`web_autosave`) when the
+  page is hidden, closed or left, and `web_load_at_start` loads it straight
+  away, skipping the logos. The game draws square pixels at about 270
+  lines (or 540 with Sharp graphics) to fill the screen under the bar; the
+  patch lets windows go below EDuke32's 640x400 minimum. Settings go in
+  eduke32.cfg (window, the parental lock) and autoexec.cfg (always run,
+  mouse look). Measured with the CPU slowed 4.5x: 60 fps, about 230 ms of
+  main-thread work a second at 384x270 and 310 at 772x540. Not yet tried
+  in the car.
 - `apps/openttd`: OpenTTD 15.3 (GPL-2.0), compiled to WebAssembly by
   `npm run build:openttd` (`tools/build-openttd.mjs`: the 15.3 tag plus
   `tools/openttd/openttd-web.patch`, built with upstream's own Emscripten

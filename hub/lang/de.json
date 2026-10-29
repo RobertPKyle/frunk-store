@@ -101,6 +101,7 @@
     "doom": { "tagline": "Die klassische Doom-Engine mit den kostenlosen Freedoom-Spielen oder eigenen Doom-Spielen, die du vom Handy schickst, mit Controller oder auf dem Bildschirm." },
     "heretic": { "tagline": "Die Heretic-Engine mit dem kostenlosen Dark-Fantasy-Spiel Blasphemer oder deinem eigenen Heretic, vom Handy geschickt. Zauber, Relikte und Fliegen." },
     "quake": { "tagline": "Die klassische Quake-Engine mit dem kostenlosen LibreQuake oder deinem eigenen Quake, vom Handy geschickt, mit Controller oder auf dem Bildschirm." },
+    "duke3d": { "tagline": "Der Shooter von 1996: die erste Episode kostenlos, oder das ganze Spiel, das du besitzt, vom Handy geschickt, mit Controller oder auf dem Bildschirm." },
     "openttd": { "tagline": "Bau ein Transportimperium mit Zügen, Lkw, Schiffen und Flugzeugen. Das Open-Source-Transport-Tycoon, für Touch gemacht." },
     "openarena": { "tagline": "Schnelle Arena-Gefechte gegen Bots auf der Quake-III-Engine: ein kostenloses Spiel mit zehn Arenen, auf dem Bildschirm oder mit Controller." },
     "craft4k": { "tagline": "Notchs winziges Minecraft4k, neu gebaut in C++ und per Ray Marching auf dem Grafikchip berechnet: eine große Blockwelt mit Sonnenschatten, Tag und Nacht und Spiegeln zum Bauen." },

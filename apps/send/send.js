@@ -6,7 +6,7 @@ import { sealPieces } from '../_shared/transfer.js';
 import { keepAwake } from '../_shared/awake.js';
 import { MAX_CART, isCart } from '../tic80/cart.js';
 import { GAMES as ARCADE, MAX_ROM_FILE, findRom } from '../arcade/games.js';
-import { MAX_ADVENTURE_FILE, MAX_FILE, MAX_HEROES_FILE, MAX_QUAKE_FILE, MAX_STORY_FILE, MAX_WAD_FILE, findAdventureFile, findGame, findHeroesFile, findQuakeFile, findStory, findWad } from '../_shared/roms.js';
+import { MAX_ADVENTURE_FILE, MAX_DUKE_FILE, MAX_FILE, MAX_HEROES_FILE, MAX_QUAKE_FILE, MAX_STORY_FILE, MAX_WAD_FILE, findAdventureFile, findDukeFile, findGame, findHeroesFile, findQuakeFile, findStory, findWad } from '../_shared/roms.js';
 
 const $ = id => document.getElementById(id);
 
@@ -15,7 +15,7 @@ let key = null;
 
 // Which app on the car asked: Retro Console (console games), Freedoom (Doom
 // WADs), Blasphemer (Heretic WADs), Adventure Games (folders of game files), Text Adventures (story
-// files), LibreQuake (Quake paks), fheroes2 (Heroes II files), Tiny Games (TIC-80 carts) or Arcade (MAME zips from
+// files), LibreQuake (Quake paks), Duke Nukem 3D (its GRP), fheroes2 (Heroes II files), Tiny Games (TIC-80 carts) or Arcade (MAME zips from
 // mamedev.org, which it links: they may be downloaded only from there). Files are checked here so the wrong
 // kind isn't sent.
 const APPS = {
@@ -29,6 +29,8 @@ const APPS = {
     lede: 'Pick text adventure story files on this phone (.z3, .z5, .z8 or .zblorb, zipped or not), such as free games from the Interactive Fiction Archive or ones you own. They appear on the car screen in a few seconds.' },
   quake: { name: 'LibreQuake', max: MAX_QUAKE_FILE, check: findQuakeFile, wrong: 'Not a Quake file',
     lede: 'Pick the Quake files from a copy you own: PAK0.PAK and PAK1.PAK from its id1 folder (in a Steam or GOG copy, the original id1 folder, not the "rerelease" one), and the mission packs\' PAK0.PAK from their hipnotic or rogue folders. Music files named trackNN.ogg work too. They appear on the car screen in a few seconds.' },
+  duke3d: { name: 'Duke Nukem 3D', max: MAX_DUKE_FILE, check: findDukeFile, wrong: 'Not a Duke Nukem 3D file this uses',
+    lede: 'Pick DUKE3D.GRP from a copy of Duke Nukem 3D you own (Atomic Edition on GOG, or the Megaton Edition\'s gameroot folder on Steam), and DUKE.RTS if you like. They appear on the car screen in a few seconds.' },
   fheroes2: { name: 'fheroes2', max: MAX_HEROES_FILE, check: findHeroesFile, wrong: 'Not a Heroes II file this uses',
     lede: 'Pick the Heroes of Might and Magic II files from a copy you own: HEROES2.AGG and HEROES2X.AGG from its DATA folder and the maps (.MP2, .MX2) from its MAPS folder, or a .zip of those two folders. Music from its MUSIC folder works too, with a second code. Up to 80 MB per code. They appear on the car screen in a few seconds.' },
   tic80: { name: 'Tiny Games', max: MAX_CART, check: isCart, wrong: 'Not a TIC-80 cart (.tic)',

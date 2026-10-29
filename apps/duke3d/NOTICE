@@ -1,0 +1,55 @@
+Duke Nukem 3D (apps/duke3d)
+
+Engine (engine/)
+  EDuke32, by Richard "TerminX" Gobeille, Evan Ramos and contributors,
+  based on the Duke Nukem 3D source code by 3D Realms (released 2003) and
+  the Build engine by Ken Silverman.
+  https://voidpoint.io/terminx/eduke32, commit
+  ec5824db81817866f70da326d3811bb0f52b3517 (master, 2026-08-07).
+  Licenses:
+    Duke Nukem 3D's game code and EDuke32's own code: GNU General Public
+    License, version 2 (engine/gpl-2.0.txt).
+    The Build engine: Ken Silverman's BUILD license (engine/BUILDLIC.TXT),
+    which allows free distribution only, over the internet, never for
+    money. This app is free and frunk.store charges nothing for it.
+
+      // "Build Engine & Tools" Copyright (c) 1993-1997 Ken Silverman
+      // Ken Silverman's official web site: "http://www.advsys.net/ken"
+      // See the included license file "BUILDLIC.TXT" for license info.
+
+  frunk.store's changes for the browser are in engine/eduke32-web.patch
+  (also tools/duke3d/eduke32-web.patch in
+  https://github.com/RobertPKyle/frunk-store, whose tools/build-duke3d.mjs
+  builds it with Emscripten 4.0.10), each change marked "[frunk]". Of the
+  files changed, only source/build/src/engine.cpp comes from Ken
+  Silverman's original release, and it says it has been modified. The
+  complete patched source the build came from, with its build script
+  (web/build.sh), is engine/eduke32-ec5824d-web-src.tar.gz.
+  The changes: the game waits for the page between frames (JSPI) and draws
+  once per screen refresh, controllers and touch handed in by the page,
+  saving and loading "Continue" from the page, windows smaller than
+  640x400, the classic software renderer only, and no network play.
+  The idea of letting the game's loops wait for the browser came from
+  Gawen Arab's EDuke32 WebAssembly work
+  (https://voidpoint.io/terminx/eduke32/-/merge_requests/365).
+
+Game (shareware/)
+  Duke Nukem 3D Episode One (L.A. Meltdown), shareware version 1.3D,
+  Copyright 1996 3D Realms Entertainment, a division of Apogee Software.
+  shareware/3dduke13SW.zip is the shareware as 3D Realms released it
+  (its 1998 repack, with the license dated 7.16.98), complete and
+  unchanged (MD5 04e4ca70b8a2d59ed56c451c5c1d5d39, SHA-256
+  c67efd179022bc6d9bde54f404c707cbcbdc15423c20be72e277bc2bdddf3d0e). Its
+  license (shareware/LICENSE.TXT, also inside the zip) lets free web
+  sites make the game available for download, with all its files and
+  nothing added or removed. The page downloads the zip and takes the
+  game's data (DUKE3D.GRP and DUKE.RTS) out of it on the player's screen.
+
+Trademarks
+  Duke Nukem is a trademark of Gearbox Software. 3D Realms and Apogee are
+  trademarks of their owners. frunk.store is not affiliated with or
+  endorsed by 3D Realms, Apogee or Gearbox.
+
+Players' own files
+  Duke Nukem 3D files a player adds are kept in that screen's IndexedDB
+  only. frunk.store doesn't provide, sell or share commercial games.

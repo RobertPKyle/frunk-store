@@ -64,3 +64,8 @@ apps/supertux/data
 tools/.mame-build
 apps/arcade/engine
 tools/.city-build
+tools/.duke3d-build
+apps/duke3d/engine/eduke32.js
+apps/duke3d/engine/eduke32.wasm
+apps/duke3d/engine/*-web-src.tar.gz
+apps/duke3d/shareware/3dduke13SW.zip

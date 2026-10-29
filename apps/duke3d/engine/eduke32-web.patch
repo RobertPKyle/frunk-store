@@ -1,0 +1,610 @@
+diff --git a/source/build/include/baselayer.h b/source/build/include/baselayer.h
+index 4412b6e..9dfc82d 100644
+--- a/source/build/include/baselayer.h
++++ b/source/build/include/baselayer.h
+@@ -335,6 +335,14 @@ void joyReadButtons(int32_t *pResult);
+ extern int32_t inputchecked;
+ 
+ int32_t wm_msgbox(const char *name, const char *fmt, ...) ATTRIBUTE((format(printf,2,3)));
++
++#ifdef __EMSCRIPTEN__
++// [frunk] the browser host (webhost.cpp)
++extern int webCalledIn;
++void webWaitFrame(void);
++void webYield(void);
++void webMessage(char const *title, char const *text);
++#endif
+ int32_t wm_ynbox(const char *name, const char *fmt, ...) ATTRIBUTE((format(printf,2,3)));
+ void wm_setapptitle(const char *name);
+ 
+diff --git a/source/build/include/compat.h b/source/build/include/compat.h
+index 9b3988b..f9ed729 100644
+--- a/source/build/include/compat.h
++++ b/source/build/include/compat.h
+@@ -741,6 +741,13 @@ void eduke32_exit_return(int) ATTRIBUTE((noreturn));
+         engineDestroyAllocator();                                                                \
+         exit(status);                                                                            \
+     } while (0)
++#elif defined __EMSCRIPTEN__
++// [frunk] the page is told the game ended (webhost.cpp)
++# ifdef __cplusplus
++extern "C"
++# endif
++void webExit(int status) ATTRIBUTE((noreturn));
++# define Bexit(status) webExit(status)
+ #else
+ # define Bexit(status) do { engineDestroyAllocator(); exit(status); } while (0)
+ #endif
+diff --git a/source/build/src/baselayer.cpp b/source/build/src/baselayer.cpp
+index d1fa14e..96859cc 100644
+--- a/source/build/src/baselayer.cpp
++++ b/source/build/src/baselayer.cpp
+@@ -862,7 +862,7 @@ int32_t baselayer_init(void)
+ 
+ void maybe_redirect_outputs(void)
+ {
+-#if !(defined __APPLE__ && defined __BIG_ENDIAN__)
++#if !(defined __APPLE__ && defined __BIG_ENDIAN__) && !defined __EMSCRIPTEN__ // [frunk] FILE is opaque in Emscripten
+     char *argp;
+ 
+     // pipe standard outputs to files
+@@ -885,6 +885,11 @@ void maybe_redirect_outputs(void)
+ 
+ int engineFPSLimit(bool const throttle)
+ {
++#ifdef __EMSCRIPTEN__
++    // [frunk] draw every time round: the page paces frames to the screen
++    (void)throttle;
++    return true;
++#endif
+     static uint64_t lastFrameTicks;
+     static uint64_t lastDelay;
+ 
+diff --git a/source/build/src/compat.cpp b/source/build/src/compat.cpp
+index 8d24342..da14cb8 100644
+--- a/source/build/src/compat.cpp
++++ b/source/build/src/compat.cpp
+@@ -129,9 +129,14 @@ char *Bgethomedir(void)
+     char const *e;
+     if ((e = getenv("HOME")) == NULL || e[0] == '\0')
+     {
++#ifdef __EMSCRIPTEN__
++        // [frunk] no user database in the browser
++        return NULL;
++#else
+         auto const pw = getpwuid(getuid());
+         if (pw == NULL || (e = pw->pw_dir) == NULL || e[0] == '\0')
+             return NULL;
++#endif
+     }
+     return Xstrdup(e);
+ #endif
+diff --git a/source/build/src/engine.cpp b/source/build/src/engine.cpp
+index 0b703bf..77fc914 100644
+--- a/source/build/src/engine.cpp
++++ b/source/build/src/engine.cpp
+@@ -11953,8 +11953,14 @@ int32_t videoSetGameMode(char davidoption, int32_t daupscaledxdim, int32_t daups
+ #ifdef USE_OPENGL
+     if (nogl) dabpp = 8;
+ #endif
++#ifdef __EMSCRIPTEN__
++    // [frunk] small windows too: the page scales the canvas up
++    daupscaledxdim = max(320, daupscaledxdim);
++    daupscaledydim = max(200, daupscaledydim);
++#else
+     daupscaledxdim = max(640, daupscaledxdim);
+     daupscaledydim = max(400, daupscaledydim);
++#endif
+ 
+     if (in3dmode() && videomodereset == 0 && (davidoption == fullscreen) && (r_displayindex == g_displayindex)
+         && (xres == daupscaledxdim) && (yres == daupscaledydim) && (bpp == dabpp) && (upscalefactor == daupscalefactor))
+diff --git a/source/build/src/sdlayer.cpp b/source/build/src/sdlayer.cpp
+index cd06163..0b270f1 100644
+--- a/source/build/src/sdlayer.cpp
++++ b/source/build/src/sdlayer.cpp
+@@ -182,6 +182,10 @@ int32_t wm_msgbox(const char *name, const char *fmt, ...)
+ #elif defined GEKKO
+     puts(buf);
+     return 0;
++#elif defined __EMSCRIPTEN__
++    // [frunk] the page shows it
++    webMessage(name, buf);
++    return 0;
+ #else
+ # if defined HAVE_GTK2
+     if (gtkbuild_msgbox(name, buf) >= 0)
+@@ -323,7 +327,7 @@ void wm_setapptitle(const char *name)
+ //
+ 
+ /* XXX: libexecinfo could be used on systems without gnu libc. */
+-#if !defined _WIN32 && defined __GNUC__ && !defined __OpenBSD__ && !(defined __APPLE__ && defined __BIG_ENDIAN__) && !defined GEKKO && !defined EDUKE32_TOUCH_DEVICES && !defined __OPENDINGUX__
++#if !defined _WIN32 && defined __GNUC__ && !defined __EMSCRIPTEN__ && !defined __OpenBSD__ && !(defined __APPLE__ && defined __BIG_ENDIAN__) && !defined GEKKO && !defined EDUKE32_TOUCH_DEVICES && !defined __OPENDINGUX__
+ # define PRINTSTACKONSEGV 1
+ # include <execinfo.h>
+ #endif
+@@ -1756,6 +1760,12 @@ int setvideomode_sdlcommonpost(int32_t x, int32_t y, int32_t c, int32_t fs, int3
+         }
+     }
+ 
++#ifdef __EMSCRIPTEN__
++    // [frunk] the browser reports no refresh rate; frames are paced by the page
++    if (refreshfreq <= 0)
++        refreshfreq = 60.0;
++#endif
++
+     static double lastrefreshfreq;
+ 
+     if (refreshfreq != lastrefreshfreq)
+@@ -2195,6 +2205,10 @@ void videoShowFrame(int32_t w)
+     SDL_Flip(sdl_surface);
+ #endif
+     MicroProfileFlip();
++#ifdef __EMSCRIPTEN__
++    // [frunk] the frame is on the canvas; wait for the next screen refresh
++    webWaitFrame();
++#endif
+ }
+ 
+ //
+@@ -2795,6 +2809,10 @@ int32_t handleevents(void)
+ #ifdef __ANDROID__
+     if (mobile_halted) return 0;
+ #endif
++#ifdef __EMSCRIPTEN__
++    // [frunk] every loop polls events: let the page run now and then
++    webYield();
++#endif
+ 
+     int32_t rv;
+ 
+diff --git a/source/build/src/timer.cpp b/source/build/src/timer.cpp
+index e8328bd..da6aaf2 100644
+--- a/source/build/src/timer.cpp
++++ b/source/build/src/timer.cpp
+@@ -29,6 +29,11 @@
+ 
+ EDUKE32_STATIC_ASSERT(CLOCK_FREQ <= 1000000000ULL && CLOCK_FREQ >= 1000000ULL);
+ 
++#ifdef __EMSCRIPTEN__
++// [frunk] Emscripten has no CLOCK_MONOTONIC_RAW
++# undef CLOCK_MONOTONIC_RAW
++#endif
++
+ #ifdef CLOCK_MONOTONIC_RAW
+ # define CLOCK_TYPE CLOCK_MONOTONIC_RAW
+ #else
+diff --git a/source/build/src/webhost.cpp b/source/build/src/webhost.cpp
+new file mode 100644
+index 0000000..ed8b3df
+--- /dev/null
++++ b/source/build/src/webhost.cpp
+@@ -0,0 +1,137 @@
++// [frunk] The browser side of the engine, for frunk.store's Duke Nukem 3D
++// page (apps/duke3d in github.com/RobertPKyle/frunk-store).
++//
++// The game's loops run as they do natively, inside main(); with JSPI, main
++// waits for the page between frames (webWaitFrame, one per screen refresh)
++// and, in loops that don't draw, every so often (webYield), so the page
++// stays responsive. Functions the page calls (web_*) must never wait: they
++// run while main is waiting.
++
++#ifdef __EMSCRIPTEN__
++
++#include "compat.h"
++#include "baselayer.h"
++#include "control.h"
++#include "sdl_inc.h"
++
++#include <emscripten.h>
++
++// Resolved by the page on its next animation frame
++EM_ASYNC_JS(void, webWaitFrameJS, (void), {
++    await Module.webFrame();
++});
++
++EM_ASYNC_JS(void, webYieldJS, (void), {
++    await new Promise(resolve => setTimeout(resolve, 0));
++});
++
++EM_JS(void, webExitJS, (int status), {
++    if (Module.onQuit) Module.onQuit(status);
++});
++
++EM_ASYNC_JS(void, webHaltJS, (void), {
++    await new Promise(() => {});
++});
++
++EM_JS(void, webMessageJS, (char const *title, char const *text), {
++    if (Module.onMessage) Module.onMessage(UTF8ToString(title), UTF8ToString(text));
++});
++
++// Set while the page is calling in, so nothing tries to wait
++int webCalledIn;
++static double webLastYield;
++static int webFrameCount;
++
++void webWaitFrame(void)
++{
++    webFrameCount++;
++    if (webCalledIn) return;
++    webWaitFrameJS();
++    webLastYield = emscripten_get_now();
++}
++
++void webYield(void)
++{
++    if (webCalledIn) return;
++    double const now = emscripten_get_now();
++    if (now - webLastYield < 50) return;
++    webYieldJS();
++    webLastYield = emscripten_get_now();
++}
++
++extern "C" void webExit(int status)
++{
++    webExitJS(status);
++    if (!webCalledIn)
++        webHaltJS();
++    emscripten_force_exit(status);
++    for (;;) {}
++}
++
++void webMessage(char const *title, char const *text)
++{
++    webMessageJS(title, text);
++}
++
++// ---------- input from the page ----------
++
++// The page's buttons, as game functions, and its sticks and finger look.
++// Axes are -32767..32767; look is in mouse units. A button the game has
++// dealt with (CONTROL_ClearButton, as for the map, which toggles) stays
++// off until the page lets it go, as a key would.
++static uint64_t webButtons, webCleared;
++static int32_t webAxes[4];   // forward, sideways, turn, look up/down
++static int32_t webLookX, webLookY;
++
++void webClearButton(int button)
++{
++    webCleared |= button < 0 ? ~(uint64_t)0 : (uint64_t)1 << button;
++}
++
++void webControlInput(ControlInfo *info)
++{
++    CONTROL_ButtonState |= webButtons & ~webCleared;
++    info->dz -= webAxes[0];
++    info->dx += webAxes[1];
++    info->dyaw += webAxes[2];
++    info->dpitch += webAxes[3];
++    info->mousex += webLookX;
++    info->mousey += webLookY;
++    webLookX = webLookY = 0;
++}
++
++extern "C" {
++
++EMSCRIPTEN_KEEPALIVE int web_frames(void) { return webFrameCount; }
++
++// One state for every frame: game functions held (two 32-bit halves) and
++// the axes, -65536..65536
++EMSCRIPTEN_KEEPALIVE void web_pad(uint32_t lo, uint32_t hi, int32_t forward, int32_t side, int32_t turn, int32_t pitch)
++{
++    webButtons = (uint64_t)hi << 32 | lo;
++    webCleared &= webButtons;
++    int32_t const in[4] = { forward, side, turn, pitch };
++    for (int i = 0; i < 4; i++)
++        webAxes[i] = (int32_t)((int64_t)clamp(in[i], -65536, 65536) * 32767 / 65536);
++}
++
++EMSCRIPTEN_KEEPALIVE void web_look(int32_t dx, int32_t dy)
++{
++    webLookX += dx;
++    webLookY += dy;
++}
++
++// A key, by SDL scancode, as if from the keyboard
++EMSCRIPTEN_KEEPALIVE void web_key(int scancode, int down)
++{
++    SDL_Event ev = {};
++    ev.type = down ? SDL_KEYDOWN : SDL_KEYUP;
++    ev.key.state = down ? SDL_PRESSED : SDL_RELEASED;
++    ev.key.keysym.scancode = (SDL_Scancode)scancode;
++    ev.key.keysym.sym = SDL_GetKeyFromScancode((SDL_Scancode)scancode);
++    SDL_PushEvent(&ev);
++}
++
++}
++
++#endif
+diff --git a/source/duke3d/src/config.cpp b/source/duke3d/src/config.cpp
+index c7137a3..9b84337 100644
+--- a/source/duke3d/src/config.cpp
++++ b/source/duke3d/src/config.cpp
+@@ -248,7 +248,12 @@ void CONFIG_SetDefaults(void)
+ 
+     ud.setup.forcesetup       = 1;
+     ud.setup.noautoload       = 1;
++#ifdef __EMSCRIPTEN__
++    // [frunk] a window the size of the page's canvas
++    ud.setup.fullscreen       = 0;
++#else
+     ud.setup.fullscreen       = 1;
++#endif
+     ud.setup.usemouse         = 1;
+ 
+     ud.althud                 = 1;
+diff --git a/source/duke3d/src/game.cpp b/source/duke3d/src/game.cpp
+index a3f46b5..7cc83ae 100644
+--- a/source/duke3d/src/game.cpp
++++ b/source/duke3d/src/game.cpp
+@@ -280,6 +280,10 @@ int32_t A_CheckInventorySprite(spritetype *s)
+ 
+ 
+ EDUKE32_NORETURN void app_exit(int returnCode);
++#ifdef __EMSCRIPTEN__
++bool webMaybeLoad(void);
++extern int webExiting;
++#endif
+ 
+ //static int g_programExitCode = INT_MIN;
+ 
+@@ -320,6 +324,10 @@ void app_exit(int returnCode)
+ 
+ void G_GameExit(const char *msg)
+ {
++#ifdef __EMSCRIPTEN__
++    // [frunk] the page treats the closing screens like title screens
++    webExiting = 1;
++#endif
+     if (msg && *msg != 0 && g_player[myconnectindex].ps != NULL)
+         g_player[myconnectindex].ps->palette = BASEPAL;
+ 
+@@ -7022,6 +7030,12 @@ MAIN_LOOP_RESTART:
+         G_SetCrosshairColor(CrosshairColors.r, CrosshairColors.g, CrosshairColors.b);
+     }
+ 
++#ifdef __EMSCRIPTEN__
++    // [frunk] Continue, from the page: straight into the saved game (web.cpp)
++    if (webMaybeLoad())
++        goto WEB_LOADED;
++#endif
++
+     if (myplayer.gm & MODE_NEWGAME)
+     {
+         G_NewGame(ud.m_volume_number, ud.m_level_number, ud.m_player_skill);
+@@ -7069,6 +7083,9 @@ MAIN_LOOP_RESTART:
+         else G_UpdateScreenArea();
+     }
+ 
++#ifdef __EMSCRIPTEN__
++WEB_LOADED:
++#endif
+ //    ud.auto_run = ud.config.RunMode;
+     ud.showweapons = ud.config.ShowWeapons;
+     P_SetupMiscInputSettings();
+@@ -7107,6 +7124,13 @@ MAIN_LOOP_RESTART:
+         double gameUpdateStartTime = timerGetFractionalTicks();
+         auto framecnt = g_frameCounter;
+ 
++#ifdef __EMSCRIPTEN__
++        // [frunk] after a stall (the screen was off, or a very slow frame),
++        // carry on from now instead of racing to catch up
++        if ((int32_t)(totalclock - ototalclock) > TICSPERFRAME * 8)
++            ototalclock = totalclock - TICSPERFRAME;
++#endif
++
+         if (((g_netClient || g_netServer) || (myplayer.gm & (MODE_MENU|MODE_DEMO)) == 0) && (int32_t)(totalclock - ototalclock) >= TICSPERFRAME)
+         {
+             do
+diff --git a/source/duke3d/src/web.cpp b/source/duke3d/src/web.cpp
+new file mode 100644
+index 0000000..e55703d
+--- /dev/null
++++ b/source/duke3d/src/web.cpp
+@@ -0,0 +1,101 @@
++// [frunk] What frunk.store's Duke Nukem 3D page (apps/duke3d in
++// github.com/RobertPKyle/frunk-store) asks of the game: what's on the
++// screen, saving the game in progress when the page is left, loading it
++// again from Continue, and console commands for its settings. These run
++// while the game waits between frames, so they must never wait themselves
++// (webCalledIn).
++
++#ifdef __EMSCRIPTEN__
++
++#include "duke3d.h"
++#include "savegame.h"
++#include "osd.h"
++
++#include <emscripten.h>
++
++// The page's Continue save: one file, written over each time
++#define WEB_SAVE_FILE "continue.esv"
++
++static int webLoadAtStart;
++int webExiting;   // set by G_GameExit
++
++// Called at the top of the main loop: loads the Continue save if the page
++// asked for it before starting. Returns true when it did.
++bool webMaybeLoad(void)
++{
++    if (!webLoadAtStart)
++        return false;
++    webLoadAtStart = 0;
++
++    savebrief_t sv("Continue");
++    Bstrcpy(sv.path, WEB_SAVE_FILE);
++    KB_FlushKeyboardQueue();
++    KB_ClearKeysDown();
++    if (G_LoadPlayerMaybeMulti(sv) != 0)
++        return false;
++    g_lastusersave = sv;
++    g_quickload = &g_lastusersave;
++    Menu_Change(MENU_CLOSE);
++    return true;
++}
++
++extern "C" {
++
++// What's showing: 1 a menu, 2 a game being played, 4 a demo, a title
++// screen or the screens after quitting, 8 typing (chat or a cheat), 16 the
++// map, 32 the console, 64 the player is dead
++EMSCRIPTEN_KEEPALIVE int web_state(void)
++{
++    auto const ps = g_player[myconnectindex].ps;
++    if (!ps || webExiting)
++        return 4;
++    int const gm = ps->gm;
++    int s = 0;
++    if (gm & MODE_MENU) s |= 1;
++    if ((gm & MODE_GAME) && !(gm & MODE_DEMO)) s |= 2;
++    if (gm & MODE_DEMO || !(gm & MODE_GAME)) s |= 4;
++    if (gm & MODE_TYPE) s |= 8;
++    if (ud.overhead_on) s |= 16;
++    if (osd && (osd->flags & OSD_DRAW)) s |= 32;
++    if (ps->i >= 0 && sprite[ps->i].extra <= 0) s |= 64;
++    return s;
++}
++
++// Before main: load the Continue save once the game is up
++EMSCRIPTEN_KEEPALIVE void web_load_at_start(void) { webLoadAtStart = 1; }
++
++// Saves the game in progress as Continue; 1 when it did
++EMSCRIPTEN_KEEPALIVE int web_autosave(void)
++{
++    auto const ps = g_player[myconnectindex].ps;
++    if (!ps || !(ps->gm & MODE_GAME) || (ps->gm & (MODE_DEMO | MODE_EOL)) || ud.multimode > 1)
++        return 0;
++    if (ps->i < 0 || sprite[ps->i].extra <= 0)
++        return 0;
++
++    webCalledIn = 1;
++    savebrief_t sv("Continue");
++    Bstrcpy(sv.path, WEB_SAVE_FILE);
++    int const ok = G_SavePlayer(sv, false) == 0;
++    webCalledIn = 0;
++    return ok;
++}
++
++EMSCRIPTEN_KEEPALIVE void web_save_config(void)
++{
++    webCalledIn = 1;
++    CONFIG_WriteSetup(0);
++    webCalledIn = 0;
++}
++
++// A console command, such as a setting
++EMSCRIPTEN_KEEPALIVE void web_cmd(char const *text)
++{
++    webCalledIn = 1;
++    OSD_Dispatch(text, true);
++    webCalledIn = 0;
++}
++
++}
++
++#endif
+diff --git a/source/mact/src/control.cpp b/source/mact/src/control.cpp
+index bf31ced..5f375cb 100644
+--- a/source/mact/src/control.cpp
++++ b/source/mact/src/control.cpp
+@@ -23,6 +23,12 @@
+ #include "android.h"
+ #endif
+ 
++#ifdef __EMSCRIPTEN__
++// [frunk] the page's on-screen controls and controllers (webhost.cpp)
++void webControlInput(ControlInfo *info);
++void webClearButton(int button);
++#endif
++
+ // TODO: add mact cvars and make this user configurable
+ #define USERINPUTDELAY 500
+ #define USERINPUTFASTDELAY 60
+@@ -637,6 +643,9 @@ void CONTROL_ClearButton(int whichbutton)
+ 
+     BUTTONCLEAR(whichbutton);
+     CONTROL_Flags[whichbutton].cleared = TRUE;
++#ifdef __EMSCRIPTEN__
++    webClearButton(whichbutton);
++#endif
+ }
+ 
+ void CONTROL_ClearAllButtons(void)
+@@ -646,6 +655,9 @@ void CONTROL_ClearAllButtons(void)
+ 
+     for (auto & c : CONTROL_Flags)
+         c.cleared = TRUE;
++#ifdef __EMSCRIPTEN__
++    webClearButton(-1);
++#endif
+ }
+ 
+ void CONTROL_ProcessBinds(void)
+@@ -702,6 +714,9 @@ void CONTROL_GetInput(ControlInfo *info)
+ #endif
+     controlPollDevices(info);
+     controlUpdateGameFunctions();
++#ifdef __EMSCRIPTEN__
++    webControlInput(info);
++#endif
+     inputchecked = 1;
+ }
+ 
+diff --git a/web/build.sh b/web/build.sh
+new file mode 100755
+index 0000000..a0cfce6
+--- /dev/null
++++ b/web/build.sh
+@@ -0,0 +1,52 @@
++#!/bin/sh
++# [frunk] Builds EDuke32 (Duke Nukem 3D only) for the browser with
++# Emscripten 4.0.10, from the top of the source tree:
++#   web/build.sh [extra link flags]
++# Output: build-web/eduke32.js and .wasm, for frunk.store's Duke Nukem 3D
++# page (apps/duke3d in github.com/RobertPKyle/frunk-store).
++#
++# Instead of the GNUmakefile: the classic software renderer only (no
++# OpenGL), SDL2, no network play, and JSPI so the game's own loops can wait
++# for the page between frames (source/build/src/webhost.cpp).
++set -e
++OPT="${OPT:--O3}"
++INC="-Isource/build/include -Isource/audiolib/include -Isource/mact/include -Isource/glad/include -Isource/imgui/include -Isource/mimalloc/include -Isource/voidwrap/include"
++DEF="-DNOASM -DRENDERTYPESDL=1 -DSDL_TARGET=2 -DNDEBUG -DNETCODE_DISABLE -DB_LITTLE_ENDIAN=1 -DB_BIG_ENDIAN=0"
++CXXFLAGS="$OPT -std=gnu++14 -fno-exceptions -fno-rtti -fno-strict-aliasing -fwrapv -fno-threadsafe-statics -funsigned-char -sUSE_SDL=2 $DEF $INC -w"
++CFLAGS="$OPT -fno-strict-aliasing -fwrapv -funsigned-char -sUSE_SDL=2 $DEF $INC -w"
++
++BUILD="2d a-c baselayer cache1d clip colmatch common communityapi compat cpuid crc32 defs engine fix16 hash hightile klzw kplib loguru lz4 md4 mhk miniz miniz_tdef miniz_tinfl mmulti mutex osd palette pngwrite pragmas rev screenshot screentext scriptfile sdlayer sjson smalltextfont smmalloc smmalloc_generic smmalloc_tls softsurface texcache textfont tiles timer vfs webhost xxhash"
++DUKE="actors anim cheats cmdline common config demo dnames game gamedef gameexec gamestructures gamevars global grpscan input menus network osdcmds osdfuncs player premap rts savegame sbar screens sector sounds text web"
++AUDIO="driver_adlib driver_sdl driver_sf2 drivers flac formats fx_man gmtimbre midi mix mixst multivoc music opl3 pitch vorbis xa xmp"
++MACT="animlib control joystick keyboard scriplib"
++IMGUI="imgui imgui_draw imgui_tables imgui_widgets imgui_impl_sdl2"
++
++SRCS=""
++for n in $BUILD; do SRCS="$SRCS source/build/src/$n"; done
++for n in $DUKE; do SRCS="$SRCS source/duke3d/src/$n"; done
++for n in $AUDIO; do SRCS="$SRCS source/audiolib/src/$n"; done
++for n in $MACT; do SRCS="$SRCS source/mact/src/$n"; done
++for n in $IMGUI; do SRCS="$SRCS source/imgui/src/$n"; done
++SRCS="$SRCS source/duke3d/rsrc/eduke32_icon"
++
++mkdir -p build-web/obj
++OBJS=""
++LIST=""
++for s in $SRCS; do
++  if [ -f "$s.cpp" ]; then f="$s.cpp"; elif [ -f "$s.c" ]; then f="$s.c"; else echo "missing: $s"; exit 1; fi
++  o="build-web/obj/$(echo "$s" | tr / _).o"
++  OBJS="$OBJS $o"
++  LIST="$LIST $f:$o"
++done
++export CXXFLAGS CFLAGS
++echo $LIST | tr ' ' '\n' | xargs -P "$(nproc)" -I{} sh -c '
++  f="${1%%:*}"; o="${1#*:}"
++  case "$f" in *.cpp) em++ $CXXFLAGS -c "$f" -o "$o" ;; *) emcc $CFLAGS -c "$f" -o "$o" ;; esac
++' _ {}
++em++ $OPT $OBJS -o build-web/eduke32.js -sUSE_SDL=2 -sJSPI \
++  -sSTACK_SIZE=8388608 -sALLOW_MEMORY_GROWTH -sINITIAL_MEMORY=134217728 \
++  -sMODULARIZE -sEXPORT_ES6 -sEXPORT_NAME=createDuke -sENVIRONMENT=web \
++  -sINVOKE_RUN=0 -sEXIT_RUNTIME=0 -sFORCE_FILESYSTEM \
++  -sEXPORTED_RUNTIME_METHODS=FS,callMain,UTF8ToString,stringToNewUTF8 \
++  -sEXPORTED_FUNCTIONS=_main,_web_pad,_web_look,_web_key,_web_state,_web_frames,_web_autosave,_web_save_config,_web_cmd,_web_load_at_start,_malloc,_free \
++  "$@"

@@ -7,6 +7,7 @@
     "build:doom": "node tools/build-doom.mjs",
     "build:scummvm": "node tools/build-scummvm.mjs",
     "build:quake": "node tools/build-quake.mjs",
+    "build:duke3d": "node tools/build-duke3d.mjs",
     "build:openttd": "node tools/build-openttd.mjs",
     "build:fheroes2": "node tools/build-fheroes2.mjs",
     "build:openarena": "node tools/build-openarena.mjs",
