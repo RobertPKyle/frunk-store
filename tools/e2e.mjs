@@ -1615,6 +1615,94 @@ await check('city builder founds a city by touch and a controller, grows it, bud
   if (await app.locator('.city').filter({ hasText: 'E2E Town' }).count()) throw new Error('not deleted');
 });
 
+await check('daily pokémon guess plays the daily by tapping and typing, keeps it, shares by QR, plays free games and other names', async () => {
+  await openFromHub(/Daily Pokémon Guess/);
+  const frame = () => page.frames().find(f => f.url().includes('/pokeguess/'));
+  const app = appFrame();
+  const test = (fn, arg) => frame().evaluate(fn, arg);
+  // the first visit explains the game
+  await app.locator('#helpClose').click();
+  await app.locator('#help').waitFor({ state: 'hidden' });
+  // every device must get the same Daily: the pool and its order are fixed
+  const pool = await test(() => window.pokeguessTest.poolSize());
+  const first = await test(() => [1, 2, 3].map(day => window.pokeguessTest.daily(day)));
+  if (pool !== 1008 || first.join() !== 'Latias,Floragato,Kleavor') throw new Error(`daily pool ${pool}, first days ${first}`);
+  const secret = await test(() => window.pokeguessTest.secret());
+  const day = await test(() => window.pokeguessTest.day());
+  const rows = () => app.locator('#grid .row:not(.head)').count();
+
+  // a wrong guess by tapping a suggestion
+  const wrong = secret === 'Pikachu' ? 'Bulbasaur' : 'Pikachu';
+  await app.locator('#guess').fill(wrong.slice(0, 4));
+  await app.locator('#suggest li', { hasText: wrong }).first().tap();
+  if (await rows() !== 1) throw new Error('first guess not shown');
+  await app.locator('#lede', { hasText: '7 guesses left' }).waitFor({ timeout: 2000 });
+  // filters narrow the list; a guessed Pokémon isn't offered again
+  await app.locator('#guess').fill('type1:fire gen:1');
+  const fire = await app.locator('#suggest li small').allTextContents();
+  if (!fire.length || !fire.every(t => t.includes('Gen 1 · Fire'))) throw new Error(`filter: ${fire.slice(0, 3)}`);
+  await app.locator('#guess').fill(wrong);
+  if (await app.locator('#suggest li', { hasText: new RegExp(`^${wrong}`) }).count()) throw new Error('guessed Pokémon still suggested');
+  // the secret by typing its name
+  await app.locator('#guess').fill(secret.toLowerCase());
+  await app.locator('#guess').press('Enter');
+  await app.locator('#resultTitle', { hasText: 'Got it in 2!' }).waitFor({ timeout: 2000 });
+  if (await app.locator('#streak').textContent() !== '1') throw new Error('streak not counted');
+  await app.locator('#qr canvas').waitFor({ state: 'attached', timeout: 5000 });
+  const link = await app.locator('#qr').getAttribute('data-link');
+  if (!link.includes(`d=${day}`) || !link.includes('g=2') || !link.includes('of=8')) throw new Error(`share link ${link}`);
+  await page.screenshot({ path: shots + 'pokeguess.png' });
+
+  // it's still solved after closing and opening the app
+  await page.click('#home');
+  await page.waitForSelector('#runner', { state: 'hidden' });
+  await openFromHub(/Daily Pokémon Guess/);
+  await app.locator('#resultTitle', { hasText: 'Got it in 2!' }).waitFor({ timeout: 5000 });
+  if (await rows() !== 2) throw new Error('guesses not kept');
+
+  // the phone page shows the squares, without names
+  const phone = await browser.newPage({ viewport: { width: 390, height: 800 }, isMobile: true, hasTouch: true });
+  try {
+    await phone.goto(link);
+    const squares = (await phone.locator('#squares').textContent()).split('\n');
+    // a Daily's generation square never says higher or lower
+    if (squares.length !== 2 || squares[1] !== '🟩🟩🟩🟩🟩' || !/^[🟦🟩]/u.test(squares[0])) throw new Error(`squares: ${squares}`);
+    if (!(await phone.locator('#head').textContent()).includes(`#${day} 2/8`)) throw new Error('share heading');
+    if ((await phone.locator('#card').textContent()).includes(secret)) throw new Error('share names the secret');
+    await phone.screenshot({ path: shots + 'pokeguess-phone.png' });
+  } finally {
+    await phone.close();
+  }
+
+  // free play from Gen 1 only: five guesses, lost after five wrong ones
+  await app.locator('#freeTab').click();
+  await app.locator('#minGen').selectOption('1');
+  await app.locator('#maxGen').selectOption('1');
+  await app.locator('#newGame').click();
+  await app.locator('#lede', { hasText: 'Gen 1. 5 guesses left' }).waitFor({ timeout: 2000 });
+  const freeSecret = await test(() => window.pokeguessTest.secret());
+  await app.locator('#guess').fill('gen:2');
+  if (!(await app.locator('#suggest').isHidden())) throw new Error('Gen 2 offered in a Gen 1 game');
+  for (const name of ['Bulbasaur', 'Charmander', 'Squirtle', 'Pidgey', 'Rattata', 'Caterpie'].filter(n => n !== freeSecret).slice(0, 5)) {
+    await app.locator('#guess').fill(name);
+    await app.locator('#guess').press('Enter');
+  }
+  await app.locator('#resultTitle', { hasText: 'Out of guesses' }).waitFor({ timeout: 2000 });
+  if (await app.locator('#streak').textContent() !== '1') throw new Error('free play changed the Daily streak');
+  await app.locator('#again').click();
+  if (await rows() !== 0) throw new Error('new game kept guesses');
+
+  // names in Japanese
+  await app.locator('#names').selectOption('ja');
+  await app.locator('#guess[placeholder="秘密のポケモンは？"]').waitFor({ timeout: 3000 });
+  await app.locator('#guess').fill('フシギ');
+  await app.locator('#suggest li', { hasText: 'フシギダネ' }).waitFor({ timeout: 2000 });
+  await app.locator('#names').selectOption('en');
+  await app.locator('#guess').fill('');
+  await app.locator('#dailyTab').click();
+  await app.locator('#resultTitle', { hasText: 'Got it in 2!' }).waitFor({ timeout: 2000 });
+});
+
 await check('supertux streams its data, starts the story by touch, saves when left and loads the save again', async () => {
   await openFromHub(/SuperTux/);
   const frame = () => page.frames().find(f => f.url().includes('/supertux/'));

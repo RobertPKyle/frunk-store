@@ -113,6 +113,7 @@
     "text": { "name": "Teksteventyr", "tagline": "Zork I, II og III, Infocom-klassikerne, nå med åpen kildekode, pluss to gratis eventyr til. Trykk på ord for å lage kommandoer, eller skriv." },
     "ascii": { "name": "ASCII-eventyr", "tagline": "Scott Millers Kroz-spill fra 1987 til 1990, nå med åpen kildekode: sju teksteventyr med edelsteiner, pisker og monstre. Trykk for å gå." },
     "puzzles": { "name": "Logikkoppgaver", "tagline": "Førti klassiske logikkoppgaver av Simon Tatham, fra Solo (sudoku) til Mines og Net, med uendelig mange nye brett i alle størrelser." },
+    "pokeguess": { "name": "Dagens Pokémon-gjetting", "tagline": "Gjett dagens hemmelige Pokémon på åtte forsøk ut fra generasjon, typer, høyde og vekt. Samme for alle, pluss fritt spill med de generasjonene du vil." },
     "chess": { "name": "Sjakkoppgave", "tagline": "Løs den daglige sjakkoppgaven fra Lichess på skjermen." },
     "terrarium": { "tagline": "Et akvarium som lever videre mens du er borte. Gi det mat og se det utvikle seg. Av Jason Goldfeder." }
   }

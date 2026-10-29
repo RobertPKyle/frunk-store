@@ -379,6 +379,20 @@
       ]
     },
     {
+      "id": "pokeguess",
+      "name": "Daily Pokémon Guess",
+      "tagline": "Guess the day's secret Pokémon in eight tries from its generation, types, height and weight. The same one for everyone, plus free play from any generations.",
+      "path": "/pokeguess/",
+      "icon": "/pokeguess/icon.svg",
+      "added": "2026-10-29",
+      "tags": [
+        "Game",
+        "Puzzle",
+        "Touch",
+        "Offline"
+      ]
+    },
+    {
       "id": "chess",
       "name": "Chess Puzzle",
       "tagline": "Solve the Lichess daily chess puzzle on your screen.",

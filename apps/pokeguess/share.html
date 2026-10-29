@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>My Pokémon guess</title>
+<link rel="icon" href="icon.svg">
+<style>
+  :root { --bg: #071213; --card: #13292b; --line: rgba(155, 211, 212, .18); --text: #e6f4f4; --muted: #8fb3b4; --accent: #ff7a7a; --accent-ink: #2b0606; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); font: 17px/1.45 system-ui, -apple-system, sans-serif; }
+  main { max-width: 520px; margin: 0 auto; padding: 22px 16px 40px; }
+  h1 { font-size: 22px; margin: 0 0 14px; }
+  #card { padding: 18px; border-radius: 16px; background: var(--card); border: 1px solid var(--line); text-align: center; }
+  #head { margin: 0 0 10px; font-weight: 700; }
+  #squares { margin: 0; font-size: 30px; line-height: 1.25; letter-spacing: 2px; white-space: pre; }
+  .actions { display: grid; gap: 10px; margin-top: 16px; }
+  .actions a, .actions button { display: flex; align-items: center; justify-content: center; min-height: 54px; border-radius: 14px; border: 1px solid var(--line); background: var(--card); color: var(--text); font: inherit; font-weight: 700; text-decoration: none; cursor: pointer; }
+  #shareBtn { background: var(--accent); color: var(--accent-ink); border: 0; font-size: 19px; }
+  #msg { margin: 14px 0 0; color: var(--muted); }
+  #msg:empty { display: none; }
+  .fine { margin-top: 22px; font-size: 14px; color: var(--muted); }
+  .fine a { color: var(--text); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Your Pokémon guess</h1>
+  <div id="card">
+    <p id="head"></p>
+    <p id="squares"></p>
+  </div>
+  <div class="actions" id="actions" hidden>
+    <button id="shareBtn" type="button" hidden>Share</button>
+    <button id="copyBtn" type="button">Copy</button>
+    <a id="post" target="_blank" rel="noopener">Post on X</a>
+  </div>
+  <p id="msg" role="status"></p>
+  <p class="fine">Play the Daily Pokémon Guess in your car's browser, or on any screen, at <a href="https://frunk.store/app/pokeguess">frunk.store</a>. Based on Squirdle by Fireblend. Unofficial fan game.</p>
+</main>
+<script type="module">
+  // The car's result page shows a QR code of this page with the result in
+  // the #fragment: d (Daily number) or f (Free play generations), g (guesses
+  // used, X for a loss), of (guesses allowed) and m (one digit per hint,
+  // rows split by -). The squares never name a Pokémon.
+  const $ = id => document.getElementById(id);
+  const LINK = 'https://frunk.store/app/pokeguess';
+  const EMOJI = { 1: '🟩', 2: '🔼', 3: '🔽', 4: '🟨', 5: '🟥', 6: '🟦' };
+  const p = new URLSearchParams(location.hash.slice(1));
+  const d = p.get('d'), f = p.get('f'), g = p.get('g'), of = p.get('of'), m = p.get('m');
+  const ok = (/^\d{1,5}$/.test(d) || /^[1-9]-[1-9]$/.test(f)) && /^([1-8]|X)$/.test(g) && /^[5-8]$/.test(of)
+    && /^[1-6]{5}(-[1-6]{5}){0,7}$/.test(m);
+  if (!ok) {
+    $('head').textContent = 'This link has no result in it. Scan the code on the car screen again.';
+  } else {
+    const head = d ? `Daily Pokémon Guess #${d} ${g}/${of}` : `Daily Pokémon Guess, free play Gen ${f.replace('-', '–')}: ${g}/${of}`;
+    const squares = m.split('-').map(row => [...row].map(n => EMOJI[n]).join('')).join('\n');
+    const text = `${head}\n${squares}`;
+    $('head').textContent = head;
+    $('squares').textContent = squares;
+    $('actions').hidden = false;
+    $('post').href = `https://x.com/intent/post?${new URLSearchParams({ text, url: LINK })}`;
+    if (navigator.share) {
+      $('shareBtn').hidden = false;
+      $('shareBtn').addEventListener('click', () => navigator.share({ text: `${text}\n${LINK}` }).catch(() => {}));
+    }
+    $('copyBtn').addEventListener('click', async () => {
+      try { await navigator.clipboard.writeText(`${text}\n${LINK}`); $('msg').textContent = 'Copied.'; }
+      catch { $('msg').textContent = 'Copying is blocked here. Press and hold the squares to copy them.'; }
+    });
+  }
+</script>
+</body>
+</html>

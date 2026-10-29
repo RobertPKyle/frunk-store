@@ -113,6 +113,7 @@
     "text": { "name": "Tekstavonturen", "tagline": "Zork I, II en III, de Infocom-klassiekers, nu open source, plus nog twee gratis avonturen. Tik op woorden om opdrachten te maken, of typ." },
     "ascii": { "name": "ASCII-quests", "tagline": "De Kroz-games van Scott Miller uit 1987 tot 1990, nu open source: zeven tekstmodus-avonturen vol edelstenen, zwepen en monsters. Tik om te lopen." },
     "puzzles": { "name": "Logische puzzels", "tagline": "Veertig klassieke logische puzzels van Simon Tatham, van Solo (sudoku) tot Mines en Net, met eindeloos nieuwe borden in elk formaat." },
+    "pokeguess": { "name": "Raad de Pokémon van de dag", "tagline": "Raad de geheime Pokémon van vandaag in acht pogingen aan de hand van generatie, types, lengte en gewicht. Voor iedereen dezelfde, plus vrij spel met de generaties die je kiest." },
     "chess": { "name": "Schaakpuzzel", "tagline": "Los de dagelijkse schaakpuzzel van Lichess op je scherm op." },
     "terrarium": { "tagline": "Een aquarium dat doorleeft terwijl je weg bent. Voer het en zie het evolueren. Door Jason Goldfeder." }
   }

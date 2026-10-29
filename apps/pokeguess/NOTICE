@@ -1,0 +1,29 @@
+Daily Pokémon Guess (apps/pokeguess)
+
+Game (game.js, index.html, data/, imgs/)
+  Squirdle, a Pokémon Wordle-like by Sergio "Fireblend" Esquivel
+  (https://squirdle.fireblend.com).
+  License: Apache License 2.0 (LICENSE).
+  Source: https://github.com/Fireblend/squirdle, commit
+  814febcdc516894b24f6e98559bbb12eb4f40029.
+  The Pokémon data (data/pokedex.json) is based on Mario Tormo Romero's
+  Complete Pokémon Dataset on Kaggle, as Squirdle's README says. The name
+  lists (data/de.json, fr.json, ja.json, ko.json) and the hint pictures
+  (imgs/) are Squirdle's, unchanged.
+
+  This is a modified version. game.js and index.html are a rewrite of
+  Squirdle's pages and scripts (index.html, daily.html, filters.html,
+  scripts/*.js, style.css) for a car's touch screen; the rules, hints,
+  attribute filters, streak titles and type colours are Squirdle's. The
+  changes: one page with Daily and Free play; the Daily Pokémon comes from
+  the date (a fixed shuffle of the Pokémon in their usual form, a new one
+  each local day from 29 October 2026) instead of Squirdle's daily.json;
+  progress is kept in localStorage instead of cookies; tapping a
+  suggestion makes the guess; each guess shows its generation, types and
+  size; a guess can't be repeated; results are shared by QR code to a
+  phone page (share.html) instead of the clipboard; jQuery and the Telex
+  web font are gone.
+
+Pokémon and Pokémon character names are trademarks of Nintendo, Creatures
+Inc. and GAME FREAK inc. This is an unofficial fan game, not affiliated with
+or endorsed by them.

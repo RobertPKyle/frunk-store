@@ -113,6 +113,7 @@
     "text": { "name": "Textadventures", "tagline": "Zork I, II und III, die Infocom-Klassiker, jetzt Open Source, dazu zwei weitere kostenlose Abenteuer. Tippe auf Wörter, um Befehle zu bauen, oder schreib selbst." },
     "ascii": { "name": "ASCII-Quests", "tagline": "Scott Millers Kroz-Spiele von 1987 bis 1990, jetzt Open Source: sieben Textmodus-Abenteuer mit Edelsteinen, Peitschen und Monstern. Tippe, um zu laufen." },
     "puzzles": { "name": "Logikrätsel", "tagline": "Vierzig klassische Logikrätsel von Simon Tatham, von Solo (Sudoku) über Mines bis Net, mit endlos neuen Feldern in jeder Größe." },
+    "pokeguess": { "name": "Pokémon-Rätsel des Tages", "tagline": "Errate das geheime Pokémon des Tages in acht Versuchen anhand von Generation, Typen, Größe und Gewicht. Für alle dasselbe, dazu freies Spiel mit beliebigen Generationen." },
     "chess": { "name": "Schachrätsel", "tagline": "Löse das tägliche Schachrätsel von Lichess auf deinem Bildschirm." },
     "terrarium": { "tagline": "Ein Aquarium, das weiterlebt, während du weg bist. Füttere es und sieh zu, wie es sich entwickelt. Von Jason Goldfeder." }
   }

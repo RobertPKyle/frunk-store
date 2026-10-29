@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Daily Pokémon Guess</title>
+<style>
+  :root { --bg: #071213; --panel: #0d1d1f; --card: #13292b; --line: rgba(155, 211, 212, .18); --text: #e6f4f4; --muted: #8fb3b4;
+          --accent: #ff7a7a; --accent-ink: #2b0606; --bad: #ffb09a; }
+  body.free { --accent: #9bd3d4; --accent-ink: #062224; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 16px/1.4 system-ui, sans-serif; overflow: hidden; -webkit-tap-highlight-color: transparent; }
+  button, input, select { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  [hidden] { display: none !important; }
+
+  .app { display: grid; grid-template-rows: auto 1fr; height: 100%; }
+  /* left padding keeps clear of the hub's Apps button */
+  header { display: flex; align-items: center; gap: 10px; min-height: 60px; padding: 8px 12px 8px 110px; border-bottom: 1px solid var(--line); }
+  header h1 { margin: 0 6px 0 0; font-size: 19px; font-weight: 800; white-space: nowrap; }
+  header h1 b { color: var(--accent); }
+  .tabs { display: flex; gap: 6px; }
+  .tabs button, .ghost { min-height: 44px; padding: 6px 16px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel); font-weight: 700; }
+  .tabs button[aria-selected="true"] { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+  .spacer { flex: 1; }
+
+  main { display: grid; grid-template-columns: minmax(0, 1fr) 280px; min-height: 0; }
+  .play { overflow-y: auto; padding: 14px 18px 24px; }
+  aside { overflow-y: auto; padding: 14px 16px 24px; border-left: 1px solid var(--line); background: var(--panel); display: grid; align-content: start; gap: 16px; }
+  aside h2 { margin: 0 0 8px; font-size: 13px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+
+  .lede { margin: 0 0 10px; color: var(--muted); }
+  .lede b { color: var(--text); }
+
+  /* guess box and its suggestions */
+  form { position: relative; display: flex; gap: 8px; max-width: 560px; }
+  #guess { flex: 1; min-width: 0; min-height: 52px; padding: 8px 14px; border-radius: 14px; border: 2px solid var(--line); background: var(--card); font-size: 19px; }
+  #guess:focus { outline: none; border-color: var(--accent); }
+  .go { min-height: 52px; padding: 6px 22px; border: 0; border-radius: 14px; background: var(--accent); color: var(--accent-ink); font-size: 18px; font-weight: 800; }
+  #suggest { position: absolute; z-index: 5; top: 58px; left: 0; right: 0; max-height: min(340px, 60vh); overflow-y: auto; margin: 0; padding: 4px; list-style: none; border-radius: 14px; border: 1px solid var(--line); background: #102426; box-shadow: 0 12px 40px rgba(0, 0, 0, .55); }
+  #suggest li { display: flex; flex-direction: column; justify-content: center; min-height: 52px; padding: 6px 12px; border-radius: 10px; cursor: pointer; }
+  #suggest li.active, #suggest li:active { background: var(--card); }
+  #suggest strong { color: var(--accent); }
+  #suggest small, .info { color: var(--muted); font-size: 13px; }
+  #error { margin: 8px 0 0; color: var(--bad); }
+  #error:empty { display: none; }
+
+  /* guesses */
+  .grid { margin-top: 14px; display: grid; gap: 6px; }
+  .row { display: grid; grid-template-columns: repeat(5, 46px) minmax(0, 1fr); gap: 6px; align-items: center; }
+  .row.head { font-size: 12px; color: var(--muted); text-align: center; }
+  .row.head span:last-child { text-align: left; padding-left: 4px; }
+  .row img { width: 46px; height: 46px; display: block; }
+  .row .name { padding-left: 4px; min-width: 0; }
+  .row .name b { display: block; font-size: 17px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row.new { animation: in .45s ease-out; }
+  @keyframes in { from { opacity: 0; transform: translateY(-6px); } }
+
+  /* end of a game */
+  #result { max-width: 560px; padding: 14px 16px; border-radius: 16px; background: var(--card); border: 1px solid var(--line); display: grid; grid-template-columns: 1fr auto; gap: 4px 16px; align-items: center; }
+  #result h2 { margin: 0; font-size: 22px; color: var(--accent); }
+  #result p { margin: 0; }
+  #result .share { grid-column: 2; grid-row: 1 / 6; text-align: center; font-size: 12px; color: var(--muted); }
+  #qr { width: 120px; height: 120px; padding: 6px; margin: 0 auto 4px; background: #fff; border-radius: 10px; }
+  #qr img, #qr canvas { display: block; width: 108px !important; height: 108px !important; }
+  #again { justify-self: start; margin-top: 8px; }
+
+  /* side panel */
+  .types { display: flex; flex-wrap: wrap; gap: 5px; }
+  .type { padding: 5px 9px; border-radius: 9px; border: 3px solid transparent; color: #fff; font-size: 13px; font-weight: 700; text-shadow: 0 1px 2px rgba(0, 0, 0, .7); opacity: .7; transition: opacity .4s, border-color .4s; }
+  .type.yes { opacity: 1; border-color: #fff; }
+  .type.no { opacity: .12; }
+  .key { display: grid; grid-template-columns: 28px 1fr; gap: 4px 8px; align-items: center; margin: 0; font-size: 14px; }
+  .key img { width: 28px; height: 28px; }
+  .gens { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  select { min-height: 44px; padding: 4px 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); }
+  .toggle { display: flex; align-items: center; gap: 10px; min-height: 44px; cursor: pointer; }
+  .toggle input { width: 22px; height: 22px; accent-color: var(--accent); }
+  .fine { font-size: 12px; color: var(--muted); margin: 0; }
+  .fine a { color: var(--muted); }
+  .stats { display: flex; gap: 14px; margin: 0; }
+  .stats b { display: block; font-size: 22px; color: var(--text); }
+  .stats span { font-size: 12px; color: var(--muted); }
+
+  /* help */
+  #help { position: fixed; inset: 0; z-index: 10; background: rgba(3, 9, 10, .8); display: grid; place-items: center; padding: 16px; }
+  #help .sheet { width: min(640px, 100%); max-height: 100%; overflow-y: auto; padding: 18px 20px; border-radius: 18px; background: var(--panel); border: 1px solid var(--line); }
+  #help h2 { margin: 0 0 8px; font-size: 20px; }
+  #help h3 { margin: 16px 0 6px; font-size: 15px; color: var(--accent); }
+  #help p, #help li { color: #cfe3e3; }
+  #help code { padding: 1px 6px; border-radius: 6px; background: var(--card); color: var(--text); }
+  #help .close { float: right; }
+
+  @media (max-width: 720px) {
+    html, body { overflow: auto; }
+    .app { height: auto; }
+    main { grid-template-columns: 1fr; }
+    aside { border-left: 0; border-top: 1px solid var(--line); }
+    header { flex-wrap: wrap; }
+  }
+</style>
+</head>
+<body class="daily">
+<div class="app">
+  <header>
+    <h1>Daily <b>Pokémon</b> Guess</h1>
+    <div class="tabs" role="tablist">
+      <button type="button" role="tab" id="dailyTab" aria-selected="true">Daily</button>
+      <button type="button" role="tab" id="freeTab" aria-selected="false">Free play</button>
+    </div>
+    <span class="spacer"></span>
+    <button type="button" class="ghost" id="helpBtn">How to play</button>
+  </header>
+
+  <main>
+    <section class="play">
+      <p class="lede" id="lede"></p>
+      <form id="guessForm" autocomplete="off">
+        <input id="guess" type="text" enterkeyhint="go" spellcheck="false" autocapitalize="off" placeholder="Who's that Pokémon?" aria-label="Your guess" aria-autocomplete="list" aria-controls="suggest">
+        <button type="submit" class="go">Guess</button>
+        <ul id="suggest" role="listbox" hidden></ul>
+      </form>
+      <p id="error" role="alert"></p>
+
+      <div id="result" hidden>
+        <h2 id="resultTitle"></h2>
+        <p id="resultText"></p>
+        <p class="info" id="resultInfo"></p>
+        <p id="resultStreak"></p>
+        <p class="info" id="resultNext"></p>
+        <div class="share">
+          <div id="qr"></div>
+          Scan to share
+        </div>
+        <button type="button" class="go" id="again" hidden>New game</button>
+      </div>
+
+      <div class="grid" id="grid">
+        <div class="row head" id="gridHead" hidden><span>Gen</span><span>Type 1</span><span>Type 2</span><span>Height</span><span>Weight</span><span>Pokémon</span></div>
+      </div>
+    </section>
+
+    <aside>
+      <section id="freeBox" hidden>
+        <h2>Free play</h2>
+        <div class="gens">
+          <label for="minGen">Gen</label>
+          <select id="minGen"></select>
+          <label for="maxGen">to</label>
+          <select id="maxGen"></select>
+        </div>
+        <p class="fine" id="freeTries"></p>
+        <button type="button" class="ghost" id="newGame" style="margin-top: 8px">New game</button>
+      </section>
+
+      <section id="statsBox">
+        <h2>Daily streak</h2>
+        <div class="stats">
+          <div><b id="streak">0</b><span>in a row</span></div>
+          <div><b id="best">0</b><span>best</span></div>
+          <div><b id="wins">0</b><span>won</span></div>
+        </div>
+        <p class="fine" id="title" style="margin-top: 6px"></p>
+      </section>
+
+      <section>
+        <h2>Types</h2>
+        <div class="types" id="types"></div>
+      </section>
+
+      <section>
+        <h2>Hints</h2>
+        <p class="key">
+          <img src="imgs/correct.png" alt=""><span>Right</span>
+          <img src="imgs/up.png" alt=""><span>Secret one is higher</span>
+          <img src="imgs/down.png" alt=""><span>Secret one is lower</span>
+          <img src="imgs/wrongpos.png" alt=""><span>Type is in the other slot</span>
+          <img src="imgs/wrong.png" alt=""><span>Wrong</span>
+        </p>
+      </section>
+
+      <section>
+        <h2>Suggestions</h2>
+        <label class="toggle"><input type="checkbox" id="infoOn" checked> Show gen, types and size</label>
+        <div class="gens"><label for="names">Names in</label> <select id="names"></select></div>
+      </section>
+
+      <p class="fine">Based on <a href="https://squirdle.fireblend.com" target="_blank" rel="noopener">Squirdle</a> by Fireblend (Apache 2.0). Unofficial fan game; Pokémon is a trademark of Nintendo, Creatures and GAME FREAK.</p>
+    </aside>
+  </main>
+</div>
+
+<div id="help" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+    <button type="button" class="ghost close" id="helpClose">Close</button>
+    <h2 id="helpTitle">How to play</h2>
+    <p>Guess the secret Pokémon. Type a name and tap it in the list. Each guess shows how close it was:</p>
+    <ul>
+      <li><b>Gen</b>, <b>Height</b> and <b>Weight</b>: right, or whether the secret one's is higher or lower.</li>
+      <li><b>Type 1</b> and <b>Type 2</b>: right, in the other slot, or wrong. A Pokémon with one type has none as Type 2.</li>
+    </ul>
+    <p>The <b>Daily</b> is the same Pokémon for everyone each day, with 8 guesses, and it's always a Pokémon's usual form (no Mega or regional forms). Win days in a row to build your streak and earn titles. A new one comes at midnight.</p>
+    <p><b>Free play</b> picks any Pokémon, forms too, from the generations you choose. Fewer generations, fewer guesses.</p>
+    <h3>Search tricks</h3>
+    <p>Type filters instead of a name to narrow the list. Put several in a row, separated by spaces:</p>
+    <ul>
+      <li><code>gen:4</code> exactly, <code>gen!4</code> anything but, <code>gen&gt;4</code> higher, <code>gen&lt;4</code> lower</li>
+      <li>Works with <code>gen</code>, <code>type1</code>, <code>type2</code>, <code>type</code> (either slot), <code>height</code> (m) and <code>weight</code> (kg)</li>
+      <li><code>type2:none</code> lists Pokémon with one type</li>
+      <li><code>gen!4 type1:fire height&lt;0.9</code> lists small Fire Pokémon outside Gen 4</li>
+    </ul>
+    <h3>Credits</h3>
+    <p class="fine">The game is Squirdle by Sergio "Fireblend" Esquivel (squirdle.fireblend.com), under the Apache License 2.0, reworked for the car's screen; its LICENSE and NOTICE (what changed) are next to this page. Data based on Mario Tormo Romero's Complete Pokémon Dataset. Pokémon and Pokémon character names are trademarks of Nintendo, Creatures Inc. and GAME FREAK inc. This is an unofficial fan game, not affiliated with or endorsed by them.</p>
+  </div>
+</div>
+
+<script type="module" src="game.js"></script>
+<script src="/sw-register.js"></script>
+</body>
+</html>

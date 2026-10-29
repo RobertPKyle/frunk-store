@@ -113,6 +113,7 @@
     "text": { "name": "文字冒險", "tagline": "Infocom 的經典 Zork I、II、III，現已開源，另有兩款免費冒險遊戲。點選單字組成指令，或直接輸入。" },
     "ascii": { "name": "ASCII 冒險", "tagline": "Scott Miller 1987 至 1990 年的 Kroz 系列，現已開源：七部文字模式冒險，有寶石、鞭子和怪物。點按即可行走。" },
     "puzzles": { "name": "邏輯謎題", "tagline": "Simon Tatham 的 40 款經典邏輯謎題，從 Solo（數獨）到 Mines、Net，任何尺寸都有無窮無盡的新盤面。" },
+    "pokeguess": { "name": "每日猜寶可夢", "tagline": "根據世代、屬性、身高和體重，在八次之內猜出今天的神祕寶可夢。所有人都是同一隻，還有可自選世代的自由模式。" },
     "chess": { "name": "西洋棋謎題", "tagline": "在螢幕上解 Lichess 每日西洋棋謎題。" },
     "terrarium": { "tagline": "你不在時也持續生活的水族箱。餵食牠們，看著牠們演化。作者：Jason Goldfeder。" }
   }

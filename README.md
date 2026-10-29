@@ -887,6 +887,25 @@ clear them to make room.
   random one from Lichess. The last puzzle is cached for offline use. Rules
   come from chess.js (BSD-2-Clause); the piece art is the cburnett set
   (CC BY-SA 3.0).
+- `apps/pokeguess`: Daily Pokémon Guess. Squirdle by Fireblend (Apache
+  License 2.0, github.com/Fireblend/squirdle), reworked for the car: guess
+  a secret Pokémon in up to 8 tries from hints on its generation, types,
+  height and weight. Squirdle's data (1160 Pokémon and forms through Gen 9,
+  names in German, French, Japanese and Korean), hint pictures, rules,
+  search filters and streak titles are kept; `game.js` and `index.html`
+  replace its pages and scripts. The Daily is the same for everyone on a
+  local date: day 1 is 29 October 2026, and each day takes the next
+  Pokémon of a fixed Mulberry32 shuffle of the 1008 Pokémon in their usual
+  form (no Mega, regional or alternate forms), so it needs no server and
+  repeats only after 1008 days. Free play picks any entry from the
+  generations chosen, with Squirdle's guess counts (5 to 8). Tapping a
+  suggestion makes the guess, and the car's keyboard closes so the new row
+  shows. Progress, the streak and the chosen name language are kept in
+  localStorage (cookies don't stay in the hub's cross-site iframe). The
+  result is shared by QR code: `share.html` on the phone gets the squares
+  in its #fragment (never the Pokémon) and offers Share, Copy and Post on
+  X. A Daily's shared generation square doesn't say higher or lower, as in
+  Squirdle. LICENSE and NOTICE (what changed) are in the folder.
 - `apps/puzzles`: Logic Puzzles. Simon Tatham's Portable Puzzle Collection
   (MIT), all 40 puzzles, built by `npm run build:puzzles`
   (`tools/build-puzzles.mjs`: a fixed upstream commit plus
