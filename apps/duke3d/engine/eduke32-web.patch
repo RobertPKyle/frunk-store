@@ -1,3 +1,19 @@
+diff --git a/source/audiolib/src/driver_sdl.cpp b/source/audiolib/src/driver_sdl.cpp
+index 9987a83..b020dc6 100644
+--- a/source/audiolib/src/driver_sdl.cpp
++++ b/source/audiolib/src/driver_sdl.cpp
+@@ -181,6 +181,11 @@ int SDLDrv_PCM_Init(int *mixrate, int *numchannels, void * initdata)
+ #ifdef __ANDROID__
+     chunksize = droidinfo.audio_buffer_size;
+ #endif
++#ifdef __EMSCRIPTEN__
++    // [frunk] The page's main thread mixes each slice between the game's
++    // frames; slices of 512 (11 ms) crackle on a slow CPU
++    chunksize = 2048;
++#endif
+ 
+     SDL_AudioSpec spec = {};
+ 
 diff --git a/source/build/include/baselayer.h b/source/build/include/baselayer.h
 index 4412b6e..9dfc82d 100644
 --- a/source/build/include/baselayer.h

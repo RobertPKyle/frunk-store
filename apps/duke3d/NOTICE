@@ -28,7 +28,8 @@ Engine (engine/)
   The changes: the game waits for the page between frames (JSPI) and draws
   once per screen refresh, controllers and touch handed in by the page,
   saving and loading "Continue" from the page, windows smaller than
-  640x400, the classic software renderer only, and no network play.
+  640x400, sound mixed in bigger slices, the classic software renderer
+  only, and no network play.
   The idea of letting the game's loops wait for the browser came from
   Gawen Arab's EDuke32 WebAssembly work
   (https://voidpoint.io/terminx/eduke32/-/merge_requests/365).

@@ -418,9 +418,12 @@ clear them to make room.
   lines (or 540 with Sharp graphics) to fill the screen under the bar; the
   patch lets windows go below EDuke32's 640x400 minimum. Settings go in
   eduke32.cfg (window, the parental lock) and autoexec.cfg (always run,
-  mouse look). Measured with the CPU slowed 4.5x: 60 fps, about 230 ms of
-  main-thread work a second at 384x270 and 310 at 772x540. Not yet tried
-  in the car.
+  mouse look). Sound is mixed on the main thread (SDL's ScriptProcessorNode)
+  in 2048-sample slices into an AudioContext made at the game's 48 kHz:
+  EDuke32's 512 (11 ms) stalled about twice a second with the CPU slowed
+  4.5x, and the sound broke up. Measured with the CPU slowed 4.5x: 60 fps,
+  about 230 ms of main-thread work a second at 384x270 and 310 at 772x540.
+  Not yet tried in the car.
 - `apps/openttd`: OpenTTD 15.3 (GPL-2.0), compiled to WebAssembly by
   `npm run build:openttd` (`tools/build-openttd.mjs`: the 15.3 tag plus
   `tools/openttd/openttd-web.patch`, built with upstream's own Emscripten

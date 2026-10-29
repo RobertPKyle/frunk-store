@@ -438,8 +438,10 @@ async function play(game, btn, resume) {
   if (starting || duke) return;
   starting = true;
   btn?.classList.add('busy');
-  // Made inside the tap, so the browser lets it play
-  try { audio = new AudioContext(); } catch { audio = null; }
+  // Made inside the tap, so the browser lets it play. At the game's own
+  // 48 kHz: the browser converts it for the speakers off the main thread,
+  // where SDL would otherwise do it between the game's frames.
+  try { audio = new AudioContext({ sampleRate: 48000 }); } catch { audio = null; }
   if (audio && !settings.get('sound', true)) audio.suspend();
   try {
     loading(game.title, 'Loading…', 0);
