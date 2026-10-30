@@ -1808,6 +1808,8 @@ await check('command & conquer plays a mission by touch, saves it, keeps the sav
   }));
   if (!saves.length) throw new Error('no saved game kept');
   // Red Alert starts and runs, with its blocks kept apart from C&C's
+  // (the reloaded page shows its buttons a moment before cnc.js wires them)
+  await frame().waitForFunction(() => document.getElementById('playRa').onclick);
   await app.locator('#playRa').evaluate(b => b.click());
   await app.locator('#player').waitFor({ timeout: 120000 });
   await until('red alert frames', async () => (await stats()).frames > 120, 60000);
