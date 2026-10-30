@@ -424,6 +424,39 @@ clear them to make room.
   4.5x, and the sound broke up. Measured with the CPU slowed 4.5x: 60 fps,
   about 230 ms of main-thread work a second at 384x270 and 310 at 772x540.
   Not yet tried in the car.
+- `apps/cnc`: Command & Conquer. Tiberian Dawn and Red Alert on Vanilla
+  Conquer (the engines from EA's 2020 source release, GPL-3.0 with EA's
+  additional terms), compiled to WebAssembly by `npm run build:cnc`
+  (`tools/build-cnc.mjs`: a pinned upstream commit plus
+  `tools/cnc/vanilla-conquer-web.patch`, whose `web/build.sh` builds both
+  games with Emscripten 4.0.10 and CMake 3.31 in Docker,
+  `tools/cnc/Dockerfile`; the patched source ships next to the engines in
+  `apps/cnc/engine/`). The same script downloads EA's freeware discs from
+  archive.org (C&C's GDI and Nod discs, Red Alert's Allied disc in EA's
+  .rar, unpacked with Debian's unrar in Docker), checks their MD5 and
+  SHA-256, and takes the games' files out unchanged
+  (`tools/cnc/westwood.mjs` reads ISO 9660, InstallShield 3 archives with
+  their PKWARE implode streams, and Red Alert's MIX archives, whose
+  encrypted index it opens with Westwood's public RSA key and Blowfish).
+  The cutscene videos are left out. Each game's files are packed by
+  `tools/supertux/pack.mjs` into 1 MB blocks (`apps/cnc/data/td/`,
+  `data/ra/`), loaded as SuperTux's are: fd_read suspends the game (JSPI)
+  until a block comes from memory, IndexedDB (database `cnc`) or the
+  network, and the files the game reads while starting
+  (`tools/cnc/boot-*.txt`) come first. Engine, data and source aren't in
+  git, so run the build before deploying `apps`. C&C's two discs each hold
+  their side's missions in GENERAL.MIX, so those go in `gdi/` and `nod/`,
+  where the game looks for each disc's files; Red Alert's disc has both
+  campaigns, and the patch drops its CD check. The page writes the games'
+  INI settings (a 640x400 window, no raw mouse, no intro) and mounts
+  their saves from IndexedDB (IDBFS). Touch goes to the game as mouse
+  events on the canvas: a tap clicks, one finger draws a selection box,
+  two fingers move the map (`web_scroll`, taken by each game's
+  ScrollClass), a held finger right-clicks; Keyboard focuses a hidden
+  field so the car's keyboard types into the game (`web_key`), and a save
+  left unnamed is named for the date and time. Measured with the CPU
+  slowed 4.5x: 60 fps, 230 to 270 ms of main-thread work a second in the
+  first missions of both games. Not yet tried in the car.
 - `apps/openttd`: OpenTTD 15.3 (GPL-2.0), compiled to WebAssembly by
   `npm run build:openttd` (`tools/build-openttd.mjs`: the 15.3 tag plus
   `tools/openttd/openttd-web.patch`, built with upstream's own Emscripten

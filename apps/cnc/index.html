@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Command &amp; Conquer</title>
+<style>
+  :root { --bg: #0d0f0a; --panel: #171a12; --card: #20251a; --line: rgba(210, 220, 160, .16); --text: #f1f2e6; --muted: #a8ad94;
+          --accent: #e8b23a; --accent2: #c2412d; --danger: #d9694a; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 16px/1.4 system-ui, sans-serif; overflow: hidden;
+               -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; touch-action: none; }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  .btn { min-height: 44px; padding: 8px 16px; border-radius: 12px; background: var(--card); border: 1px solid var(--line); white-space: nowrap; }
+  .btn.primary { background: var(--accent); border-color: transparent; color: #1d1503; font-weight: 700; }
+  .btn.armed { background: var(--danger); border-color: transparent; color: #fff; }
+  .btn.on { background: var(--accent2); border-color: transparent; color: #fff; }
+  .btn:disabled { opacity: .5; cursor: default; }
+  [hidden] { display: none !important; }
+
+  /* ---------- start ---------- */
+  #start { display: flex; flex-direction: column; height: 100%; }
+  /* left padding keeps clear of the hub's Apps button */
+  header { display: flex; align-items: center; gap: 10px; min-height: 60px; padding: 8px 12px 8px 110px; border-bottom: 1px solid var(--line); }
+  header h1 { margin: 0; font-size: 18px; font-weight: 600; flex: 1; }
+  .scroll { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 14px 16px 20px; touch-action: pan-y; }
+  .games { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; max-width: 980px; }
+  .game { display: flex; flex-direction: column; gap: 10px; padding: 16px; border-radius: 16px; background: var(--panel); border: 1px solid var(--line); }
+  .game h2 { margin: 0; font-size: 20px; color: var(--text); letter-spacing: 0; text-transform: none; }
+  .game p { margin: 0; color: #d9dcc8; }
+  .game .note { margin: 0; }
+  h2 { margin: 18px 2px 8px; font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .note { font-size: 13px; color: var(--muted); margin: 6px 2px; max-width: 60em; }
+  #status:empty { display: none; }
+  #status { margin: 12px 2px 0; color: var(--text); }
+  .legal { margin-top: 18px; font-size: 12px; color: var(--muted); user-select: text; -webkit-user-select: text; max-width: 60em; }
+  .legal p { margin: 4px 0; }
+  .legal a { color: var(--muted); }
+
+  /* ---------- overlays ---------- */
+  .overlay { position: fixed; inset: 0; z-index: 5; display: grid; place-items: center; padding: 64px 16px 16px; background: rgba(6, 8, 4, .9); }
+  .sheet { display: flex; flex-direction: column; max-width: 560px; padding: 18px; border-radius: 18px; background: var(--panel); border: 1px solid var(--line); }
+  .sheet h2 { margin: 0 0 8px; font-size: 19px; color: var(--text); letter-spacing: 0; text-transform: none; }
+  .sheet p { margin: 0 0 10px; font-size: 15px; color: #d9dcc8; overflow-wrap: anywhere; }
+
+  /* ---------- loading ---------- */
+  #loading { position: fixed; inset: 0; z-index: 4; display: grid; place-content: center; gap: 14px; text-align: center; background: var(--bg); padding: 16px; }
+  #loading b { font-size: 20px; }
+  #loadText { color: var(--muted); font-size: 15px; }
+  progress { width: min(320px, 80vw); height: 8px; accent-color: var(--accent); }
+
+  /* ---------- player ---------- */
+  #player { position: fixed; inset: 0; display: grid; grid-template-rows: 60px minmax(0, 1fr); grid-template-columns: minmax(0, 1fr); background: #000; }
+  .bar { display: flex; align-items: center; gap: 8px; padding: 8px 10px 8px 110px; background: var(--panel); border-bottom: 1px solid var(--line); }
+  .bar b { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #wait { font-size: 13px; color: var(--muted); white-space: nowrap; }
+  .screen { position: relative; min-height: 0; min-width: 0; overflow: hidden; }
+  /* the canvas must have no border or padding, or the clicks land off; fit() sizes it */
+  #canvas { position: absolute; display: block; border: 0; padding: 0; background: #000; outline: none; image-rendering: pixelated; }
+  #canvas.smooth { image-rendering: auto; }
+  /* touches land here and go to the game as mouse clicks and drags */
+  #touch { position: absolute; inset: 0; }
+  /* focused to bring up the car's keyboard; what's typed goes to the game */
+  #kbd { position: absolute; left: 0; bottom: 0; width: 1px; height: 1px; opacity: 0; border: 0; padding: 0; }
+
+  @media (max-width: 640px) {
+    .bar .btn { padding: 8px 10px; }
+  }
+</style>
+</head>
+<body>
+<section id="start">
+  <header>
+    <h1>Command &amp; Conquer</h1>
+  </header>
+  <div class="scroll">
+    <div class="games">
+      <div class="game">
+        <h2>Tiberian Dawn</h2>
+        <p>The 1995 original: lead GDI or the Brotherhood of Nod in the war over Tiberium. Both campaigns, plus skirmish battles against the computer, with the music and EVA's voice.</p>
+        <div class="row">
+          <button class="btn primary" id="playTd" type="button">Play</button>
+          <span class="note" id="keptTd"></span>
+        </div>
+      </div>
+      <div class="game">
+        <h2>Red Alert</h2>
+        <p>The 1996 prequel: the Allies against the Soviet Union in an alternate Second World War. Both campaigns, plus skirmish battles against the computer, with Frank Klepacki's soundtrack.</p>
+        <div class="row">
+          <button class="btn primary" id="playRa" type="button">Play</button>
+          <span class="note" id="keptRa"></span>
+        </div>
+      </div>
+    </div>
+    <p class="note" id="status" aria-live="polite"></p>
+
+    <h2>Controls</h2>
+    <p class="note">Tap to select and give orders, as with a mouse click. Drag one finger to draw a box around units. Drag two fingers to move the map, or tap the radar. Hold a finger still for a moment for a right click (it deselects). The Deselect button does the same. Keyboard brings up the car's keyboard, for naming saved games and the game's keyboard shortcuts; a save left unnamed is named for the date and time. The sidebar on the right builds; tap the game's Options button at the top for saving, loading and settings. A mouse and keyboard work too.</p>
+
+    <h2>Game data</h2>
+    <div class="row">
+      <button class="btn" id="all" type="button">Download everything</button>
+      <button class="btn" id="forget" type="button">Remove</button>
+    </div>
+    <p class="note">Tiberian Dawn is about 60 MB and Red Alert about 110 MB, most of it music. Each downloads what it needs as you play and keeps it on the car for next time. Download everything first if you'll be somewhere without a connection. The cutscene videos aren't included.</p>
+
+    <div class="legal">
+      <p>Unofficial port, not affiliated with or endorsed by Electronic Arts. Command &amp; Conquer and Red Alert are trademarks of Electronic Arts Inc. The games' files are from EA's freeware releases (Command &amp; Conquer Gold in 2007, Red Alert in 2008), unchanged, without the cutscene videos; Command &amp; Conquer and Red Alert &copy; 1995, 1996 Westwood Studios / Electronic Arts. EA's license for the Red Alert freeware is in <a href="data/ra-EA-EULA.rtf" target="_blank">ra-EA-EULA.rtf</a>; the games' readmes: <a href="data/td-README.WRI" target="_blank">C&amp;C</a>, <a href="data/ra-README.TXT" target="_blank">Red Alert</a>.</p>
+      <p>Engine: Vanilla Conquer by The Assembly Armada and contributors, from the source code Electronic Arts released for the C&amp;C Remastered Collection, under the GNU GPL version 3 with EA's additional terms (<a href="engine/License.txt" target="_blank">License.txt</a>). This is a modified version: compiled to WebAssembly with changes for the browser in <a href="engine/vanilla-conquer-web.patch" target="_blank">vanilla-conquer-web.patch</a>, built by tools/build-cnc.mjs in github.com/RobertPKyle/frunk-store; source: <a href="engine/vanilla-conquer-ce83b59-web-src.tar.gz">vanilla-conquer-ce83b59-web-src.tar.gz</a>. See <a href="NOTICE" target="_blank">/cnc/NOTICE</a>.</p>
+      <p>Play only while parked.</p>
+    </div>
+  </div>
+</section>
+
+<section id="loading" hidden aria-live="polite">
+  <b id="loadTitle">Command &amp; Conquer</b>
+  <span id="loadText"></span>
+  <progress id="loadBar" max="1" value="0" hidden></progress>
+</section>
+
+<section id="failed" class="overlay" hidden aria-labelledby="failedTitle">
+  <div class="sheet">
+    <h2 id="failedTitle">The game stopped</h2>
+    <p id="failedText"></p>
+    <div class="row"><button class="btn primary" id="failedOk" type="button">Start again</button></div>
+  </div>
+</section>
+
+<section id="player" hidden>
+  <div class="bar">
+    <b id="title">Command &amp; Conquer</b>
+    <span id="wait" hidden>Loading…</span>
+    <button class="btn" id="deselectBtn" type="button">Deselect</button>
+    <button class="btn" id="keysBtn" type="button">Keyboard</button>
+    <button class="btn" id="smoothBtn" type="button">Sharp</button>
+    <button class="btn" id="soundBtn" type="button">Sound on</button>
+    <button class="btn" id="quitBtn" type="button">Quit</button>
+  </div>
+  <div class="screen" id="screen">
+    <canvas id="canvas" tabindex="-1" oncontextmenu="event.preventDefault()"></canvas>
+    <div id="touch"></div>
+    <input id="kbd" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="Type into the game">
+  </div>
+</section>
+
+<script type="module" src="cnc.js"></script>
+<script src="/sw-register.js"></script>
+</body>
+</html>

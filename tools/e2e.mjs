@@ -1757,6 +1757,65 @@ await check('supertux streams its data, starts the story by touch, saves when le
   await app.locator('#start').waitFor({ timeout: 10000 });
 });
 
+await check('command & conquer plays a mission by touch, saves it, keeps the save, and red alert starts', async () => {
+  await openFromHub(/Command & Conquer/);
+  const frame = () => page.frames().find(f => f.url().includes('/cnc/'));
+  const app = appFrame();
+  const stats = () => frame().evaluate(() => window.cncStats());
+  const until = async (what, fn, ms = 30000) => {
+    for (const t = Date.now(); Date.now() - t < ms; await page.waitForTimeout(250)) if (await fn()) return;
+    throw new Error(`no ${what}; game log: ${(await frame().evaluate(() => window.cncLog.slice(-3).join(' | '))) || 'empty'}`);
+  };
+  const cdp = await page.context().newCDPSession(page);
+  const touch = (type, points) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: points.map(([x, y], id) => ({ x, y, id })) });
+  // A tap at a place on the game's 640x400 screen, as fractions of it
+  const tap = async (fx, fy, wait) => {
+    const b = await app.locator('#canvas').boundingBox();
+    await touch('touchStart', [[b.x + b.width * fx, b.y + b.height * fy]]);
+    await page.waitForTimeout(80);
+    await touch('touchEnd', []);
+    await page.waitForTimeout(wait);
+  };
+  await app.locator('#playTd').click();
+  await app.locator('#player').waitFor({ timeout: 120000 });
+  await until('frames', async () => (await stats()).frames > 60);
+  // Every file the main menu reads came with the first download
+  const boot = await stats();
+  if (boot.waits) throw new Error(`the main menu waited for data ${boot.waits} times`);
+  await page.waitForTimeout(2000);
+  // Start New Game, OK on the difficulty, GDI: the first mission
+  await tap(0.5, 0.146, 2000);
+  await tap(0.78, 0.6, 3000);
+  await tap(0.25, 0.5, 10000);
+  // Options, Save Mission, Save (without a name: named for the time)
+  await tap(0.15, 0.02, 2000);
+  await tap(0.5, 0.427, 2000);
+  await tap(0.415, 0.81, 3000);
+  if (!(await app.locator('#failed').isHidden())) throw new Error(await app.locator('#failedText').textContent());
+  await page.screenshot({ path: shots + 'cnc.png' });
+  // Quit writes the saves to IndexedDB (IDBFS) and goes back to the start
+  // (a script click: after a screenshot, headless Chrome's clicks miss in the frame)
+  await app.locator('#quitBtn').evaluate(b => b.click());
+  await app.locator('#start').waitFor({ timeout: 10000 });
+  const saves = await frame().evaluate(() => new Promise(resolve => {
+    const req = indexedDB.open('/home/web_user/.config/vanilla-conquer');
+    req.onsuccess = () => {
+      if (!req.result.objectStoreNames.contains('FILE_DATA')) { req.result.close(); return resolve([]); }
+      const get = req.result.transaction('FILE_DATA').objectStore('FILE_DATA').getAllKeys();
+      get.onsuccess = () => { req.result.close(); resolve(get.result.filter(k => /vanillatd\/savegame\.\d+$/i.test(k))); };
+    };
+    req.onerror = () => resolve([]);
+  }));
+  if (!saves.length) throw new Error('no saved game kept');
+  // Red Alert starts and runs, with its blocks kept apart from C&C's
+  await app.locator('#playRa').evaluate(b => b.click());
+  await app.locator('#player').waitFor({ timeout: 120000 });
+  await until('red alert frames', async () => (await stats()).frames > 120, 60000);
+  if ((await stats()).game !== 'ra') throw new Error('not red alert');
+  await app.locator('#quitBtn').evaluate(b => b.click());
+  await app.locator('#start').waitFor({ timeout: 10000 });
+});
+
 await check('librequake plays with touch and a controller and resumes from its autosave', async () => {
   await openFromHub(/LibreQuake/);
   const frame = () => page.frames().find(f => f.url().includes('/quake/'));

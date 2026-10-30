@@ -1,0 +1,442 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 8d094fa..7e24da6 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -139,7 +139,12 @@ if(SDL1)
+     set(SDL2 OFF)
+ endif()
+ 
+-if(SDL2)
++if(SDL2 AND EMSCRIPTEN)
++    # [frunk] Emscripten's own SDL2 port
++    add_compile_options(-sUSE_SDL=2)
++    add_link_options(-sUSE_SDL=2)
++    set(DDRAW OFF)
++elseif(SDL2)
+     message("Find path is ${CMAKE_FIND_ROOT_PATH}")
+     find_package(SDL2 REQUIRED)
+     list(APPEND VANILLA_LIBS ${SDL2_LIBRARY})
+@@ -152,7 +157,12 @@ if(SDL2)
+     set(DDRAW OFF)
+ endif()
+ 
+-if(OPENAL)
++if(OPENAL AND EMSCRIPTEN)
++    # [frunk] Emscripten's OpenAL, on Web Audio
++    include_directories(${EMSCRIPTEN_SYSROOT}/include/AL)
++    list(APPEND VANILLA_LIBS openal)
++    set(DSOUND OFF)
++elseif(OPENAL)
+     find_package(OpenAL REQUIRED)
+     list(APPEND VANILLA_LIBS OpenAL::OpenAL)
+     set(DSOUND OFF)
+diff --git a/common/CMakeLists.txt b/common/CMakeLists.txt
+index eada872..024e8c4 100644
+--- a/common/CMakeLists.txt
++++ b/common/CMakeLists.txt
+@@ -155,6 +155,11 @@ if(DSOUND OR DDRAW)
+     list(APPEND VANILLA_LIBS dxguid)
+ endif()
+ 
++if(EMSCRIPTEN)
++    # [frunk] the browser side of the engine
++    list(APPEND COMMONV_SRC webhost.cpp)
++endif()
++
+ if(NETWORKING)
+     list(APPEND COMMONV_SRC
+         connect.cpp
+diff --git a/common/framelimit.cpp b/common/framelimit.cpp
+index 2a46e07..c93e3f6 100644
+--- a/common/framelimit.cpp
++++ b/common/framelimit.cpp
+@@ -15,8 +15,19 @@ extern WWMouseClass* WWMouse;
+ void Video_Render_Frame();
+ #endif
+ 
++#ifdef __EMSCRIPTEN__
++void webWaitFrame();
++#endif
++
+ void Frame_Limiter(FrameLimitFlags flags)
+ {
++#ifdef __EMSCRIPTEN__
++    // [frunk] the browser paces frames: draw, then wait for the screen's next
++    // refresh (the page resolves it), whatever the flags say
++    Video_Render_Frame();
++    webWaitFrame();
++    return;
++#endif
+     static auto frame_start = std::chrono::steady_clock::now();
+ #ifdef NEW_VIDEO_BUILD
+     static auto render_avg = 0;
+diff --git a/common/mssleep.h b/common/mssleep.h
+index eb1f8eb..e07ac06 100644
+--- a/common/mssleep.h
++++ b/common/mssleep.h
+@@ -10,6 +10,8 @@
+ #include <winbase.h>
+ #elif defined(_WIN32)
+ #include <synchapi.h>
++#elif defined(__EMSCRIPTEN__)
++#include <emscripten.h>
+ #else /* Assuming recent posix*/
+ #ifndef __USE_POSIX199309
+ #define __USE_POSIX199309 1
+@@ -27,6 +29,9 @@ static inline void us_sleep(unsigned us)
+ {
+ #ifdef _WIN32
+     Sleep((us + 999) / 1000);
++#elif defined(__EMSCRIPTEN__)
++    // [frunk] lets the page run meanwhile (JSPI)
++    emscripten_sleep((us + 999) / 1000);
+ #else
+     struct timespec ts;
+     ts.tv_sec = us / 1000000;
+@@ -42,6 +47,9 @@ static inline void ms_sleep(unsigned ms)
+ {
+ #ifdef _WIN32
+     Sleep(ms);
++#elif defined(__EMSCRIPTEN__)
++    // [frunk] lets the page run meanwhile (JSPI)
++    emscripten_sleep(ms);
+ #else
+     struct timespec ts;
+     ts.tv_sec = ms / 1000;
+diff --git a/common/paths_posix.cpp b/common/paths_posix.cpp
+index 195e6f4..2a2274b 100644
+--- a/common/paths_posix.cpp
++++ b/common/paths_posix.cpp
+@@ -128,7 +128,10 @@ const char* PathsClass::Program_Path()
+         std::string tmp;
+         char buffer[PATH_MAX];
+         char* resolved = nullptr;
+-#if defined(__linux__) || defined(__CYGWIN__) || defined(__sun)
++#if defined(__EMSCRIPTEN__)
++        // [frunk] the page puts the game's files in /game
++        resolved = strcpy(buffer, "/game/vanilla");
++#elif defined(__linux__) || defined(__CYGWIN__) || defined(__sun)
+         resolved = realpath(PROC_SELF_EXE, buffer);
+ #elif defined(__APPLE__)
+         char buffer1[PATH_MAX];
+diff --git a/common/webhost.cpp b/common/webhost.cpp
+new file mode 100644
+index 0000000..5280ade
+--- /dev/null
++++ b/common/webhost.cpp
+@@ -0,0 +1,75 @@
++// [frunk] The browser side of the engine, for frunk.store's Command &
++// Conquer page (apps/cnc in github.com/RobertPKyle/frunk-store).
++//
++// The game's loops run as they do natively, inside main(); with JSPI, main
++// waits for the page between frames (webWaitFrame, one per screen refresh)
++// and, in loops that only poll the keyboard, every so often (webYield), so
++// the page stays responsive. Functions the page calls (web_*) must never
++// wait: they run while main is waiting.
++
++#ifdef __EMSCRIPTEN__
++
++#include <SDL.h>
++#include <emscripten.h>
++
++// Resolved by the page on its next animation frame
++EM_ASYNC_JS(void, webWaitFrameJS, (void), { await Module.webFrame(); });
++
++static double webLastWait;
++static int webFrameCount;
++
++void webWaitFrame()
++{
++    webFrameCount++;
++    webWaitFrameJS();
++    webLastWait = emscripten_get_now();
++}
++
++// A loop that polls the keyboard without drawing waits a frame now and then
++void webYield()
++{
++    if (emscripten_get_now() - webLastWait < 16) {
++        return;
++    }
++    webWaitFrameJS();
++    webLastWait = emscripten_get_now();
++}
++
++// Finger drags on the page, in game pixels, until the map takes them
++static int webScrollX, webScrollY;
++
++bool webTakeScroll(int& dx, int& dy)
++{
++    dx = webScrollX;
++    dy = webScrollY;
++    webScrollX = webScrollY = 0;
++    return dx || dy;
++}
++
++extern "C" {
++
++EMSCRIPTEN_KEEPALIVE int web_frames(void)
++{
++    return webFrameCount;
++}
++
++// A key, by SDL scancode, as if from the keyboard
++EMSCRIPTEN_KEEPALIVE void web_key(int scancode, int down)
++{
++    SDL_Event ev = {};
++    ev.type = down ? SDL_KEYDOWN : SDL_KEYUP;
++    ev.key.state = down ? SDL_PRESSED : SDL_RELEASED;
++    ev.key.keysym.scancode = (SDL_Scancode)scancode;
++    ev.key.keysym.sym = SDL_GetKeyFromScancode((SDL_Scancode)scancode);
++    SDL_PushEvent(&ev);
++}
++
++// Moves the map by this many game pixels (a finger dragging it)
++EMSCRIPTEN_KEEPALIVE void web_scroll(int dx, int dy)
++{
++    webScrollX += dx;
++    webScrollY += dy;
++}
++}
++
++#endif
+diff --git a/common/wwkeyboard_sdl2.cpp b/common/wwkeyboard_sdl2.cpp
+index 30f1745..46f3d48 100644
+--- a/common/wwkeyboard_sdl2.cpp
++++ b/common/wwkeyboard_sdl2.cpp
+@@ -29,8 +29,16 @@ WWKeyboardClassSDL2::~WWKeyboardClassSDL2()
+ {
+ }
+ 
++#ifdef __EMSCRIPTEN__
++void webYield();
++#endif
++
+ void WWKeyboardClassSDL2::Fill_Buffer_From_System(void)
+ {
++#ifdef __EMSCRIPTEN__
++    // [frunk] loops that wait on the keyboard without drawing let the page run
++    webYield();
++#endif
+ #ifdef NETWORKING
+     Process_Network();
+ #endif
+diff --git a/common/wwstd.h b/common/wwstd.h
+index 5e41f06..4f3f494 100644
+--- a/common/wwstd.h
++++ b/common/wwstd.h
+@@ -260,6 +260,7 @@ inline static void _splitpath(const char* path, char* drive, char* dir, char* fn
+     }
+ }
+ 
++#ifndef __EMSCRIPTEN__ // [frunk] Emscripten's string.h has strupr
+ inline static char* strupr(char* str)
+ {
+     char* ret = str;
+@@ -269,6 +270,7 @@ inline static char* strupr(char* str)
+     }
+     return ret;
+ }
++#endif
+ 
+ inline static void strrev(char* str)
+ {
+diff --git a/redalert/conquer.cpp b/redalert/conquer.cpp
+index 4825ba4..594a4b6 100644
+--- a/redalert/conquer.cpp
++++ b/redalert/conquer.cpp
+@@ -3806,6 +3806,14 @@ static bool Change_Local_Dir(int cd)
+ 
+ bool Force_CD_Available(int cd_desired) //	ajw
+ {
++#ifdef __EMSCRIPTEN__
++    /*
++    ** [frunk] The page has every file the game reads in /game, from one disc
++    ** (its GENERAL.MIX has both campaigns' missions) and without MAIN.MIX,
++    ** whose archives are there on their own.
++    */
++    return true;
++#endif
+     /*
+     ** If the required CD is set to -2 then it means that the file is present
+     ** on the local hard drive and we shouldn't have to worry about it.
+diff --git a/redalert/loaddlg.cpp b/redalert/loaddlg.cpp
+index 5b54a2d..62b0527 100644
+--- a/redalert/loaddlg.cpp
++++ b/redalert/loaddlg.cpp
+@@ -40,6 +40,7 @@
+  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+ 
+ #include "function.h"
++#include <time.h>
+ #include "msgbox.h"
+ #include "edit.h"
+ #include "drop.h"
+@@ -453,6 +454,16 @@ int LoadOptionsClass::Process(void)
+         case (BUTTON_EDIT | KN_BUTTON):
+ 
+         case (BUTTON_SAVE | KN_BUTTON):
++#ifdef __EMSCRIPTEN__
++            /*
++            ** [frunk] There may be no keyboard to type a name with: a save
++            ** without one is named for when it was made.
++            */
++            if (!strlen(game_descr)) {
++                time_t now = time(NULL);
++                strftime(game_descr, sizeof(game_descr), "%b %d %H:%M", localtime(&now));
++            }
++#endif
+             if (!strlen(game_descr)) {
+                 WWMessageBox().Process(TXT_MUSTENTER_DESCRIPTION);
+                 firsttime = true;
+diff --git a/redalert/scroll.cpp b/redalert/scroll.cpp
+index 5c063b8..8ba830d 100644
+--- a/redalert/scroll.cpp
++++ b/redalert/scroll.cpp
+@@ -37,6 +37,11 @@
+ 
+ #include "function.h"
+ 
++#ifdef __EMSCRIPTEN__
++#include <math.h>
++bool webTakeScroll(int& dx, int& dy);
++#endif
++
+ #define SCROLL_DELAY 1
+ 
+ CDTimerClass<SystemTimerClass> ScrollClass::Counter;
+@@ -106,6 +111,17 @@ void ScrollClass::AI(KeyNumType& input, int x, int y)
+         }
+ #endif
+ 
++#ifdef __EMSCRIPTEN__
++        /*
++        ** [frunk] Finger drags on the page pan the map, pixel for pixel.
++        */
++        int web_dx, web_dy;
++        if (webTakeScroll(web_dx, web_dy)) {
++            int web_distance = int(sqrt(double(web_dx * web_dx + web_dy * web_dy)) * ICON_LEPTON_W / ICON_PIXEL_W);
++            Scroll_Map((DirType)Desired_Facing256(0, 0, web_dx, web_dy), web_distance, true);
++        }
++#endif
++
+         if (!noscroll) {
+             bool at_screen_edge = (y == 0 || x == 0 || x >= SeenBuff.Get_Width() - 1 || y >= SeenBuff.Get_Height() - 1);
+ 
+diff --git a/tiberiandawn/init.cpp b/tiberiandawn/init.cpp
+index 8ae9955..928e0d9 100644
+--- a/tiberiandawn/init.cpp
++++ b/tiberiandawn/init.cpp
+@@ -48,6 +48,7 @@
+ #include "common/paths.h"
+ #include "common/winasm.h"
+ #include <time.h>
++#include <strings.h>
+ 
+ /****************************************
+ **	Function prototypes for this module **
+@@ -352,6 +353,16 @@ bool Init_Game(int, char*[])
+         found = Find_First(scan_path, 0, &ffd);
+         while (found) {
+             char* ptr = (char*)ffd->GetName();
++#ifdef __EMSCRIPTEN__
++            /*
++            ** [frunk] SCORES.MIX matches "sc*.mix" too, which is meant for
++            ** scenario packs: don't load all the music at start.
++            */
++            if (strcasecmp(ptr, "SCORES.MIX") == 0) {
++                found = Find_Next(ffd);
++                continue;
++            }
++#endif
+             new MFCD(ptr);
+             MFCD::Cache(ptr);
+             found = Find_Next(ffd);
+diff --git a/tiberiandawn/loaddlg.cpp b/tiberiandawn/loaddlg.cpp
+index f205eb1..1313c2d 100644
+--- a/tiberiandawn/loaddlg.cpp
++++ b/tiberiandawn/loaddlg.cpp
+@@ -40,6 +40,7 @@
+  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+ 
+ #include "function.h"
++#include <time.h>
+ #include "loaddlg.h"
+ #include "common/file.h"
+ #include "common/framelimit.h"
+@@ -421,6 +422,16 @@ int LoadOptionsClass::Process(void)
+         ** Save: Save the game & exit the dialog
+         */
+         case (BUTTON_SAVE | KN_BUTTON):
++#ifdef __EMSCRIPTEN__
++            /*
++            ** [frunk] There may be no keyboard to type a name with: a save
++            ** without one is named for when it was made.
++            */
++            if (!strlen(game_descr)) {
++                time_t now = time(NULL);
++                strftime(game_descr, sizeof(game_descr), "%b %d %H:%M", localtime(&now));
++            }
++#endif
+             if (!strlen(game_descr)) {
+                 WWMessageBox().Process(TXT_MUSTENTER_DESCRIPTION);
+                 firsttime = true;
+diff --git a/tiberiandawn/scroll.cpp b/tiberiandawn/scroll.cpp
+index 596a8f7..5ef8393 100644
+--- a/tiberiandawn/scroll.cpp
++++ b/tiberiandawn/scroll.cpp
+@@ -37,6 +37,11 @@
+ 
+ #include "function.h"
+ 
++#ifdef __EMSCRIPTEN__
++#include <math.h>
++bool webTakeScroll(int& dx, int& dy);
++#endif
++
+ #define SCROLL_DELAY 1
+ 
+ CountDownTimerClass ScrollClass::Counter;
+@@ -110,6 +115,17 @@ void ScrollClass::AI(KeyNumType& input, int x, int y)
+         }
+ #endif
+ 
++#ifdef __EMSCRIPTEN__
++        /*
++        ** [frunk] Finger drags on the page pan the map, pixel for pixel.
++        */
++        int web_dx, web_dy;
++        if (webTakeScroll(web_dx, web_dy)) {
++            int web_distance = int(sqrt(double(web_dx * web_dx + web_dy * web_dy)) * ICON_LEPTON_W / ICON_PIXEL_W);
++            Scroll_Map((DirType)Desired_Facing256(0, 0, web_dx, web_dy), web_distance, true);
++        }
++#endif
++
+         if (!noscroll) {
+ 
+             /*
+diff --git a/web/build.sh b/web/build.sh
+new file mode 100755
+index 0000000..cb80a5e
+--- /dev/null
++++ b/web/build.sh
+@@ -0,0 +1,19 @@
++#!/bin/sh
++# [frunk] Builds Vanilla Conquer's Tiberian Dawn and Red Alert for the
++# browser with Emscripten 4.0.10, from the top of the source tree:
++#   web/build.sh
++# Output: build-web/vanillatd.{js,wasm} and build-web/vanillara.{js,wasm},
++# for frunk.store's Command & Conquer page (apps/cnc in
++# github.com/RobertPKyle/frunk-store).
++#
++# SDL2 and OpenAL from Emscripten, no network play, and JSPI so the games'
++# own loops can wait for the page between frames (common/webhost.cpp).
++set -e
++git config --global --add safe.directory "$(pwd)" 2>/dev/null || true
++LINK="-g0 -sJSPI -sENVIRONMENT=web -sALLOW_MEMORY_GROWTH -sINITIAL_MEMORY=67108864 -sSTACK_SIZE=4194304 \
++  -sMODULARIZE -sEXPORT_ES6 -sEXPORT_NAME=createConquer -sINVOKE_RUN=0 -sEXIT_RUNTIME=1 -sFORCE_FILESYSTEM -lidbfs.js \
++  -sEXPORTED_RUNTIME_METHODS=FS,IDBFS,callMain,addRunDependency,removeRunDependency \
++  -sEXPORTED_FUNCTIONS=_main,_web_key,_web_scroll,_web_frames"
++emcmake cmake -S . -B build-web -DCMAKE_BUILD_TYPE=Release -DNETWORKING=OFF -DBUILD_TOOLS=OFF \
++  -DCMAKE_EXE_LINKER_FLAGS="$LINK" >/dev/null
++cmake --build build-web -j"$(nproc)" --target VanillaTD VanillaRA

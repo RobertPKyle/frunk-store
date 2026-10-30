@@ -252,6 +252,18 @@
       "added": "2026-10-29"
     },
     {
+      "id": "cnc",
+      "name": "Command & Conquer",
+      "tagline": "Command & Conquer and Red Alert, the 1995 and 1996 real-time strategy classics EA made free: both sides' campaigns and skirmish, by touch.",
+      "path": "/cnc/",
+      "icon": "/cnc/icon.svg",
+      "tags": [
+        "Game",
+        "Touch"
+      ],
+      "added": "2026-10-30"
+    },
+    {
       "id": "openttd",
       "name": "OpenTTD",
       "tagline": "Build a transport empire with trains, trucks, ships and planes. The open-source Transport Tycoon, made for touch.",

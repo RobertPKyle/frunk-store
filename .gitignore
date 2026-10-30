@@ -69,3 +69,8 @@ apps/duke3d/engine/eduke32.js
 apps/duke3d/engine/eduke32.wasm
 apps/duke3d/engine/*-web-src.tar.gz
 apps/duke3d/shareware/3dduke13SW.zip
+tools/.cnc-build
+apps/cnc/engine/vanilla*.js
+apps/cnc/engine/vanilla*.wasm
+apps/cnc/engine/*-web-src.tar.gz
+apps/cnc/data

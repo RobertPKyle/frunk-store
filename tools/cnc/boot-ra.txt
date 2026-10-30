@@ -1,0 +1,10 @@
+# Files Red Alert reads while it starts, in order
+[start]
+REDALERT.MIX
+CONQUER.MIX
+SOUNDS.MIX
+RUSSIAN.MIX
+ALLIES.MIX
+TEMPERAT.MIX
+SNOW.MIX
+INTERIOR.MIX

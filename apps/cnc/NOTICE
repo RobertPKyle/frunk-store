@@ -1,0 +1,64 @@
+Command & Conquer (apps/cnc)
+
+Unofficial port, not affiliated with or endorsed by Electronic Arts.
+Command & Conquer and Red Alert are trademarks of Electronic Arts Inc.
+
+Engine (engine/)
+  Vanilla Conquer, by The Assembly Armada and contributors, built from the
+  source code Electronic Arts released in 2020 with the Command & Conquer
+  Remastered Collection (TiberianDawn.dll and RedAlert.dll).
+  https://github.com/TheAssemblyArmada/Vanilla-Conquer, commit
+  ce83b59edd99cccac6cebaae054ca04962c744b7 (vanilla, 2026-07-16).
+  License: GNU General Public License, version 3, with Electronic Arts'
+  additional terms under its section 7 (engine/License.txt).
+
+  This is a modified version of the program. frunk.store's changes for the
+  browser are in engine/vanilla-conquer-web.patch (also
+  tools/cnc/vanilla-conquer-web.patch in
+  https://github.com/RobertPKyle/frunk-store, whose tools/build-cnc.mjs
+  builds it with Emscripten 4.0.10), each change marked "[frunk]". The
+  complete patched source the build came from, with its build script
+  (web/build.sh), is engine/vanilla-conquer-ce83b59-web-src.tar.gz.
+  The changes: the games wait for the page between frames (JSPI) and draw
+  once per screen refresh; the page's finger drags move the map; the game
+  files are read from /game; Red Alert doesn't ask for a CD, as the page
+  has all of its files; Command & Conquer doesn't load all its music at
+  start (SCORES.MIX matched the pattern meant for scenario packs); a saved
+  game left without a name is named for the date and time; Emscripten's
+  SDL2 and OpenAL; no network play.
+
+  Libraries compiled into it: Emscripten's SDL2 port (zlib license) and
+  Emscripten's OpenAL on Web Audio (Emscripten: MIT / University of
+  Illinois/NCSA licenses).
+
+Games (data/)
+  Command & Conquer (Tiberian Dawn) Copyright 1995, 1996, 1997 Westwood
+  Studios, and Command & Conquer: Red Alert Copyright 1996 Westwood Studios;
+  Electronic Arts. Electronic Arts made both freeware: Command & Conquer
+  Gold in 2007 and Red Alert in 2008, as CD images on its own download page
+  (commandandconquer.com/classic), archived at
+  https://archive.org/details/official-cn-ctiberian-sun_202510:
+    GDI95.iso                 md5 1cb7c6290718c5e729ae1a4a146aa793
+    NOD95.iso                 md5 1dfb2ccae81117b053b60d70e8381250
+    RedAlert1_AlliedDisc.rar  md5 0a528b4d12d01b9076c16687ebf821b0
+  EA's license that came with the Red Alert freeware is
+  data/ra-EA-EULA.rtf; the discs' readmes are data/td-README.WRI and
+  data/ra-README.TXT.
+
+  The files are used unchanged, taken out of the discs by
+  tools/build-cnc.mjs:
+    Command & Conquer: CONQUER.MIX, DESERT.MIX, TEMPERAT.MIX, WINTER.MIX,
+    SOUNDS.MIX and SCORES.MIX from the GDI disc; GENERAL.MIX from each of
+    the GDI and Nod discs (each holds its side's missions), as
+    gdi/GENERAL.MIX and nod/GENERAL.MIX; CCLOCAL.MIX, UPDATE.MIX,
+    UPDATEC.MIX, SPEECH.MIX, TRANSIT.MIX, DESEICNH.MIX, TEMPICNH.MIX and
+    WINTICNH.MIX from the GDI disc's installer archive (INSTALL/SETUP.Z).
+    Red Alert: REDALERT.MIX from the Allied disc's INSTALL folder, and
+    CONQUER.MIX, GENERAL.MIX, SCORES.MIX, SOUNDS.MIX, RUSSIAN.MIX,
+    ALLIES.MIX, INTERIOR.MIX, SNOW.MIX and TEMPERAT.MIX, the archives inside
+    the disc's MAIN.MIX.
+  Left out: the cutscene videos (MOVIES.MIX, MOVIES1.MIX) and everything
+  else on the discs (installers, DirectX, extras).
+  For downloading, each game's files are stored one after another in 1 MB
+  pieces (data/td/, data/ra/; some gzipped), which the page joins back
+  into the same files.

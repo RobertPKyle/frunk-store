@@ -102,6 +102,7 @@
     "heretic": { "tagline": "Heretic-motoren med det gratis mørke fantasyspillet Blasphemer, eller Heretic du eier, sendt fra telefonen. Trylleformler, relikvier og flyging." },
     "quake": { "tagline": "Den klassiske Quake-motoren med gratis LibreQuake, eller Quake du eier, sendt fra telefonen, med kontroller eller på skjermen." },
     "duke3d": { "tagline": "Skytespillet fra 1996: første episode gratis, eller hele spillet du eier, sendt fra telefonen, med kontroller eller på skjermen." },
+    "cnc": { "tagline": "Command & Conquer og Red Alert, sanntidsstrategiklassikerne fra 1995 og 1996 som EA gjorde gratis: kampanjene for begge sider og skirmish, med berøring." },
     "openttd": { "tagline": "Bygg et transportimperium med tog, lastebiler, skip og fly. Transport Tycoon med åpen kildekode, laget for berøring." },
     "openarena": { "tagline": "Rask arenaskyting mot boter på Quake III-motoren: et gratis spill med ti arenaer, på skjermen eller med kontroller." },
     "craft4k": { "tagline": "Notchs lille Minecraft4k bygget på nytt i C++ og strålemarsjert på grafikkbrikken: en stor klosseverden med solskygger, dag og natt og speil å bygge med." },
