@@ -103,6 +103,7 @@
     "quake": { "tagline": "經典的 Quake 引擎，搭配免費的 LibreQuake，或從手機傳送你擁有的 Quake，用控制器或螢幕操作。" },
     "duke3d": { "tagline": "1996 年射擊遊戲的第一章免費暢玩，或從手機傳送你擁有的完整版，用控制器或螢幕操作。" },
     "cnc": { "tagline": "EA 免費開放的 1995 年與 1996 年即時戰略經典《Command & Conquer》和《Red Alert》：雙方陣營的戰役和遭遇戰，觸控操作。" },
+    "elderscrolls": { "tagline": "Bethesda 免費開放的 1994 年與 1996 年開放世界角色扮演遊戲 Arena 與 Daggerfall：整片行省任你探索，可用手把或觸控遊玩。" },
     "openttd": { "tagline": "用火車、卡車、船和飛機打造運輸帝國。開源版的 Transport Tycoon，專為觸控設計。" },
     "openarena": { "tagline": "在 Quake III 引擎上與電腦對手進行快節奏的競技場射擊：免費遊戲，內含十個競技場，用螢幕或控制器操作。" },
     "craft4k": { "tagline": "Notch 的迷你 Minecraft4k 以 C++ 重寫，在顯示晶片上以光線步進繪製：一個巨大的方塊世界，有陽光陰影、晝夜交替，還能用鏡子建造。" },

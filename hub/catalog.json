@@ -264,6 +264,19 @@
       "added": "2026-10-30"
     },
     {
+      "id": "elderscrolls",
+      "name": "The Elder Scrolls",
+      "tagline": "Arena and Daggerfall, Bethesda's 1994 and 1996 open-world RPGs, free from Bethesda: whole provinces to roam, with a controller or by touch.",
+      "path": "/elderscrolls/",
+      "icon": "/elderscrolls/icon.svg",
+      "tags": [
+        "Game",
+        "Controller",
+        "Touch"
+      ],
+      "added": "2026-10-31"
+    },
+    {
       "id": "openttd",
       "name": "OpenTTD",
       "tagline": "Build a transport empire with trains, trucks, ships and planes. The open-source Transport Tycoon, made for touch.",

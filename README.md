@@ -457,6 +457,47 @@ clear them to make room.
   left unnamed is named for the date and time. Measured with the CPU
   slowed 4.5x: 60 fps, 230 to 270 ms of main-thread work a second in the
   first missions of both games. Not yet tried in the car.
+- `apps/elderscrolls`: The Elder Scrolls. Arena and Daggerfall in DOSBox:
+  em-dosbox (DOSBox SVN r4305 ported to Emscripten, GPL-2.0) compiled to
+  WebAssembly by `npm run build:elderscrolls`
+  (`tools/build-elderscrolls.mjs`: a pinned upstream commit plus
+  `tools/elderscrolls/em-dosbox-web.patch`, built with Autotools and
+  Emscripten 4.0.10 in Docker, `tools/elderscrolls/Dockerfile`; the patched
+  source ships next to the engine in `apps/elderscrolls/engine/`). The
+  patch links with JSPI in place of Asyncify, yields to the page through a
+  MessageChannel (a timer's 4 ms clamp halved the speed) and targets 90%
+  of the CPU, drops the splash screen and DOSBox's hotkeys, adds `web_key`,
+  `web_frames`, `web_cycles` and `web_mouse_x/y`, and places the mouse
+  pointer by screen pixel even when a game narrows the mouse range
+  (Daggerfall's clicks landed about 5% short). em-dosbox's function-array
+  CPU cores are configured off: in WebAssembly they ran at half speed. The
+  same script downloads Bethesda's freeware zips from Bethesda's own
+  server and checks their SHA-256. Arena's ARENA folder comes out of
+  Arena106.exe (a RAR self-extractor, Debian's unrar in Docker)
+  unchanged. Daggerfall is set up as its installer's "huge" install
+  would: ARCH3D.BSA and DAGGER.SND unpacked from the CD's PACKED.DAT
+  (36-byte block headers and PKWARE implode streams, read with
+  `tools/cnc/westwood.mjs`'s `blast`), Bethesda's 1.07.213 patch run in
+  Debian's DOSBox in Docker (`DAG213 < YES.TXT`), and the installer's
+  full Z.CFG (a partial one hangs on a black screen after the intro) and
+  an HMISET.CFG for a Sound Blaster 16. Each game is packed by
+  `tools/supertux/pack.mjs` into 1 MB blocks (`apps/elderscrolls/data/`),
+  loaded as Command & Conquer's are (IndexedDB database `elderscrolls`),
+  with the files read at start (`tools/elderscrolls/boot-*.txt`) first;
+  Daggerfall's big archives stay out of its start list, since it reads
+  only parts of them. Engine, data and source aren't in git, so run the
+  build before deploying `apps`. DOSBox mounts the game as C: with an
+  overlay drive on `/save/<game>` (IDBFS) for everything the game writes.
+  Both games are played with the mouse: a tap clicks, a dragged finger
+  holds the button, a held finger presses the right button (a swing if it
+  moves). A controller walks with the left stick or D-pad (arrow keys),
+  moves the pointer with the right stick (or Select and the D-pad), clicks
+  with A and B, swings with the right trigger (the right button held while
+  the pointer sweeps), runs with the left trigger, and X is Enter, which
+  both games' lists need. Every click is held until DOSBox has drawn two
+  frames, as the games poll the mouse. Measured with the CPU slowed 4.5x:
+  Arena about 15 fps turning in its first dungeon, Daggerfall about 22 fps
+  in Privateer's Hold, about 18,000 DOSBox cycles. Not yet tried in the car.
 - `apps/openttd`: OpenTTD 15.3 (GPL-2.0), compiled to WebAssembly by
   `npm run build:openttd` (`tools/build-openttd.mjs`: the 15.3 tag plus
   `tools/openttd/openttd-web.patch`, built with upstream's own Emscripten

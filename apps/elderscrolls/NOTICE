@@ -1,0 +1,54 @@
+The Elder Scrolls: Arena and Daggerfall (apps/elderscrolls)
+
+Unofficial, not affiliated with or endorsed by Bethesda Softworks or ZeniMax
+Media. The Elder Scrolls, Arena and Daggerfall are trademarks of ZeniMax
+Media Inc.
+
+Engine (engine/)
+  DOSBox, by the DOSBox Team (https://www.dosbox.com), SVN r4305, as ported
+  to Emscripten by Boris Gjenero as em-dosbox
+  (https://github.com/dreamlayers/em-dosbox, branch em-dosbox-svn-sdl2,
+  commit e1f72dd11513c9ddc6e2a9c1f08ff50581c320f7, 2023-01-06).
+  License: GNU General Public License, version 2 (engine/COPYING).
+
+  This is a modified version of the program. frunk.store's changes for the
+  browser are in engine/em-dosbox-web.patch (also
+  tools/elderscrolls/em-dosbox-web.patch in
+  https://github.com/RobertPKyle/frunk-store, whose
+  tools/build-elderscrolls.mjs builds it with Emscripten 4.0.10), each
+  change marked "[frunk]". The complete patched source the build came from
+  is engine/em-dosbox-e1f72dd-web-src.tar.gz.
+  The changes: linked as an ES module with JSPI in place of Asyncify, so
+  DOSBox's own loop and its file reads can wait for the page; it lets the
+  page run through a MessageChannel message rather than a timer, and uses
+  up to 90% of the CPU rather than 60%; no splash screen and no DOSBox
+  hotkeys; the page can type keys and read how many frames were drawn and
+  where the game has the mouse pointer; and the pointer goes where it is
+  on the screen even when a game narrows the mouse's range (Daggerfall's
+  was about 5% short). Built without em-dosbox's function-array CPU cores,
+  which are slower in WebAssembly.
+
+  Libraries compiled into it: Emscripten's SDL2 port (zlib license);
+  Emscripten itself (MIT / University of Illinois/NCSA licenses).
+
+Games (data/)
+  The Elder Scrolls: Arena Copyright 1994 Bethesda Softworks, and The Elder
+  Scrolls II: Daggerfall Copyright 1996 Bethesda Softworks. Bethesda made
+  both freeware, Arena in 2004 and Daggerfall in 2009, from its own server
+  (https://cdnstatic.bethsoft.com/elderscrolls.com/assets/files/tes/extras/):
+    Arena106Setup.zip  sha256 aed6d15d9cd29fde12464097fd73e0c9fa290d2a57979e84a1cc8ac0c3fb1fc7
+    DFInstall.zip      sha256 a9ba539d56f84f28b9da8c0a1d5ef5d34ccd6dcb5003f2bb2f5aa8baf6ffe828
+  Bethesda's terms and setup notes that came with them are
+  data/arena-setup.pdf and data/daggerfall-legal.pdf.
+
+  tools/build-elderscrolls.mjs takes the files out:
+    Arena: the ARENA folder from Arena106.exe (a RAR self-extractor inside
+    the zip), unchanged.
+    Daggerfall: the DAGGER folder from the zip's DFCD (the CD), set up as
+    its installer's "huge" install would: ARCH3D.BSA and DAGGER.SND
+    unpacked from PACKED.DAT (which isn't kept), Bethesda's 1.07.213 patch
+    (DAG213.EXE, from the same zip) applied by running it in DOSBox, and
+    the installer's Z.CFG and HMISET.CFG (Sound Blaster 16) written.
+  For downloading, each game's files are stored one after another in 1 MB
+  pieces (data/arena/, data/daggerfall/; some gzipped), which the page
+  joins back into the same files.

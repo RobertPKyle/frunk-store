@@ -74,3 +74,8 @@ apps/cnc/engine/vanilla*.js
 apps/cnc/engine/vanilla*.wasm
 apps/cnc/engine/*-web-src.tar.gz
 apps/cnc/data
+tools/.elderscrolls-build
+apps/elderscrolls/engine/dosbox.js
+apps/elderscrolls/engine/dosbox.wasm
+apps/elderscrolls/engine/*-web-src.tar.gz
+apps/elderscrolls/data

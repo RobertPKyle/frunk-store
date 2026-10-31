@@ -1818,6 +1818,130 @@ await check('command & conquer plays a mission by touch, saves it, keeps the sav
   await app.locator('#start').waitFor({ timeout: 10000 });
 });
 
+await check('elder scrolls: arena makes a character by touch and controller, fights, saves and keeps it; daggerfall starts', async () => {
+  await openFromHub(/The Elder Scrolls/);
+  const frame = () => page.frames().find(f => f.url().includes('/elderscrolls/'));
+  const app = appFrame();
+  const stats = () => frame().evaluate(() => window.esStats());
+  const until = async (what, fn, ms = 30000) => {
+    for (const t = Date.now(); Date.now() - t < ms; await page.waitForTimeout(250)) if (await fn()) return;
+    throw new Error(`no ${what}; DOSBox log: ${(await frame().evaluate(() => window.esLog.slice(-3).join(' | '))) || 'empty'}`);
+  };
+  const cdp = await page.context().newCDPSession(page);
+  const touch = (type, points) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: points.map(([x, y], id) => ({ x, y, id })) });
+  // A tap on a pixel of the game's 320x200 screen
+  const tap = async (x, y, wait = 2500) => {
+    const b = await app.locator('#canvas').boundingBox();
+    await touch('touchStart', [[b.x + (x + 0.5) * b.width / 320, b.y + (y + 0.5) * b.height / 200]]);
+    await page.waitForTimeout(80);
+    await touch('touchEnd', []);
+    await page.waitForTimeout(wait);
+  };
+  const look = () => app.locator('#canvas').screenshot();
+  await app.locator('#playArena').click();
+  await app.locator('#player').waitFor({ timeout: 120000 });
+  await until('frames', async () => (await stats()).frames > 30);
+  // Two pads like the car: the controller's raw device and the car's
+  // standard copy; buttons by the standard layout
+  await frame().evaluate(() => {
+    const pad = (id, mapping, index) => ({ id, index, mapping, connected: true, timestamp: 0, axes: [0, 0, 0, 0], buttons: Array.from({ length: 17 }, () => ({ pressed: false, value: 0 })) });
+    const pads = [pad('raw', '', 0), pad('Tesla Virtual Gamepad', 'standard', 1)];
+    navigator.getGamepads = () => pads;
+    window.padPress = async (b, ms = 200) => {
+      Object.assign(pads[1].buttons[b], { pressed: true, value: 1 });
+      await new Promise(r => setTimeout(r, ms));
+      Object.assign(pads[1].buttons[b], { pressed: false, value: 0 });
+      await new Promise(r => setTimeout(r, 200));
+    };
+    window.padAxes = async (axes, ms) => {
+      pads[1].axes = axes;
+      await new Promise(r => setTimeout(r, ms));
+      pads[1].axes = [0, 0, 0, 0];
+      await new Promise(r => setTimeout(r, 300));
+    };
+  });
+  const press = async (b, wait = 1500, ms) => { await frame().evaluate(([b, ms]) => padPress(b, ms), [b, ms]); await page.waitForTimeout(wait); };
+  const START = 9, A = 0, X = 2, RB = 5, RT = 7;
+  // Start (Esc) through the intro to the main menu, which needed nothing
+  // the first download didn't bring
+  for (let i = 0; i < 4; i++) await press(START);
+  const menu = await stats();
+  if (menu.waits) throw new Error(`the main menu waited for data ${menu.waits} times`);
+  // The right stick moves the pointer, and DOSBox puts it on that pixel
+  await frame().evaluate(() => padAxes([0, 0, 0.6, 0.4], 500));
+  const moved = await stats();
+  if (moved.pointer[0] <= 160 || moved.pointer[1] <= 100) throw new Error(`the stick didn't move the pointer (${moved.pointer})`);
+  if (Math.abs(moved.gamePointer[0] - moved.pointer[0]) > 1 || Math.abs(moved.gamePointer[1] - moved.pointer[1]) > 1) throw new Error(`the game's pointer is at ${moved.gamePointer}, the page's at ${moved.pointer}`);
+  // Start New Game; the story; Barbarian, picked with X (Enter)
+  await tap(160, 112, 3000);
+  for (let i = 0; i < 5; i++) await press(START);
+  await tap(125, 85, 1000);
+  await press(X, 2500);
+  // A name, typed with the car's keyboard
+  await app.locator('#keysBtn').click();
+  await page.keyboard.type('Bench', { delay: 80 });
+  await page.keyboard.press('Enter');
+  await page.waitForTimeout(2500);
+  await app.locator('#keysBtn').click();
+  // Male, from Skyrim; the province's messages
+  await tap(159, 125, 4000);
+  await tap(155, 45);
+  await tap(155, 45);
+  await tap(155, 123);
+  for (let i = 0; i < 5; i++) await press(A, 2500);
+  // The bonus points, Done, keep the stats, Done
+  for (let i = 0; i < 10; i++) await tap(42, 50, 400);
+  await tap(26, 185);
+  await page.keyboard.press('s');
+  await page.waitForTimeout(3000);
+  await tap(26, 185, 5000);
+  // Past the vision, in the first dungeon: the left stick turns, RB raises
+  // the fists, the right trigger swings
+  await press(START, 4000);
+  let before = await look();
+  await frame().evaluate(() => padAxes([-1, 0, 0, 0], 1200));
+  if ((await look()).equals(before)) throw new Error('the left stick didn\'t turn');
+  await press(RB, 2000);
+  before = await look();
+  await press(RT, 300, 300);
+  if ((await look()).equals(before)) throw new Error('the right trigger didn\'t swing');
+  await page.waitForTimeout(1500);
+  // Save in the first slot, named with the car's keyboard
+  await press(START, 2500);
+  await tap(157, 128);
+  await tap(160, 7, 1500);
+  await app.locator('#keysBtn').click();
+  await page.keyboard.type('Pad', { delay: 80 });
+  await page.keyboard.press('Enter');
+  await page.waitForTimeout(4000);
+  if (!(await app.locator('#failed').isHidden())) throw new Error(await app.locator('#failedText').textContent());
+  await page.screenshot({ path: shots + 'elderscrolls.png' });
+  // Quit writes the overlay drive to IndexedDB (IDBFS) and goes back to the start
+  // (a script click: after a screenshot, headless Chrome's clicks miss in the frame)
+  await app.locator('#quitBtn').evaluate(b => b.click());
+  await app.locator('#start').waitFor({ timeout: 10000 });
+  const saved = await frame().evaluate(() => new Promise(resolve => {
+    const req = indexedDB.open('/save');
+    req.onsuccess = () => {
+      if (!req.result.objectStoreNames.contains('FILE_DATA')) { req.result.close(); return resolve([]); }
+      const get = req.result.transaction('FILE_DATA').objectStore('FILE_DATA').getAllKeys();
+      get.onsuccess = () => { req.result.close(); resolve(get.result.filter(k => /^\/save\/arena\/ARENA\//i.test(k))); };
+    };
+    req.onerror = () => resolve([]);
+  }));
+  if (!saved.some(k => /NAMES\.DAT$/i.test(k))) throw new Error(`no saved game kept (${saved.join(', ') || 'nothing'})`);
+  // Daggerfall starts and runs to its menu, with its blocks kept apart from Arena's
+  // (the reloaded page shows its buttons a moment before es.js wires them)
+  await frame().waitForFunction(() => document.getElementById('playDaggerfall').onclick);
+  await app.locator('#playDaggerfall').evaluate(b => b.click());
+  await app.locator('#player').waitFor({ timeout: 120000 });
+  await until('daggerfall frames', async () => (await stats()).frames > 60, 90000);
+  if ((await stats()).game !== 'daggerfall') throw new Error('not daggerfall');
+  if (!(await app.locator('#failed').isHidden())) throw new Error(await app.locator('#failedText').textContent());
+  await app.locator('#quitBtn').evaluate(b => b.click());
+  await app.locator('#start').waitFor({ timeout: 10000 });
+});
+
 await check('librequake plays with touch and a controller and resumes from its autosave', async () => {
   await openFromHub(/LibreQuake/);
   const frame = () => page.frames().find(f => f.url().includes('/quake/'));

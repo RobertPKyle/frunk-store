@@ -20,6 +20,12 @@
       ]
     },
     {
+      "source": "/elderscrolls/data/:game/:version/:block",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+      ]
+    },
+    {
       "source": "/supertux/data/:version/:block",
       "headers": [
         { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }

@@ -103,6 +103,7 @@
     "quake": { "tagline": "Die klassische Quake-Engine mit dem kostenlosen LibreQuake oder deinem eigenen Quake, vom Handy geschickt, mit Controller oder auf dem Bildschirm." },
     "duke3d": { "tagline": "Der Shooter von 1996: die erste Episode kostenlos, oder das ganze Spiel, das du besitzt, vom Handy geschickt, mit Controller oder auf dem Bildschirm." },
     "cnc": { "tagline": "Command & Conquer und Red Alert, die Echtzeitstrategie-Klassiker von 1995 und 1996, die EA freigegeben hat: die Kampagnen beider Seiten und Gefechte gegen die KI, per Touch." },
+    "elderscrolls": { "tagline": "Arena und Daggerfall, Bethesdas Open-World-Rollenspiele von 1994 und 1996, von Bethesda kostenlos freigegeben: ganze Provinzen zum Erkunden, mit Controller oder per Touch." },
     "openttd": { "tagline": "Bau ein Transportimperium mit Zügen, Lkw, Schiffen und Flugzeugen. Das Open-Source-Transport-Tycoon, für Touch gemacht." },
     "openarena": { "tagline": "Schnelle Arena-Gefechte gegen Bots auf der Quake-III-Engine: ein kostenloses Spiel mit zehn Arenen, auf dem Bildschirm oder mit Controller." },
     "craft4k": { "tagline": "Notchs winziges Minecraft4k, neu gebaut in C++ und per Ray Marching auf dem Grafikchip berechnet: eine große Blockwelt mit Sonnenschatten, Tag und Nacht und Spiegeln zum Bauen." },

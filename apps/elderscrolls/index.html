@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>The Elder Scrolls</title>
+<style>
+  :root { --bg: #0e0c09; --panel: #19150f; --card: #241e15; --line: rgba(230, 205, 150, .16); --text: #f3ecdd; --muted: #b0a58c;
+          --accent: #d9a441; --accent2: #9b3b2a; --danger: #d9694a; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 16px/1.4 system-ui, sans-serif; overflow: hidden;
+               -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; touch-action: none; }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  .btn { min-height: 44px; padding: 8px 16px; border-radius: 12px; background: var(--card); border: 1px solid var(--line); white-space: nowrap; }
+  .btn.primary { background: var(--accent); border-color: transparent; color: #1f1504; font-weight: 700; }
+  .btn.armed { background: var(--danger); border-color: transparent; color: #fff; }
+  .btn.on { background: var(--accent2); border-color: transparent; color: #fff; }
+  .btn:disabled { opacity: .5; cursor: default; }
+  [hidden] { display: none !important; }
+
+  /* ---------- start ---------- */
+  #start { display: flex; flex-direction: column; height: 100%; }
+  /* left padding keeps clear of the hub's Apps button */
+  header { display: flex; align-items: center; gap: 10px; min-height: 60px; padding: 8px 12px 8px 110px; border-bottom: 1px solid var(--line); }
+  header h1 { margin: 0; font-size: 18px; font-weight: 600; flex: 1; }
+  .scroll { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 14px 16px 20px; touch-action: pan-y; }
+  .games { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; max-width: 980px; }
+  .game { display: flex; flex-direction: column; gap: 10px; padding: 16px; border-radius: 16px; background: var(--panel); border: 1px solid var(--line); }
+  .game h2 { margin: 0; font-size: 20px; color: var(--text); letter-spacing: 0; text-transform: none; }
+  .game p { margin: 0; color: #ddd4c0; }
+  .game .note { margin: 0; }
+  h2 { margin: 18px 2px 8px; font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .note { font-size: 13px; color: var(--muted); margin: 6px 2px; max-width: 60em; }
+  #status:empty { display: none; }
+  #status { margin: 12px 2px 0; color: var(--text); }
+  table.pad { border-collapse: collapse; font-size: 13px; color: var(--muted); margin: 4px 2px; }
+  table.pad th, table.pad td { text-align: left; padding: 3px 14px 3px 0; vertical-align: top; }
+  table.pad th { color: var(--text); font-weight: 600; }
+  .legal { margin-top: 18px; font-size: 12px; color: var(--muted); user-select: text; -webkit-user-select: text; max-width: 60em; }
+  .legal p { margin: 4px 0; }
+  .legal a { color: var(--muted); }
+
+  /* ---------- overlays ---------- */
+  .overlay { position: fixed; inset: 0; z-index: 5; display: grid; place-items: center; padding: 64px 16px 16px; background: rgba(8, 6, 4, .9); }
+  .sheet { display: flex; flex-direction: column; max-width: 560px; max-height: calc(100vh - 80px); padding: 18px; border-radius: 18px; background: var(--panel); border: 1px solid var(--line); }
+  .sheet h2 { margin: 0 0 8px; font-size: 19px; color: var(--text); letter-spacing: 0; text-transform: none; }
+  .sheet p { margin: 0 0 10px; font-size: 15px; color: #ddd4c0; overflow-wrap: anywhere; }
+  #spellText { flex: 1; min-height: 0; overflow-y: auto; margin: 0 0 12px; padding: 10px 12px; border-radius: 10px; background: #0d0b08;
+               font: 14px/1.35 ui-monospace, monospace; white-space: pre; touch-action: pan-y; user-select: text; -webkit-user-select: text; }
+
+  /* ---------- loading ---------- */
+  #loading { position: fixed; inset: 0; z-index: 4; display: grid; place-content: center; gap: 14px; text-align: center; background: var(--bg); padding: 16px; }
+  #loading b { font-size: 20px; }
+  #loadText { color: var(--muted); font-size: 15px; }
+  progress { width: min(320px, 80vw); height: 8px; accent-color: var(--accent); }
+
+  /* ---------- player ---------- */
+  #player { position: fixed; inset: 0; display: grid; grid-template-rows: 60px minmax(0, 1fr); grid-template-columns: minmax(0, 1fr); background: #000; }
+  .bar { display: flex; align-items: center; gap: 8px; padding: 8px 10px 8px 110px; background: var(--panel); border-bottom: 1px solid var(--line); }
+  .bar b { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #wait, #padNote { font-size: 13px; color: var(--muted); white-space: nowrap; }
+  .screen { position: relative; min-height: 0; min-width: 0; overflow: hidden; }
+  /* the canvas must have no border or padding, or the clicks land off; fit() sizes it */
+  #canvas { position: absolute; display: block; border: 0; padding: 0; background: #000; outline: none; image-rendering: pixelated; }
+  #canvas.smooth { image-rendering: auto; }
+  /* touches land here and go to the game as mouse clicks and drags */
+  #touch { position: absolute; inset: 0; }
+  /* focused to bring up the car's keyboard; what's typed goes to the game */
+  #kbd { position: absolute; left: 0; bottom: 0; width: 1px; height: 1px; opacity: 0; border: 0; padding: 0; }
+
+  @media (max-width: 760px) {
+    .bar .btn { padding: 8px 10px; }
+    #padNote { display: none; }
+  }
+</style>
+</head>
+<body>
+<section id="start">
+  <header>
+    <h1>The Elder Scrolls</h1>
+  </header>
+  <div class="scroll">
+    <div class="games">
+      <div class="game">
+        <h2>Arena</h2>
+        <p>The 1994 original: imprisoned by the Imperial Battlemage, you escape and roam all of Tamriel to piece together the Staff of Chaos. Dungeons, towns and quests across the whole continent.</p>
+        <div class="row">
+          <button class="btn primary" id="playArena" type="button">Play</button>
+          <button class="btn" id="spellsArena" type="button">Spell costs</button>
+          <span class="note" id="keptArena"></span>
+        </div>
+      </div>
+      <div class="game">
+        <h2>Daggerfall</h2>
+        <p>The 1996 sequel: the Emperor sends you to the Iliac Bay to lay a king's ghost to rest. A world the size of Great Britain, factions, guilds, and the patched 1.07.213 version.</p>
+        <div class="row">
+          <button class="btn primary" id="playDaggerfall" type="button">Play</button>
+          <span class="note" id="keptDaggerfall"></span>
+        </div>
+      </div>
+    </div>
+    <p class="note" id="status" aria-live="polite"></p>
+
+    <h2>Controls</h2>
+    <p class="note">Both games are played with the pointer, as they were with a mouse. Tap to click. Drag a finger to hold the button down while the pointer moves (in the 3D view, that walks toward the pointer). Hold a finger still for a moment for a right click; keep holding and drag to swing your weapon once it's drawn. Keyboard brings up the car's keyboard, for names, saved games and the games' keys. Menu is the Esc key (save, load and options). A mouse and keyboard work too.</p>
+    <p class="note">With a controller:</p>
+    <table class="pad">
+      <tr><th></th><th>Arena</th><th>Daggerfall</th></tr>
+      <tr><td>Left stick or D-pad</td><td colspan="2">Walk forward and back, turn</td></tr>
+      <tr><td>Right stick (or Select + D-pad)</td><td colspan="2">Move the pointer</td></tr>
+      <tr><td>A / B</td><td colspan="2">Click / right click at the pointer</td></tr>
+      <tr><td>Right trigger</td><td colspan="2">Swing your weapon (toward the right stick, if it's held)</td></tr>
+      <tr><td>Left trigger (held)</td><td colspan="2">Run</td></tr>
+      <tr><td>X</td><td colspan="2">Enter: pick the highlighted line of a list, or confirm</td></tr>
+      <tr><td>Y</td><td colspan="2">Jump</td></tr>
+      <tr><td>LB / RB</td><td colspan="2">Cast a spell / draw or put away your weapon</td></tr>
+      <tr><td>Start / Select</td><td colspan="2">Game menu (Esc) / automap</td></tr>
+      <tr><td>Left / right stick click</td><td colspan="2">Logbook / character sheet</td></tr>
+    </table>
+
+    <h2>Game data</h2>
+    <div class="row">
+      <button class="btn" id="all" type="button">Download everything</button>
+      <button class="btn" id="forget" type="button">Remove</button>
+    </div>
+    <p class="note">Arena is about 10 MB to download and Daggerfall about 150 MB, mostly its world and cutscene videos. Each downloads what it needs as you play and keeps it on the car for next time. Download everything first if you'll be somewhere without a connection. Saved games stay on the car.</p>
+    <p class="note">Arena asks the cost of a spell now and then, the copy protection of its day: Spell costs shows Bethesda's list of answers.</p>
+
+    <div class="legal">
+      <p>Unofficial, not affiliated with or endorsed by Bethesda Softworks or ZeniMax Media. The Elder Scrolls, Arena and Daggerfall are trademarks of ZeniMax Media Inc. The games' files are from Bethesda's freeware releases (Arena in 2004, Daggerfall in 2009), with Daggerfall set up as its installer and Bethesda's 1.07.213 patch would; The Elder Scrolls: Arena &copy; 1994 and The Elder Scrolls II: Daggerfall &copy; 1996 Bethesda Softworks. Bethesda's terms and setup notes: <a href="data/arena-setup.pdf" target="_blank">Arena</a>, <a href="data/daggerfall-legal.pdf" target="_blank">Daggerfall</a>.</p>
+      <p>Engine: DOSBox (the DOSBox Team, GPL version 2) as ported to the browser by Boris Gjenero's em-dosbox. This is a modified version, compiled to WebAssembly with the changes in <a href="engine/em-dosbox-web.patch" target="_blank">em-dosbox-web.patch</a>, built by tools/build-elderscrolls.mjs in github.com/RobertPKyle/frunk-store; license: <a href="engine/COPYING" target="_blank">COPYING</a>; source: <a href="engine/em-dosbox-e1f72dd-web-src.tar.gz">em-dosbox-e1f72dd-web-src.tar.gz</a>. See <a href="NOTICE" target="_blank">/elderscrolls/NOTICE</a>.</p>
+      <p>Play only while parked.</p>
+    </div>
+  </div>
+</section>
+
+<section id="loading" hidden aria-live="polite">
+  <b id="loadTitle">The Elder Scrolls</b>
+  <span id="loadText"></span>
+  <progress id="loadBar" max="1" value="0" hidden></progress>
+</section>
+
+<section id="failed" class="overlay" hidden aria-labelledby="failedTitle">
+  <div class="sheet">
+    <h2 id="failedTitle">The game stopped</h2>
+    <p id="failedText"></p>
+    <div class="row"><button class="btn primary" id="failedOk" type="button">Start again</button></div>
+  </div>
+</section>
+
+<section id="spells" class="overlay" hidden aria-labelledby="spellsTitle">
+  <div class="sheet">
+    <h2 id="spellsTitle">Arena's spell costs</h2>
+    <p>When Arena asks the cost of a spell, type the number from Bethesda's list.</p>
+    <div id="spellText"></div>
+    <div class="row"><button class="btn primary" id="spellsOk" type="button">Done</button></div>
+  </div>
+</section>
+
+<section id="player" hidden>
+  <div class="bar">
+    <b id="title">The Elder Scrolls</b>
+    <span id="wait" hidden>Loading…</span>
+    <span id="padNote" hidden>Controller</span>
+    <button class="btn" id="menuBtn" type="button">Menu</button>
+    <button class="btn" id="keysBtn" type="button">Keyboard</button>
+    <button class="btn" id="spellsBtn" type="button" hidden>Spells</button>
+    <button class="btn" id="smoothBtn" type="button">Sharp</button>
+    <button class="btn" id="soundBtn" type="button">Sound on</button>
+    <button class="btn" id="quitBtn" type="button">Quit</button>
+  </div>
+  <div class="screen" id="screen">
+    <canvas id="canvas" tabindex="-1" oncontextmenu="event.preventDefault()"></canvas>
+    <div id="touch"></div>
+    <input id="kbd" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="Type into the game">
+  </div>
+</section>
+
+<script type="module" src="es.js"></script>
+<script src="/sw-register.js"></script>
+</body>
+</html>

@@ -1,0 +1,242 @@
+diff --git a/configure.ac b/configure.ac
+index bb56077..edc0c98 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -23,7 +23,7 @@ AS_IF([test "x$enable_emscripten" = "xyes"],
+        cross_compiling=yes
+        : ${CXXFLAGS="-O3"}
+        : ${CFLAGS="-O3"}
+-       ac_cv_exeext=.html])
++       : ${ac_cv_exeext=.html}])
+ 
+ dnl Detect the canonical host and target build environment
+ AC_CANONICAL_HOST
+@@ -751,6 +751,13 @@ AC_ARG_ENABLE(
+   [], [enable_wasm=yes])
+ AM_CONDITIONAL([WEBASSEMBLY], [test "x$enable_wasm" == "xyes"])
+ 
++dnl [frunk] the build for frunk.store's Elder Scrolls app (JSPI, ES module)
++AC_ARG_ENABLE(
++  [frunk],
++  [AC_HELP_STRING([--enable-frunk], [Link for frunk.store's page])],
++  [], [enable_frunk=no])
++AM_CONDITIONAL([FRUNK_WEB], [test "x$enable_frunk" = "xyes"])
++
+ # Use of Emscripten-specific compiler flags breaks tests compiled with the
+ # host compiler, so those flags are set at the end.
+ AS_IF([test "x$enable_emscripten" = "xyes"],[
+diff --git a/src/Makefile.am b/src/Makefile.am
+index 1c1b5df..63d6957 100644
+--- a/src/Makefile.am
++++ b/src/Makefile.am
+@@ -20,6 +20,14 @@ EXTRA_DIST = winres.rc dosbox.ico
+ 
+ if EMSCRIPTEN_BUILD
+ dosbox_LDFLAGS=-s TOTAL_MEMORY=134217728 -s ALLOW_MEMORY_GROWTH=0 -s FORCE_FILESYSTEM
++if FRUNK_WEB
++# [frunk] JSPI (not Asyncify) lets DOSBox's own loop and file reads wait for
++# the page; an ES module the page imports, with IndexedDB (IDBFS) for saves
++dosbox_LDFLAGS=-g0 -sJSPI -sENVIRONMENT=web -sMODULARIZE -sEXPORT_ES6 -sEXPORT_NAME=createDosbox \
++  -sINVOKE_RUN=0 -sEXIT_RUNTIME=1 -sFORCE_FILESYSTEM -sALLOW_MEMORY_GROWTH -sINITIAL_MEMORY=67108864 \
++  -sSTACK_SIZE=1048576 -sFETCH -lidbfs.js -sEXPORTED_RUNTIME_METHODS=FS,IDBFS,callMain \
++  -sEXPORTED_FUNCTIONS=_main,_web_key,_web_frames,_web_cycles,_web_mouse_x,_web_mouse_y
++else
+ CLEANFILES=dosbox.js dosbox.html.mem dosbox.js.orig.js dosbox.js.tmp.js
+ if EMTERPRETER
+ dosbox_LDFLAGS+=-s EMTERPRETIFY=1 -s EMTERPRETIFY_ASYNC=1 -s EMTERPRETIFY_WHITELIST=@$(srcdir)/emterpretify.txt -s FETCH=1
+@@ -27,7 +35,6 @@ EXTRA_dosbox_DEPENDENCIES=emterpretify.txt
+ else
+ # Memory init file is huge and it doesn't save bandwith even if using gzip.
+ # It is only required when using emterpreter.
+-dosbox_LDFLAGS+=--memory-init-file 0
+ if ASYNCIFY
+ dosbox_LDFLAGS+=-s ASYNCIFY=1 -s FETCH=1 -s ASYNCIFY_ONLY=@$(srcdir)/asyncify.txt
+ EXTRA_dosbox_DEPENDENCIES=asyncify.txt
+@@ -39,6 +46,7 @@ else
+ dosbox_LDFLAGS+=-s WASM=0
+ endif
+ endif
++endif
+ 
+ # https://stackoverflow.com/questions/1779984/header-dependency-in-automake
+ BUILT_SOURCES=version.stamp
+diff --git a/src/dosbox.cpp b/src/dosbox.cpp
+index aceca69..0df977d 100644
+--- a/src/dosbox.cpp
++++ b/src/dosbox.cpp
+@@ -138,6 +138,19 @@ bool ticksLocked;
+ void increaseticks();
+ 
+ #ifdef EMSCRIPTEN
++// [frunk] Lets the page run (input, drawing, sound) between slices of
++// emulation. A MessageChannel message, unlike emscripten_sleep()'s timer,
++// isn't held back to 4 ms when timers nest. While the page holds a promise
++// in Module.webHold (it's hidden), emulation waits for it.
++EM_ASYNC_JS(void, em_yield, (void), {
++  await new Promise(resolve => {
++    const c = new MessageChannel();
++    c.port1.onmessage = resolve;
++    c.port2.postMessage(0);
++  });
++  while (Module.webHold) await Module.webHold;
++});
++extern "C" EMSCRIPTEN_KEEPALIVE int web_cycles(void) { return CPU_CycleMax; }
+ static int ticksEntry;
+ #if defined(EMTERPRETER_SYNC) || defined(EM_ASYNCIFY)
+ int nosleep_lock = 0;
+@@ -163,7 +176,7 @@ static Bitu Normal_Loop(void) {
+ #ifdef EMTERPRETER_SYNC
+ 			emscripten_sleep_with_yield(1);
+ #elif defined(EM_ASYNCIFY)
+-			emscripten_sleep(1);
++			em_yield();
+ #endif
+ 			ticksEntry = GetTicks();
+ 		} else if (SDL_TICKS_PASSED(ticksEntry, last_sleep + 2000) &&
+@@ -213,7 +226,8 @@ static Bitu Normal_Loop(void) {
+ // cause tick limits to be hit more often and disrupt sound.
+ // Over 60 increases sound interruptions in Firefox 34 in Linux.
+ // Up to 80 delivers results which aren't too bad.
+-#define CPU_USAGE_TARGET 60
++// [frunk] 90: the page needs little besides (60 left the car's CPU idle)
++#define CPU_USAGE_TARGET 90
+ // Exceeding the soft limit will case immediate cutback or
+ // recalculation of CPU_CycleMax.
+ #define SOFT_TICK_LIMIT 18
+diff --git a/src/gui/sdl_mapper.cpp b/src/gui/sdl_mapper.cpp
+index 752f34e..dd43486 100644
+--- a/src/gui/sdl_mapper.cpp
++++ b/src/gui/sdl_mapper.cpp
+@@ -2255,10 +2255,12 @@ static void CreateDefaultBinds(void) {
+ 	sprintf(buffer,"mod_2 \"key %d\"",SDLK_RALT);CreateStringBind(buffer);
+ 	sprintf(buffer,"mod_2 \"key %d\"",SDLK_LALT);CreateStringBind(buffer);
+ #endif
++#ifndef EMSCRIPTEN /* [frunk] no DOSBox hotkeys in the browser */
+ 	for (CHandlerEventVector_it hit=handlergroup.begin();hit!=handlergroup.end();hit++) {
+ 		(*hit)->MakeDefaultBind(buffer);
+ 		CreateStringBind(buffer);
+ 	}
++#endif
+ 
+ 	/* joystick1, buttons 1-6 */
+ 	sprintf(buffer,"jbutton_0_0 \"stick_0 button 0\" ");CreateStringBind(buffer);
+diff --git a/src/gui/sdlmain.cpp b/src/gui/sdlmain.cpp
+index aaf7c07..36677a4 100644
+--- a/src/gui/sdlmain.cpp
++++ b/src/gui/sdlmain.cpp
+@@ -1581,7 +1581,30 @@ bool GFX_StartUpdate(Bit8u * & pixels,Bitu & pitch) {
+ }
+ 
+ 
++#ifdef EMSCRIPTEN
++// [frunk] Frames drawn, so the page can hold a click down until the game
++// has drawn (and so polled the mouse) a couple of times
++static int web_frame_count = 0;
++extern "C" EMSCRIPTEN_KEEPALIVE int web_frames(void) { return web_frame_count; }
++
++// [frunk] A key from the page (controller, on-screen buttons, the car's
++// keyboard), by SDL scancode, as if typed
++extern "C" EMSCRIPTEN_KEEPALIVE void web_key(int scancode, int down) {
++	SDL_Event e;
++	memset(&e, 0, sizeof(e));
++	e.type = down ? SDL_KEYDOWN : SDL_KEYUP;
++	e.key.state = down ? SDL_PRESSED : SDL_RELEASED;
++	e.key.keysym.scancode = (SDL_Scancode)scancode;
++	e.key.keysym.sym = SDL_GetKeyFromScancode((SDL_Scancode)scancode);
++	if (sdl.window) e.key.windowID = SDL_GetWindowID(sdl.window);
++	SDL_PushEvent(&e);
++}
++#endif
++
+ void GFX_EndUpdate( const Bit16u *changedLines ) {
++#ifdef EMSCRIPTEN
++	if (sdl.updating) web_frame_count++;
++#endif
+ #if C_DDRAW
+ 	int ret;
+ #endif
+@@ -2191,7 +2214,8 @@ static void GUI_StartUp(Section * sec) {
+  * The splash screen requires emterpreter sync.
+  * Creating a 2D context prevents subsequent creation of a 3D context.
+  */
+-#if !defined(EMSCRIPTEN) || defined(EMTERPRETER_SYNC) || defined(EM_ASYNCIFY)
++/* [frunk] no splash screen: the page starts the game straight away */
++#if !defined(EMSCRIPTEN)
+ /* Please leave the Splash screen stuff in working order in DOSBox. We spend a lot of time making DOSBox. */
+ 	SDL_Surface* splash_surf = NULL;
+ #ifdef EMSCRIPTEN
+diff --git a/src/ints/mouse.cpp b/src/ints/mouse.cpp
+index b463a60..6558f79 100644
+--- a/src/ints/mouse.cpp
++++ b/src/ints/mouse.cpp
+@@ -88,6 +88,7 @@ static struct {
+ 	Bit16u hidden;
+ 	float add_x,add_y;
+ 	Bit16s min_x,max_x,min_y,max_y;
++	float screen_x,screen_y; // [frunk] the whole screen, in mouse units, for the video mode
+ 	float mickey_x,mickey_y;
+ 	float x,y;
+ 	button_event event_queue[QUEUE_SIZE];
+@@ -463,6 +464,31 @@ void DrawCursor() {
+ 	RestoreVgaRegisters();
+ }
+ 
++#ifdef EMSCRIPTEN
++#include <emscripten.h>
++
++/* [frunk] Mouse units across the whole screen: the video mode's, unless the
++ * game narrowed the range to no wider than the screen's pixels, which
++ * means it counts in pixels. */
++static void web_units(float &ux, float &uy) {
++	ux = mouse.screen_x; uy = mouse.screen_y;
++	if (ux <= 0 || uy <= 0) { ux = mouse.max_x; uy = mouse.max_y; }
++	if (mouse.max_x - mouse.min_x + 1 <= (Bits)CurMode->swidth) ux = CurMode->swidth;
++	if (mouse.max_y - mouse.min_y + 1 <= (Bits)CurMode->sheight) uy = CurMode->sheight;
++}
++
++/* [frunk] Where the game has the pointer, in screen pixels, so the page
++ * follows when the game moves it (Arena does, in its menus) */
++extern "C" EMSCRIPTEN_KEEPALIVE int web_mouse_x(void) {
++	float ux, uy; web_units(ux, uy);
++	return ux > 0 ? (int)(POS_X * CurMode->swidth / ux) : 0;
++}
++extern "C" EMSCRIPTEN_KEEPALIVE int web_mouse_y(void) {
++	float ux, uy; web_units(ux, uy);
++	return uy > 0 ? (int)(POS_Y * CurMode->sheight / uy) : 0;
++}
++#endif
++
+ void Mouse_CursorMoved(float xrel,float yrel,float x,float y,bool emulate) {
+ 	float dx = xrel * mouse.pixelPerMickey_x;
+ 	float dy = yrel * mouse.pixelPerMickey_y;
+@@ -486,8 +512,21 @@ void Mouse_CursorMoved(float xrel,float yrel,float x,float y,bool emulate) {
+ 			mouse.y = y*(real_readb(BIOSMEM_SEG,BIOSMEM_NB_ROWS)+1)*8;
+ 		} else if ((mouse.max_x < 2048) || (mouse.max_y < 2048) || (mouse.max_x != mouse.max_y)) {
+ 			if ((mouse.max_x > 0) && (mouse.max_y > 0)) {
++#ifdef EMSCRIPTEN
++				/* [frunk] The pointer goes where it is on the screen, in the
++				 * game's units, even when the game narrows the range (Daggerfall
++				 * keeps its cursor on screen with a range a little smaller than
++				 * the screen, which scaled every position about 5% short). A
++				 * range no wider than the screen's pixels means the game counts
++				 * in pixels. */
++				float ux, uy;
++				web_units(ux, uy);
++				mouse.x = x*ux;
++				mouse.y = y*uy;
++#else
+ 				mouse.x = x*mouse.max_x;
+ 				mouse.y = y*mouse.max_y;
++#endif
+ 			} else {
+ 				mouse.x += xrel;
+ 				mouse.y += yrel;
+@@ -671,6 +710,8 @@ void Mouse_AfterNewVideoMode(bool setmode) {
+ 	mouse.max_x = 639;
+ 	mouse.min_x = 0;
+ 	mouse.min_y = 0;
++	mouse.screen_x = mouse.max_x + 1;
++	mouse.screen_y = mouse.max_y + 1;
+ 
+ 	mouse.events = 0;
+ 	mouse.timer_in_progress = false;
