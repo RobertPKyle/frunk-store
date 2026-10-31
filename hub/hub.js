@@ -7,6 +7,10 @@ import { LANGS, EN_UI } from './i18n.js';
 const grid = document.getElementById('grid');
 const recentRow = document.getElementById('recent');
 const filterRow = document.getElementById('filters');
+const toolbar = document.getElementById('toolbar');
+const searchForm = document.getElementById('search');
+const queryInput = document.getElementById('query');
+const clearQuery = document.getElementById('clearQuery');
 const runner = document.getElementById('runner');
 let frame = document.getElementById('frame');
 const loading = document.getElementById('loading');
@@ -73,6 +77,7 @@ function applyLang() {
   for (const node of document.querySelectorAll('[data-i18n-label]')) node.setAttribute('aria-label', t(node.dataset.i18nLabel));
   for (const node of document.querySelectorAll('[data-i18n-title]')) node.title = t(node.dataset.i18nTitle);
   document.getElementById('langName').textContent = LANGS.find(([code]) => code === lang)[1];
+  queryInput.placeholder = t('searchLabel');
   fsLabel();
   if (catalog) {
     renderRecent();
@@ -102,8 +107,24 @@ function badge(app) {
   return [el('span', { class: 'badge' }, t(key))];
 }
 
+// Search: every word typed must be in the app's name, tagline or tags, in
+// the hub's language or in English, ignoring case and accents. While
+// something is typed it covers every app, not only the chip's.
+let query = '';
+const fold = s => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+function matches(app, words) {
+  const hay = fold([app.id, app.name, app.tagline, appName(app), appTagline(app), ...app.tags, ...app.tags.map(tagName)].join('\n'));
+  return words.every(w => hay.includes(w));
+}
+
 function renderGrid() {
-  const shown = listed().filter(app => filter === 'all' || app.tags.includes(filter));
+  const words = fold(query.trim()).split(/\s+/).filter(Boolean);
+  const shown = listed().filter(app => words.length ? matches(app, words) : filter === 'all' || app.tags.includes(filter));
+  filterRow.toggleAttribute('data-off', words.length > 0);
+  if (!shown.length) {
+    grid.replaceChildren(el('p', { class: 'empty' }, t('searchNone').replace('{query}', query.trim())));
+    return;
+  }
   grid.replaceChildren(...shown.map(app => {
     const card = el('button', { class: 'card', type: 'button', 'data-app': app.id },
       ...badge(app),
@@ -127,12 +148,29 @@ function renderFilters() {
         filter = tag;
         store.set('filter', tag);
         for (const c of filterRow.children) c.setAttribute('aria-pressed', String(c === chip));
-        renderGrid();
+        if (query) setQuery(''); else renderGrid();   // the chip takes over from a search
       });
       return chip;
     }));
-  filterRow.hidden = false;
+  toolbar.hidden = false;
 }
+
+function setQuery(text) {
+  if (text === query) return;
+  query = queryInput.value = text;
+  clearQuery.hidden = !text;
+  searchForm.classList.toggle('typed', !!text);
+  renderGrid();
+}
+queryInput.addEventListener('input', () => setQuery(queryInput.value));
+clearQuery.addEventListener('click', () => { setQuery(''); queryInput.focus(); });
+// Enter (the keyboard's Search key) opens the first app found, and puts the
+// keyboard away either way
+searchForm.addEventListener('submit', e => {
+  e.preventDefault();
+  queryInput.blur();
+  if (query.trim()) grid.querySelector('.card')?.click();
+});
 
 // The last few apps opened, newest first, one tap away. Returning visitors
 // know what the site is, so the row takes the place of the lede.
@@ -280,6 +318,111 @@ if (document.documentElement.requestFullscreen) {
     store.set('fullscreen', !!document.fullscreenElement);
   });
 }
+
+// Browsing with a controller, or arrow keys: the D-pad or left stick moves
+// between the chips, recent apps and cards, A opens the one in focus. The
+// controller is read only while the hub itself is showing, never while an
+// app runs, so a game's input stays its own. The focused card is lit by
+// the .padnav class, since a ring from focus() alone isn't shown after a tap.
+const NAV = '#filters .chip, #recent .recent-app, #grid .card';
+const DEAD = 0.5;          // stick travel before it counts as a direction
+const REPEAT = [400, 130]; // ms held before the first and the next repeats
+let padNav = false, lastNav = null;
+let padDir = null, padRepeat = 0, padA = false;
+
+function navItems() {
+  return [...document.querySelectorAll(NAV)].filter(n => n.offsetParent !== null);
+}
+
+function setPadNav(on) {
+  padNav = on;
+  document.body.classList.toggle('padnav', on);
+}
+
+// The nearest element in that direction, measured from the focused one's
+// edge, with sideways offset counted against it, so down from a chip lands
+// on the card below it
+function move(dir) {
+  const items = navItems();
+  if (!items.length) return;
+  const cur = document.activeElement;
+  let next;
+  if (!items.includes(cur)) {
+    next = items.includes(lastNav) ? lastNav : items.find(n => n.matches('.card')) ?? items[0];
+  } else {
+    const r = cur.getBoundingClientRect();
+    const cx = (r.left + r.right) / 2, cy = (r.top + r.bottom) / 2;
+    let best = Infinity;
+    for (const n of items) {
+      if (n === cur) continue;
+      const b = n.getBoundingClientRect();
+      const bx = (b.left + b.right) / 2, by = (b.top + b.bottom) / 2;
+      let ahead, aside;
+      if (dir === 'down') { ahead = b.top - r.bottom; aside = Math.abs(bx - cx); }
+      else if (dir === 'up') { ahead = r.top - b.bottom; aside = Math.abs(bx - cx); }
+      else if (dir === 'right') { ahead = b.left - r.right; aside = Math.abs(by - cy); }
+      else { ahead = r.left - b.right; aside = Math.abs(by - cy); }
+      if (ahead < -1) continue;
+      const score = ahead + aside * 1.5;
+      if (score < best) { best = score; next = n; }
+    }
+  }
+  if (!next) return;
+  setPadNav(true);
+  lastNav = next;
+  next.focus({ preventScroll: true });
+  next.scrollIntoView({ block: 'nearest', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+}
+
+function pollPads() {
+  // while an app runs, only a look now and then for when the hub is back
+  if (!runner.hidden || document.hidden) { padDir = null; setTimeout(pollPads, 500); return; }
+  requestAnimationFrame(pollPads);
+  if (!langMenu.hidden) { padDir = null; return; }
+  // The car lists a controller twice, raw and as a "Tesla Virtual Gamepad"
+  // with the standard layout: read the standard one. Its A and B are
+  // swapped from the usual numbering there, so either face button opens.
+  const pads = [...navigator.getGamepads()].filter(Boolean);
+  const pad = pads.find(p => p.mapping === 'standard') || pads[0];
+  let dir = null, a = false;
+  if (pad) {
+    const [x = 0, y = 0] = pad.axes;
+    const on = i => pad.mapping === 'standard' && !!pad.buttons[i]?.pressed;
+    if (on(12) || y < -DEAD) dir = 'up';
+    else if (on(13) || y > DEAD) dir = 'down';
+    else if (on(14) || x < -DEAD) dir = 'left';
+    else if (on(15) || x > DEAD) dir = 'right';
+    a = !!(pad.buttons[0]?.pressed || pad.buttons[1]?.pressed);
+  }
+  const now = performance.now();
+  if (dir && (dir !== padDir || now >= padRepeat)) {
+    padRepeat = now + REPEAT[dir === padDir ? 1 : 0];
+    move(dir);
+  }
+  padDir = dir;
+  if (a && !padA && padNav && navItems().includes(document.activeElement)) document.activeElement.click();
+  padA = a;
+}
+
+// Chrome tells of a controller once a button on it is pressed
+let padsSeen = false;
+addEventListener('gamepadconnected', () => {
+  if (padsSeen) return;
+  padsSeen = true;
+  pollPads();
+});
+
+document.addEventListener('keydown', e => {
+  const dir = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right' }[e.key];
+  if (!dir || !runner.hidden || !langMenu.hidden || e.altKey || e.ctrlKey || e.metaKey) return;
+  // left and right in the search box move its caret; up and down leave it
+  if (e.target === queryInput && (dir === 'left' || dir === 'right')) return;
+  if (e.target === queryInput) queryInput.blur();
+  e.preventDefault();
+  move(dir);
+});
+// a tap takes over: no ring on what the controller had picked
+document.addEventListener('pointerdown', () => setPadNav(false));
 
 // The language menu: each language listed in its own name
 const langBtn = document.getElementById('langBtn');

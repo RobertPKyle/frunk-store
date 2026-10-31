@@ -29,4 +29,5 @@ export const EN_UI = {
   selected: 'Selected',
   badgeNew: 'New',
   badgeUpdated: 'Updated',
+  searchNone: 'No apps match “{query}”.',
 };

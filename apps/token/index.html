@@ -38,7 +38,8 @@
   #chart { position: absolute; inset: 8px 6px 4px 10px; width: calc(100% - 16px); height: calc(100% - 12px); }
   #chartMsg { position: absolute; inset: 0; display: grid; place-items: center; padding: 20px; text-align: center; color: var(--muted); font-size: 14px; }
   .fine { margin: 7px 2px 0; font-size: 11.5px; color: var(--muted); line-height: 1.35; }
-  .link { padding: 0; border: 0; background: none; color: var(--soft); text-decoration: underline; font-size: inherit; min-height: 0; }
+  /* in a line of small print, so the padding gives it a tappable height without widening the gap */
+  .link { padding: 12px 4px; margin: -12px -4px; border: 0; background: none; color: var(--soft); text-decoration: underline; font-size: inherit; min-height: 0; }
 
   .side { display: flex; flex-direction: column; gap: 8px; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
   .card { padding: 10px 12px; border-radius: 12px; background: var(--card); border: 1px solid var(--line); }

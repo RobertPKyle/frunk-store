@@ -64,13 +64,41 @@ h1 { font-size: 30px; line-height: 1.15; margin: 8px 0 4px; letter-spacing: -0.0
 .recent-app img { flex: none; border-radius: 8px; }
 .recent-app span { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .recent-app:active, .chip:active { transform: scale(.97); }
-.filters { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 16px; }
+/* Chips to filter the grid, and a search box at the row's end */
+.toolbar { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 8px 16px; margin: 0 0 16px; }
+.toolbar[hidden] { display: none; }
+.filters { display: flex; flex-wrap: wrap; gap: 8px; }
+/* while a search is on, it covers every app: the chip isn't the filter */
+.filters[data-off] .chip[aria-pressed="true"] { background: transparent; border-color: var(--line); color: #c3cad6; }
+/* gives way to long chip labels (German, Dutch) before it wraps to a row of its own */
+.search { position: relative; flex: 1 1 150px; max-width: 224px; margin-left: auto; }
+.search svg { position: absolute; left: 15px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
+.search input {
+  width: 100%; min-height: 44px; padding: 8px 16px 8px 42px; border-radius: 999px;
+  background: transparent; border: 1px solid var(--line); color: var(--text); font: inherit; font-size: 15px;
+}
+.search input::placeholder { color: var(--muted); }
+.search input:focus { outline: none; border-color: var(--accent); }
+.search input::-webkit-search-cancel-button { display: none; }   /* too small to tap; the × button instead */
+.search.typed input { padding-right: 44px; }   /* room for the × */
+.search .clear {
+  position: absolute; right: 2px; top: 50%; transform: translateY(-50%); width: 42px; height: 40px;
+  background: transparent; border: 0; border-radius: 999px; color: var(--muted); font-size: 24px; line-height: 1;
+}
+.search .clear[hidden] { display: none; }
+.empty { grid-column: 1 / -1; margin: 0; padding: 12px 4px; color: var(--muted); }
 .chip {
   min-height: 44px; padding: 8px 16px; border-radius: 999px; background: transparent;
   border: 1px solid var(--line); color: #c3cad6; font-size: 15px; font-weight: 600;
 }
 .chip[aria-pressed="true"] { background: var(--accent); border-color: transparent; color: #111418; }
-.recent[hidden], .filters[hidden] { display: none; }
+.recent[hidden] { display: none; }
+/* Moving between apps with a controller or arrow keys: the one in focus
+   lit, where a tap shows no ring */
+.card:focus-visible, .chip:focus-visible, .recent-app:focus-visible, .padnav .card:focus, .padnav .chip:focus, .padnav .recent-app:focus {
+  outline: 3px solid var(--accent); outline-offset: 2px;
+}
+.card, .chip, .recent-app { scroll-margin: 20px; }   /* room around the one scrolled into view */
 
 .grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
 .card {
@@ -168,8 +196,11 @@ h1 { font-size: 30px; line-height: 1.15; margin: 8px 0 4px; letter-spacing: -0.0
   /* two columns leave no room beside the icon for "Aktualisiert" */
   .badge { position: static; align-self: flex-start; margin-bottom: -2px; }
   /* one row of chips that scrolls sideways, rather than two */
-  .filters { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin: 0 -16px 16px; padding: 0 16px; }
+  /* no wrap: a wrapping column takes the chip row's full width, past the screen */
+  .toolbar { flex-direction: column; flex-wrap: nowrap; align-items: stretch; gap: 10px; }
+  .filters { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin: 0 -16px; padding: 0 16px; }
   .chip { flex: none; }
+  .search { flex: none; max-width: none; margin-left: 0; }
 }
 @media (prefers-reduced-motion: reduce) {
   .card, .spinner { transition: none; animation-duration: 2s; }

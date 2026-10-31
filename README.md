@@ -21,7 +21,13 @@ The app list lives in `hub/catalog.json`. `appsOrigin` in that file sets where
 the apps are served from. The hub shows the last three apps opened in place of
 its lede, and chips that filter the grid by tag (Game, Camp Mode, Road Trip,
 Tool); both are kept in the hub's localStorage, along with whether full
-screen was on, so the next tap on an app turns it back on.
+screen was on, so the next tap on an app turns it back on. The search box
+at the end of the chip row finds apps by name, tagline or tag, in the hub's
+language or English; Enter (the keyboard's Search key) opens the first one
+found. A controller browses the hub too: the D-pad or left stick moves
+between chips and cards and A opens one (arrow keys and Enter do the same).
+The controller is read only while the hub itself is showing, never while an
+app runs.
 
 An app's catalog entry can carry `"added"` or `"updated"` with a date
 (`YYYY-MM-DD`). For 14 days after it, the app's card shows a New or Updated

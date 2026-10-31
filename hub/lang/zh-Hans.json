@@ -65,6 +65,9 @@
     "homeLabel": "返回应用列表",
     "badgeNew": "新",
     "badgeUpdated": "更新",
+    "searchLabel": "搜索应用",
+    "searchClear": "清除搜索",
+    "searchNone": "没有符合“{query}”的应用。",
     "slowLoad": "仍在加载，信号较弱时可能会比较慢。"
   },
   "tags": {

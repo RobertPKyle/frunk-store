@@ -65,6 +65,9 @@
     "homeLabel": "Terug naar de apps",
     "badgeNew": "Nieuw",
     "badgeUpdated": "Bijgewerkt",
+    "searchLabel": "Apps zoeken",
+    "searchClear": "Zoekopdracht wissen",
+    "searchNone": "Geen apps gevonden voor ‘{query}’.",
     "slowLoad": "Nog aan het laden. Bij een zwak signaal kan dit even duren."
   },
   "tags": {

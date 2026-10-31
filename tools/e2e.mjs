@@ -123,6 +123,34 @@ await check('hub shows recent apps and filters by category', async () => {
   await page.waitForSelector('#runner', { state: 'hidden' });
 });
 
+await check('hub search finds apps and arrow keys move between cards', async () => {
+  await page.goto(base + '/');
+  await page.waitForSelector('#grid .card');
+  await page.fill('#query', 'puzz');
+  const found = await page.locator('#grid .card h2').allTextContents();
+  if (!found.includes('Logic Puzzles') || found.includes('Weather')) throw new Error(`"puzz" finds ${found.join(', ')}`);
+  await page.fill('#query', 'zzzz');
+  if (!(await page.locator('#grid .empty').isVisible())) throw new Error('no "no apps match" note');
+  await page.fill('#query', 'brick');
+  await page.keyboard.press('Enter');   // the keyboard's Search key opens the first app found
+  await page.waitForSelector('#loading', { state: 'hidden' });
+  if (!(await page.title()).startsWith('Brick Breaker')) throw new Error(`Enter opened "${await page.title()}"`);
+  await page.click('#home');
+  await page.waitForSelector('#runner', { state: 'hidden' });
+  await page.getByRole('button', { name: 'All', exact: true }).click();   // a chip clears the search
+  if (await page.inputValue('#query')) throw new Error('the chip left the search in place');
+  await page.evaluate(() => document.activeElement.blur());
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('ArrowRight');
+  const focused = await page.evaluate(() => document.activeElement.dataset.app);
+  if (focused !== 'breakout') throw new Error(`down, right focused ${focused}`);
+  await page.keyboard.press('Enter');
+  await page.waitForSelector('#loading', { state: 'hidden' });
+  if (!(await page.title()).startsWith('Brick Breaker')) throw new Error(`Enter opened "${await page.title()}"`);
+  await page.click('#home');
+  await page.waitForSelector('#runner', { state: 'hidden' });
+});
+
 await check('hub badges a new app until it is opened', async () => {
   // Brick Breaker made new today, so the check doesn't depend on the catalog's real dates
   const today = new Date().toLocaleDateString('sv');

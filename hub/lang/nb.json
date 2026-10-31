@@ -65,6 +65,9 @@
     "homeLabel": "Tilbake til appene",
     "badgeNew": "Ny",
     "badgeUpdated": "Oppdatert",
+    "searchLabel": "Søk i apper",
+    "searchClear": "Tøm søket",
+    "searchNone": "Ingen apper passer til «{query}».",
     "slowLoad": "Laster fortsatt. Svakt signal kan gjøre dette tregt."
   },
   "tags": {

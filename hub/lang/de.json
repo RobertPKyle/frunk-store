@@ -65,6 +65,9 @@
     "homeLabel": "Zurück zu den Apps",
     "badgeNew": "Neu",
     "badgeUpdated": "Aktualisiert",
+    "searchLabel": "Apps suchen",
+    "searchClear": "Suche löschen",
+    "searchNone": "Keine App passt zu „{query}“.",
     "slowLoad": "Lädt noch. Bei schwachem Empfang kann das dauern."
   },
   "tags": {

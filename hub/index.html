@@ -68,7 +68,16 @@
   <h1 data-i18n="title">Apps for your car's browser</h1>
   <p class="lede" id="lede" data-i18n="lede">Games and tools built to run on the center screen while you're parked.</p>
   <nav id="recent" class="recent" aria-label="Recently used" data-i18n-label="recentLabel" hidden></nav>
-  <div id="filters" class="filters" role="group" aria-label="Show" data-i18n-label="filtersLabel" hidden></div>
+  <div id="toolbar" class="toolbar" hidden>
+    <div id="filters" class="filters" role="group" aria-label="Show" data-i18n-label="filtersLabel"></div>
+    <form id="search" class="search" role="search">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true">
+        <circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/>
+      </svg>
+      <input id="query" type="search" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="search" aria-label="Search apps" data-i18n-label="searchLabel">
+      <button id="clearQuery" class="clear" type="button" aria-label="Clear search" data-i18n-label="searchClear" hidden>×</button>
+    </form>
+  </div>
   <div id="grid" class="grid" aria-live="polite"></div>
   <p id="catalogError" class="error" hidden></p>
 
