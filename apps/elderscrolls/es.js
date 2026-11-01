@@ -414,7 +414,7 @@ $('smoothBtn').onclick = () => { settings.set('smooth', !smooth()); showSmooth()
 let syncing = false, syncAgain = false;
 function syncfs() {
   return new Promise(resolve => {
-    if (!running) return resolve();
+    if (!FS) return resolve();   // not running: still written back once the game has quit
     if (syncing) { syncAgain = true; return resolve(); }
     syncing = true;
     try {

@@ -1790,6 +1790,134 @@ await check('prince of persia starts, moves by touch and controller, quick saves
   await app.locator('#kept').filter({ hasText: /saved game/ }).waitFor({ timeout: 10000 });
 });
 
+await check('death rally: starts a game by controller, types a name with the car keyboard, races, and keeps its settings', async () => {
+  await openFromHub(/Death Rally/);
+  const frame = () => page.frames().find(f => f.url().includes('/deathrally/'));
+  const app = appFrame();
+  const stats = () => frame().evaluate(() => window.dosStats());
+  const until = async (what, fn, ms = 30000) => {
+    for (const t = Date.now(); Date.now() - t < ms; await page.waitForTimeout(250)) if (await fn()) return;
+    throw new Error(`no ${what}; DOSBox log: ${(await frame().evaluate(() => window.dosLog.slice(-3).join(' | '))) || 'empty'}`);
+  };
+  const look = () => app.locator('#canvas').screenshot();
+  await app.locator('#play').click();
+  await app.locator('#player').waitFor({ timeout: 120000 });
+  await until('frames', async () => (await stats()).frames > 30);
+  // The seeded settings (sound card, the arrows as the race keys) are in the save overlay
+  const seeded = await frame().evaluate(() => window.dosFS().readFile('/save/deathrally/RALLY/DR.CFG').length);
+  if (seeded !== 2942) throw new Error(`DR.CFG is ${seeded} bytes`);
+  // Two pads like the car: the controller's raw device and the car's
+  // standard copy; buttons by the standard layout
+  await frame().evaluate(() => {
+    const pad = (id, mapping, index) => ({ id, index, mapping, connected: true, timestamp: 0, axes: [0, 0, 0, 0], buttons: Array.from({ length: 17 }, () => ({ pressed: false, value: 0 })) });
+    const pads = [pad('raw', '', 0), pad('Tesla Virtual Gamepad', 'standard', 1)];
+    navigator.getGamepads = () => pads;
+    window.padPress = async (b, ms = 200) => {
+      Object.assign(pads[1].buttons[b], { pressed: true, value: 1 });
+      await new Promise(r => setTimeout(r, ms));
+      Object.assign(pads[1].buttons[b], { pressed: false, value: 0 });
+    };
+  });
+  const press = async (b, wait = 2500, ms) => { await frame().evaluate(([b, ms]) => padPress(b, ms), [b, ms]); await page.waitForTimeout(wait); };
+  const A = 0, START = 9, RT = 7;
+  // the intro, then the main menu: A (Enter) is Start Racing, then Start A New Game
+  await page.waitForTimeout(12000);
+  await press(A);
+  await press(A);
+  if (!(await app.locator('#padNote').isVisible())) throw new Error('the controller wasn\'t noticed');
+  // The driver's licence wants a nickname, typed with the car's keyboard
+  await app.locator('#keysBtn').click();
+  await page.keyboard.type('Frunk', { delay: 150 });
+  await page.waitForTimeout(1500);
+  await app.locator('#keysBtn').click();
+  // weapons yes, the difficulty, the welcome, sign up, prepare to race: the race loads
+  for (let i = 0; i < 5; i++) await press(A, 3500);
+  await page.waitForTimeout(3000);
+  // the race's welcome box, then the race itself: the right trigger (Up) accelerates
+  await press(A, 1500);
+  const before = await look();
+  const beforeFrames = (await stats()).frames;
+  await press(RT, 500, 3000);
+  if ((await look()).equals(before)) throw new Error('the race didn\'t move');
+  if ((await stats()).frames - beforeFrames < 60) throw new Error('the race drew too few frames');
+  await page.screenshot({ path: shots + 'deathrally.png' });
+  // Start (Esc) asks to abort the race
+  const racing = await look();
+  await press(START, 1500);
+  if ((await look()).equals(racing)) throw new Error('Start didn\'t open the race menu');
+  // Quit writes the overlay drive to IndexedDB and goes back to the start
+  // (a script click: after a screenshot, headless Chrome's clicks miss in the frame)
+  await app.locator('#quitBtn').evaluate(b => b.click());
+  await app.locator('#start').waitFor({ timeout: 10000 });
+  await app.locator('#kept').filter({ hasText: /Downloaded/ }).waitFor({ timeout: 10000 });
+  const kept = await frame().evaluate(() => new Promise(resolve => {
+    const req = indexedDB.open('/save');
+    req.onupgradeneeded = () => req.transaction.abort();
+    req.onsuccess = () => {
+      if (!req.result.objectStoreNames.contains('FILE_DATA')) { req.result.close(); return resolve([]); }
+      const get = req.result.transaction('FILE_DATA').objectStore('FILE_DATA').getAllKeys();
+      get.onsuccess = () => { req.result.close(); resolve(get.result.filter(k => /deathrally\/RALLY\/DR\.CFG$/i.test(k))); };
+    };
+    req.onerror = () => resolve([]);
+  }));
+  if (!kept.length) throw new Error('DR.CFG not kept in IndexedDB');
+});
+
+await check('wolfenstein 3d: starts a game, turns and opens the menu by controller, and keeps its data', async () => {
+  await openFromHub(/Wolfenstein 3D/);
+  const frame = () => page.frames().find(f => f.url().includes('/wolf3d/'));
+  const app = appFrame();
+  const stats = () => frame().evaluate(() => window.dosStats());
+  const until = async (what, fn, ms = 30000) => {
+    for (const t = Date.now(); Date.now() - t < ms; await page.waitForTimeout(250)) if (await fn()) return;
+    throw new Error(`no ${what}; DOSBox log: ${(await frame().evaluate(() => window.dosLog.slice(-3).join(' | '))) || 'empty'}`);
+  };
+  const look = () => app.locator('#canvas').screenshot();
+  const tapKey = async (code, wait = 2500) => { await page.keyboard.down(code); await page.waitForTimeout(250); await page.keyboard.up(code); await page.waitForTimeout(wait); };
+  await app.locator('#play').click();
+  await app.locator('#player').waitFor({ timeout: 120000 });
+  await until('frames', async () => (await stats()).frames > 5);
+  await page.waitForTimeout(3000);
+  // A real keyboard goes straight to the game: through the "press a key"
+  // screens to the menu, N for New Game, the episode, the difficulty
+  for (let i = 0; i < 3; i++) await tapKey('Enter');
+  await tapKey('KeyN', 1500);
+  for (let i = 0; i < 3; i++) await tapKey('Enter');
+  await page.waitForTimeout(8000);
+  await frame().evaluate(() => {
+    const pad = (id, mapping, index) => ({ id, index, mapping, connected: true, timestamp: 0, axes: [0, 0, 0, 0], buttons: Array.from({ length: 17 }, () => ({ pressed: false, value: 0 })) });
+    const pads = [pad('raw', '', 0), pad('Tesla Virtual Gamepad', 'standard', 1)];
+    navigator.getGamepads = () => pads;
+    window.padPress = async (b, ms = 200) => {
+      Object.assign(pads[1].buttons[b], { pressed: true, value: 1 });
+      await new Promise(r => setTimeout(r, ms));
+      Object.assign(pads[1].buttons[b], { pressed: false, value: 0 });
+    };
+    window.padAxes = async (axes, ms) => {
+      pads[1].axes = axes;
+      await new Promise(r => setTimeout(r, ms));
+      pads[1].axes = [0, 0, 0, 0];
+    };
+  });
+  // the left stick turns: the view changes and the game keeps drawing
+  const standing = await look();
+  const beforeFrames = (await stats()).frames;
+  await frame().evaluate(() => padAxes([-1, 0, 0, 0], 2000));
+  await page.waitForTimeout(300);
+  if ((await look()).equals(standing)) throw new Error('the left stick didn\'t turn');
+  if ((await stats()).frames - beforeFrames < 40) throw new Error('the game drew too few frames while turning');
+  if (!(await app.locator('#padNote').isVisible())) throw new Error('the controller wasn\'t noticed');
+  await page.screenshot({ path: shots + 'wolf3d.png' });
+  // Start (Esc) opens the game's menu
+  const playing = await look();
+  await frame().evaluate(() => padPress(9));
+  await page.waitForTimeout(2000);
+  if ((await look()).equals(playing)) throw new Error('Start didn\'t open the menu');
+  await app.locator('#quitBtn').evaluate(b => b.click());
+  await app.locator('#start').waitFor({ timeout: 10000 });
+  await app.locator('#kept').filter({ hasText: /Downloaded/ }).waitFor({ timeout: 10000 });
+});
+
 await check('supertux streams its data, starts the story by touch, saves when left and loads the save again', async () => {
   await openFromHub(/SuperTux/);
   const frame = () => page.frames().find(f => f.url().includes('/supertux/'));

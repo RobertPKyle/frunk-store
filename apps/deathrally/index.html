@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Death Rally</title>
+<style>
+  :root { --bg: #0b0b0d; --panel: #16161a; --card: #222228; --line: rgba(255, 190, 120, .16); --text: #f2efe9; --muted: #a9a49b;
+          --accent: #f0a22a; --accent2: #b3261e; --danger: #d9694a; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 16px/1.4 system-ui, sans-serif; overflow: hidden;
+               -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; touch-action: none; }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  .btn { min-height: 44px; padding: 8px 16px; border-radius: 12px; background: var(--card); border: 1px solid var(--line); white-space: nowrap; }
+  .btn.primary { background: var(--accent); border-color: transparent; color: #1f1504; font-weight: 700; }
+  .btn.on { background: var(--accent2); border-color: transparent; color: #fff; }
+  .btn:disabled { opacity: .5; cursor: default; }
+  [hidden] { display: none !important; }
+
+  /* ---------- start ---------- */
+  #start { display: flex; flex-direction: column; height: 100%; }
+  /* left padding keeps clear of the hub's Apps button */
+  header { display: flex; align-items: center; gap: 10px; min-height: 60px; padding: 8px 12px 8px 110px; border-bottom: 1px solid var(--line); }
+  header h1 { margin: 0; font-size: 18px; font-weight: 600; flex: 1; }
+  .scroll { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 14px 16px 20px; touch-action: pan-y; }
+  .hero { display: flex; gap: 16px; align-items: center; max-width: 760px; padding: 16px; border-radius: 16px; background: var(--panel); border: 1px solid var(--line); }
+  .hero img { width: 84px; height: 84px; flex: none; }
+  .hero h2 { margin: 0 0 6px; font-size: 20px; color: var(--text); letter-spacing: 0; text-transform: none; }
+  .hero p { margin: 0 0 10px; color: #ddd8d0; }
+  h2 { margin: 18px 2px 8px; font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .note { font-size: 13px; color: var(--muted); margin: 6px 2px; max-width: 60em; }
+  #status:empty { display: none; }
+  table.keys { border-collapse: collapse; font-size: 13px; color: var(--muted); margin: 4px 2px; }
+  table.keys th, table.keys td { text-align: left; padding: 3px 14px 3px 0; vertical-align: top; }
+  table.keys th { color: var(--text); font-weight: 600; }
+  .legal { margin-top: 18px; font-size: 12px; color: var(--muted); user-select: text; -webkit-user-select: text; max-width: 60em; }
+  .legal p { margin: 4px 0; }
+  .legal a { color: var(--muted); }
+
+  /* ---------- overlays ---------- */
+  .overlay { position: fixed; inset: 0; z-index: 5; display: grid; place-items: center; padding: 64px 16px 16px; background: rgba(8, 6, 4, .9); }
+  .sheet { display: flex; flex-direction: column; max-width: 560px; padding: 18px; border-radius: 18px; background: var(--panel); border: 1px solid var(--line); }
+  .sheet h2 { margin: 0 0 8px; font-size: 19px; color: var(--text); letter-spacing: 0; text-transform: none; }
+  .sheet p { margin: 0 0 10px; font-size: 15px; color: #ddd8d0; overflow-wrap: anywhere; }
+
+  /* ---------- loading ---------- */
+  #loading { position: fixed; inset: 0; z-index: 4; display: grid; place-content: center; gap: 14px; text-align: center; background: var(--bg); padding: 16px; }
+  #loading b { font-size: 20px; }
+  #loadText { color: var(--muted); font-size: 15px; }
+  progress { width: min(320px, 80vw); height: 8px; accent-color: var(--accent); }
+
+  /* ---------- player ---------- */
+  #player { position: fixed; inset: 0; display: grid; grid-template-rows: 60px minmax(0, 1fr); grid-template-columns: minmax(0, 1fr); background: #000; }
+  .bar { display: flex; align-items: center; gap: 8px; padding: 8px 10px 8px 110px; background: var(--panel); border-bottom: 1px solid var(--line); }
+  .bar b { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #wait, #padNote { font-size: 13px; color: var(--muted); white-space: nowrap; }
+  .screen { position: relative; min-height: 0; min-width: 0; overflow: hidden; }
+  #canvas { position: absolute; display: block; border: 0; padding: 0; background: #000; outline: none; image-rendering: pixelated; }
+  #canvas.smooth { image-rendering: auto; }
+  /* focused to bring up the car's keyboard; what's typed goes to the game */
+  #kbd { position: absolute; left: 0; bottom: 0; width: 1px; height: 1px; opacity: 0; border: 0; padding: 0; }
+
+  /* ---------- on-screen controls ---------- */
+  .touch { position: absolute; inset: 0; pointer-events: none; }
+  .touch button {
+    position: absolute; pointer-events: auto; width: 72px; height: 72px; border-radius: 50%; font-size: 14px; font-weight: 700;
+    background: rgba(30, 24, 20, .55); border: 2px solid rgba(255, 210, 160, .35); color: #fff; touch-action: none;
+    display: grid; place-items: center; line-height: 1.1; text-align: center; padding: 0;
+  }
+  .touch button.held, .touch button:active { background: rgba(240, 162, 42, .55); border-color: var(--accent); }
+  .touch .arrow { font-size: 28px; }
+  /* a D-pad on the left */
+  #tUp { left: 88px; bottom: 170px; }
+  #tDown { left: 88px; bottom: 14px; }
+  #tLeft { left: 12px; bottom: 92px; }
+  #tRight { left: 164px; bottom: 92px; }
+  /* the actions on the right */
+  #tTurbo { right: 12px; bottom: 182px; }
+  #tGun { right: 12px; bottom: 98px; width: 80px; height: 80px; }
+  #tMine { right: 100px; bottom: 98px; }
+  #tHorn { right: 12px; bottom: 14px; }
+  @media (max-width: 640px) {
+    .bar .btn { padding: 8px 10px; }
+    #padNote { display: none; }
+  }
+</style>
+</head>
+<body>
+<section id="start">
+  <header>
+    <h1>Death Rally</h1>
+  </header>
+  <div class="scroll">
+    <div class="hero">
+      <img src="icon.svg" alt="">
+      <div>
+        <h2>Death Rally, the 1996 shareware episode</h2>
+        <p>Remedy's first game: a top-down death race with machine guns, mines and turbo. Win prize money, upgrade your car in the underground market and climb the ranks toward the Adversary. The free episode has six of the nineteen tracks and three of the six cars, with Duke Nukem among the drivers.</p>
+        <div class="row">
+          <button class="btn primary play" id="play" type="button">Play</button>
+          <span class="note" id="kept"></span>
+        </div>
+      </div>
+    </div>
+    <p class="note" id="status" aria-live="polite"></p>
+
+    <h2>Controls</h2>
+    <table class="keys">
+      <tr><th></th><th>Controller</th><th>On screen</th></tr>
+      <tr><td>Steer, menus</td><td>Left stick or D-pad</td><td>◀ ▶ (▲ ▼ in menus)</td></tr>
+      <tr><td>Accelerate, brake</td><td>Right trigger / left trigger, or stick up / down</td><td>▲ ▼</td></tr>
+      <tr><td>Machine gun, OK in menus</td><td>Bottom button</td><td>Gun</td></tr>
+      <tr><td>Drop a mine</td><td>Right button</td><td>Mine</td></tr>
+      <tr><td>Turbo</td><td>Top button, or a shoulder button</td><td>Turbo</td></tr>
+      <tr><td>Horn</td><td>Left button</td><td>Horn</td></tr>
+      <tr><td>Back, game menu (Esc)</td><td>Start</td><td>Menu</td></tr>
+    </table>
+    <p class="note">Keyboard brings up the car's keyboard for your name and the game's other keys. A keyboard plugged into the car works too: arrows steer, Up accelerates, Down brakes, Enter fires, Alt drops a mine, Shift is turbo, Space the horn (change them under Configure).</p>
+
+    <div class="legal">
+      <p>Death Rally &copy; 1996 Remedy Entertainment, published by Apogee Software, Ltd. This is the shareware episode (version 1.1) exactly as Apogee released it (<a href="data/1ral11.zip">1ral11.zip</a>, from Apogee's own FTP server as saved by the Internet Archive), whose license lets anyone share it without charge with every file included unchanged, which this app does: <a href="LICENSE.TXT" target="_blank">LICENSE.TXT</a>. frunk.store charges nothing for it. The full game is sold by Remedy (Death Rally Classic). Unofficial; not affiliated with or endorsed by Remedy Entertainment or Apogee Software / 3D Realms.</p>
+      <p>Engine: DOSBox (the DOSBox Team, GPL version 2) as ported to the browser by Boris Gjenero's em-dosbox. This is a modified version, compiled to WebAssembly with the changes in <a href="engine/em-dosbox-web.patch" target="_blank">em-dosbox-web.patch</a>, built by tools/build-dos.mjs in github.com/RobertPKyle/frunk-store; license: <a href="engine/COPYING" target="_blank">COPYING</a>; source: <a href="engine/em-dosbox-e1f72dd-web-src.tar.gz">em-dosbox-e1f72dd-web-src.tar.gz</a>. See <a href="NOTICE" target="_blank">/deathrally/NOTICE</a>.</p>
+      <p>Play only while parked.</p>
+    </div>
+  </div>
+</section>
+
+<section id="loading" hidden aria-live="polite">
+  <b id="loadTitle">Death Rally</b>
+  <span id="loadText"></span>
+  <progress id="loadBar" max="1" value="0" hidden></progress>
+</section>
+
+<section id="failed" class="overlay" hidden aria-labelledby="failedTitle">
+  <div class="sheet">
+    <h2 id="failedTitle">The game stopped</h2>
+    <p id="failedText"></p>
+    <div class="row"><button class="btn primary" id="failedOk" type="button">Start again</button></div>
+  </div>
+</section>
+
+<section id="player" hidden>
+  <div class="bar">
+    <b id="title">Death Rally</b>
+    <span id="wait" hidden>Loading…</span>
+    <span id="padNote" hidden>Controller</span>
+    <button class="btn" id="menuBtn" type="button">Menu</button>
+    <button class="btn" id="keysBtn" type="button">Keyboard</button>
+    <button class="btn" id="smoothBtn" type="button">Sharp</button>
+    <button class="btn" id="soundBtn" type="button">Sound on</button>
+    <button class="btn" id="quitBtn" type="button">Quit</button>
+  </div>
+  <div class="screen" id="screen">
+    <canvas id="canvas" tabindex="-1" oncontextmenu="event.preventDefault()"></canvas>
+    <div class="touch" id="touch" hidden>
+      <button type="button" id="tUp" class="arrow" data-key="up" aria-label="Up, accelerate">▲</button>
+      <button type="button" id="tDown" class="arrow" data-key="down" aria-label="Down, brake">▼</button>
+      <button type="button" id="tLeft" class="arrow" data-key="left" aria-label="Left">◀</button>
+      <button type="button" id="tRight" class="arrow" data-key="right" aria-label="Right">▶</button>
+      <button type="button" id="tTurbo" data-key="lshift">Turbo</button>
+      <button type="button" id="tGun" data-key="enter">Gun</button>
+      <button type="button" id="tMine" data-key="lalt">Mine</button>
+      <button type="button" id="tHorn" data-key="space">Horn</button>
+    </div>
+    <input id="kbd" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="Type into the game">
+  </div>
+</section>
+
+<script type="module" src="dr.js"></script>
+<script src="/sw-register.js"></script>
+</body>
+</html>

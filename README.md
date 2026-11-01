@@ -504,6 +504,57 @@ clear them to make room.
   frames, as the games poll the mouse. Measured with the CPU slowed 4.5x:
   Arena about 15 fps turning in its first dungeon, Daggerfall about 22 fps
   in Privateer's Hold, about 18,000 DOSBox cycles. Not yet tried in the car.
+- `apps/deathrally` and `apps/wolf3d`: Death Rally and Wolfenstein 3D, the
+  shareware episodes in DOSBox. Both use The Elder Scrolls app's engine
+  build (em-dosbox at the same commit with
+  `tools/elderscrolls/em-dosbox-web.patch`, built by `npm run build:dos`,
+  `tools/build-dos.mjs`, in the same Docker image; a copy of the engine and
+  its source tarball goes in each app's `engine/`) and share one page
+  script, `apps/_shared/dosgame.js`: the data blocks (all fetched before the
+  game starts, kept in IndexedDB, database named after the app), DOSBox
+  with the game's folder as C: and an overlay drive on `/save/<id>` (IDBFS)
+  for what the game writes, keys through `web_key` held at least two
+  DOSBox frames, a controller whose buttons each hold one or more keys
+  (`pad` in the app's script; the left stick and D-pad are the arrows), the
+  same on-screen buttons as Prince of Persia (`data-key`), the car's
+  keyboard through a hidden field, and `?run=OTHER.EXE` to run a game's
+  setup program instead. A real keyboard goes straight to SDL, which
+  listens on the window, so the page doesn't inject it twice (a key down
+  twice reads as two presses). The same script fetches the shareware zips
+  from the Internet Archive's copy of Apogee's FTP server
+  (ftp.3drealms.com/share/, saved 2015-11-30; the server is gone) and
+  checks their SHA-256, unpacks them unchanged, keeps the zip in each app's
+  `data/` and the license text in the app's folder, and packs the game's
+  folder with `tools/supertux/pack.mjs`; engine, data and licenses aren't
+  in git, so run the build before deploying `apps`.
+  - Death Rally (`1ral11.zip`, v1.1, 7.3 MB, 1996): Remedy's, published by
+    Apogee; its LICENSE.TXT lets individuals share it without charge with
+    every file included unmodified. The zip's DRSW11.SHR is a plain zip of
+    the game's folder. The game's SETUP.EXE and settings live in DR.CFG,
+    which the page seeds into the save overlay the first time
+    (`drcfg.js`): the file as the game itself wrote it after SETUP chose a
+    Sound Blaster 16 at 220h/7/1 and Define Keyboard put accelerate on Up
+    and brake on Down, then with the machine gun moved from Ctrl to Enter
+    by the game's own byte scrambling (so the bottom button is OK in the
+    menus and the gun in a race; Ctrl held with Enter made the menus miss
+    the Enter). The menus are keyboard-driven, and the driver's licence
+    needs a nickname typed. Measured with the CPU slowed 4.5x: 60 to 65
+    fps in a race at about 19,000 cycles. Not yet tried in the car.
+  - Wolfenstein 3D (`1wolf14.zip`, v1.4, 1.4 MB, 1993): id Software's,
+    published by Apogee; its VENDOR.DOC encourages everyone to copy and
+    pass it around without charging, all files unmodified. The zip's
+    W3DSW14.SHR is Apogee's installer archive: a 58-byte header, then
+    168-byte entries (name, compressed size at 0x88, DOS date and time)
+    each followed by a PKWARE implode stream, unpacked by
+    `tools/dos/apogee.mjs` with `blast` from `tools/cnc/westwood.mjs`. The
+    game finds the Sound Blaster itself (DOSBox's BLASTER variable), so
+    nothing is seeded; CONFIG.WL1 and the saves go to the overlay. The
+    bottom button holds Ctrl then Enter (the game's menus read the last
+    key pressed, so Enter must come second); the top button cycles the
+    weapons with 1 to 4; the right stick strafes (Alt with an arrow). The
+    menus take the first letter as a hotkey (N for New Game). Measured
+    with the CPU slowed 4.5x: 70 fps turning at about 12,500 cycles. Not
+    yet tried in the car.
 - `apps/openttd`: OpenTTD 15.3 (GPL-2.0), compiled to WebAssembly by
   `npm run build:openttd` (`tools/build-openttd.mjs`: the 15.3 tag plus
   `tools/openttd/openttd-web.patch`, built with upstream's own Emscripten
@@ -1061,6 +1112,7 @@ npm run build:doom                      # Doom and Heretic engines + Freedoom an
 npm run build:scummvm                   # ScummVM engine + free adventures (needs Docker); run before deploying apps
 npm run build:quake                     # Quake engine + LibreQuake (needs Docker); run before deploying apps
 npm run build:openttd                   # OpenTTD engine + its free base sets (needs Docker); run before deploying apps
+npm run build:dos                       # DOSBox engine + the Death Rally and Wolfenstein 3D shareware (needs Docker); run before deploying apps
 npm run build:fheroes2                  # fheroes2 engine for Heroes II (needs Docker); run before deploying apps
 npm run build:openarena                 # Quake III engine + OpenArena (needs Docker); run before deploying apps
 npm run build:blocks                    # ClassiCube engine + its textures, font and sounds (needs Docker); run before deploying apps

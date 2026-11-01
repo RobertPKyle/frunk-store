@@ -81,3 +81,10 @@ apps/elderscrolls/engine/dosbox.js
 apps/elderscrolls/engine/dosbox.wasm
 apps/elderscrolls/engine/*-web-src.tar.gz
 apps/elderscrolls/data
+tools/.dos-build
+apps/deathrally/engine
+apps/deathrally/data
+apps/deathrally/LICENSE.TXT
+apps/wolf3d/engine
+apps/wolf3d/data
+apps/wolf3d/VENDOR.DOC

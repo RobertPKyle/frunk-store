@@ -277,6 +277,32 @@
       "added": "2026-10-31"
     },
     {
+      "id": "deathrally",
+      "name": "Death Rally",
+      "tagline": "Remedy's 1996 top-down death race, the free shareware episode: machine guns, mines and turbo on six tracks, with a controller or on screen.",
+      "path": "/deathrally/",
+      "icon": "/deathrally/icon.svg",
+      "tags": [
+        "Game",
+        "Controller",
+        "Touch"
+      ],
+      "added": "2026-11-01"
+    },
+    {
+      "id": "wolf3d",
+      "name": "Wolfenstein 3D",
+      "tagline": "id Software's 1992 shooter that started the genre, the free first episode in full: escape Castle Wolfenstein floor by floor, with a controller or on screen.",
+      "path": "/wolf3d/",
+      "icon": "/wolf3d/icon.svg",
+      "tags": [
+        "Game",
+        "Controller",
+        "Touch"
+      ],
+      "added": "2026-11-01"
+    },
+    {
       "id": "openttd",
       "name": "OpenTTD",
       "tagline": "Build a transport empire with trains, trucks, ships and planes. The open-source Transport Tycoon, made for touch.",
