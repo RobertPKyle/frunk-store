@@ -1731,6 +1731,65 @@ await check('daily pokémon guess plays the daily by tapping and typing, keeps i
   await app.locator('#resultTitle', { hasText: 'Got it in 2!' }).waitFor({ timeout: 2000 });
 });
 
+await check('prince of persia starts, moves by touch and controller, quick saves and keeps the save', async () => {
+  await openFromHub(/Prince of Persia/);
+  const frame = () => page.frames().find(f => f.url().includes('/pop/'));
+  const app = appFrame();
+  const stats = () => frame().evaluate(() => window.popStats());
+  const until = async (what, fn, ms = 30000) => {
+    for (const t = Date.now(); Date.now() - t < ms; await page.waitForTimeout(250)) if (await fn()) return;
+    throw new Error(`no ${what}`);
+  };
+  const look = () => app.locator('#canvas').screenshot();
+  const tapKey = async (code, ms = 100) => { await page.keyboard.down(code); await page.waitForTimeout(ms); await page.keyboard.up(code); };
+  await app.locator('#play').click();
+  await until('frames', async () => (await stats()).frames > 5, 60000);
+  // Enter skips the intro, Shift leaves the title: the first level
+  await tapKey('Enter'); await page.waitForTimeout(1200);
+  await tapKey('Enter'); await page.waitForTimeout(1200);
+  await tapKey('ShiftLeft'); await page.waitForTimeout(3000);
+  const standing = await look();
+  // The on-screen buttons on a touch screen, else the keyboard: the prince runs right
+  if (await app.locator('#touch').isVisible()) {
+    const b = await app.locator('#tRight').boundingBox();
+    await page.touchscreen.tap(b.x + b.width / 2, b.y + b.height / 2);
+  } else {
+    await tapKey('ArrowRight', 150);
+  }
+  await page.waitForTimeout(1500);
+  if ((await look()).equals(standing)) throw new Error('the prince didn\'t move');
+  // F6 quick saves to the working directory, IDBFS at /save
+  await tapKey('F6'); await page.waitForTimeout(1000);
+  const saved = await frame().evaluate(() => window.Module.FS.analyzePath('/save/QUICKSAVE.SAV').exists);
+  if (!saved) throw new Error('no quick save after F6');
+  // Two pads like the car: the controller's raw device and the car's
+  // standard copy. Start (Esc) opens the pause menu, the right button
+  // (Shift) picks Resume
+  await frame().evaluate(() => {
+    const pad = (id, mapping, index) => ({ id, index, mapping, connected: true, timestamp: 0, axes: [0, 0, 0, 0], buttons: Array.from({ length: 17 }, () => ({ pressed: false, value: 0 })) });
+    const pads = [pad('raw', '', 0), pad('Tesla Virtual Gamepad', 'standard', 1)];
+    navigator.getGamepads = () => pads;
+    window.padPress = async (b, ms = 150) => {
+      Object.assign(pads[1].buttons[b], { pressed: true, value: 1 });
+      await new Promise(r => setTimeout(r, ms));
+      Object.assign(pads[1].buttons[b], { pressed: false, value: 0 });
+    };
+  });
+  const press = async (b, wait = 1200) => { await frame().evaluate(b => padPress(b), b); await page.waitForTimeout(wait); };
+  const playing = await look();
+  await press(9);
+  if (!(await app.locator('#padNote').isVisible())) throw new Error('the controller wasn\'t noticed');
+  if ((await look()).equals(playing)) throw new Error('Start didn\'t open the pause menu');
+  await page.screenshot({ path: shots + 'pop.png' });
+  await press(1);
+  await page.waitForTimeout(500);
+  // Leaving through the hub writes the save to IndexedDB; the start screen says so
+  await page.click('#home');
+  await page.waitForSelector('#runner', { state: 'hidden' });
+  await openFromHub(/Prince of Persia/);
+  await app.locator('#kept').filter({ hasText: /saved game/ }).waitFor({ timeout: 10000 });
+});
+
 await check('supertux streams its data, starts the story by touch, saves when left and loads the save again', async () => {
   await openFromHub(/SuperTux/);
   const frame = () => page.frames().find(f => f.url().includes('/supertux/'));

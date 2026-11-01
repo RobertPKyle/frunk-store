@@ -1,0 +1,68 @@
+diff -ruN rel/SDLPoP-1.23/src/common.h edit/src/common.h
+--- rel/SDLPoP-1.23/src/common.h	2023-02-04 03:43:22.000000000 -0600
++++ edit/src/common.h	2026-10-31 19:13:35.162818168 -0500
+@@ -74,6 +74,14 @@
+ 		}						\
+ 	} while (0)
+ 
++// [frunk] In the browser (frunk.store's build) the game runs on a stack
++// that can wait (JSPI): a wait hands the page its turn, which draws the
++// screen and lets its events in, and comes back when the time has passed
++#ifdef __EMSCRIPTEN__
++#include <emscripten.h>
++#define SDL_Delay(ms) emscripten_sleep(ms)
++#endif
++
+ #ifdef __cplusplus
+ }
+ #endif
+diff -ruN rel/SDLPoP-1.23/src/menu.c edit/src/menu.c
+--- rel/SDLPoP-1.23/src/menu.c	2023-02-04 03:43:22.000000000 -0600
++++ edit/src/menu.c	2026-10-31 19:13:35.163801187 -0500
+@@ -2143,6 +2143,7 @@
+ 		case SDL_SCANCODE_LEFT:
+ 			menu_control_x = -1;
+ 			break;
++		case SDL_SCANCODE_LSHIFT: // [frunk] the action button on the screen and the controller picks too
+ 		case SDL_SCANCODE_RETURN:
+ 		case SDL_SCANCODE_SPACE:
+ 			pressed_enter = 1;
+diff -ruN rel/SDLPoP-1.23/src/seg009.c edit/src/seg009.c
+--- rel/SDLPoP-1.23/src/seg009.c	2023-02-04 03:43:22.000000000 -0600
++++ edit/src/seg009.c	2026-10-31 19:13:35.163461581 -0500
+@@ -2479,7 +2479,13 @@
+ #ifdef SDL_HINT_WINDOWS_DISABLE_THREAD_NAMING
+ 	SDL_SetHint(SDL_HINT_WINDOWS_DISABLE_THREAD_NAMING, "1");
+ #endif
++#ifdef __EMSCRIPTEN__
++	// [frunk] the page reads the controller itself and sends keys: the car
++	// lists each controller twice, and SDL would take both
++	if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_NOPARACHUTE) != 0) {
++#else
+ 	if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_NOPARACHUTE | SDL_INIT_GAMECONTROLLER) != 0) {
++#endif
+ 		sdlperror("set_gr_mode: SDL_Init");
+ 		quit(1);
+ 	}
+@@ -2682,6 +2688,9 @@
+ }
+ 
+ void update_screen() {
++#ifdef __EMSCRIPTEN__
++	EM_ASM({ Module.popFrames = (Module.popFrames | 0) + 1; });   // [frunk] for the page's checks
++#endif
+ 	draw_overlay();
+ 	SDL_Surface* surface = get_final_surface();
+ 	init_scaling();
+@@ -3697,6 +3706,11 @@
+ void idle() {
+ 	process_events();
+ 	update_screen();
++#ifdef __EMSCRIPTEN__
++	// [frunk] the loops that idle() until a timer runs out never return to
++	// the page on their own
++	emscripten_sleep(1);
++#endif
+ }
+ 
+ void do_simple_wait(int timer_index) {

@@ -111,6 +111,7 @@
     "openarena": { "tagline": "Snelle arenagevechten tegen bots op de Quake III-engine: een gratis game met tien arena's, op het scherm of met een controller." },
     "craft4k": { "tagline": "Notch' piepkleine Minecraft4k herbouwd in C++ en met ray marching op de grafische chip getekend: een grote blokkenwereld met zonneschaduwen, dag en nacht, en spiegels om mee te bouwen." },
     "fheroes2": { "tagline": "Heroes of Might and Magic II van je eigen exemplaar, op de opensource-engine fheroes2: steden, helden en beurtgebaseerde gevechten, met touch." },
+    "pop": { "name": "Prince of Persia", "tagline": "Het origineel uit 1989 op SDLPoP: zestig minuten om uit de kerkers te ontsnappen en de vizier te stoppen. Twaalf levels, met controller of via touch." },
     "supertux": { "tagline": "Tux' spring-en-ren-avontuur over Icy Island en het Rooted Forest, plus twee bonuseilanden: zo'n honderd levels. Touch of controller." },
     "blocks": { "name": "Blokkenbouwer", "tagline": "Bouw wat je wilt in een blokkenwereld in Minecraft Classic-stijl: creatieve modus, vliegen en werelden die opslaan terwijl je speelt." },
     "city": { "name": "Stedenbouwer", "tagline": "Sticht een stad en laat hem groeien van dorp tot megalopolis: zones, wegen, stroom, belastingen en rampen, in de klassieke stadssimulatie uit 1989, nu open source." },

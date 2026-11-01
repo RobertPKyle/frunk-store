@@ -111,6 +111,7 @@
     "openarena": { "tagline": "在 Quake III 引擎上與電腦對手進行快節奏的競技場射擊：免費遊戲，內含十個競技場，用螢幕或控制器操作。" },
     "craft4k": { "tagline": "Notch 的迷你 Minecraft4k 以 C++ 重寫，在顯示晶片上以光線步進繪製：一個巨大的方塊世界，有陽光陰影、晝夜交替，還能用鏡子建造。" },
     "fheroes2": { "tagline": "用你自己的 Heroes of Might and Magic II 檔案，在開源的 fheroes2 引擎上遊玩：城鎮、英雄與回合制戰鬥，觸控操作。" },
+    "pop": { "name": "Prince of Persia", "tagline": "在 SDLPoP 上玩 1989 年原版：六十分鐘內逃出地牢、阻止宰相。十二關，可用控制器或觸控。" },
     "supertux": { "tagline": "Tux 橫越冰雪島與根之森林的跳躍冒險，外加兩座獎勵島嶼：約一百個關卡。觸控或控制器皆可。" },
     "blocks": { "name": "方塊建造家", "tagline": "在 Minecraft Classic 風格的方塊世界裡蓋出任何東西：創造模式、飛行，世界會在遊玩時自動儲存。" },
     "city": { "name": "城市建造家", "tagline": "建立一座城市，從村莊發展成超級大都會：分區、道路、電力、稅收和災難，1989 年的經典城市模擬，現已開源。" },

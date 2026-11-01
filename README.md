@@ -652,6 +652,33 @@ clear them to make room.
   Measured with the CPU slowed 4.5x: 250-390 ms/s of main-thread work.
   The engine isn't in git, so run the build before deploying `apps`. Not
   yet tried in the car.
+- `apps/pop`: Prince of Persia (1989) on SDLPoP 1.23 (GPL-3.0-or-later),
+  compiled to WebAssembly by `npm run build:pop` (`tools/build-pop.mjs`: the
+  release's source tarball checked against its SHA-256, plus
+  `tools/pop/sdlpop-web.patch`, emcc in Docker from `tools/pop/Dockerfile`,
+  emsdk 4.0.10 with the SDL2 and SDL2_image ports; about 20 s; 1.1 MB of
+  wasm). The game's data (466 KB: the graphics, levels, sounds and OPL
+  music as SDLPoP's repository ships them; Ubisoft's, not under SDLPoP's
+  license, hosted by the user's choice) and `tools/pop/SDLPoP.ini` are
+  preloaded at `/pop`, where the game looks for them (`Module.thisProgram`
+  is `/pop/prince`). The game's own loops run inside `main()` on a stack
+  that can wait (JSPI): the patch makes `SDL_Delay` and `idle()` hand the
+  page its turn with `emscripten_sleep`, and the build uses WebAssembly
+  exceptions and longjmp (Emscripten's JavaScript ones put JS frames on the
+  stack through libpng's setjmp, where JSPI can't suspend). SDL's controller
+  support is off: the page reads one pad (the car's "Tesla Virtual
+  Gamepad", else a standard one) and sends keys, as the on-screen buttons
+  do, through `KeyboardEvent`s on the window, which SDL reads: the D-pad or
+  stick moves, the bottom button jumps, the left one crouches, the right
+  one and the shoulders are Shift (grab, careful step, sword), Start is Esc
+  (the pause menu) and Select is Enter (skips cutscenes); the patch lets
+  Shift pick in the pause menu too. SDL sizes a resizable window by the
+  canvas's CSS size, so the canvas is shown (under the loading screen)
+  before the game starts. Saves (PRINCE.SAV, QUICKSAVE.SAV, the pause
+  menu's SDLPoP.cfg) live in IDBFS at `/save`, the working directory,
+  synced every 3 s and when the page is hidden or the hub's close handshake
+  asks; hiding the page also opens the pause menu, so the hour's clock
+  stops. `window.popStats()` counts drawn frames for the e2e check.
 - `apps/supertux`: SuperTux 0.7.0 (GPL-3.0-or-later), compiled to
   WebAssembly by `npm run build:supertux` (`tools/build-supertux.mjs`: the
   release's source tarball checked against its SHA-256, plus

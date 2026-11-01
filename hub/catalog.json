@@ -300,6 +300,7 @@
       ],
       "added": "2026-10-28"
     },
+    { "id": "pop", "name": "Prince of Persia", "tagline": "The 1989 original on SDLPoP: sixty minutes to escape the dungeons and stop the Vizier. Twelve levels, with a controller or by touch.", "path": "/pop/", "icon": "/pop/icon.svg", "tags": ["Game", "Controller", "Touch"], "added": "2026-10-31" },
     {
       "id": "supertux",
       "name": "SuperTux",

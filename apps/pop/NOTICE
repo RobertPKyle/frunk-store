@@ -1,0 +1,31 @@
+Prince of Persia (apps/pop)
+
+Engine (engine/)
+  SDLPoP 1.23, by Dávid Nagy, Falcury and contributors: an open-source port
+  of Prince of Persia for DOS, from a disassembly of the original.
+  License: GNU General Public License, version 3 or later (engine/COPYING).
+  Source: https://github.com/NagyD/SDLPoP, release v1.23, with frunk.store's
+  changes for the browser in engine/sdlpop-web.patch (also
+  tools/pop/sdlpop-web.patch in https://github.com/RobertPKyle/frunk-store,
+  whose tools/build-pop.mjs builds it). The patched source the build came
+  from is engine/sdlpop-1.23-web-src.tar.gz.
+  The changes: the game's waits hand the page its turn (emscripten_sleep
+  with JSPI), so its own loops run as they are inside main(); SDL's
+  controller support is off, since the page reads the controller itself
+  (the car lists each controller twice) and sends keys; the action key
+  (Shift) also picks in the pause menu; and a frame counter for the page.
+  tools/pop/SDLPoP.ini sets the starting options (pause menu on, no
+  splash, the original 4:3 picture, quick saves, the fixes and enhancements
+  on); the player's own settings go to SDLPoP.cfg next to the saves.
+  SDLPoP includes opl3.c (Nuked OPL3, by Alexey Khokholov, LGPL 2.1 or
+  later) and stb_vorbis.c (by Sean Barrett, public domain / MIT); see the
+  source.
+
+Game data (engine/prince.data, preloaded at /pop/data)
+  The graphics, levels, sounds and music of Prince of Persia (1989), by
+  Jordan Mechner, published by Brøderbund, now owned by Ubisoft, as the
+  SDLPoP repository ships them (its data folder). They are not covered by
+  SDLPoP's license. frunk.store is not affiliated with or endorsed by
+  Ubisoft, Jordan Mechner or the SDLPoP project.
+
+Page (index.html, pop.js, icon.svg): by frunk.store.

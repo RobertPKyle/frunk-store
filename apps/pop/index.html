@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Prince of Persia</title>
+<style>
+  :root { --bg: #140f0c; --panel: #241a14; --card: #30231b; --line: rgba(255, 210, 160, .16); --text: #f7efe4; --muted: #b9a893;
+          --accent: #f0a83a; --danger: #c4503a; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 16px/1.4 system-ui, sans-serif; overflow: hidden;
+               -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; touch-action: none; }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  .btn { min-height: 44px; padding: 8px 16px; border-radius: 12px; background: var(--card); border: 1px solid var(--line); white-space: nowrap; }
+  .btn.primary { background: var(--accent); border-color: transparent; color: #221503; font-weight: 700; }
+  .btn:disabled { opacity: .5; cursor: default; }
+  [hidden] { display: none !important; }
+
+  /* ---------- start ---------- */
+  #start { display: flex; flex-direction: column; height: 100%; }
+  /* left padding keeps clear of the hub's Apps button */
+  header { display: flex; align-items: center; gap: 10px; min-height: 60px; padding: 8px 12px 8px 110px; border-bottom: 1px solid var(--line); }
+  header h1 { margin: 0; font-size: 18px; font-weight: 600; flex: 1; }
+  .scroll { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 14px 16px 20px; touch-action: pan-y; }
+  .hero { display: flex; gap: 16px; align-items: center; max-width: 720px; padding: 16px; border-radius: 16px; background: var(--panel); border: 1px solid var(--line); }
+  .hero img { width: 84px; height: 84px; flex: none; }
+  .hero p { margin: 0 0 12px; color: #e8dccb; }
+  h2 { margin: 18px 2px 8px; font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .note { font-size: 13px; color: var(--muted); margin: 6px 2px; max-width: 60em; }
+  table.keys { border-collapse: collapse; font-size: 13px; color: var(--muted); margin: 4px 2px; }
+  table.keys th, table.keys td { text-align: left; padding: 3px 14px 3px 0; vertical-align: top; }
+  table.keys th { color: var(--text); font-weight: 600; }
+  .legal { margin-top: 18px; font-size: 12px; color: var(--muted); user-select: text; -webkit-user-select: text; max-width: 60em; }
+  .legal p { margin: 4px 0; }
+
+  /* ---------- overlays ---------- */
+  .overlay { position: fixed; inset: 0; z-index: 5; display: grid; place-items: center; padding: 64px 16px 16px; background: rgba(10, 6, 4, .9); }
+  .sheet { display: flex; flex-direction: column; max-width: 560px; padding: 18px; border-radius: 18px; background: var(--panel); border: 1px solid var(--line); }
+  .sheet h2 { margin: 0 0 8px; font-size: 19px; color: var(--text); letter-spacing: 0; text-transform: none; }
+  .sheet p { margin: 0 0 10px; font-size: 15px; color: #e8dccb; overflow-wrap: anywhere; }
+  #loading { position: fixed; inset: 0; z-index: 4; display: grid; place-content: center; gap: 14px; text-align: center; background: var(--bg); padding: 16px; }
+  #loading b { font-size: 20px; }
+  #loadText { color: var(--muted); font-size: 15px; }
+
+  /* ---------- player ---------- */
+  #player { position: fixed; inset: 0; display: grid; grid-template-rows: 60px minmax(0, 1fr); grid-template-columns: minmax(0, 1fr); background: #000; }
+  .bar { display: flex; align-items: center; gap: 8px; padding: 8px 10px 8px 110px; background: var(--panel); border-bottom: 1px solid var(--line); }
+  .bar b { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #padNote { font-size: 13px; color: var(--muted); white-space: nowrap; }
+  .screen { position: relative; min-height: 0; min-width: 0; overflow: hidden; display: grid; place-items: center; }
+  /* SDL sets the canvas's own size in its style; the sheet's rule wins and
+     keeps the 4:3 picture as big as the screen area allows */
+  #canvas { display: block; width: min(100%, calc((100vh - 60px) * 4 / 3)) !important; height: auto !important; aspect-ratio: 4 / 3;
+            border: 0; padding: 0; background: #000; outline: none; image-rendering: pixelated; }
+
+  /* ---------- on-screen controls ---------- */
+  .touch { position: absolute; inset: 0; pointer-events: none; }
+  .touch button {
+    position: absolute; pointer-events: auto; width: 76px; height: 76px; border-radius: 50%; font-size: 15px; font-weight: 700;
+    background: rgba(40, 28, 20, .55); border: 2px solid rgba(255, 220, 170, .35); color: #fff; touch-action: none;
+    display: grid; place-items: center; line-height: 1.1; text-align: center; padding: 0;
+  }
+  .touch button.held, .touch button:active { background: rgba(240, 168, 58, .55); border-color: var(--accent); }
+  .touch .arrow { font-size: 30px; }
+  #tLeft { left: 14px; bottom: 16px; }
+  #tRight { left: 104px; bottom: 16px; }
+  #tUp { right: 14px; bottom: 108px; }
+  #tDown { right: 104px; bottom: 16px; }
+  #tAction { right: 14px; bottom: 16px; width: 84px; height: 84px; }
+  @media (max-width: 640px) {
+    .bar .btn { padding: 8px 10px; }
+    .hero img { width: 60px; height: 60px; }
+  }
+</style>
+</head>
+<body>
+<section id="start">
+  <header>
+    <h1>Prince of Persia</h1>
+    <button class="btn primary" id="play" type="button">Play</button>
+  </header>
+  <div class="scroll">
+    <div class="hero">
+      <img src="icon.svg" alt="">
+      <div>
+        <p>Jordan Mechner's 1989 original: sixty minutes to climb out of the dungeons, past guards, spikes and chompers, and stop the Vizier Jaffar. Twelve levels, running on SDLPoP, the open-source port of the DOS game.</p>
+        <div class="row">
+          <button class="btn primary" id="play2" type="button">Play</button>
+          <span class="note" id="kept" style="margin:0"></span>
+        </div>
+        <p class="note" id="status" aria-live="polite"></p>
+      </div>
+    </div>
+
+    <h2>Controls</h2>
+    <table class="keys">
+      <tr><th></th><th>Controller</th><th>On the screen</th></tr>
+      <tr><td>Run, turn</td><td>D-pad or left stick</td><td>◀ ▶</td></tr>
+      <tr><td>Jump, climb up</td><td>Bottom button, or stick up</td><td>Jump</td></tr>
+      <tr><td>Crouch, climb down</td><td>Left button, or stick down</td><td>Crouch</td></tr>
+      <tr><td>Grab a ledge, careful step, sword</td><td>Right button, shoulders or triggers (hold)</td><td>Grab</td></tr>
+      <tr><td>Pause menu (quick save and load, settings)</td><td>Start</td><td>Menu</td></tr>
+      <tr><td>Skip a cutscene</td><td>Select</td><td>Menu</td></tr>
+    </table>
+    <p class="note">Hold Grab while walking to take careful steps; press it at the edge of a fall to catch the ledge. A jump while running clears wider gaps. Quick save keeps your place on this car (the pause menu, or F6 and F9 on a keyboard); the game's own save (from level 3) is in the pause menu too.</p>
+
+    <div class="legal">
+      <p>Game: Prince of Persia (1989) by Jordan Mechner, published by Brøderbund; now owned by Ubisoft. Engine: SDLPoP 1.23 by Dávid Nagy, Falcury and contributors (GNU GPL version 3 or later), an open-source port of the DOS game, compiled to WebAssembly with small changes for the browser: /pop/engine/sdlpop-web.patch, built by tools/build-pop.mjs in github.com/RobertPKyle/frunk-store; the source is at /pop/engine/. The game's graphics, levels, sounds and music are the ones SDLPoP ships. See /pop/NOTICE.</p>
+      <p>frunk.store is not affiliated with or endorsed by Ubisoft, Jordan Mechner or the SDLPoP project. Play only while parked.</p>
+    </div>
+  </div>
+</section>
+
+<section id="loading" hidden aria-live="polite">
+  <b>Prince of Persia</b>
+  <span id="loadText">Loading…</span>
+</section>
+
+<section id="failed" class="overlay" hidden aria-labelledby="failedTitle">
+  <div class="sheet">
+    <h2 id="failedTitle">The game stopped</h2>
+    <p id="failedText"></p>
+    <div class="row"><button class="btn primary" id="failedOk" type="button">Start again</button></div>
+  </div>
+</section>
+
+<section id="player" hidden>
+  <div class="bar">
+    <b>Prince of Persia</b>
+    <span id="padNote" hidden>Controller</span>
+    <button class="btn" id="menuBtn" type="button">Menu</button>
+    <button class="btn" id="soundBtn" type="button">Sound on</button>
+    <button class="btn" id="quitBtn" type="button">Quit</button>
+  </div>
+  <div class="screen" id="screen">
+    <canvas id="canvas" tabindex="-1" oncontextmenu="event.preventDefault()"></canvas>
+    <div class="touch" id="touch" hidden>
+      <button type="button" id="tLeft" class="arrow" data-key="ArrowLeft" aria-label="Left">◀</button>
+      <button type="button" id="tRight" class="arrow" data-key="ArrowRight" aria-label="Right">▶</button>
+      <button type="button" id="tUp" data-key="ArrowUp">Jump</button>
+      <button type="button" id="tDown" data-key="ArrowDown">Crouch</button>
+      <button type="button" id="tAction" data-key="ShiftLeft">Grab</button>
+    </div>
+  </div>
+</section>
+
+<script type="module" src="pop.js"></script>
+<script src="/sw-register.js"></script>
+</body>
+</html>
