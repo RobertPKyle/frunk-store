@@ -1045,6 +1045,17 @@ clear them to make room.
   random one from Lichess. The last puzzle is cached for offline use. Rules
   come from chess.js (BSD-2-Clause); the piece art is the cburnett set
   (CC BY-SA 3.0).
+- `apps/stockfish`: Chess vs Stockfish, full games against Stockfish 19. The
+  engine is the unchanged lite single-threaded build of stockfish.js 19.0.1
+  (GPL-3.0, 1.8 MB of wasm), which runs in a worker. `npm run build:stockfish`
+  (`tools/build-stockfish.mjs`) downloads it, its license and its source to
+  `apps/stockfish/engine` and checks their SHA-256; none of them are in git,
+  so run it before deploying `apps`. Rules and piece art load from
+  `apps/chess`. Eight levels: Stockfish's Skill Level with a limit on depth or
+  nodes, so a level plays the same on any computer, and the two weakest also
+  play a random move now and then. Every search also has a 4 s time limit. The
+  game is saved after every move in localStorage, and a game left on the
+  engine's turn carries on when the app opens again.
 - `apps/pokeguess`: Daily Pokémon Guess. Squirdle by Fireblend (Apache
   License 2.0, github.com/Fireblend/squirdle), reworked for the car: guess
   a secret Pokémon in up to 8 tries from hints on its generation, types,

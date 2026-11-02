@@ -414,6 +414,105 @@ await check('chess puzzle renders a board', async () => {
   await page.screenshot({ path: shots + 'chess.png' });
 });
 
+await check('chess vs stockfish plays, takes back, hints, promotes and resumes', async () => {
+  await openFromHub(/Chess vs Stockfish/);
+  const app = appFrame();
+  const tap = sq => app.locator(`[data-sq="${sq}"]`).click();
+  const moves = () => app.locator('#moves i').count();
+  const until = (fn, arg) => page.frames().find(f => f.url().includes('/stockfish/')).waitForFunction(fn, arg, { timeout: 30000 });
+  const statusIs = text => until(t => document.getElementById('status').textContent.includes(t), text);
+  const saved = list => page.frames().find(f => f.url().includes('/stockfish/')).evaluate(l => {
+    localStorage.setItem('frunk.stockfish.game', JSON.stringify(l));
+    location.reload();
+  }, list);
+
+  // first visit: pick a level and side, and the engine answers a move
+  await app.locator('#setup').waitFor();
+  if (await app.locator('#cancel').isVisible()) throw new Error('nothing to go back to, yet Keep playing shows');
+  await app.locator('[data-level="3"]').click();
+  await app.locator('[data-color="w"]').click();
+  if (await app.locator('[data-level="3"].on').count() !== 1) throw new Error('the level was not picked');
+  await app.locator('#play').click();
+  await tap('e2');
+  if (await app.locator('.sq.tgt').count() !== 2) throw new Error('e2 should offer two moves');
+  await tap('e4');
+  await until(() => document.querySelectorAll('#moves i').length === 2);
+  await statusIs('Your move');
+  const box = await app.locator('#board').boundingBox();
+  console.log(`     board ${Math.round(box.width)}x${Math.round(box.height)}`);
+  if (box.width !== box.height || box.width < 500) throw new Error(`board is ${box.width}x${box.height}`);
+
+  // a hint marks a move's two squares
+  await app.locator('#hint').click();
+  await until(() => document.querySelectorAll('.sq.hint').length === 2);
+  await statusIs('Your move');
+
+  // take back undoes both sides' moves, and a move can be taken back while the engine thinks
+  await app.locator('#back').click();
+  if (await moves() !== 0) throw new Error('take back left moves on the board');
+  await tap('d2');
+  await tap('d4');
+  await app.locator('#back').click();
+  if (await moves() !== 0) throw new Error('take back during the reply left moves on the board');
+  await page.waitForTimeout(600);   // the called-off reply must not land
+  if (await moves() !== 0) throw new Error('a called-off reply was played');
+
+  // a promotion asks which piece, and an underpromotion is played as chosen
+  await saved({ moves: ['a2a4', 'b7b5', 'a4b5', 'a7a6', 'b5a6', 'g8f6', 'a6a7', 'f6g8'], you: 'w', level: 0 });
+  await app.locator('[data-sq="a7"]').waitFor();
+  await tap('a7');
+  await tap('b8');
+  await app.locator('[data-promote="n"]').click();
+  await until(() => document.getElementById('moves').textContent.includes('axb8=N'));
+
+  // a saved game on the engine's turn carries on, and mate ends the game
+  await saved({ moves: ['f2f3', 'e7e5', 'g2g4'], you: 'w', level: 7 });
+  await statusIs('Checkmate. Stockfish wins.');
+  if (!(await app.locator('#hint').isDisabled())) throw new Error('hint is on after the game ended');
+  await until(() => document.querySelectorAll('.sq.check').length === 1);
+
+  // playing Black: the board turns round and the engine moves first
+  await app.locator('#new').click();
+  await app.locator('[data-color="b"]').click();
+  await app.locator('[data-level="7"]').click();
+  await app.locator('#play').click();
+  if (await app.locator('.sq').first().getAttribute('data-sq') !== 'h1') throw new Error('board not turned for Black');
+  await until(() => document.querySelectorAll('#moves i').length === 1);
+  await statusIs('Your move');
+  // Screenshots come last: right after one, Chrome can give a click to the hub's iframe element instead of the app
+  await page.screenshot({ path: shots + 'stockfish.png' });
+  await app.locator('#new').click();
+  await app.locator('#cancel').waitFor();
+  await page.screenshot({ path: shots + 'stockfish-setup.png' });
+});
+
+await check('chess vs stockfish plays offline after one visit', async () => {
+  const context = await browser.newContext({ viewport: { width: 773, height: 601 } });
+  try {
+    const p = await context.newPage();
+    await p.goto(`${appsBase}/stockfish/`);
+    // the service worker fetches them after the page loads
+    const urls = ['/stockfish/', '/stockfish/app.js', '/stockfish/engine/stockfish-19-lite-single.js', '/stockfish/engine/stockfish-19-lite-single.wasm', '/chess/chess.min.js', '/chess/pieces.js', '/sw-register.js'];
+    for (let tries = 0; ; tries++) {
+      const missing = await p.evaluate(async urls => {
+        const hits = await Promise.all(urls.map(url => caches.match(url)));
+        return urls.filter((_, i) => !hits[i]);
+      }, urls);
+      if (!missing.length) break;
+      if (tries === 120) throw new Error(`not cached: ${missing}`);
+      await p.waitForTimeout(250);
+    }
+    await context.setOffline(true);
+    await p.reload();
+    await p.locator('#play').click();
+    await p.locator('[data-sq="e2"]').click();
+    await p.locator('[data-sq="e4"]').click();
+    await p.waitForFunction(() => document.querySelectorAll('#moves i').length === 2, null, { timeout: 30000 });
+  } finally {
+    await context.close();
+  }
+});
+
 await check('terrarium runs, feeds and catches up after time away', async () => {
   await openFromHub(/Terrarium/);
   const tank = () => page.frames().find(f => f.url().includes('/terrarium/'));

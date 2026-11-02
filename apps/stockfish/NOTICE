@@ -1,0 +1,16 @@
+Chess vs Stockfish (apps/stockfish)
+
+Engine (engine/)
+  Stockfish 19 by T. Romstad, M. Costalba, J. Kiiski, G. Linscott and other
+  contributors (https://github.com/official-stockfish/Stockfish), compiled to
+  WebAssembly as stockfish.js 19.0.1 by Nathan Rugg
+  (https://github.com/nmrugg/stockfish.js). This is the unchanged "lite
+  single-threaded" build from that project's v19.0.1 release, with the small
+  NNUE network nn-61e7af4bb97d by Chris Bao (sscg13).
+  License: GNU General Public License, version 3 (engine/COPYING.txt).
+  Source: engine/stockfish.js-19.0.1-src.tar.gz, the project's v19.0.1 tag.
+
+Rules and board (loaded from ../chess)
+  chess.js 1.4.0, BSD-2-Clause, https://github.com/jhlywa/chess.js
+  (../chess/chess-LICENSE.txt).
+  cburnett chess pieces, Colin M.L. Burnett, CC BY-SA 3.0.

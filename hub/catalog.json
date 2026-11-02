@@ -445,6 +445,19 @@
       ]
     },
     {
+      "id": "stockfish",
+      "name": "Chess vs Stockfish",
+      "tagline": "Full games against Stockfish 19, from a gentle beginner level up to full strength. Take back a move, ask for a hint and pick up where you left off.",
+      "path": "/stockfish/",
+      "icon": "/stockfish/icon.svg",
+      "added": "2026-11-01",
+      "tags": [
+        "Game",
+        "Touch",
+        "Offline"
+      ]
+    },
+    {
       "id": "chess",
       "name": "Chess Puzzle",
       "tagline": "Solve the Lichess daily chess puzzle on your screen.",

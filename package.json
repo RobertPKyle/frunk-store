@@ -17,6 +17,7 @@
     "build:blocks": "node tools/build-blocks.mjs",
     "build:supertux": "node tools/build-supertux.mjs",
     "build:pop": "node tools/build-pop.mjs",
+    "build:stockfish": "node tools/build-stockfish.mjs",
     "build:mame": "node tools/build-mame.mjs",
     "build:craft4k": "node tools/build-craft4k.mjs",
     "build:puzzles": "node tools/build-puzzles.mjs",

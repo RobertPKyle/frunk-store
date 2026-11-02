@@ -15,7 +15,7 @@ const SLOW = 3000;   // ms to wait for a page before using the cached copy
 // The Elder Scrolls', Death Rally's and Wolfenstein 3D's data blocks, Duke
 // Nukem 3D's and the DOS games' shareware zips; and the
 // engine sources, rarely fetched). A second copy here would only fill storage.
-const SKIP = /^\/(cnc\/(data\/(td|ra)\/[0-9a-f]{12}\/\d+\.bin(\.gz)?|engine\/[^/]+\.tar\.gz)|elderscrolls\/(data\/(arena|daggerfall)\/[0-9a-f]{12}\/\d+\.bin(\.gz)?|engine\/[^/]+\.tar\.gz)|(deathrally|wolf3d)\/(data\/([0-9a-f]{12}\/\d+\.bin(\.gz)?|[^/]+\.zip)|engine\/[^/]+\.tar\.gz)|doom\/freedoom\/[^/]+\.wad\.gz|heretic\/blasphemer\/[^/]+\.wad\.gz|adventure\/games\/[^/]+\.zip|quake\/librequake\/([^/]+\.pak\.gz|music\/[^/]+\.ogg)|duke3d\/(shareware\/[^/]+\.zip|engine\/[^/]+\.tar\.gz)|openttd\/data\/[^/]+\.tar\.gz|openarena\/data\/[^/]+\.pk3|supertux\/data\/[0-9a-f]{12}\/\d+\.bin(\.gz)?)$/;
+const SKIP = /^\/(cnc\/(data\/(td|ra)\/[0-9a-f]{12}\/\d+\.bin(\.gz)?|engine\/[^/]+\.tar\.gz)|elderscrolls\/(data\/(arena|daggerfall)\/[0-9a-f]{12}\/\d+\.bin(\.gz)?|engine\/[^/]+\.tar\.gz)|(deathrally|wolf3d)\/(data\/([0-9a-f]{12}\/\d+\.bin(\.gz)?|[^/]+\.zip)|engine\/[^/]+\.tar\.gz)|doom\/freedoom\/[^/]+\.wad\.gz|heretic\/blasphemer\/[^/]+\.wad\.gz|adventure\/games\/[^/]+\.zip|quake\/librequake\/([^/]+\.pak\.gz|music\/[^/]+\.ogg)|duke3d\/(shareware\/[^/]+\.zip|engine\/[^/]+\.tar\.gz)|openttd\/data\/[^/]+\.tar\.gz|openarena\/data\/[^/]+\.pk3|supertux\/data\/[0-9a-f]{12}\/\d+\.bin(\.gz)?|stockfish\/engine\/[^/]+\.tar\.gz)$/;
 
 // Pages shown from the cache: their files come from the cache first. Lost
 // when the worker stops, which only means going back to network-first.

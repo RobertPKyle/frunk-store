@@ -63,6 +63,7 @@ apps/supertux/engine
 apps/supertux/data
 tools/.pop-build
 apps/pop/engine
+apps/stockfish/engine
 tools/.mame-build
 apps/arcade/engine
 tools/.city-build
