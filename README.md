@@ -29,6 +29,10 @@ between chips and cards and A opens one (arrow keys and Enter do the same).
 The controller is read only while the hub itself is showing, never while an
 app runs.
 
+The referral offer in the footer shows only in the Americas and Europe, going by
+the browser's time zone; a zone that says nothing (UTC) falls back on the
+language. The community token's block is hidden in the Chinese hub.
+
 An app's catalog entry can carry `"added"` or `"updated"` with a date
 (`YYYY-MM-DD`). For 14 days after it, the app's card shows a New or Updated
 badge, until it's opened after that date. Set `added` on a new app and

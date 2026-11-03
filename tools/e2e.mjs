@@ -199,6 +199,36 @@ await check('hub switches language and remembers it', async () => {
   if (!(await page.locator('#grid .card h2').allTextContents()).includes('Brick Breaker')) throw new Error('cards not back in English');
 });
 
+await check('referral shows only in the Americas and Europe, token not in Chinese', async () => {
+  const cases = [
+    ['America/Denver', 'en', true, true],
+    ['America/Toronto', 'en', true, true],
+    ['Pacific/Honolulu', 'en', true, true],
+    ['Europe/Berlin', 'de', true, true],
+    ['America/Los_Angeles', 'zh-Hant', true, false],
+    ['Asia/Taipei', 'zh-Hant', false, false],
+    ['Asia/Hong_Kong', 'en', false, true],
+    ['Asia/Singapore', 'zh-Hans', false, false],
+    ['Asia/Tokyo', 'ja', false, true],
+    ['Australia/Sydney', 'en', false, true],
+    ['UTC', 'en', true, true],
+    ['UTC', 'zh-Hant', false, false],
+  ];
+  for (const [timezoneId, code, referral, token] of cases) {
+    const context = await browser.newContext({ viewport: { width: 773, height: 601 }, timezoneId });
+    try {
+      const p = await context.newPage();
+      await p.addInitScript(c => localStorage.setItem('hub.lang', JSON.stringify(c)), code);
+      await p.goto(base + '/');
+      await p.waitForSelector('.card');
+      const shown = [await p.locator('.referral').isVisible(), await p.locator('.token').isVisible()];
+      if (shown[0] !== referral || shown[1] !== token) throw new Error(`${timezoneId} in ${code}: referral ${shown[0]}, token ${shown[1]}`);
+    } finally {
+      await context.close();
+    }
+  }
+});
+
 await check('every language has every string', async () => {
   // compares each language's file with the English on the page: every key,
   // the same links and markup, the same {placeholders}, every app and tag

@@ -70,9 +70,25 @@ async function loadLang(code) {
   return { ui: file.ui ?? {}, tags: file.tags ?? {}, apps: file.apps ?? {} };
 }
 
+// The referral offer is for the Americas and Europe. The browser's time zone says
+// where the car is without asking a server, so it also works offline. A zone that
+// says nothing (UTC, as a browser set up without one reports) falls back on the
+// language, so an unset English browser keeps seeing it.
+function referralHere() {
+  let zone = '';
+  try { zone = Intl.DateTimeFormat().resolvedOptions().timeZone ?? ''; } catch {}
+  if (/^(America|Europe|US|Canada)\//.test(zone)) return true;
+  if (/^(Pacific\/Honolulu|Atlantic\/(Reykjavik|Azores|Madeira|Canary|Faroe))$/.test(zone)) return true;
+  if (zone && !/^(UTC|GMT|Etc\/.*)$/.test(zone)) return false;
+  return !/^(zh|ja|ko)/.test(lang);
+}
+
 // The strings are the hub's own files, so they may carry markup (links, code)
 function applyLang() {
   root.lang = lang;
+  document.querySelector('.referral').hidden = !referralHere();
+  // the community token isn't promoted to Chinese readers
+  document.querySelector('.token').hidden = lang.startsWith('zh');
   for (const node of document.querySelectorAll('[data-i18n]')) node.innerHTML = t(node.dataset.i18n);
   for (const node of document.querySelectorAll('[data-i18n-label]')) node.setAttribute('aria-label', t(node.dataset.i18nLabel));
   for (const node of document.querySelectorAll('[data-i18n-title]')) node.title = t(node.dataset.i18nTitle);
