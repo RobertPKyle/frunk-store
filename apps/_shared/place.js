@@ -1,5 +1,5 @@
 // Shared location for apps that need one (Star Map, Weather, Satellites,
-// Sky Events, What's Around Me, Pit Stop).
+// Sky Events, What's Around Me, Pit Stop, Planes Overhead).
 // One saved place is used by every app on this origin, so picking it once is
 // enough. The picker offers the car's location, a search for any town or park
 // (Open-Meteo geocoding), and a list of presets that works offline.

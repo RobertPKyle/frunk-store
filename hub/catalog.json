@@ -125,6 +125,15 @@
       ]
     },
     {
+      "id": "planes",
+      "name": "Planes Overhead",
+      "tagline": "A live flight radar. See what's flying over you, where it's headed and where to look for it.",
+      "path": "/planes/",
+      "icon": "/planes/icon.svg",
+      "tags": ["Road Trip", "Camp Mode"],
+      "added": "2026-11-03"
+    },
+    {
       "id": "speedtest",
       "name": "Speed Test",
       "tagline": "How fast is the car's internet right now? Download, upload and ping, on Wi-Fi or LTE.",

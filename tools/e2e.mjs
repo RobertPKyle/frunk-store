@@ -392,6 +392,113 @@ await check('pit stop lists places with hours and directions', async () => {
   await page.screenshot({ path: shots + 'pitstop-map.png' });
 });
 
+await check('planes overhead shows planes, details and only routes that fit', async () => {
+  // The function itself, against adsb.lol: it rejects spots off its grid, and answers on it
+  if ((await fetch(appsBase + '/api/planes?lat=34.05&lon=-118.2&r=60')).status !== 400) throw new Error('off-grid location not rejected');
+  if ((await fetch(appsBase + '/api/planes?lat=34.0&lon=-118.2&r=61')).status !== 400) throw new Error('unknown radius not rejected');
+  const live = await fetch(appsBase + '/api/planes?lat=34.0&lon=-118.2&r=30');
+  if (live.status === 200) {
+    const { now, ac } = await live.json();
+    if (!now || !Array.isArray(ac)) throw new Error('unexpected answer from the function');
+    if (ac.length && ac[0].length !== 13) throw new Error(`expected 13 fields per plane, got ${ac[0].length}`);
+    console.log(`     ${ac.length} planes within 30 nm of Los Angeles, live`);
+  } else if (live.status !== 503) throw new Error(`function answered ${live.status}`);
+
+  // The app, with planes placed around whatever spot it asks about. The first
+  // sits exactly on the car, so a tap at the map's center finds it.
+  let home = null;
+  const planes = route => {
+    const q = new URL(route.request().url()).searchParams, la = home?.lat ?? +q.get('lat'), lo = home?.lon ?? +q.get('lon');
+    route.fulfill({
+      status: 200, contentType: 'application/json',
+      body: JSON.stringify({
+        now: Date.now(),
+        ac: [
+          ['aaaaaa', 'UAL100', la, lo, 12000, 0, 90, 1200, 'B738', 'N12345', 'A3', 0.5, 0],
+          ['bbbbbb', 'SKW3883', la + 0.05, lo + 0.05, 30000, 400, 45, 0, 'E75L', 'N241SY', 'A3', 0.5, 0],
+        ],
+      }),
+    });
+  };
+  const cors = { 'Access-Control-Allow-Origin': '*' };
+  const callsign = route => {
+    const fits = route.request().url().endsWith('UAL100');
+    const stop = (iata_code, municipality, latitude, longitude) => ({ iata_code, municipality, latitude, longitude });
+    route.fulfill({
+      status: 200, contentType: 'application/json', headers: cors,
+      body: JSON.stringify({
+        response: {
+          flightroute: fits
+            ? { airline: { name: 'United Airlines' }, origin: stop('AAA', 'South City/Elsewhere', home.lat - 5, home.lon), destination: stop('BBB', 'North City', home.lat + 5, home.lon) }
+            : { airline: { name: 'SkyWest Airlines' }, origin: stop('CCC', 'Far City', home.lat + 40, home.lon + 60), destination: stop('DDD', 'Farther City', home.lat + 42, home.lon + 66) },
+        },
+      }),
+    });
+  };
+  const aircraft = route => route.fulfill({
+    status: 200, contentType: 'application/json', headers: cors,
+    body: JSON.stringify({ response: { aircraft: { manufacturer: 'Boeing', type: '737-824', registered_owner: 'United Airlines' } } }),
+  });
+  let tiles = 0;
+  const countTiles = r => { if (r.url().includes('tiles.openfreemap.org/planet/') && r.ok()) tiles++; };
+  page.on('response', countTiles);
+  await page.route('**/api/planes?*', planes);
+  await page.route('https://api.adsbdb.com/v0/callsign/*', callsign);
+  await page.route('https://api.adsbdb.com/v0/aircraft/*', aircraft);
+  try {
+    await openFromHub(/Planes Overhead/);
+    const picker = appFrame().locator('.fp-picker');
+    await picker.or(appFrame().locator('#map canvas')).first().waitFor();
+    if (await picker.isVisible()) await appFrame().getByRole('button', { name: 'Los Angeles' }).click();
+    await appFrame().locator('#map canvas').waitFor();
+    const frame = page.frames().find(f => f.url().includes('/planes/'));
+    home = await frame.evaluate(() => JSON.parse(localStorage.getItem('frunk.place')));
+
+    // The list shows plain names, closest first, and sorts out on the next answer
+    await frame.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+    await appFrame().locator('.row').filter({ hasText: 'United 100' }).waitFor();
+    await appFrame().locator('.row').filter({ hasText: 'SkyWest 3883' }).waitFor();
+    await appFrame().locator('#summary').filter({ hasText: '2 planes on this map' }).waitFor();
+    const first = await appFrame().locator('.row').first().innerText();
+    if (!first.includes('United 100') || !first.includes('Boeing 737-800')) throw new Error(`list starts with ${first}`);
+    // The map fetched its tiles under the site's COEP headers
+    for (let i = 0; i < 40 && !tiles; i++) await page.waitForTimeout(250);
+    if (!tiles) throw new Error('no map tiles loaded');
+
+    // A tap at the map's center lands on the plane above the car
+    const box = await appFrame().locator('#map').boundingBox();
+    await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
+    await appFrame().locator('#detail h1').filter({ hasText: 'United 100' }).waitFor();
+    await appFrame().locator('#detail .route').filter({ hasText: 'AAA' }).filter({ hasText: 'BBB' }).waitFor();
+    const text = await appFrame().locator('#detail').innerText();
+    if (!text.includes('Boeing 737-824')) throw new Error('full aircraft type missing');
+    if (!text.includes('almost straight up')) throw new Error(`no look direction in: ${text}`);
+    if (text.includes('Elsewhere')) throw new Error('long town list not shortened');
+    await page.screenshot({ path: shots + 'planes-detail.png' });
+
+    // The other plane's flight number points at a route far from where it is
+    await appFrame().locator('#backBtn').click();
+    await appFrame().locator('.row').filter({ hasText: 'SkyWest 3883' }).click();
+    await appFrame().locator('#detail .noroute').filter({ hasText: 'Route not known' }).waitFor();
+    if (await appFrame().locator('#detail .route').count()) throw new Error('route that does not fit was shown');
+    await appFrame().locator('#backBtn').click();
+
+    // Miles or kilometres, shared with the other apps
+    const unit = await appFrame().locator('#unitsBtn').textContent();
+    const other = unit === 'mi' ? 'km' : 'mi';
+    await appFrame().locator('#unitsBtn').click();
+    await appFrame().locator('.row .far').last().filter({ hasText: other }).waitFor();
+    await appFrame().locator('#unitsBtn').click();
+    await appFrame().locator('.row .far').last().filter({ hasText: unit }).waitFor();
+    await page.screenshot({ path: shots + 'planes.png' });
+  } finally {
+    page.off('response', countTiles);
+    await page.unroute('**/api/planes?*', planes);
+    await page.unroute('https://api.adsbdb.com/v0/callsign/*', callsign);
+    await page.unroute('https://api.adsbdb.com/v0/aircraft/*', aircraft);
+  }
+});
+
 await check('chess puzzle renders a board', async () => {
   await openFromHub(/Chess Puzzle/);
   const frame = page.frames().find(f => f.url().includes('/chess/'));

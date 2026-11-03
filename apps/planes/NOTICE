@@ -1,0 +1,22 @@
+Planes Overhead uses these works by other people.
+
+maplibre/  MapLibre GL JS 6.15.0, from the npm package maplibre-gl.
+           BSD 3-Clause; see maplibre/LICENSE.txt. The source map comments
+           were removed from the two .mjs files. Nothing else was changed.
+
+fonts/     B612 and B612 Mono, the typeface Airbus commissioned for cockpit
+           displays, from the npm packages @fontsource/b612 and
+           @fontsource/b612-mono 5.3.0. SIL Open Font License 1.1; see
+           fonts/OFL.txt.
+
+Data, fetched when the app runs and not stored in this repository:
+
+Flight positions  adsb.lol, Open Database License (ODbL) 1.0.
+                  https://adsb.lol
+Flight routes     adsbdb, https://www.adsbdb.com. Route data is the work of
+and aircraft      David Taylor and Jim Mason. Aircraft data comes from
+                  PlaneBase. Neither is copied or stored by this app beyond a
+                  single viewing.
+Base map          OpenFreeMap (https://openfreemap.org) with tiles from
+                  OpenMapTiles (https://openmaptiles.org) and data from
+                  OpenStreetMap contributors (ODbL).

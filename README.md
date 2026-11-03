@@ -118,10 +118,28 @@ clear them to make room.
   Vercel's CDN caches each spot for a day. Uncached queries are limited to 40
   per IP per hour and 3000 a day overall. The last 6 spots are kept on the
   device for offline use.
-- Distances in Pit Stop, What's Around Me and Sky Events, and Weather's
-  wind (mph or km/h), come in miles or kilometres
-  (`apps/_shared/units.js`). The mi/km button next to Here in Pit Stop and
-  What's Around Me switches them for all four apps; Weather's °F/°C button
+- `apps/planes` and `apps/api/planes.js`: Planes Overhead, a live flight
+  radar. The base map is MapLibre GL JS with a reduced OpenFreeMap style
+  (`map-style.js`) that leaves out buildings and small roads, so it costs the
+  GPU little. Planes are drawn on a separate canvas above the map, so moving
+  them never redraws it, and only the closest get air-traffic-control-style
+  labels. Positions come from adsb.lol (ODbL) every 12 seconds, or every 30
+  once nobody has touched the screen for 10 minutes, and are carried forward
+  along each plane's heading in between. adsb.lol sends no CORS headers, so
+  the function asks on the app's behalf. The app snaps its location to a grid
+  that depends on the circle size (30, 60, 120 or 250 nautical miles) and the
+  function rejects anything else, so Vercel's CDN shares each answer for a few
+  seconds however many cars are watching. Each server instance also stops at
+  120 adsb.lol queries a minute. adsb.fi has more detail per plane but its
+  terms allow only personal, non-commercial use, so it isn't used. Tapping a
+  plane asks adsbdb directly for its route and full type. Flight number
+  records go out of date, so a route is shown only when the plane is near the
+  line between its two airports. The labels are in B612, the typeface Airbus
+  commissioned for cockpit displays. See `apps/planes/NOTICE`.
+- Distances in Pit Stop, What's Around Me, Planes Overhead and Sky Events,
+  and Weather's wind (mph or km/h), come in miles or kilometres
+  (`apps/_shared/units.js`). The mi/km button next to Here in Pit Stop, What's
+  Around Me and Planes Overhead switches them for all five apps; Weather's °F/°C button
   sets only temperature and rain. Until it's tapped, browsers set to US or
   UK English get miles.
 - `apps/speedtest`: Speed Test. Download, upload, ping, jitter and ping under
@@ -1103,12 +1121,12 @@ clear them to make room.
   lives at `games/terrarium/`; the shared helpers it needs are copied into
   `apps/terrarium/engine/`.
 - `apps/_shared/place.js`: the location picker. Star Map, Weather,
-  Satellites, Sky Events, What's Around Me and Pit Stop share one saved place
-  (`frunk.place` in localStorage). A place picked as the car's location
+  Satellites, Sky Events, What's Around Me, Pit Stop and Planes Overhead share
+  one saved place (`frunk.place` in localStorage). A place picked as the car's location
   follows the car: when the browser already shares the location, each app
   checks it on start and moves the place once the car is more than 5 km
-  away. What's Around Me and Pit Stop always use the car's location when
-  they're allowed to.
+  away. What's Around Me, Pit Stop and Planes Overhead always use the car's
+  location when they're allowed to.
 - `apps/_shared/awake.js`: keeps the screen on (Screen Wake Lock) while Sleep
   Sounds plays, while Campfire shows, and on the phone page while it sends
   games. The browser drops the lock when the page is hidden, so it's taken
