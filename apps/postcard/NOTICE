@@ -1,0 +1,18 @@
+Road Trip Postcard uses these works by other people.
+
+fonts/     Alfa Slab One and League Gothic, SIL Open Font License 1.1, and
+           Yellowtail, Apache License 2.0, from the npm packages
+           @fontsource/alfa-slab-one, @fontsource/league-gothic and
+           @fontsource/yellowtail 5.3.0. See the license files in fonts/.
+
+The map uses the copy of MapLibre GL JS in ../planes/maplibre (BSD 3-Clause).
+
+Data, fetched when a card is drawn and not stored in this repository:
+
+Map          OpenFreeMap (https://openfreemap.org) with tiles from OpenMapTiles
+             (https://openmaptiles.org) and data from OpenStreetMap contributors
+             (ODbL). Cards with the map credit it on the card.
+Place names  Nominatim (https://nominatim.openstreetmap.org), OpenStreetMap
+             data, ODbL. One request for each place chosen.
+Weather and  Open-Meteo (https://open-meteo.com), CC BY 4.0. Elevation is the
+elevation    Copernicus DEM GLO-90. Poster cards credit it on the card.

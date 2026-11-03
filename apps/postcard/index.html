@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Road Trip Postcard</title>
+<style>
+  @font-face { font-family: "Alfa Slab One"; src: url(fonts/alfa-slab-one-latin-400-normal.woff2) format("woff2"); font-display: block; }
+  @font-face { font-family: "Yellowtail"; src: url(fonts/yellowtail-latin-400-normal.woff2) format("woff2"); font-display: block; }
+  @font-face { font-family: "League Gothic"; src: url(fonts/league-gothic-latin-400-normal.woff2) format("woff2"); font-display: block; }
+
+  :root { --desk: #1d2230; --raised: #2c3346; --line: rgba(225, 230, 245, .2); --text: #f1f2f6; --muted: #aab0c0; --pick: #ffd166; --ink: #1b1608; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--desk); color: var(--text); font: 15px/1.3 system-ui, sans-serif; overflow: hidden; -webkit-tap-highlight-color: transparent; }
+  button, input { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  button:focus-visible, input:focus-visible { outline: 2px solid var(--pick); outline-offset: 2px; }
+  [hidden] { display: none !important; }
+  .btn { min-height: 44px; padding: 6px 12px; border-radius: 8px; background: var(--raised); border: 1px solid var(--line); white-space: nowrap; }
+
+  .app { display: flex; flex-direction: column; height: 100%; padding: 8px; gap: 8px; }
+  /* Clear of the hub's Apps button */
+  .top { display: flex; gap: 6px; padding-left: 96px; flex: none; }
+  #placeBtn { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; text-align: left; }
+
+  .work { display: grid; grid-template-columns: 1fr 172px; gap: 10px; flex: 1; min-height: 0; }
+  .stage { min-width: 0; min-height: 0; display: flex; align-items: flex-start; justify-content: center; }
+  #card { display: block; max-width: 100%; max-height: 100%; aspect-ratio: 8 / 5; border-radius: 3px; background: var(--raised); box-shadow: 0 3px 0 rgba(0, 0, 0, .35); }
+  .send { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  #qr { padding: 8px; background: #fff; border-radius: 8px; line-height: 0; }
+  #qr img, #qr canvas { display: block; }
+  .send p { margin: 0; text-align: center; color: var(--muted); font-size: 14px; }
+  .send b { display: block; color: var(--text); font-size: 15px; }
+  #status { min-height: 1.3em; color: var(--pick); font-size: 13px; text-align: center; }
+  .send .credit { margin-top: auto; font-size: 11px; line-height: 1.25; }
+
+  .row { display: flex; align-items: center; gap: 6px; flex: none; min-width: 0; }
+  .row > span { flex: none; width: 66px; color: var(--muted); font-size: 14px; }
+  .chips { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; overscroll-behavior: contain; min-width: 0; flex: 1; }
+  .chips::-webkit-scrollbar { display: none; }
+  .chip { flex: none; min-height: 44px; padding: 0 13px; border-radius: 8px; background: transparent; border: 1px solid var(--line); white-space: nowrap; }
+  .chip[aria-pressed="true"] { background: var(--pick); border-color: var(--pick); color: var(--ink); font-weight: 700; }
+  .type { flex: none; width: 210px; min-height: 44px; padding: 0 12px; border-radius: 8px; background: #111520; border: 2px solid var(--pick); outline: 0 !important; }
+  .gap { flex: none; width: 1px; margin: 6px 3px; background: var(--line); }
+
+  @media (max-width: 640px) {
+    .work { grid-template-columns: 1fr; grid-template-rows: auto auto; }
+    .send { flex-direction: row; }
+    .row > span { width: 52px; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="top">
+    <button class="btn" id="placeBtn" type="button">Set location</button>
+    <button class="btn" id="hereBtn" type="button">Here</button>
+  </div>
+  <div class="work">
+    <div class="stage"><canvas id="card" width="1000" height="625" role="img" aria-label="Your postcard"></canvas></div>
+    <div class="send">
+      <div id="qr"></div>
+      <p><b>Scan to keep it</b>Your phone gets the full-size picture to save or send.</p>
+      <div id="status" role="status"></div>
+      <p class="credit">Map and place names from OpenStreetMap contributors. Weather and elevation from Open-Meteo.</p>
+    </div>
+  </div>
+  <div class="row"><span>Name</span><div class="chips" id="names" role="group" aria-label="Name on the card"></div></div>
+  <div class="row"><span>Message</span><div class="chips" id="lines" role="group" aria-label="Message on the card"></div></div>
+  <div class="row"><span>Look</span><div class="chips" id="looks" role="group" aria-label="Look of the card"></div></div>
+</div>
+<script type="module" src="postcard.js"></script>
+<script src="/sw-register.js"></script>
+</body>
+</html>

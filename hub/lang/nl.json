@@ -98,6 +98,7 @@
     "under": {"name":"Wat ligt onder me","tagline":"Het gesteente onder je auto, helder uitgelegd: een boorkern door de tijd, de ouderdom van elke laag en fossielen uit de buurt."},
     "pitstop": { "name": "Pitstop", "tagline": "Toiletten, koffie, eten en winkels op loopafstand van de lader, met wat er nu open is." },
     "planes": {"name":"Vliegtuigen boven je","tagline":"Een live vluchtradar. Zie wat er over je heen vliegt, waar het naartoe gaat en waar je het kunt zien."},
+    "postcard": {"name":"Roadtrip-ansichtkaart","tagline":"Maak van je plek een vintage ansichtkaart, met je plaatsnaam in grote letters vol kaart, en stuur hem naar je telefoon."},
     "speedtest": { "name": "Snelheidstest", "tagline": "Hoe snel is het internet in de auto nu? Download, upload en ping, via wifi of LTE." },
     "probe": { "name": "Auto-benchmark", "tagline": "Bekijk wat de browser van deze auto kan." },
     "arcade": { "name": "Arcade", "tagline": "Twintig arcadegames van 1977 tot 1986 op MAME, door hun makers vrijgegeven via mamedev.org: Robby Roto, Gridlee, Targ, Super Tank en meer, verstuurd vanaf je telefoon." },

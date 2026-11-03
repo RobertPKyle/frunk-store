@@ -146,6 +146,17 @@ clear them to make room.
   MapLibre copy in `apps/planes`. Every service allows browsers, so there's no
   function. Coordinates are rounded to 3 decimals, and the last 3 spots are
   kept on the device.
+- `apps/postcard`: Road Trip Postcard. Draws a vintage card of where the car is:
+  a large-letter "Greetings from" with a bright map inside the letters, or a
+  park poster whose ridges are the real skyline to the north (elevation from
+  Open-Meteo). Both are drawn by `card.js`, so the car and the phone make the
+  same picture. The QR code holds the card's details in its #fragment, which
+  never reaches a server, and `view.html` draws the full-size PNG on the phone.
+  So nothing is stored, and there's no function. Coordinates in the link are
+  rounded to 2 decimals (about 1 km), and the card names a town, never a spot.
+  The map is rendered once off screen with MapLibre from `apps/planes`, copied
+  to a plain canvas, and removed to give the GPU its memory back. Town names
+  come from Nominatim, one request per place chosen.
 - `apps/planes` and `apps/api/planes.js`: Planes Overhead, a live flight
   radar. The base map is MapLibre GL JS with a reduced OpenFreeMap style
   (`map-style.js`) that leaves out buildings and small roads, so it costs the

@@ -659,6 +659,77 @@ await check("what's under me shows the rock layers, fossils and the map", async 
   }
 });
 
+await check('road trip postcard draws a card and hands it to the phone', async () => {
+  await openFromHub(/Road Trip Postcard/);
+  const app = appFrame();
+  const picker = app.locator('.fp-picker');
+  await picker.or(app.locator('#qr a')).first().waitFor({ timeout: 20000 });
+  if (!(await picker.isVisible())) await app.locator('#placeBtn').click();
+  await app.getByRole('button', { name: 'Moab' }).click();
+
+  // The name comes from the place chosen, the map fills the letters, and the code follows
+  await app.locator('#names .chip[aria-pressed="true"]').filter({ hasText: 'Moab' }).waitFor({ timeout: 20000 });
+  await app.locator('#names .chip').filter({ hasText: 'Utah' }).waitFor({ timeout: 20000 });
+  // The status line empties once the map has been drawn into the letters
+  for (let i = 0; ; i++) {
+    if (!(await app.locator('#status').textContent())) break;
+    if (i > 200) throw new Error(`stuck on: ${await app.locator('#status').textContent()}`);
+    await page.waitForTimeout(200);
+  }
+  const link = async () => decodeURIComponent((await app.locator('#qr a').getAttribute('href')).replace(/\+/g, ' '));
+  const linkHas = async text => {
+    for (let i = 0; i < 40; i++) { if ((await link()).includes(text)) return; await page.waitForTimeout(100); }
+    throw new Error(`link lacks ${text}: ${await link()}`);
+  };
+  await linkHas('n=Moab');
+  await linkHas('la=38.57');   // about 1 km, not the exact spot
+  // Most of a real card is many colors. A blank or failed canvas isn't.
+  const colors = () => page.frames().find(f => f.url().includes('/postcard/')).evaluate(() => {
+    const c = document.getElementById('card'), d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data, seen = new Set();
+    for (let i = 0; i < d.length; i += 4 * 97) seen.add((d[i] >> 3) << 10 | (d[i + 1] >> 3) << 5 | d[i + 2] >> 3);
+    return seen.size;
+  });
+  await page.waitForTimeout(400);
+  const n = await colors();
+  if (n < 60) throw new Error(`card looks blank: ${n} colors`);
+  await page.screenshot({ path: shots + 'postcard.png' });
+
+  // Choices reach the card and the code
+  await app.locator('#lines .chip').filter({ hasText: 'Made it!' }).click();
+  await linkHas('m=Made it!');
+  await app.locator('#looks .chip').filter({ hasText: 'Park poster' }).click();
+  await linkHas('s=p');
+  await app.locator('#looks .chip').filter({ hasText: 'Night' }).click();
+  await linkHas('c=night');
+  await app.locator('#names .chip').filter({ hasText: 'Type your own' }).click();
+  await app.locator('#names input').fill('Dead Horse Point');
+  await linkHas('n=Dead Horse Point');
+  const posterLink = await app.locator('#qr a').getAttribute('href');
+  await page.waitForTimeout(1500);
+  await page.screenshot({ path: shots + 'postcard-poster.png' });
+  // Back to the usual look, for whoever opens it next
+  await app.locator('#looks .chip').filter({ hasText: 'Greetings' }).click();
+
+  // The phone page draws the full-size card from the link alone
+  const phone = await browser.newPage({ viewport: { width: 390, height: 780 } });
+  const phoneErrors = [];
+  phone.on('pageerror', e => phoneErrors.push(e.message));
+  try {
+    await phone.goto(posterLink);
+    await phone.locator('#picture').waitFor({ timeout: 40000 });
+    const size = await phone.locator('#picture').evaluate(async img => { await img.decode(); return [img.naturalWidth, img.naturalHeight]; });
+    if (size[0] !== 1600 || size[1] !== 1000) throw new Error(`picture is ${size}`);
+    await phone.screenshot({ path: shots + 'postcard-phone.png' });
+    // A link that isn't a card says so, instead of drawing something odd
+    await phone.goto(new URL(posterLink).origin + '/postcard/view.html#la=999&n=x');
+    await phone.reload();
+    await phone.locator('#wait').filter({ hasText: "doesn't hold a postcard" }).waitFor({ timeout: 10000 });
+    if (phoneErrors.length) throw new Error(phoneErrors.join('; '));
+  } finally {
+    await phone.close();
+  }
+});
+
 await check('chess puzzle renders a board', async () => {
   await openFromHub(/Chess Puzzle/);
   const frame = page.frames().find(f => f.url().includes('/chess/'));

@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Your postcard</title>
+<link rel="icon" href="icon.svg">
+<style>
+  @font-face { font-family: "Alfa Slab One"; src: url(fonts/alfa-slab-one-latin-400-normal.woff2) format("woff2"); font-display: block; }
+  @font-face { font-family: "Yellowtail"; src: url(fonts/yellowtail-latin-400-normal.woff2) format("woff2"); font-display: block; }
+  @font-face { font-family: "League Gothic"; src: url(fonts/league-gothic-latin-400-normal.woff2) format("woff2"); font-display: block; }
+  :root { --desk: #1d2230; --raised: #2c3346; --line: rgba(225, 230, 245, .2); --text: #f1f2f6; --muted: #aab0c0; --pick: #ffd166; --ink: #1b1608; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; min-height: 100%; background: var(--desk); color: var(--text); font: 17px/1.45 system-ui, -apple-system, sans-serif; }
+  main { max-width: 720px; margin: 0 auto; padding: 16px; }
+  #wait { padding: 40px 0; text-align: center; color: var(--muted); }
+  img { display: block; width: 100%; height: auto; border-radius: 3px; box-shadow: 0 3px 0 rgba(0, 0, 0, .35); }
+  .do { display: flex; gap: 10px; margin: 14px 0; }
+  .do a, .do button { flex: 1; min-height: 50px; padding: 12px; border-radius: 10px; font: inherit; font-weight: 700; text-align: center; text-decoration: none; cursor: pointer; }
+  #share { background: var(--pick); color: var(--ink); border: 0; }
+  #save { background: var(--raised); color: var(--text); border: 1px solid var(--line); }
+  [hidden] { display: none !important; }
+  p { margin: 0 0 10px; color: var(--muted); font-size: 15px; }
+  a.home { color: var(--pick); }
+  .fine { font-size: 13px; }
+</style>
+</head>
+<body>
+<main>
+  <div id="wait">Drawing your postcard…</div>
+  <div id="done" hidden>
+    <img id="picture" alt="Your postcard">
+    <div class="do">
+      <button id="share" type="button" hidden>Share</button>
+      <a id="save" download="postcard.png">Save picture</a>
+    </div>
+    <p id="tip"></p>
+    <p>Made in the car at <a class="home" href="https://frunk.store">frunk.store</a>, free apps for your car's browser.</p>
+    <p class="fine">Map data © OpenStreetMap contributors, through OpenFreeMap. Elevation from Copernicus DEM, through Open-Meteo. Weather from Open-Meteo.</p>
+  </div>
+</main>
+<script type="module">
+  import { H, W, decode, drawCard, loadFonts, loadMap, loadRidges } from './card.js';
+
+  const $ = id => document.getElementById(id);
+
+  async function start() {
+    const spec = decode(location.hash);
+    if (!spec) {
+      $('wait').textContent = 'This link doesn\'t hold a postcard. Scan the code in the car again.';
+      return;
+    }
+    await loadFonts();
+    const assets = {};
+    // A card without its map is still a card, so a failed download doesn't stop it
+    if (spec.style === 'g') assets.mapImage = await loadMap(spec.lat, spec.lon).catch(() => null);
+    else assets.ridges = await loadRidges(spec.lat, spec.lon).catch(() => null);
+
+    const canvas = Object.assign(document.createElement('canvas'), { width: W, height: H });
+    drawCard(canvas, spec, assets);
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+    const url = URL.createObjectURL(blob);
+    const fileName = `postcard-${spec.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'road-trip'}.png`;
+    $('picture').src = url;
+    $('save').href = url;
+    $('save').download = fileName;
+    const file = new File([blob], fileName, { type: 'image/png' });
+    if (navigator.canShare?.({ files: [file] })) {
+      $('share').hidden = false;
+      $('share').onclick = () => navigator.share({ files: [file] }).catch(() => {});
+    }
+    $('tip').textContent = /iPhone|iPad/.test(navigator.userAgent)
+      ? 'To save it to Photos, press and hold the picture.'
+      : 'The card shows your town, not your exact spot.';
+    $('wait').hidden = true;
+    $('done').hidden = false;
+  }
+
+  start().catch(() => {
+    $('wait').textContent = 'Couldn\'t draw this postcard. Check your connection, then reload the page.';
+  });
+</script>
+</body>
+</html>

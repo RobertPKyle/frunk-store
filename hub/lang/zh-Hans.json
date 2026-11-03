@@ -98,6 +98,7 @@
     "under": {"name":"我的脚下","tagline":"用通俗的话讲讲车底下的岩石：穿越时间的钻探岩芯、每一层的年龄，以及附近发现的化石。"},
     "pitstop": { "name": "充电歇脚", "tagline": "充电站步行范围内的厕所、咖啡、餐饮和商店，并标出现在是否营业。" },
     "planes": {"name":"头顶的飞机","tagline":"实时航班雷达。看看头顶飞过什么飞机、飞往哪里，以及该往天空哪个方向看。"},
+    "postcard": {"name":"公路旅行明信片","tagline":"把你所在的地方做成复古明信片，用填满地图的大字写上地名，再发送到手机。"},
     "speedtest": { "name": "网速测试", "tagline": "车上的网络现在有多快？测量下载、上传和延迟，Wi-Fi 或 LTE 都可以。" },
     "probe": { "name": "车机性能测试", "tagline": "看看这辆车的浏览器能做到什么。" },
     "arcade": { "name": "街机", "tagline": "MAME 上的 20 款 1977 至 1986 年街机游戏，由原作者通过 mamedev.org 免费开放：Robby Roto、Gridlee、Targ、Super Tank 等，从手机发送即可游玩。" },

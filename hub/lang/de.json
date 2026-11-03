@@ -98,6 +98,7 @@
     "under": {"name":"Was ist unter mir","tagline":"Das Gestein unter deinem Auto, einfach erklärt: ein Bohrkern durch die Erdgeschichte, das Alter jeder Schicht und Fossilien aus der Nähe."},
     "pitstop": { "name": "Boxenstopp", "tagline": "Toiletten, Kaffee, Essen und Läden in Gehweite der Ladesäule, mit allem, was gerade geöffnet hat." },
     "planes": {"name":"Flugzeuge über dir","tagline":"Ein Live-Flugradar. Sieh, was über dich hinwegfliegt, wohin es geht und wo du es am Himmel findest."},
+    "postcard": {"name":"Roadtrip-Postkarte","tagline":"Mach aus deinem Standort eine Vintage-Postkarte, mit deinem Ort in großen Kartenbuchstaben, und schick sie aufs Handy."},
     "speedtest": { "name": "Speedtest", "tagline": "Wie schnell ist das Internet im Auto gerade? Download, Upload und Ping, über WLAN oder LTE." },
     "probe": { "name": "Auto-Benchmark", "tagline": "Sieh dir an, was der Browser dieses Autos kann." },
     "arcade": { "name": "Spielhalle", "tagline": "Zwanzig Arcade-Spiele von 1977 bis 1986 mit MAME, von ihren Machern über mamedev.org freigegeben: Robby Roto, Gridlee, Targ, Super Tank und mehr, vom Handy geschickt." },

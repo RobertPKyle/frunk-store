@@ -152,6 +152,15 @@
       "added": "2026-11-03"
     },
     {
+      "id": "postcard",
+      "name": "Road Trip Postcard",
+      "tagline": "Turn where you're parked into a vintage postcard, with your town in big map-filled letters, and send it to your phone.",
+      "path": "/postcard/",
+      "icon": "/postcard/icon.svg",
+      "tags": ["Road Trip"],
+      "added": "2026-11-03"
+    },
+    {
       "id": "speedtest",
       "name": "Speed Test",
       "tagline": "How fast is the car's internet right now? Download, upload and ping, on Wi-Fi or LTE.",
