@@ -95,6 +95,7 @@
     "satellites": { "name": "Satellittsporer", "tagline": "Når du kan se ISS, Hubble og nye Starlink-tog passere over deg." },
     "skyevents": { "name": "Himmelfenomener", "tagline": "Meteorsvermer, fullmåner, formørkelser og planeter for året som kommer, og hva som er oppe i kveld." },
     "nearby": { "name": "Hva er rundt meg", "tagline": "Historie, severdigheter og natur nær der du har parkert, fra Wikipedia. Perfekt mens bilen lader." },
+    "under": {"name":"Hva er under meg","tagline":"Berget under bilen forklart enkelt: en borekjerne gjennom tiden, hvor gammelt hvert lag er, og fossiler funnet i nærheten."},
     "pitstop": { "name": "Pitstopp", "tagline": "Toaletter, kaffe, mat og butikker i gangavstand fra laderen, med det som er åpent nå." },
     "planes": {"name":"Fly over deg","tagline":"En flyradar i sanntid. Se hva som flyr over deg, hvor det skal, og hvor du skal se etter det."},
     "speedtest": { "name": "Hastighetstest", "tagline": "Hvor raskt er internett i bilen akkurat nå? Nedlasting, opplasting og ping, på Wi-Fi eller LTE." },

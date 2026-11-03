@@ -1,0 +1,21 @@
+What's Under Me uses these works by other people.
+
+fonts/     Zilla Slab, from the npm package @fontsource/zilla-slab 5.3.0.
+           SIL Open Font License 1.1; see fonts/OFL.txt.
+
+The map uses the copy of MapLibre GL JS in ../planes/maplibre (BSD 3-Clause).
+
+Data, fetched when the app runs and not stored in this repository, except that
+a device keeps its last three spots for quicker reopening:
+
+Geology     Macrostrat, https://macrostrat.org, CC BY 4.0, and the geological
+            surveys whose maps it brings together.
+Fossils     The Paleobiology Database, https://paleobiodb.org, CC BY 4.0.
+Plate       The GPlates Web Service, https://www.gplates.org, using the
+motions     Merdith et al. 2021 plate model.
+Base map    OpenFreeMap (https://openfreemap.org) with tiles from OpenMapTiles
+            (https://openmaptiles.org) and data from OpenStreetMap contributors
+            (ODbL).
+
+The explanations in geology.js were written for this app. Period ages and
+colors follow the International Chronostratigraphic Chart.

@@ -588,6 +588,77 @@ await check('audiobooks streams a book, survives a lost connection and remembers
   await frame().evaluate(() => localStorage.removeItem('audiobooks.progress'));
 });
 
+await check("what's under me shows the rock layers, fossils and the map", async () => {
+  let tiles = 0;
+  const countTiles = r => { if (r.url().includes('tiles.macrostrat.org/carto/') && r.ok()) tiles++; };
+  page.on('response', countTiles);
+  try {
+    await openFromHub(/What's Under Me/);
+    const app = appFrame();
+    const frame = page.frames().find(f => f.url().includes('/under/'));
+    const savedPlace = await frame.evaluate(() => localStorage.getItem('frunk.place'));
+    const go = async name => {
+      if (!(await app.locator('.fp-picker').isVisible())) await app.locator('#placeBtn').click();
+      await app.getByRole('button', { name }).click();
+    };
+    const picker = app.locator('.fp-picker');
+    await picker.or(app.locator('#rockPanel h1')).first().waitFor({ timeout: 30000 });
+    await go('Moab');
+
+    // Real data: the surface here, then the layers below it, oldest last
+    await app.locator('#rockPanel .where').filter({ hasText: 'At the surface' }).waitFor({ timeout: 30000 });
+    const layers = await app.locator('.layer').count();
+    if (layers < 5) throw new Error(`only ${layers} layers at Moab`);
+    const top = await app.locator('#rockPanel').innerText();
+    if (!/years old/.test(top) || !/one day/.test(top) || !/The world back then/.test(top)) throw new Error(`missing words: ${top}`);
+    console.log(`     ${layers} layers at Moab, surface ${await app.locator('#rockPanel h1').textContent()}`);
+
+    // A deep layer explains itself, including where the plates had this spot
+    await app.locator('.layer').nth(4).click();
+    await app.locator('#rockPanel .where').filter({ hasText: 'Deeper in this region' }).waitFor();
+    await app.locator('#driftLine').filter({ hasText: /this spot/ }).waitFor({ timeout: 15000 });
+    console.log(`     ${await app.locator('#driftLine').textContent()}`);
+
+    // Height above sea level follows the mi/km choice shared with other apps
+    const unit = await app.locator('#unitsBtn').textContent();
+    await app.locator('#unitsBtn').click();
+    await app.locator('#groundLine').filter({ hasText: unit === 'mi' ? / m above/ : / ft above/ }).waitFor();
+    await app.locator('#unitsBtn').click();
+    await app.locator('#groundLine').filter({ hasText: unit === 'mi' ? / ft above/ : / m above/ }).waitFor();
+
+    // Fossils near Moab include dinosaurs
+    await app.locator('#tabFossils').click();
+    await app.locator('.group h3').filter({ hasText: 'Dinosaurs' }).waitFor({ timeout: 30000 });
+    console.log(`     ${await app.locator('#tabFossils').textContent()}: ${(await app.locator('.group').first().innerText()).replace(/\n+/g, ' | ')}`);
+    await page.screenshot({ path: shots + 'under-fossils.png' });
+
+    // The map loads Macrostrat's tiles under the site's COEP headers; a tap looks somewhere else
+    await app.locator('#tabMap').click();
+    await app.locator('#map canvas').waitFor({ timeout: 15000 });
+    for (let i = 0; i < 60 && !tiles; i++) await page.waitForTimeout(250);
+    if (!tiles) throw new Error('no geologic map tiles loaded');
+    await app.locator('#mapNote').filter({ hasText: 'Tap anywhere' }).waitFor();
+    await page.waitForTimeout(1500);
+    const box = await app.locator('#map').boundingBox();
+    await page.touchscreen.tap(box.x + box.width * 0.3, box.y + box.height * 0.3);
+    await app.locator('#backRow').waitFor({ timeout: 5000 });
+    await app.locator('#tabRock').click();
+    await app.locator('#rockPanel h1').waitFor({ timeout: 30000 });
+    await app.locator('#backBtn').click();
+    await app.locator('#backRow').waitFor({ state: 'hidden' });
+    await app.locator('#rockPanel .where').filter({ hasText: 'under you' }).waitFor({ timeout: 30000 });
+    await page.screenshot({ path: shots + 'under.png' });
+
+    // Outside North America there's no deep column, and the app says so
+    await go('London');
+    await app.locator('.coreEnd').filter({ hasText: 'mostly North America' }).waitFor({ timeout: 30000 });
+    console.log(`     London: ${await app.locator('#rockPanel h1').textContent()}`);
+    await frame.evaluate(v => { if (v) localStorage.setItem('frunk.place', v); else localStorage.removeItem('frunk.place'); }, savedPlace);
+  } finally {
+    page.off('response', countTiles);
+  }
+});
+
 await check('chess puzzle renders a board', async () => {
   await openFromHub(/Chess Puzzle/);
   const frame = page.frames().find(f => f.url().includes('/chess/'));

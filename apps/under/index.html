@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>What's Under Me</title>
+<style>
+  @font-face { font-family: "Zilla Slab"; src: url(fonts/zilla-slab-latin-400-normal.woff2) format("woff2"); font-weight: 400; font-display: swap; }
+  @font-face { font-family: "Zilla Slab"; src: url(fonts/zilla-slab-latin-600-normal.woff2) format("woff2"); font-weight: 600; font-display: swap; }
+  @font-face { font-family: "Zilla Slab"; src: url(fonts/zilla-slab-latin-700-normal.woff2) format("woff2"); font-weight: 700; font-display: swap; }
+
+  :root {
+    --rock: #232a2f; --tray: #1b2125; --raised: #30393f; --line: rgba(220, 230, 225, .17);
+    --bone: #f3efe4; --dust: #aeb8b6; --note: #f5c83c; --ink: #171b1e;
+    /* Marks geologic maps use for each rock, tiled over its color */
+    --dots: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='12'%3E%3Cg fill='%23000' fill-opacity='.42'%3E%3Ccircle cx='3' cy='3' r='1.1'/%3E%3Ccircle cx='10' cy='9' r='1.1'/%3E%3C/g%3E%3C/svg%3E");
+    --dashes: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='10'%3E%3Cg stroke='%23000' stroke-opacity='.4' stroke-width='1.3'%3E%3Cpath d='M1 3h8M11 8h8'/%3E%3C/g%3E%3C/svg%3E");
+    --bricks: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='16'%3E%3Cpath d='M0 .5h24M0 8.500h24M6 .5v8M18 8.500v8' stroke='%23000' stroke-opacity='.4' fill='none'/%3E%3C/svg%3E");
+    --pebbles: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='18'%3E%3Cg fill='none' stroke='%23000' stroke-opacity='.45'%3E%3Cellipse cx='6' cy='5' rx='3.5' ry='2.5'/%3E%3Cellipse cx='16' cy='13' rx='3' ry='2.2'/%3E%3C/g%3E%3C/svg%3E");
+    --vees: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='16'%3E%3Cpath d='M3 3l2.5 5L8 3M13 11l2.5 5L18 11' stroke='%23000' stroke-opacity='.45' fill='none'/%3E%3C/svg%3E");
+    --plus: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='16'%3E%3Cpath d='M5 1v6M2 4h6M15 9v6M12 12h6' stroke='%23000' stroke-opacity='.42' fill='none'/%3E%3C/svg%3E");
+    --waves: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='12'%3E%3Cpath d='M0 6c4-5 8-5 12 0s8 5 12 0' stroke='%23000' stroke-opacity='.4' fill='none'/%3E%3C/svg%3E");
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--rock); color: var(--bone); font: 16px/1.35 "Zilla Slab", Georgia, serif; overflow: hidden; -webkit-tap-highlight-color: transparent; }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  button:focus-visible { outline: 2px solid var(--note); outline-offset: 2px; }
+  [hidden] { display: none !important; }
+  .btn { min-height: 44px; padding: 8px 12px; border-radius: 6px; background: var(--raised); border: 1px solid var(--line); white-space: nowrap; }
+
+  .app { display: grid; grid-template-columns: 286px 1fr; height: 100%; }
+
+  /* The drill core, top of the column at the car */
+  .tray { display: flex; flex-direction: column; min-height: 0; background: var(--tray); border-right: 1px solid var(--line); }
+  /* Clear of the hub's Apps button */
+  #groundLine { flex: none; min-height: 60px; padding: 8px 10px 4px 108px; font-size: 14px; line-height: 1.2; color: var(--dust); display: flex; align-items: center; }
+  #core { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 0 0 10px; }
+  .layer { display: grid; grid-template-columns: 72px 1fr; width: 100%; min-height: 44px; padding: 0 8px 0 10px; text-align: left; background: none; border: 0; }
+  .layer[aria-pressed="true"] { background: var(--raised); }
+  .seg { position: relative; display: block; background-color: var(--c); background-image: var(--mark); border-bottom: 2px solid var(--tray); }
+  /* Light across a round core */
+  .seg::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(0, 0, 0, .46), rgba(0, 0, 0, .05) 26%, rgba(255, 255, 255, .24) 46%, rgba(0, 0, 0, .05) 70%, rgba(0, 0, 0, .5)); }
+  .p-dots { --mark: var(--dots); } .p-dashes { --mark: var(--dashes); } .p-bricks { --mark: var(--bricks); } .p-pebbles { --mark: var(--pebbles); }
+  .p-vees { --mark: var(--vees); } .p-plus { --mark: var(--plus); } .p-waves { --mark: var(--waves); }
+  .lbl { min-width: 0; padding: 5px 0 5px 10px; align-self: center; }
+  .lbl b, .lbl span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lbl b { font-size: 15px; font-weight: 600; line-height: 1.15; }
+  .lbl span { font-size: 13px; color: var(--dust); }
+  .coreEnd { padding: 10px 12px 2px; font-size: 13px; color: var(--dust); }
+
+  .read { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+  .head { display: flex; gap: 6px; padding: 8px; flex: none; }
+  #placeBtn { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; text-align: left; }
+  .tabs { display: flex; flex: none; padding: 0 8px; gap: 2px; border-bottom: 1px solid var(--line); }
+  .tab { flex: 1; min-height: 44px; padding: 4px 6px; background: none; border: 0; border-bottom: 3px solid transparent; color: var(--dust); font-weight: 600; }
+  .tab[aria-selected="true"] { color: var(--bone); border-bottom-color: var(--note); }
+
+  .panel { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 12px 16px 14px; }
+  .where { margin: 0; color: var(--dust); }
+  h1 { margin: 0; font-size: 31px; font-weight: 700; line-height: 1.08; overflow-wrap: anywhere; }
+  .age { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin: 8px 0 2px; font-size: 21px; font-weight: 600; line-height: 1.15; }
+  .period { padding: 1px 8px; border-radius: 4px; background: var(--c); color: var(--ink); font-size: 15px; font-weight: 700; }
+  .clock { margin: 4px 0 0; color: var(--dust); font-size: 15px; }
+  .read h2 { margin: 16px 0 3px; font-size: 16px; font-weight: 700; color: var(--note); }
+  .read p { margin: 0; }
+  .fine { margin-top: 14px !important; font-size: 13px; color: var(--dust); }
+  .say { color: var(--dust); }
+
+  .group { display: grid; grid-template-columns: 38px 1fr; gap: 0 10px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+  .group svg { width: 34px; height: 34px; fill: currentColor; color: var(--note); }
+  .group h3 { margin: 0; font-size: 18px; font-weight: 700; line-height: 1.15; }
+  .group p { font-size: 15px; line-height: 1.3; overflow-wrap: anywhere; }
+  .group small { display: block; color: var(--dust); font-size: 14px; }
+
+  #mapPanel { position: relative; flex: 1; min-height: 0; }
+  #map { position: absolute; inset: 0; }
+  #mapNote { position: absolute; left: 8px; bottom: 8px; max-width: 74%; padding: 4px 8px; border-radius: 6px; background: rgba(27, 33, 37, .88); font-size: 13px; pointer-events: none; }
+
+  #backRow { flex: none; display: flex; align-items: center; gap: 8px; padding: 6px 10px; background: var(--raised); font-size: 14px; }
+  #backRow span { flex: 1; min-width: 0; }
+
+  footer { flex: none; padding: 5px 10px 6px; font-size: 11px; line-height: 1.25; color: var(--dust); border-top: 1px solid var(--line); }
+
+  @media (max-width: 640px) {
+    .app { grid-template-columns: 1fr; grid-template-rows: 36% 64%; }
+    .tray { border-right: 0; border-bottom: 1px solid var(--line); }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="tray">
+    <div id="groundLine"></div>
+    <div id="core" aria-label="Rock layers, youngest at the top"></div>
+  </div>
+  <div class="read">
+    <div class="head">
+      <button class="btn" id="placeBtn" type="button">Set location</button>
+      <button class="btn" id="hereBtn" type="button">Here</button>
+      <button class="btn" id="unitsBtn" type="button">mi</button>
+    </div>
+    <div class="tabs" role="tablist">
+      <button class="tab" id="tabRock" role="tab" type="button" aria-selected="true">Rock</button>
+      <button class="tab" id="tabFossils" role="tab" type="button" aria-selected="false">Fossils</button>
+      <button class="tab" id="tabMap" role="tab" type="button" aria-selected="false">Map</button>
+    </div>
+    <div id="backRow" hidden><span id="backText"></span><button class="btn" id="backBtn" type="button"></button></div>
+    <div class="panel" id="rockPanel" aria-live="polite"></div>
+    <div class="panel" id="fossilPanel" hidden></div>
+    <div id="mapPanel" hidden><div id="map"></div><div id="mapNote">Tap anywhere to see what's under it. Colors show rock types and ages.</div></div>
+    <footer>Geology from Macrostrat (CC BY 4.0) and the surveys behind it. Fossils from the Paleobiology Database (CC BY 4.0). Plate motions from GPlates. Map from OpenFreeMap and OpenStreetMap contributors.</footer>
+  </div>
+</div>
+<script type="module" src="under.js"></script>
+<script src="/sw-register.js"></script>
+</body>
+</html>

@@ -131,6 +131,21 @@ clear them to make room.
   `crossorigin="anonymous"` to play under COEP. The Archive's cover images
   have no CORS headers, so covers are drawn as cloth bindings instead, one
   cloth per genre. A lost connection keeps the place and keeps retrying.
+- `apps/under`: What's Under Me. The rock beneath the car as a drill core you
+  scroll down through time, each segment in its map color with the pattern
+  geologic maps use for that rock. The top comes from Macrostrat's map for that
+  exact spot (worldwide). The layers below come from its regional columns,
+  mostly North America, and the app says they aren't all right underfoot;
+  anything younger than the bedrock here is left out, since it can't be under
+  it. Each layer gets plain-language text from `geology.js`. Fossils come from
+  the Paleobiology Database, within 40 km or else 120 km, and dinosaurs need a
+  separate query because their class varies. GPlates says where the plates had
+  the spot at that age, using the paleomagnetic MERDITH2021 model; MULLER2022
+  is in a mantle frame and gave wrong latitudes for this (Grand Canyon near the
+  South Pole at 769 million years). The Map tab loads Macrostrat's vector tiles on the
+  MapLibre copy in `apps/planes`. Every service allows browsers, so there's no
+  function. Coordinates are rounded to 3 decimals, and the last 3 spots are
+  kept on the device.
 - `apps/planes` and `apps/api/planes.js`: Planes Overhead, a live flight
   radar. The base map is MapLibre GL JS with a reduced OpenFreeMap style
   (`map-style.js`) that leaves out buildings and small roads, so it costs the

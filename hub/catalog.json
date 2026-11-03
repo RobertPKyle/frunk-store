@@ -123,6 +123,15 @@
       ]
     },
     {
+      "id": "under",
+      "name": "What's Under Me",
+      "tagline": "The rock under your car in plain words: a drill core down through time, how old each layer is and the fossils found nearby.",
+      "path": "/under/",
+      "icon": "/under/icon.svg",
+      "tags": ["Road Trip", "Camp Mode"],
+      "added": "2026-11-03"
+    },
+    {
       "id": "pitstop",
       "name": "Pit Stop",
       "tagline": "Restrooms, coffee, food and shops within walking distance of the charger, with what's open now.",

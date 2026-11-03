@@ -95,6 +95,7 @@
     "satellites": { "name": "Satelliten-Tracker", "tagline": "Wann die ISS, Hubble und neue Starlink-Ketten über dich hinwegziehen." },
     "skyevents": { "name": "Himmelsereignisse", "tagline": "Meteorströme, Vollmonde, Finsternisse und Planeten fürs kommende Jahr, und was heute Nacht zu sehen ist." },
     "nearby": { "name": "Was ist in der Nähe", "tagline": "Geschichte, Sehenswürdigkeiten und Natur rund um deinen Parkplatz, aus Wikipedia. Ideal beim Laden." },
+    "under": {"name":"Was ist unter mir","tagline":"Das Gestein unter deinem Auto, einfach erklärt: ein Bohrkern durch die Erdgeschichte, das Alter jeder Schicht und Fossilien aus der Nähe."},
     "pitstop": { "name": "Boxenstopp", "tagline": "Toiletten, Kaffee, Essen und Läden in Gehweite der Ladesäule, mit allem, was gerade geöffnet hat." },
     "planes": {"name":"Flugzeuge über dir","tagline":"Ein Live-Flugradar. Sieh, was über dich hinwegfliegt, wohin es geht und wo du es am Himmel findest."},
     "speedtest": { "name": "Speedtest", "tagline": "Wie schnell ist das Internet im Auto gerade? Download, Upload und Ping, über WLAN oder LTE." },
