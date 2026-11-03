@@ -48,6 +48,15 @@
       ]
     },
     {
+      "id": "audiobooks",
+      "name": "Audiobooks",
+      "tagline": "Thousands of free audiobooks read by volunteers, with resume and a sleep timer. For Camp Mode and long charging stops.",
+      "path": "/audiobooks/",
+      "icon": "/audiobooks/icon.svg",
+      "tags": ["Camp Mode", "Road Trip"],
+      "added": "2026-11-03"
+    },
+    {
       "id": "fireplace",
       "name": "Campfire",
       "tagline": "A crackling fire with sparks and crickets. Cozy screen for the campsite.",

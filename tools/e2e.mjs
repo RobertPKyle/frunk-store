@@ -38,6 +38,8 @@ page.on('console', m => {
   if (m.type() !== 'error') return;
   // Pit Stop asks again when OpenStreetMap is busy; the check below fails if it never answers
   if (m.location().url.includes('/api/places') && m.text().includes('status of 503')) return;
+  // The Audiobooks check cuts the connection to a chapter on purpose
+  if (m.location().url.includes('archive.org/download/') && m.text().includes('ERR_FAILED')) return;
   errors.push(`console: ${m.text()}`);
 });
 
@@ -497,6 +499,93 @@ await check('planes overhead shows planes, details and only routes that fit', as
     await page.unroute('https://api.adsbdb.com/v0/callsign/*', callsign);
     await page.unroute('https://api.adsbdb.com/v0/aircraft/*', aircraft);
   }
+});
+
+await check('audiobooks streams a book, survives a lost connection and remembers the place', async () => {
+  await openFromHub(/Audiobooks/);
+  const app = appFrame();
+  const frame = () => page.frames().find(f => f.url().includes('/audiobooks/'));
+  await app.locator('.book').first().waitFor();
+  await frame().evaluate(() => localStorage.removeItem('audiobooks.progress'));
+  await openFromHub(/Audiobooks/);
+  await app.locator('.book').first().waitFor();
+  const firstScreen = await app.locator('.book').count();
+  if (firstScreen < 30 || firstScreen > 100) throw new Error(`${firstScreen} covers on the first screen`);
+
+  // Shelves, then the whole catalog through search. The hub allows no adult content.
+  await app.locator('.chip').filter({ hasText: 'Under an hour' }).click();
+  await app.locator('#shelves h2').filter({ hasText: 'Under an hour' }).waitFor();
+  await app.locator('.book').first().waitFor();
+  await app.locator('#search').fill('kama sutra');
+  await app.locator('#shelves h2').filter({ hasText: 'Nothing matches' }).waitFor();
+  await app.locator('#search').fill('tom sawyer');
+  await app.locator('#shelves h2').filter({ hasText: 'tom sawyer' }).waitFor();
+  await app.locator('.book[aria-label*="Tom Sawyer"]').first().click();
+
+  // The real Archive: chapters, then audio that plays under the site's COEP headers
+  await app.locator('.ch').first().waitFor({ timeout: 30000 });
+  const chapters = await app.locator('.ch').count();
+  if (chapters < 5) throw new Error(`only ${chapters} chapters`);
+  const seconds = () => frame().evaluate(() => document.getElementById('audio').currentTime);
+  const playedPast = async (t, timeout = 45000) => {
+    const end = Date.now() + timeout;
+    for (;;) {
+      const state = await frame().evaluate(() => { const a = document.getElementById('audio'); return { t: a.currentTime, err: a.error?.message || '', paused: a.paused, status: document.getElementById('status').textContent }; });
+      if (state.t > t && !state.paused) return state.t;
+      if (Date.now() > end) throw new Error(`audio stuck: ${JSON.stringify(state)}`);
+      await page.waitForTimeout(300);
+    }
+  };
+  await app.locator('#playBtn').click();
+  await playedPast(1);
+  await app.locator('#fwdSkip').click();
+  await playedPast(30);
+
+  // Speed, kept as the book plays; then back to normal for the next run
+  const startSpeed = await app.locator('#speedBtn').textContent();
+  await app.locator('#speedBtn').click();
+  const rate = await frame().evaluate(() => document.getElementById('audio').playbackRate);
+  if (rate === 1 && startSpeed === '1×') throw new Error('speed button did nothing');
+  while (await app.locator('#speedBtn').textContent() !== '1×') await app.locator('#speedBtn').click();
+
+  // Sleep timer: on, then off again
+  await app.locator('#sleepBtn').click();
+  await app.locator('#sleepBtn').filter({ hasText: /15 min|14 min/ }).waitFor();
+  for (let i = 0; i < 4; i++) await app.locator('#sleepBtn').click();
+  await app.locator('#sleepBtn').filter({ hasText: 'off' }).waitFor();
+
+  // A chapter that can't load says so, then plays once the connection is back
+  const cut = route => route.abort();
+  await page.route('**/*.archive.org/**', cut);
+  await page.route('https://archive.org/download/**', cut);
+  await app.locator('.ch').nth(2).click();
+  await app.locator('#status').filter({ hasText: 'Waiting for a connection' }).waitFor({ timeout: 15000 });
+  await page.unroute('**/*.archive.org/**', cut);
+  await page.unroute('https://archive.org/download/**', cut);
+  await playedPast(1, 60000);
+  if (await app.locator('.ch').nth(2).getAttribute('aria-current') !== 'true') throw new Error('chapter 3 not marked as playing');
+
+  // The library shows what's playing, and keeps the book for next time
+  await app.locator('#backBtn').click();
+  await app.locator('#bar').waitFor();
+  await app.locator('#shelves h2').filter({ hasText: 'Keep listening' }).first().waitFor({ timeout: 1000 }).catch(() => {});
+  await app.locator('#barPlay').click();
+  await app.locator('#barPlay[aria-label="Play"]').waitFor();
+  const saved = await frame().evaluate(() => JSON.parse(localStorage.getItem('audiobooks.progress')));
+  const entry = Object.values(saved)[0];
+  if (!entry || entry.ch !== 2 || !(entry.t > 0)) throw new Error(`saved place: ${JSON.stringify(saved)}`);
+  await openFromHub(/Audiobooks/);
+  await app.locator('#shelves h2').filter({ hasText: 'Keep listening' }).waitFor();
+  await page.screenshot({ path: shots + 'audiobooks.png' });
+  await app.locator('.book[aria-label*="Tom Sawyer"]').first().click();
+  await app.locator('.ch[aria-current="true"]').waitFor({ timeout: 30000 });
+  if (await app.locator('.ch').nth(2).getAttribute('aria-current') !== 'true') throw new Error('did not reopen at chapter 3');
+  await app.locator('#playBtn').click();
+  const at = await playedPast(Math.max(0.5, entry.t - 6));
+  await app.locator('#playBtn').click();
+  console.log(`     ${chapters} chapters, picked up at ${at.toFixed(1)} s after saving ${entry.t.toFixed(1)} s`);
+  await page.screenshot({ path: shots + 'audiobooks-book.png' });
+  await frame().evaluate(() => localStorage.removeItem('audiobooks.progress'));
 });
 
 await check('chess puzzle renders a board', async () => {

@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "build:wasm": "node tools/build-wasm.mjs",
+    "build:audiobooks": "node tools/build-audiobooks.mjs",
     "build:doom": "node tools/build-doom.mjs",
     "build:scummvm": "node tools/build-scummvm.mjs",
     "build:quake": "node tools/build-quake.mjs",

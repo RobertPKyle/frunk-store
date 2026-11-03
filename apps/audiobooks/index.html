@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Audiobooks</title>
+<style>
+  @font-face { font-family: "IM Fell English"; src: url(fonts/im-fell-english-latin-400-normal.woff2) format("woff2"); font-style: normal; font-display: swap; }
+  @font-face { font-family: "IM Fell English"; src: url(fonts/im-fell-english-latin-400-italic.woff2) format("woff2"); font-style: italic; font-display: swap; }
+  @font-face { font-family: "Alegreya Sans"; src: url(fonts/alegreya-sans-latin-400-normal.woff2) format("woff2"); font-weight: 400; font-display: swap; }
+  @font-face { font-family: "Alegreya Sans"; src: url(fonts/alegreya-sans-latin-700-normal.woff2) format("woff2"); font-weight: 700; font-display: swap; }
+
+  :root {
+    --shelf: #1f1611; --board: #2c2018; --raised: #3a2a1f; --line: rgba(236, 215, 170, .2);
+    --paper: #f3e8d3; --faded: #bcab92; --gilt: #e0c070; --ink: #24170b;
+    --title: "IM Fell English", Georgia, serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--shelf); color: var(--paper); font: 16px/1.35 "Alegreya Sans", system-ui, sans-serif; overflow: hidden; -webkit-tap-highlight-color: transparent; }
+  button, input { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  button:focus-visible, input:focus-visible { outline: 2px solid var(--gilt); outline-offset: 2px; }
+  [hidden] { display: none !important; }
+  .btn { min-height: 44px; padding: 8px 14px; border-radius: 8px; background: var(--raised); border: 1px solid var(--line); white-space: nowrap; }
+
+  .view { position: absolute; inset: 0; display: flex; flex-direction: column; min-height: 0; }
+
+  /* Library. The left padding keeps clear of the hub's Apps button. */
+  .top { display: flex; gap: 8px; padding: 8px 8px 6px 104px; }
+  #search { flex: 1; min-width: 0; min-height: 44px; padding: 8px 14px; border-radius: 8px; background: var(--board); border: 1px solid var(--line); }
+  #search::placeholder { color: var(--faded); }
+  .chips { display: flex; gap: 6px; padding: 0 8px 8px; overflow-x: auto; scrollbar-width: none; overscroll-behavior: contain; flex: none; }
+  .chips::-webkit-scrollbar { display: none; }
+  .chip { flex: none; min-height: 40px; padding: 0 14px; border-radius: 8px; background: transparent; border: 1px solid var(--line); white-space: nowrap; }
+  .chip[aria-pressed="true"] { background: var(--gilt); border-color: var(--gilt); color: var(--ink); font-weight: 700; }
+  #shelves { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 0 12px 12px; }
+  #shelves h2 { margin: 6px 0 8px; font: 400 22px/1.2 var(--title); }
+  #shelves .note { margin: -4px 0 10px; color: var(--faded); font-size: 14px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 12px; margin-bottom: 14px; }
+  #moreBtn { display: block; margin: 0 auto 8px; }
+
+  /* A cloth-bound book with its title stamped in gilt. Each shelf has its own cloth. */
+  .book { position: relative; display: block; width: 100%; aspect-ratio: 5 / 7; padding: 0; overflow: hidden; color: var(--stamp, var(--gilt)); text-align: center; border: 0; border-radius: 2px 5px 5px 2px; background-color: var(--cloth); background-image: repeating-linear-gradient(0deg, rgba(0, 0, 0, .06) 0 1px, transparent 1px 3px), repeating-linear-gradient(90deg, rgba(255, 255, 255, .025) 0 1px, transparent 1px 3px); }
+  /* The hinge where the board meets the spine */
+  .book::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 10px; background: rgba(0, 0, 0, .28); border-right: 1px solid rgba(255, 255, 255, .08); }
+  .plate { position: absolute; inset: 8px 7px 8px 17px; display: flex; flex-direction: column; align-items: center; padding: 10px 5px 8px; border: 1px solid currentColor; outline: 1px solid currentColor; outline-offset: -4px; }
+  .book[data-orn="1"] .plate { border-width: 2px 0; outline-offset: -5px; outline-color: transparent; }
+  .book .t { flex: 1; display: flex; flex-direction: column; justify-content: center; min-height: 0; overflow: hidden; font: 400 var(--size, 17px)/1.12 var(--title); overflow-wrap: anywhere; }
+  .book .orn { width: 6px; height: 6px; margin: 3px 0 5px; flex: none; background: currentColor; transform: rotate(45deg); }
+  .book .a { width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: italic 13px/1.2 var(--title); }
+  .book .len { font-size: 12px; line-height: 1.2; margin-top: 2px; opacity: .85; }
+  .progress { height: 5px; margin-top: 4px; border-radius: 3px; background: var(--raised); overflow: hidden; }
+  .progress i { display: block; height: 100%; background: var(--gilt); }
+  .c-adventure { --cloth: #1f4a3a; } .c-mystery { --cloth: #6b1f24; } .c-spooky { --cloth: #3a2140; }
+  .c-scifi { --cloth: #123e55; } .c-love { --cloth: #752a43; } .c-classics { --cloth: #1c2c52; }
+  .c-ideas { --cloth: #533619; } .c-short { --cloth: #37493f; } .c-kids { --cloth: #c08a2a; --stamp: var(--ink); }
+
+  /* What's playing, shown over the library */
+  #bar { flex: none; display: flex; align-items: center; gap: 10px; padding: 6px 8px 6px 12px; background: var(--board); border-top: 1px solid var(--line); }
+  #barOpen { flex: 1; min-width: 0; min-height: 48px; padding: 0; background: none; border: 0; text-align: left; }
+  #barOpen b, #barOpen span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #barOpen b { font: 400 18px/1.2 var(--title); }
+  #barOpen span { font-size: 14px; color: var(--faded); }
+
+  .round { width: 48px; height: 48px; flex: none; padding: 0; display: grid; place-items: center; border-radius: 50%; background: var(--gilt); color: var(--ink); border: 0; }
+  .round svg { width: 24px; height: 24px; fill: currentColor; }
+  .round .pause, .round.playing .play { display: none; }
+  .round.playing .pause { display: block; }
+
+  /* One book */
+  #bookView { display: grid; grid-template-columns: 232px 1fr; }
+  .side { display: flex; flex-direction: column; min-height: 0; padding: 62px 12px 10px 14px; background: var(--board); border-right: 1px solid var(--line); }
+  #bookCover { width: 158px; flex: none; margin: 0 auto 10px; pointer-events: none; }
+  #bookCover .book { --size: 20px; }
+  .sets { display: flex; gap: 6px; margin-bottom: 8px; flex: none; }
+  .sets .btn { flex: 1; min-width: 0; padding: 6px 4px; font-size: 15px; overflow: hidden; text-overflow: ellipsis; }
+  #about { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; margin: 0; font-size: 14px; line-height: 1.35; color: var(--faded); }
+  .main { display: flex; flex-direction: column; min-width: 0; min-height: 0; padding: 8px 12px 0; }
+  #backBtn { position: absolute; left: 104px; top: 8px; z-index: 1; }
+  #bookTitle { margin: 0; font: 400 27px/1.1 var(--title); overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  #bookBy { margin: 2px 0 8px; color: var(--faded); }
+  #bookBy em { font: italic 17px var(--title); color: var(--paper); }
+  #chapterNow { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #seek { display: block; width: 100%; height: 34px; margin: 2px 0 0; background: transparent; -webkit-appearance: none; appearance: none; cursor: pointer; }
+  #seek::-webkit-slider-runnable-track { height: 6px; border-radius: 3px; background: linear-gradient(to right, var(--gilt) var(--done, 0%), var(--raised) var(--done, 0%)); }
+  #seek::-webkit-slider-thumb { -webkit-appearance: none; width: 24px; height: 24px; margin-top: -9px; border-radius: 50%; background: var(--gilt); border: 3px solid var(--shelf); }
+  #seek:disabled { opacity: .5; }
+  .times { display: flex; justify-content: space-between; font-size: 14px; color: var(--faded); font-variant-numeric: tabular-nums; }
+  .transport { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 4px 0 6px; flex: none; }
+  .transport .btn { width: 62px; min-height: 52px; padding: 0; font-size: 18px; }
+  .transport .btn svg { width: 22px; height: 22px; fill: currentColor; vertical-align: middle; }
+  .transport .round { width: 68px; height: 68px; }
+  .transport .round svg { width: 34px; height: 34px; }
+  .transport button:disabled { opacity: .45; cursor: default; }
+  #status { min-height: 21px; font-size: 14px; color: var(--gilt); text-align: center; }
+  #chapters { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; margin: 2px -12px 0; padding: 0 12px 8px; border-top: 1px solid var(--line); }
+  .ch { display: grid; grid-template-columns: 34px 1fr auto; gap: 6px; align-items: center; width: 100%; min-height: 44px; padding: 6px 4px; text-align: left; background: none; border: 0; border-bottom: 1px solid rgba(236, 215, 170, .1); }
+  .ch i { font-style: normal; color: var(--faded); font-variant-numeric: tabular-nums; font-size: 14px; }
+  .ch span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ch small { font-size: 14px; color: var(--faded); font-variant-numeric: tabular-nums; }
+  .ch[aria-current="true"] { color: var(--gilt); font-weight: 700; }
+  .ch[aria-current="true"] i, .ch[aria-current="true"] small { color: var(--gilt); }
+  #bookMsg { padding: 14px 0; }
+  #bookMsg p { margin: 0 0 10px; }
+
+  /* Language list */
+  #langs { position: absolute; inset: 0; z-index: 3; display: flex; flex-direction: column; gap: 10px; padding: 8px 12px 12px; background: var(--shelf); }
+  #langs .head { display: flex; align-items: center; gap: 10px; padding-left: 92px; min-height: 44px; }
+  #langs h2 { flex: 1; margin: 0; font: 400 22px var(--title); }
+  #langList { flex: 1; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; align-content: start; }
+  #langList .btn[aria-pressed="true"] { border-color: var(--gilt); color: var(--gilt); }
+  footer { flex: none; padding: 4px 12px 6px; font-size: 12px; color: var(--faded); border-top: 1px solid var(--line); }
+
+  @media (max-width: 640px) {
+    #bookView { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+    .side { flex-direction: row; flex-wrap: wrap; gap: 8px; padding: 60px 12px 8px; }
+    #bookCover { width: 64px; margin: 0; }
+    #about { display: none; }
+    .sets { flex: 1; min-width: 180px; }
+    .top { padding-left: 92px; }
+  }
+</style>
+</head>
+<body>
+<audio id="audio" crossorigin="anonymous" preload="auto"></audio>
+
+<div class="view" id="library">
+  <div class="top">
+    <input id="search" type="search" placeholder="Search by title or author" enterkeyhint="search" aria-label="Search by title or author">
+    <button class="btn" id="langBtn" type="button">English</button>
+  </div>
+  <div class="chips" id="chips" role="group" aria-label="Shelves"></div>
+  <div id="shelves"></div>
+  <div id="bar" hidden>
+    <button id="barOpen" type="button"><b id="barTitle"></b><span id="barChapter"></span></button>
+    <button class="round" id="barPlay" type="button" aria-label="Play">
+      <svg class="play" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4v16l13-8z"/></svg>
+      <svg class="pause" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>
+    </button>
+  </div>
+  <footer>Read by LibriVox volunteers and hosted by the Internet Archive. Public domain in the USA.</footer>
+</div>
+
+<div class="view" id="bookView" hidden>
+  <button class="btn" id="backBtn" type="button">Library</button>
+  <div class="side">
+    <div id="bookCover"></div>
+    <div class="sets">
+      <button class="btn" id="speedBtn" type="button">1×</button>
+      <button class="btn" id="sleepBtn" type="button">Sleep: off</button>
+    </div>
+    <p id="about"></p>
+  </div>
+  <div class="main">
+    <h1 id="bookTitle"></h1>
+    <p id="bookBy"></p>
+    <div id="bookMsg" hidden></div>
+    <div id="playerArea">
+      <div id="chapterNow"></div>
+      <input id="seek" type="range" min="0" max="1000" value="0" step="1" aria-label="Position in this chapter">
+      <div class="times"><span id="timeNow">0:00</span><span id="timeLeft"></span></div>
+      <div class="transport">
+        <button class="btn" id="prevBtn" type="button" aria-label="Previous chapter"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5h3v14H6zM20 5v14L9 12z"/></svg></button>
+        <button class="btn" id="backSkip" type="button" aria-label="Back 15 seconds">−15</button>
+        <button class="round" id="playBtn" type="button" aria-label="Play">
+          <svg class="play" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4v16l13-8z"/></svg>
+          <svg class="pause" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>
+        </button>
+        <button class="btn" id="fwdSkip" type="button" aria-label="Forward 30 seconds">+30</button>
+        <button class="btn" id="nextBtn" type="button" aria-label="Next chapter"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5h3v14h-3zM4 5v14l11-7z"/></svg></button>
+      </div>
+      <div id="status" role="status"></div>
+    </div>
+    <div id="chapters"></div>
+  </div>
+</div>
+
+<div id="langs" hidden>
+  <div class="head"><h2>Language</h2><button class="btn" id="langClose" type="button">Close</button></div>
+  <div id="langList"></div>
+</div>
+
+<script type="module" src="audiobooks.js"></script>
+<script src="/sw-register.js"></script>
+</body>
+</html>

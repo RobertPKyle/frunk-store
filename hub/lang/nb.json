@@ -88,6 +88,7 @@
     "breakout": { "tagline": "Klassisk racketspill. Dra for å flytte, trykk for å sende ut ballen." },
     "fractal": { "name": "Fraktalutforsker", "tagline": "Mandelbrot i WebAssembly på flere tråder. Knip for å zoome." },
     "sleep": { "name": "Søvnlyder", "tagline": "Regn, hav, bål og mer for campingmodus, med dempet klokke og søvntimer." },
+    "audiobooks": {"name":"Lydbøker","tagline":"Tusenvis av gratis lydbøker lest av frivillige, med bokmerke og søvntimer. Til Camp-modus og lange ladestopp."},
     "fireplace": { "name": "Leirbål", "tagline": "Et sprakende bål med gnister og sirisser. En koselig skjerm for campingplassen." },
     "stars": { "name": "Stjernekart", "tagline": "Hva som er på himmelen i kveld: stjerner, planeter og månen over leirplassen din." },
     "weather": { "name": "Vær", "tagline": "Værvarsel, solnedgang, når det blir helt mørkt, månen og en vurdering av stjernetitting i kveld." },

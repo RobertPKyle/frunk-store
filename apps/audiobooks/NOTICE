@@ -1,0 +1,14 @@
+Audiobooks uses these works by other people.
+
+fonts/     IM Fell English, from the npm package @fontsource/im-fell-english
+           5.3.0, and Alegreya Sans, from @fontsource/alegreya-sans 5.3.0.
+           Both SIL Open Font License 1.1; see fonts/OFL-IMFell.txt and
+           fonts/OFL-AlegreyaSans.txt.
+
+shelf.json and more.json come from the LibriVox catalog
+(https://librivox.org), with download counts from the Internet Archive
+(https://archive.org). tools/build-audiobooks.mjs builds them.
+
+The recordings are read by LibriVox volunteers and stream from the Internet
+Archive. They are not stored in this repository. LibriVox places its recordings
+in the public domain in the USA; copyright in other countries can differ.

@@ -88,6 +88,7 @@
     "breakout": { "tagline": "Das klassische Schlägerspiel. Zum Bewegen ziehen, zum Abschlagen tippen." },
     "fractal": { "name": "Fraktal-Explorer", "tagline": "Mandelbrot in WebAssembly auf mehreren Threads. Mit zwei Fingern zoomen." },
     "sleep": { "name": "Schlafklänge", "tagline": "Regen, Meer, Lagerfeuer und mehr für den Camp-Modus, mit gedimmter Uhr und Sleep-Timer." },
+    "audiobooks": {"name":"Hörbücher","tagline":"Tausende kostenlose Hörbücher, gelesen von Freiwilligen, mit Lesezeichen und Schlaftimer. Für den Camp-Modus und lange Ladepausen."},
     "fireplace": { "name": "Lagerfeuer", "tagline": "Ein knisterndes Feuer mit Funken und Grillen. Ein gemütlicher Bildschirm für den Campingplatz." },
     "stars": { "name": "Sternkarte", "tagline": "Was heute Nacht am Himmel steht: Sterne, Planeten und der Mond über deinem Stellplatz." },
     "weather": { "name": "Wetter", "tagline": "Vorhersage, Sonnenuntergang, echte Dunkelheit, Mond und eine Bewertung fürs Sternegucken heute Nacht." },

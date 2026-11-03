@@ -118,6 +118,19 @@ clear them to make room.
   Vercel's CDN caches each spot for a day. Uncached queries are limited to 40
   per IP per hour and 3000 a day overall. The last 6 spots are kept on the
   device for offline use.
+- `apps/audiobooks`: Audiobooks. LibriVox's public-domain recordings, streamed
+  from the Internet Archive, with resume, speed and a sleep timer that fades
+  out and rewinds a minute. Its API sends no CORS headers, so
+  `npm run build:audiobooks` turns the catalog into `shelf.json` (what the
+  library opens with) and `more.json` (the rest, loaded for a search or Show
+  more). Rerun it now and then to pick up new books; it keeps LibriVox's answer
+  in `tools/.audiobooks-build` for a week. The hub allows no adult content, so
+  the build leaves out LibriVox's Erotica genre and a short list of titles;
+  searching only looks through these files, so they can't come back. Opening a
+  book asks the Archive for its chapters, and the audio element needs
+  `crossorigin="anonymous"` to play under COEP. The Archive's cover images
+  have no CORS headers, so covers are drawn as cloth bindings instead, one
+  cloth per genre. A lost connection keeps the place and keeps retrying.
 - `apps/planes` and `apps/api/planes.js`: Planes Overhead, a live flight
   radar. The base map is MapLibre GL JS with a reduced OpenFreeMap style
   (`map-style.js`) that leaves out buildings and small roads, so it costs the

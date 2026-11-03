@@ -88,6 +88,7 @@
     "breakout": { "tagline": "Klassiek batje-en-balspel. Sleep om te bewegen, tik om de bal weg te schieten." },
     "fractal": { "name": "Fractalverkenner", "tagline": "Mandelbrot in WebAssembly op meerdere threads. Knijp om te zoomen." },
     "sleep": { "name": "Slaapgeluiden", "tagline": "Regen, zee, kampvuur en meer voor de kampeermodus, met een gedimde klok en slaaptimer." },
+    "audiobooks": {"name":"Luisterboeken","tagline":"Duizenden gratis luisterboeken, voorgelezen door vrijwilligers, met bladwijzer en slaaptimer. Voor Camp Mode en lange laadstops."},
     "fireplace": { "name": "Kampvuur", "tagline": "Een knetterend vuur met vonken en krekels. Een gezellig scherm voor op de camping." },
     "stars": { "name": "Sterrenkaart", "tagline": "Wat er vannacht aan de hemel staat: sterren, planeten en de maan boven je kampeerplek." },
     "weather": { "name": "Weer", "tagline": "Weersverwachting, zonsondergang, echte duisternis, de maan en een score voor sterrenkijken vannacht." },
