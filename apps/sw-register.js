@@ -9,9 +9,15 @@ if ('serviceWorker' in navigator) {
     .then(() => navigator.serviceWorker.ready)
     .then(reg => {
       if (!first) return;
-      const urls = [location.href, ...performance.getEntriesByType('resource').map(e => e.name)]
-        .filter(url => new URL(url).origin === location.origin);
-      reg.active?.postMessage({ frunk: 'cache', urls });
+      // Once the page has loaded, as a file still on its way isn't listed yet
+      // and, having started before the worker ran, won't go through it either
+      const send = () => {
+        const urls = [location.href, ...performance.getEntriesByType('resource').map(e => e.name)]
+          .filter(url => new URL(url).origin === location.origin);
+        reg.active?.postMessage({ frunk: 'cache', urls });
+      };
+      if (document.readyState === 'complete') send();
+      else addEventListener('load', send, { once: true });
     })
     .catch(() => {});
 }
