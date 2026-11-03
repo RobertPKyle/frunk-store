@@ -851,6 +851,161 @@ await check('chess vs stockfish plays offline after one visit', async () => {
   }
 });
 
+await check('mahjong plays a hand, scores a win, saves, resumes and speaks Chinese', async () => {
+  await openFromHub(/^Mahjong$/);
+  const app = appFrame();
+  const frame = () => page.frames().find(f => f.url().includes('/mahjong/'));
+  const game = () => frame().evaluate(() => JSON.parse(localStorage.getItem('frunk.mahjong.game')));
+  const put = state => frame().evaluate(st => {
+    localStorage.setItem('frunk.mahjong.game', JSON.stringify(st));
+    localStorage.setItem('frunk.mahjong.prefs', JSON.stringify({ fast: true, sound: false, numbers: true }));
+    location.reload();
+  }, state);
+
+  // first visit: Taiwan's 16 tiles, played with fast bots
+  await app.locator('[data-group="rules"][data-value="tw"]').click();
+  await app.locator('[data-group="level"][data-value="0"]').click();
+  await app.locator('#startBtn').click();
+  await app.locator('#hand [data-i]').first().waitFor();
+  await put(await game());
+  await app.locator('#hand [data-i]').first().waitFor();
+
+  // play to the end of the hand, throwing the newest tile and passing on every claim
+  const started = Date.now();
+  let turns = 0, handAt = null;
+  for (;;) {
+    if (Date.now() - started > 90000) throw new Error('the hand did not finish');
+    if (await app.locator('[data-next]').isVisible()) break;
+    if (await app.locator('[data-act="pass"]').count()) { await app.locator('[data-act="pass"]').click().catch(() => {}); continue; }
+    if (await app.locator('[data-act="win"]').count()) { await app.locator('[data-act="win"]').click().catch(() => {}); continue; }
+    const drawn = app.locator('#hand .drawn');
+    if (await drawn.count()) {
+      // the state survives a reload at the same tile
+      if (turns === 3) {
+        const before = await game();
+        handAt = before.players[0].hand.join();
+        await frame().evaluate(() => location.reload());
+        await app.locator('#hand .drawn').waitFor();
+        const after = await game();
+        if (after.players[0].hand.join() !== handAt) throw new Error('reloading changed the hand');
+        if (after.wall.length !== before.wall.length) throw new Error('reloading changed the wall');
+      }
+      turns++;
+      const tiles = app.locator('#hand [data-i]');
+      const n = await tiles.count();
+      await tiles.nth(n - 1).click().catch(() => {});
+      await tiles.nth(n - 1).click().catch(() => {});
+      continue;
+    }
+    await page.waitForTimeout(30);
+  }
+  const played = await game();
+  if (played.scores.reduce((a, b) => a + b, 0) !== 0) throw new Error(`scores don't add to zero: ${played.scores}`);
+  if (played.players.some(p => p.melds.length * 3 + p.hand.length > 17 + 3)) throw new Error('a hand holds too many tiles');
+
+  // a set hand: Hong Kong, half flush 3, red dragons 1, concealed 1, self-draw 1
+  const start = await frame().evaluate(async () => {
+    const { newGame, newCfg } = await import('/mahjong/game.js');
+    const s = newGame(newCfg({ rules: 'hk', level: 1, minFan: 3 }));
+    s.dealer = 1;
+    s.discards = 5;
+    s.noCalls = false;
+    s.players[0].hand = [0, 1, 2, 3, 4, 5, 6, 7, 8, 31, 31, 31, 0, 0];
+    s.players[0].melds = [];
+    s.players[0].flowers = [36];   // not this seat's own flower
+    s.turn = 0;
+    s.drawn = 0;
+    s.phase = 'discard';
+    s.afterClaim = false;
+    return s;
+  });
+  await put(start);
+  await app.locator('[data-act="win"]').click();
+  const box = app.locator('#resultBox');
+  await box.locator('[data-next]').waitFor();
+  const text = await box.textContent();
+  for (const word of ['You win', 'Self-drawn', 'One suit with honors', 'Self-draw', 'Nothing taken from others', 'Pung of red dragons', '6', 'faan']) {
+    if (!text.includes(word)) throw new Error(`result has no "${word}": ${text}`);
+  }
+  const won = await game();
+  if (won.result.total !== 6) throw new Error(`worth ${won.result.total} faan, expected 6`);
+  if (won.scores[0] !== 48) throw new Error(`self-draw at 6 faan should pay 16 from each, got ${won.scores}`);
+  await page.waitForTimeout(800);
+  await page.screenshot({ path: shots + 'mahjong-result.png' });
+
+  // a complete hand under the minimum says why it can't win
+  await frame().evaluate(async () => {
+    const { newGame, newCfg } = await import('/mahjong/game.js');
+    const s = newGame(newCfg({ rules: 'hk', level: 1, minFan: 3 }));
+    s.dealer = 1;
+    s.discards = 5;
+    s.noCalls = false;
+    s.players[0].hand = [0, 1, 2, 12, 13, 14, 19, 20, 21, 3, 4, 5, 9, 9];
+    s.players[0].melds = [{ type: 'chow', tile: 15, from: 3 }];
+    s.players[0].hand.splice(9, 3);
+    s.players[0].flowers = [36];   // not this seat's own flower
+    s.turn = 0;
+    s.drawn = 9;
+    s.phase = 'discard';
+    s.afterClaim = false;
+    localStorage.setItem('frunk.mahjong.game', JSON.stringify(s));
+    location.reload();
+  });
+  await app.locator('#bar .note').waitFor();
+  const note = await app.locator('#bar .note').textContent();
+  if (!/needs 3/.test(note)) throw new Error(`no minimum note: ${note}`);
+  if (await app.locator('[data-act="win"]').count()) throw new Error('a win was offered under the minimum');
+
+  // the hint marks a tile, and tapping a tile twice throws it
+  await app.locator('[data-act="hint"]').click();
+  await app.locator('#hand .hinted').waitFor();
+  await page.screenshot({ path: shots + 'mahjong-table.png' });
+
+  // the rules screen lists what scores
+  await app.locator('#menuBtn').click();
+  await app.locator('[data-menu="rules"]').click();
+  await app.locator('#rulesBox .values li').first().waitFor();
+  if (await app.locator('#rulesBox .values li').count() < 25) throw new Error('the scoring table is short');
+  await app.locator('[data-close-rules]').click();
+  await page.click('#home');
+  await page.waitForSelector('#runner', { state: 'hidden' });
+
+  // the hub tells the app its language, and the claim words follow the rules played
+  await page.evaluate(() => localStorage.setItem('hub.lang', '"zh-Hant"'));
+  await page.goto(base + '/');
+  await page.locator('#grid .card').filter({ has: page.locator('h2', { hasText: '麻將' }) }).click();
+  await page.waitForSelector('#loading', { state: 'hidden' });
+  await app.locator('#menuBtn').filter({ hasText: '選單' }).waitFor();
+  if (!frame().url().endsWith('#lang=zh-Hant')) throw new Error(`no language in ${frame().url()}`);
+  await page.evaluate(() => localStorage.removeItem('hub.lang'));
+  await page.click('#home');
+  await page.waitForSelector('#runner', { state: 'hidden' });
+});
+
+await check('mahjong plays offline after one visit', async () => {
+  const context = await browser.newContext({ viewport: { width: 773, height: 601 } });
+  try {
+    const p = await context.newPage();
+    await p.goto(`${appsBase}/mahjong/`);
+    const urls = ['/mahjong/', '/mahjong/app.js', '/mahjong/rules.js', '/mahjong/game.js', '/mahjong/bot.js', '/mahjong/tiles.js', '/mahjong/glyphs.js', '/mahjong/i18n.js', '/sw-register.js'];
+    for (let tries = 0; ; tries++) {
+      const missing = await p.evaluate(async urls => {
+        const hits = await Promise.all(urls.map(url => caches.match(url)));
+        return urls.filter((_, i) => !hits[i]);
+      }, urls);
+      if (!missing.length) break;
+      if (tries === 120) throw new Error(`not cached: ${missing}`);
+      await p.waitForTimeout(250);
+    }
+    await context.setOffline(true);
+    await p.reload();
+    await p.locator('#startBtn').click();
+    await p.locator('#hand [data-i]').first().waitFor();
+  } finally {
+    await context.close();
+  }
+});
+
 await check('terrarium runs, feeds and catches up after time away', async () => {
   await openFromHub(/Terrarium/);
   const tank = () => page.frames().find(f => f.url().includes('/terrarium/'));

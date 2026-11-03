@@ -1,0 +1,16 @@
+Mahjong (apps/mahjong)
+
+Rules, bots and tile art are written for this app. Only the tile characters
+come from elsewhere.
+
+Characters on the tiles and buttons (glyphs.js)
+  LXGW WenKai TC Medium v1.530, Copyright 2022-2026 The LXGW WenKai Project
+  Authors (https://github.com/lxgw/LxgwWenkaiTC). Licensed under the SIL Open
+  Font License, version 1.1 (OFL-LXGWWenKaiTC.txt). glyphs.js holds the
+  outlines of the 37 characters used, made by tools/build-mahjong.mjs.
+
+Scoring values
+  Hong Kong: zh.wikipedia.org, 香港麻雀食糊列表 ("3-3" system), with payments from
+  en.wikipedia.org, Hong Kong Mahjong scoring rules.
+  Taiwan: zh.wikibooks.org, 台灣麻將, without its declared 天聽 and 地聽, plus
+  字一色 at 16.

@@ -126,6 +126,7 @@
     "ascii": { "name": "ASCII 冒险", "tagline": "Scott Miller 1987 至 1990 年的 Kroz 系列，现已开源：七部文字模式冒险，有宝石、鞭子和怪物。点按即可行走。" },
     "puzzles": { "name": "逻辑谜题", "tagline": "Simon Tatham 的 40 款经典逻辑谜题，从 Solo（数独）到 Mines、Net，任何尺寸都有无穷无尽的新盘面。" },
     "pokeguess": { "name": "每日猜宝可梦", "tagline": "根据世代、属性、身高和体重，在八次之内猜出今天的神秘宝可梦。所有人都是同一只，还有可自选世代的自由模式。" },
+    "mahjong": { "name": "麻将", "tagline": "香港 13 张或台湾 16 张，和三位电脑对手对局。自动计番计台，有提示，下次还能接着打。" },
     "stockfish": { "name": "与 Stockfish 下国际象棋", "tagline": "与 Stockfish 19 下完整对局，从轻松的入门级到全力以赴任你选。可以悔棋、请求提示，还能接着上次继续下。" },
     "chess": { "name": "国际象棋谜题", "tagline": "在屏幕上解 Lichess 每日国际象棋谜题。" },
     "terrarium": { "tagline": "你不在时也持续生活的水族箱。喂食它们，看着它们进化。作者：Jason Goldfeder。" }

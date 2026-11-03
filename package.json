@@ -19,6 +19,7 @@
     "build:supertux": "node tools/build-supertux.mjs",
     "build:pop": "node tools/build-pop.mjs",
     "build:stockfish": "node tools/build-stockfish.mjs",
+    "build:mahjong": "node tools/build-mahjong.mjs",
     "build:mame": "node tools/build-mame.mjs",
     "build:craft4k": "node tools/build-craft4k.mjs",
     "build:puzzles": "node tools/build-puzzles.mjs",
@@ -32,10 +33,12 @@
     "build:n64": "node tools/build-n64js.mjs",
     "build:battleship": "node tools/build-battleship.mjs",
     "dev": "node tools/dev.mjs",
-    "test:e2e": "node tools/e2e.mjs"
+    "test:e2e": "node tools/e2e.mjs",
+    "test:mahjong": "node tools/test-mahjong.mjs"
   },
   "devDependencies": {
     "esbuild": "^0.28.2",
+    "opentype.js": "^2.0.0",
     "playwright-core": "^1.64.0",
     "satellite.js": "^7.1.0",
     "wabt": "^1.0.39"

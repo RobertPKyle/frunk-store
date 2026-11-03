@@ -248,7 +248,8 @@ function openApp(id, { push }) {
   remember(id);
   stayAwake(app.tags.includes('Game'));
   freshFrame();
-  frame.src = appsOrigin + app.path;
+  // an app that has its own translations is told the hub's language
+  frame.src = appsOrigin + app.path + (app.langs?.includes(lang) ? `#lang=${lang}` : '');
   runner.hidden = false;
   document.title = `${appName(app)} · frunk.store`;
 }

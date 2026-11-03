@@ -126,6 +126,7 @@
     "ascii": { "name": "ASCII-Quests", "tagline": "Scott Millers Kroz-Spiele von 1987 bis 1990, jetzt Open Source: sieben Textmodus-Abenteuer mit Edelsteinen, Peitschen und Monstern. Tippe, um zu laufen." },
     "puzzles": { "name": "Logikrätsel", "tagline": "Vierzig klassische Logikrätsel von Simon Tatham, von Solo (Sudoku) über Mines bis Net, mit endlos neuen Feldern in jeder Größe." },
     "pokeguess": { "name": "Pokémon-Rätsel des Tages", "tagline": "Errate das geheime Pokémon des Tages in acht Versuchen anhand von Generation, Typen, Größe und Gewicht. Für alle dasselbe, dazu freies Spiel mit beliebigen Generationen." },
+    "mahjong": { "name": "Mahjong", "tagline": "Hongkong- oder Taiwan-Regeln gegen drei Bots. Jede Hand wird für dich gewertet, mit Tipps und Weiterspielen, wo du aufgehört hast." },
     "stockfish": { "name": "Schach gegen Stockfish", "tagline": "Ganze Partien gegen Stockfish 19, von einer sanften Anfängerstufe bis zur vollen Stärke. Nimm Züge zurück, hol dir einen Tipp und spiel später weiter." },
     "chess": { "name": "Schachrätsel", "tagline": "Löse das tägliche Schachrätsel von Lichess auf deinem Bildschirm." },
     "terrarium": { "tagline": "Ein Aquarium, das weiterlebt, während du weg bist. Füttere es und sieh zu, wie es sich entwickelt. Von Jason Goldfeder." }

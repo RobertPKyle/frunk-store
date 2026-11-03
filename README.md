@@ -37,7 +37,8 @@ console). While an app tagged Game is open, the hub keeps the screen on with
 a wake lock, since play with a controller never touches the screen.
 
 The hub's own text comes in English, Traditional and Simplified Chinese,
-German, Norwegian, Dutch, Japanese and Korean (the apps stay in English). The
+German, Norwegian, Dutch, Japanese and Korean (the apps stay in English, except
+Mahjong, which also comes in both kinds of Chinese). The
 language button in the header switches it; until someone picks one, the hub
 follows the browser's language. English is written once, in `hub/index.html`
 (elements marked `data-i18n`) and `hub/i18n.js`; each other language is one
@@ -1113,6 +1114,25 @@ clear them to make room.
   play a random move now and then. Every search also has a 4 s time limit. The
   game is saved after every move in localStorage, and a game left on the
   engine's turn carries on when the app opens again.
+- `apps/mahjong`: Mahjong against three bots, under Hong Kong rules (13 tiles,
+  faan, a minimum of 0, 1 or 3 to win, half spicy points, capped at 13) or
+  Taiwan rules (16 tiles, 100 base and 20 per tai, dealer streak bonus, 16 tiles
+  left in the wall). `rules.js` holds the scoring and `game.js` the state, a plain
+  object saved in localStorage after every action; neither touches the page, so
+  `npm run test:mahjong` runs them in node: each table entry, then whole games
+  checking that every tile stays accounted for and scores add to zero, then each
+  level in a table of the level below. Hong Kong's values follow zh.wikipedia's
+  香港麻雀食糊列表, and Taiwan's zh.wikibooks' 台灣麻將, leaving out its declared
+  天聽 and 地聽 and adding 字一色 at 16. Sources disagree on some table rules: a
+  wall played to its last tile in Hong Kong, the discarder paying in full, and one
+  winner per discard are choices made here, and the rules screen lists them.
+  `bot.js` sees only what a seat would see: it picks discards by shanten and live
+  tiles, builds toward value, and at Hard weighs danger and folds. Tile faces are
+  SVG background images, and their Chinese characters are outlines in `glyphs.js`
+  (`npm run build:mahjong`, LXGW WenKai TC, OFL), since an image can't use the
+  page's fonts and a car may have no Chinese font. The app's own text comes in
+  English, Traditional and Simplified Chinese. A catalog entry's `langs` lists the
+  languages an app has, and the hub passes the current one as `#lang=`.
 - `apps/pokeguess`: Daily Pokémon Guess. Squirdle by Fireblend (Apache
   License 2.0, github.com/Fireblend/squirdle), reworked for the car: guess
   a secret Pokémon in up to 8 tries from hints on its generation, types,

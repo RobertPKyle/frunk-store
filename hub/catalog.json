@@ -481,6 +481,23 @@
       ]
     },
     {
+      "id": "mahjong",
+      "name": "Mahjong",
+      "tagline": "Hong Kong or Taiwan rules against three bots, with every hand scored for you, hints, and a game that carries on where you left off.",
+      "path": "/mahjong/",
+      "icon": "/mahjong/icon.svg",
+      "added": "2026-11-03",
+      "langs": [
+        "zh-Hant",
+        "zh-Hans"
+      ],
+      "tags": [
+        "Game",
+        "Touch",
+        "Offline"
+      ]
+    },
+    {
       "id": "stockfish",
       "name": "Chess vs Stockfish",
       "tagline": "Full games against Stockfish 19, from a gentle beginner level up to full strength. Take back a move, ask for a hint and pick up where you left off.",
