@@ -132,6 +132,15 @@
       "added": "2026-11-03"
     },
     {
+      "id": "beach",
+      "name": "Beach Conditions",
+      "tagline": "Water temperature, waves, wind and tide near your car, drawn as a beach you can read at a glance.",
+      "path": "/beach/",
+      "icon": "/beach/icon.svg",
+      "tags": ["Road Trip", "Camp Mode"],
+      "added": "2026-11-04"
+    },
+    {
       "id": "pitstop",
       "name": "Pit Stop",
       "tagline": "Restrooms, coffee, food and shops within walking distance of the charger, with what's open now.",

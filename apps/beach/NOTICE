@@ -1,0 +1,24 @@
+Beach Conditions uses these works by other people.
+
+fonts/     Bowlby One and Cabin, from the npm packages @fontsource/bowlby-one
+           and @fontsource/cabin 5.3.0. SIL Open Font License 1.1; see
+           fonts/OFL.txt.
+
+Data, fetched when the app runs and not stored in this repository, except
+tides.json:
+
+Readings   NOAA National Data Buoy Center, https://www.ndbc.noaa.gov. Its own
+           data is public domain. It also carries readings from partners,
+           whose station's operator the app names when that station is picked.
+Waves      Many wave readings come from CDIP, Scripps Institution of
+           Oceanography, https://cdip.ucsd.edu, whose data is free for public
+           use if not altered, with a link to its homepage on web displays.
+           This app converts units and otherwise shows the values as sent.
+Tides      NOAA Center for Operational Oceanographic Products and Services,
+           https://tidesandcurrents.noaa.gov. Predictions at the closest
+           station. tides.json is a shortened copy of its station list, made
+           by tools/build-beach-tides.mjs.
+Alerts     National Weather Service, https://www.weather.gov. Public domain.
+
+None of these sources endorses this app. The plain-language descriptions of
+water temperature and waves were written for this app and are general guidance.

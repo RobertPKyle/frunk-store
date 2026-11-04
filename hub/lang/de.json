@@ -96,6 +96,7 @@
     "skyevents": { "name": "Himmelsereignisse", "tagline": "Meteorströme, Vollmonde, Finsternisse und Planeten fürs kommende Jahr, und was heute Nacht zu sehen ist." },
     "nearby": { "name": "Was ist in der Nähe", "tagline": "Geschichte, Sehenswürdigkeiten und Natur rund um deinen Parkplatz, aus Wikipedia. Ideal beim Laden." },
     "under": {"name":"Was ist unter mir","tagline":"Das Gestein unter deinem Auto, einfach erklärt: ein Bohrkern durch die Erdgeschichte, das Alter jeder Schicht und Fossilien aus der Nähe."},
+    "beach": {"name":"Strandbedingungen","tagline":"Wassertemperatur, Wellen, Wind und Gezeiten in deiner Nähe, gezeichnet als Strand, den du auf einen Blick liest."},
     "pitstop": { "name": "Boxenstopp", "tagline": "Toiletten, Kaffee, Essen und Läden in Gehweite der Ladesäule, mit allem, was gerade geöffnet hat." },
     "planes": {"name":"Flugzeuge über dir","tagline":"Ein Live-Flugradar. Sieh, was über dich hinwegfliegt, wohin es geht und wo du es am Himmel findest."},
     "postcard": {"name":"Roadtrip-Postkarte","tagline":"Mach aus deinem Standort eine Vintage-Postkarte, mit deinem Ort in großen Kartenbuchstaben, und schick sie aufs Handy."},

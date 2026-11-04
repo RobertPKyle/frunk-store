@@ -96,6 +96,7 @@
     "skyevents": { "name": "Himmelfenomener", "tagline": "Meteorsvermer, fullmåner, formørkelser og planeter for året som kommer, og hva som er oppe i kveld." },
     "nearby": { "name": "Hva er rundt meg", "tagline": "Historie, severdigheter og natur nær der du har parkert, fra Wikipedia. Perfekt mens bilen lader." },
     "under": {"name":"Hva er under meg","tagline":"Berget under bilen forklart enkelt: en borekjerne gjennom tiden, hvor gammelt hvert lag er, og fossiler funnet i nærheten."},
+    "beach": {"name":"Strandforhold","tagline":"Vanntemperatur, bølger, vind og tidevann nær bilen, tegnet som en strand du leser med ett blikk."},
     "pitstop": { "name": "Pitstopp", "tagline": "Toaletter, kaffe, mat og butikker i gangavstand fra laderen, med det som er åpent nå." },
     "planes": {"name":"Fly over deg","tagline":"En flyradar i sanntid. Se hva som flyr over deg, hvor det skal, og hvor du skal se etter det."},
     "postcard": {"name":"Bilturpostkort","tagline":"Gjør stedet du står til et gammeldags postkort, med stedsnavnet i store bokstaver fylt med kart, og send det til telefonen."},

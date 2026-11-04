@@ -96,6 +96,7 @@
     "skyevents": { "name": "Hemelverschijnselen", "tagline": "Meteorenzwermen, volle manen, verduisteringen en planeten voor het komende jaar, en wat er vannacht te zien is." },
     "nearby": { "name": "Wat is er in de buurt", "tagline": "Geschiedenis, bezienswaardigheden en natuur rond je parkeerplek, uit Wikipedia. Ideaal tijdens het laden." },
     "under": {"name":"Wat ligt onder me","tagline":"Het gesteente onder je auto, helder uitgelegd: een boorkern door de tijd, de ouderdom van elke laag en fossielen uit de buurt."},
+    "beach": {"name":"Strandcondities","tagline":"Watertemperatuur, golven, wind en getij bij je auto, getekend als een strand dat je in één oogopslag leest."},
     "pitstop": { "name": "Pitstop", "tagline": "Toiletten, koffie, eten en winkels op loopafstand van de lader, met wat er nu open is." },
     "planes": {"name":"Vliegtuigen boven je","tagline":"Een live vluchtradar. Zie wat er over je heen vliegt, waar het naartoe gaat en waar je het kunt zien."},
     "postcard": {"name":"Roadtrip-ansichtkaart","tagline":"Maak van je plek een vintage ansichtkaart, met je plaatsnaam in grote letters vol kaart, en stuur hem naar je telefoon."},

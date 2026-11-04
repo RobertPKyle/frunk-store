@@ -136,6 +136,20 @@ clear them to make room.
   `crossorigin="anonymous"` to play under COEP. The Archive's cover images
   have no CORS headers, so covers are drawn as cloth bindings instead, one
   cloth per genre. A lost connection keeps the place and keeps retrying.
+- `apps/beach` and `apps/api/beach.js`: Beach Conditions. A side view of a beach
+  with each number on the thing it measures: water temperature in the sea, which
+  also sets the sea's color, and tide on the sand. Wave height and tide are to
+  scale with the person, and waves roll in at the measured period, with the buoy
+  riding them on CSS animations alone. Readings come from NDBC's `latest_obs.txt`
+  and station list, which send no CORS headers. The function gives every car the
+  same whole list, so one URL stays on the CDN for ten minutes and a car's
+  location never reaches it; NDBC asks for retrievals to be kept low. Each number
+  comes from the closest station that has it, with a buoy preferred over a harbor
+  gauge up to 40 km further. Tides (NOAA, `tides.json` from
+  `node tools/build-beach-tides.mjs`) and beach alerts (National Weather Service)
+  are called directly and only for US waters. Wave heights come from offshore
+  sensors, and the app says so. Not a safety service: its words describe the
+  water, never whether it's safe. See `apps/beach/NOTICE`.
 - `apps/under`: What's Under Me. The rock beneath the car as a drill core you
   scroll down through time, each segment in its map color with the pattern
   geologic maps use for that rock. The top comes from Macrostrat's map for that

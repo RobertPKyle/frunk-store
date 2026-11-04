@@ -618,6 +618,78 @@ await check('audiobooks streams a book, survives a lost connection and remembers
   await frame().evaluate(() => localStorage.removeItem('audiobooks.progress'));
 });
 
+await check('beach conditions shows the sea near a place', async () => {
+  await openFromHub(/Beach Conditions/);
+  const app = appFrame();
+  const frame = page.frames().find(f => f.url().includes('/beach/'));
+  const savedPlace = await frame.evaluate(() => localStorage.getItem('frunk.place'));
+  const go = async name => {
+    if (!(await app.locator('.fp-picker').isVisible())) await app.locator('#placeBtn').click();
+    await app.getByRole('button', { name, exact: true }).click();
+  };
+  await app.locator('.fp-picker, .row').first().waitFor({ timeout: 30000 });
+  await go('San Diego');
+
+  // Real readings through the function, real tides from NOAA, all under COEP
+  await app.locator('#title').filter({ hasText: 'Near San Diego' }).waitFor({ timeout: 30000 });
+  await app.locator('#waveBig').filter({ hasText: /^\d+\.\d (ft|m)$/ }).waitFor({ timeout: 30000 });
+  const water = await app.locator('#waterBig').textContent();
+  if (!/^-?\d+°[FC]$/.test(water)) throw new Error(`water reads ${water}`);
+  await app.locator('#sandText').filter({ hasText: /Tide (rising|falling)/ }).waitFor({ timeout: 30000 });
+  const rows = await app.locator('.row').count();
+  if (rows < 6) throw new Error(`only ${rows} rows`);
+  console.log(`     ${water}, ${await app.locator('#waveBig').textContent()}: ${(await app.locator('#waveWords').textContent())}`);
+  console.log(`     ${(await app.locator('#sandText').innerText()).replace(/\n+/g, ' | ')}`);
+
+  // The waves really roll, at the measured period, and the buoy rides them
+  const motion = await frame.evaluate(() => [...document.querySelectorAll('.wave, .float')].map(n => ({
+    name: n.id, playing: n.getAnimations().some(a => a.playState === 'running'), seconds: getComputedStyle(n).animationDuration,
+  })));
+  if (motion.length < 2 || !motion.filter(m => m.name.startsWith('wave')).every(m => m.playing)) throw new Error(`no motion: ${JSON.stringify(motion)}`);
+
+  // Units are shared with the other apps
+  const unit = await app.locator('#unitsBtn').textContent();
+  await app.locator('#unitsBtn').click();
+  await app.locator('#waveBig').filter({ hasText: unit === 'mi' ? / m$/ : / ft$/ }).waitFor();
+  await app.locator('#unitsBtn').click();
+  const degrees = await app.locator('#tempBtn').textContent();
+  await app.locator('#tempBtn').click();
+  await app.locator('#waterBig').filter({ hasText: degrees === '°F' ? /°C$/ : /°F$/ }).waitFor();
+  await app.locator('#tempBtn').click();
+
+  // A station shows only its own numbers; a missing one says so instead of reading as zero
+  const partial = await frame.evaluate(() => [...document.querySelectorAll('.row')].slice(1)
+    .findIndex(r => !/°/.test(r.querySelector('span').textContent)));
+  if (partial >= 0) {
+    await app.locator('.row').nth(partial + 1).click();
+    await app.locator('#waterBig').filter({ hasText: 'No reading' }).waitFor();
+    await app.locator('#waterWords').filter({ hasText: 'from this station' }).waitFor();
+    if (await app.locator('.row[aria-pressed="true"]').count() !== 1) throw new Error('station not marked');
+    await app.locator('.row').first().click();
+    await app.locator('#title').filter({ hasText: 'Near San Diego' }).waitFor();
+  }
+
+  // Far from any water, the app says so and drops the local-only numbers
+  await go('Moab');
+  await app.locator('#where').filter({ hasText: "isn't your local water" }).waitFor({ timeout: 30000 });
+  await app.locator('#pickBeach').waitFor();
+  if (/ air|wind/.test(await app.locator('#air').innerText())) throw new Error('air or wind from far away');
+  if (await app.locator('#alertNote').textContent()) throw new Error('an all-clear far from the water');
+
+  // Outside the US there are readings but no tide times
+  await go('London');
+  await app.locator('#title').filter({ hasText: 'Near London' }).waitFor({ timeout: 30000 });
+  await app.locator('#sandText').filter({ hasText: 'US coasts only' }).waitFor({ timeout: 30000 });
+
+  // Last, as a click right after a screenshot can miss the app
+  await go('San Diego');
+  await app.locator('#sandText').filter({ hasText: /Tide (rising|falling)/ }).waitFor({ timeout: 30000 });
+  const markers = await app.locator('#marker').count();
+  if (markers !== 1) throw new Error(`${markers} buoys and piers in the picture`);
+  await frame.evaluate(v => { if (v) localStorage.setItem('frunk.place', v); else localStorage.removeItem('frunk.place'); }, savedPlace);
+  await page.screenshot({ path: shots + 'beach.png' });
+});
+
 await check("what's under me shows the rock layers, fossils and the map", async () => {
   let tiles = 0;
   const countTiles = r => { if (r.url().includes('tiles.macrostrat.org/carto/') && r.ok()) tiles++; };
