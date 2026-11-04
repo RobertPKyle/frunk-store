@@ -806,6 +806,25 @@ clear them to make room.
   synced every 3 s and when the page is hidden or the hub's close handshake
   asks; hiding the page also opens the pause menu, so the hour's clock
   stops. `window.popStats()` counts drawn frames for the e2e check.
+- `apps/neverputt`: Neverputt, 3D minigolf from the Neverball project (GPL-2.0-or-later),
+  compiled to WebAssembly by `npm run build:neverputt`
+  (`tools/build-neverputt.mjs`: a pinned commit's tarball, `tools/neverputt/neverputt-web.patch`,
+  emcc in Docker from `tools/neverputt/Dockerfile`, emsdk 4.0.10 with gl4es, which turns the game's
+  OpenGL calls into WebGL 1; about 2 minutes on first build, 2.4 MB of wasm). The project's own `mapc`
+  compiles the nine courses (170 holes), and they go with the textures, sounds and
+  music into one 26 MB zip preloaded at `/data`, so there are no separate downloads;
+  the project's package downloader is compiled out. Neverball's level sets, its extra
+  balls (the Octocat one rests on GitHub's permission to that project) and the
+  Chinese and Korean font are left out. One course picture is resized to 256 by 256,
+  since WebGL 1 can't mipmap other sizes and it showed as a black tile.
+  The game's main loop runs on the browser's animation frames. The page makes
+  `navigator.getGamepads` show SDL only standard pads when there are any (the car
+  lists each controller twice), with the D-pad and the device's own axes
+  counted as the left stick, because the game has no other way to read direction.
+  On a touch screen `requestPointerLock` does nothing. Picture: Fast (the default) draws one pixel per CSS
+  pixel, Sharp uses them all. Settings are in IDBFS at `/neverball`. `audio.js`
+  is the upstream page's sound code under the same license. Measured with the CPU slowed 4.5x
+  and a software GPU: about 30 ms/s of script. See `apps/neverputt/NOTICE`.
 - `apps/supertux`: SuperTux 0.7.0 (GPL-3.0-or-later), compiled to
   WebAssembly by `npm run build:supertux` (`tools/build-supertux.mjs`: the
   release's source tarball checked against its SHA-256, plus

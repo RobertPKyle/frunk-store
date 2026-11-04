@@ -2434,6 +2434,76 @@ await check('daily pokémon guess plays the daily by tapping and typing, keeps i
   await app.locator('#resultTitle', { hasText: 'Got it in 2!' }).waitFor({ timeout: 2000 });
 });
 
+await check('neverputt plays by touch and controller, and keeps what it writes', async () => {
+  await openFromHub(/Neverputt/);
+  const frame = () => page.frames().find(f => f.url().includes('/neverputt/'));
+  const app = appFrame();
+  const stats = () => frame().evaluate(() => window.neverputtStats());
+  const until = async (what, fn, ms = 15000) => {
+    for (const t = Date.now(); Date.now() - t < ms; await page.waitForTimeout(100)) if (await fn()) return;
+    throw new Error(`no ${what}`);
+  };
+  // Two pads like the car: the controller's raw device, whose presses must not
+  // count, and the car's standard copy. A button on the raw device is "back".
+  await frame().evaluate(() => {
+    const pad = (id, mapping, index) => ({ id, index, mapping, connected: true, timestamp: 0, axes: [0, 0, 0, 0], buttons: Array.from({ length: 17 }, () => ({ pressed: false, value: 0 })) });
+    window.fakePads = [pad('raw', '', 0), pad('Tesla Virtual Gamepad', 'standard', 1)];
+    window.padPress = async b => {
+      for (const p of window.fakePads.map((p, i) => [p, i === 0 ? 1 : b])) Object.assign(p[0].buttons[p[1]], { pressed: true, value: 1 });
+      await new Promise(r => setTimeout(r, 150));
+      for (const p of window.fakePads.map((p, i) => [p, i === 0 ? 1 : b])) Object.assign(p[0].buttons[p[1]], { pressed: false, value: 0 });
+    };
+  });
+  await app.locator('#play').click();
+  await until('frames', async () => (await stats()).frames > 10, 60000);
+  await page.waitForTimeout(800);
+  const box = await app.locator('#canvas').boundingBox();
+  const tapAt = async (x, y) => { await page.touchscreen.tap(box.x + box.width * x, box.y + box.height * y); };
+  const moves = async (what, action) => {
+    const before = (await stats()).states;
+    await action();
+    await until(what, async () => (await stats()).states > before);
+    await page.waitForTimeout(1000);
+  };
+  const s = await stats();
+  if (s.width > box.width + 1) throw new Error(`Fast should draw one pixel per CSS pixel: ${s.width} for ${box.width}`);
+  // Touch: Play, the first course
+  await moves('course screen after a tap on Play', () => tapAt(0.5, 0.558));
+  await moves('players screen after a tap on a course', () => tapAt(0.207, 0.235));
+  // Controller: one player, the hole's card, on to the first shot
+  await moves('hole after the bottom button', () => frame().evaluate(() => padPress(0)));
+  if (!(await app.locator('#padNote').isVisible())) throw new Error('the controller wasn\'t noticed');
+  await moves('first shot after the bottom button', () => frame().evaluate(() => padPress(0)));
+  // A tap without dragging putts. (Before any screenshot: after one, Chrome
+  // sends the next touch to the hub's frame element, not into the frame.)
+  await moves('the ball rolling after a tap', () => tapAt(0.5, 0.7));
+  await page.waitForTimeout(4000);
+  // The stick sets how hard to hit, which draws the power arrow. Only the raw
+  // device's axes move, as on a small controller's D-pad in the car.
+  const look = () => app.locator('#canvas').screenshot();
+  const still = await look();
+  await frame().evaluate(() => { window.fakePads[0].axes[1] = -1; });
+  await page.waitForTimeout(700);
+  await frame().evaluate(() => { window.fakePads[0].axes[1] = 0; });
+  await page.waitForTimeout(300);
+  if ((await look()).equals(still)) throw new Error('the D-pad didn\'t set the power');
+  await page.screenshot({ path: shots + 'neverputt.png' });
+  await moves('pause after Menu', () => frame().evaluate(() => document.getElementById('menuBtn').click()));
+  // What the game writes to its folder (its settings file, when they change)
+  // reaches IndexedDB by itself
+  await frame().evaluate(() => window.neverputtGame().FS.writeFile('/neverball/e2e-check', 'x'));
+  await until('the file in IndexedDB', () => frame().evaluate(() => new Promise(resolve => {
+    const req = indexedDB.open('/neverball');
+    req.onerror = () => resolve(false);
+    req.onsuccess = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains('FILE_DATA')) { db.close(); return resolve(false); }
+      const g = db.transaction('FILE_DATA').objectStore('FILE_DATA').getAllKeys();
+      g.onsuccess = () => { db.close(); resolve(g.result.some(k => /e2e-check/.test(k))); };
+    };
+  })), 10000);
+});
+
 await check('prince of persia starts, moves by touch and controller, quick saves and keeps the save', async () => {
   await openFromHub(/Prince of Persia/);
   const frame = () => page.frames().find(f => f.url().includes('/pop/'));

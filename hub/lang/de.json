@@ -119,6 +119,7 @@
     "craft4k": { "tagline": "Notchs winziges Minecraft4k, neu gebaut in C++ und per Ray Marching auf dem Grafikchip berechnet: eine große Blockwelt mit Sonnenschatten, Tag und Nacht und Spiegeln zum Bauen." },
     "fheroes2": { "tagline": "Heroes of Might and Magic II aus deiner eigenen Kopie, auf der Open-Source-Engine fheroes2: Städte, Helden und rundenbasierte Kämpfe, per Touch." },
     "pop": { "name": "Prince of Persia", "tagline": "Das Original von 1989 auf SDLPoP: sechzig Minuten, um aus den Kerkern zu entkommen und den Wesir aufzuhalten. Zwölf Level, mit Controller oder per Touch." },
+    "neverputt": { "name": "Neverputt", "tagline": "3D-Minigolf aus dem Neverball-Projekt: neun Kurse, 170 Löcher und bis zu vier Spieler abwechselnd an einem Bildschirm. Touch oder Controller." },
     "supertux": { "tagline": "Tux' Jump-'n'-Run-Abenteuer über Icy Island und den Rooted Forest, dazu zwei Bonusinseln: rund hundert Level. Touch oder Controller." },
     "blocks": { "tagline": "Bau alles, was du willst, in einer Blockwelt im Stil von Minecraft Classic: Kreativmodus, Fliegen und Welten, die beim Spielen gespeichert werden." },
     "city": { "tagline": "Gründe eine Stadt und lass sie vom Dorf zur Megalopolis wachsen: Zonen, Straßen, Strom, Steuern und Katastrophen, in der klassischen Städtesimulation von 1989, jetzt Open Source." },

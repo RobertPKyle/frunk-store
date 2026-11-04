@@ -119,6 +119,7 @@
     "craft4k": { "tagline": "Notch 的迷你 Minecraft4k 用 C++ 重写，在显卡上光线步进渲染：一个巨大的方块世界，有阳光阴影、昼夜交替，还能用镜子建造。" },
     "fheroes2": { "tagline": "用你自己的 Heroes of Might and Magic II 文件，在开源的 fheroes2 引擎上游玩：城镇、英雄和回合制战斗，触屏操作。" },
     "pop": { "name": "Prince of Persia", "tagline": "在 SDLPoP 上玩 1989 年原版：六十分钟内逃出地牢、阻止宰相。十二关，可用控制器或触控。" },
+    "neverputt": { "name": "Neverputt", "tagline": "来自 Neverball 项目的 3D 迷你高尔夫:九个球场、170 个球洞,最多四名玩家在同一屏幕上轮流击球。支持触控或手柄。" },
     "supertux": { "tagline": "Tux 横跨冰雪岛和根之森林的跳跃冒险，外加两座奖励岛屿：约一百个关卡。触屏或手柄皆可。" },
     "blocks": { "name": "方块建造家", "tagline": "在 Minecraft Classic 风格的方块世界里搭建任何东西：创造模式、飞行，世界会在游玩时自动保存。" },
     "city": { "name": "城市建造家", "tagline": "建立一座城市，从村庄发展成超级大都市：分区、道路、电力、税收和灾难，1989 年的经典城市模拟，现已开源。" },

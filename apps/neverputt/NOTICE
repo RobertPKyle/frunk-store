@@ -1,0 +1,35 @@
+Neverputt (apps/neverputt)
+
+Game and engine (engine/)
+  Neverputt, by Robert Kooima and the Neverball contributors (doc/authors.txt
+  in the source), from the Neverball project.
+  License: GNU General Public License, version 2 or later (engine/COPYING).
+  Source: https://github.com/Neverball/neverball, commit
+  2821e1e47de84cc9a743277dcd4152be3766a374, with frunk.store's changes for this
+  site in engine/neverputt-web.patch (also tools/neverputt/neverputt-web.patch
+  in https://github.com/RobertPKyle/frunk-store, whose
+  tools/build-neverputt.mjs builds it). The source the build came from, with
+  the courses' map files, is engine/neverball-2821e1e47de8-web-src.tar.gz.
+  The changes: Neverputt's main program instead of Neverball's; the project's
+  package downloads off, since all the courses come with the game; the browser's
+  standard controller layout; every controller press counts, since the page
+  shows the game only the pads it should read; no pause when the frame loses
+  focus and no controller loss either, since the page pauses when it's really
+  hidden; no Exit or switch-to-Neverball button; a screen-change counter for
+  the page's end-to-end check. Neverball's own level sets, the extra balls (one of them used with
+  GitHub's permission to the Neverball project) and the Chinese and Korean font
+  are left out, and the iCourse picture is resized to 256 by 256 at build time.
+  The page's Picture setting chooses the drawing resolution.
+  The engine includes gl4es (MIT, https://github.com/ptitSeb/gl4es, commit
+  c9895df34cd466c23bc60c2bd3db3d87e98fcbe7), miniz (MIT) and Emscripten's SDL2,
+  SDL2_ttf, FreeType, libpng and libjpeg ports under their own licenses (see
+  doc/legal in the source). The game's font is DejaVu Sans Bold (see
+  doc/legal/license-DejaVu.txt).
+
+Game data (engine/neverball.data, preloaded at /data)
+  The nine courses, textures, sounds and music as the Neverball project
+  publishes them, under the project's license (LICENSE.md in the source).
+
+Page
+  audio.js is from Neverball's js/index.html, under the same license.
+  index.html, neverputt.js and icon.svg: by frunk.store.
