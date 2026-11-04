@@ -22,7 +22,8 @@
     --slots: 14.7;
     --h: min(calc((100vw - 16px) / var(--slots)), 10.5vh);
   }
-  body[data-rules="tw"] { --slots: 17.7; }
+  /* On :root, where --h reads it: --h is worked out once there, then inherited */
+  :root[data-rules="tw"] { --slots: 17.7; }
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; overflow: hidden; }
   body {

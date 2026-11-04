@@ -910,6 +910,15 @@ await check('mahjong plays a hand, scores a win, saves, resumes and speaks Chine
     if (await app.locator('[data-act="win"]').count()) { await app.locator('[data-act="win"]').click().catch(() => {}); continue; }
     const drawn = app.locator('#hand .drawn');
     if (await drawn.count()) {
+      // Taiwan's 17 tiles fit on screen. Clicks below can't catch this, as Playwright
+      // scrolls a tile into view; the page has no scrolling for a player to do that.
+      if (turns === 0) {
+        const off = await frame().evaluate(() => [...document.querySelectorAll('#hand [data-i]')].filter(t => {
+          const r = t.getBoundingClientRect();
+          return r.left < 0 || r.right > innerWidth;
+        }).length);
+        if (off) throw new Error(`${off} tiles of the Taiwan hand are off screen`);
+      }
       // the state survives a reload at the same tile
       if (turns === 3) {
         const before = await game();

@@ -359,7 +359,7 @@ function barHTML() {
 
 function render() {
   if (!s) return;
-  document.body.dataset.rules = s.cfg.rules;
+  document.documentElement.dataset.rules = s.cfg.rules;
   document.body.classList.toggle('numbers', !!prefs.numbers);
   setHTML($('s1'), seatHTML(1));
   setHTML($('s2'), seatHTML(2));
