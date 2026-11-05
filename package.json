@@ -19,6 +19,7 @@
     "build:supertux": "node tools/build-supertux.mjs",
     "build:pop": "node tools/build-pop.mjs",
     "build:neverputt": "node tools/build-neverputt.mjs",
+    "build:neverball": "node tools/build-neverball.mjs",
     "build:stockfish": "node tools/build-stockfish.mjs",
     "build:mahjong": "node tools/build-mahjong.mjs",
     "build:mame": "node tools/build-mame.mjs",

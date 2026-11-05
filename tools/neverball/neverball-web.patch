@@ -1,0 +1,238 @@
+diff -ru a/ball/main.c b/ball/main.c
+--- a/ball/main.c	2026-11-04 05:35:27.000000000 -0600
++++ b/ball/main.c	2026-11-04 19:31:57.281156403 -0600
+@@ -646,8 +646,12 @@
+             switch (e.window.event)
+             {
+             case SDL_WINDOWEVENT_FOCUS_LOST:
++#ifndef __EMSCRIPTEN__
++                /* In the browser the page pauses when it's really hidden; a
++                   frame can lose focus to its parent page at any time. */
+                 if (video_get_grab())
+                     goto_pause();
++#endif
+                 break;
+ 
+             case SDL_WINDOWEVENT_MOVED:
+@@ -939,6 +943,11 @@
+ 
+     /* Initialize SDL. */
+ 
++#ifdef __EMSCRIPTEN__
++    /* SDL drops controller input while the window lacks focus, which a frame
++       can do while it's the thing being played. */
++    SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
++#endif
+ #ifdef SDL_HINT_TOUCH_MOUSE_EVENTS
+     SDL_SetHint(SDL_HINT_TOUCH_MOUSE_EVENTS, "0");
+ #endif
+diff -ru a/ball/st_title.c b/ball/st_title.c
+--- a/ball/st_title.c	2026-11-04 05:35:27.000000000 -0600
++++ b/ball/st_title.c	2026-11-04 19:31:57.294986870 -0600
+@@ -218,7 +218,9 @@
+                         gui_state(kd, gt_prefix("menu^Help"), GUI_MED, TITLE_HELP, 0);
+ 
+                     gui_state(kd, gt_prefix("menu^Options"), GUI_MED, TITLE_CONF, 0);
++#ifndef __EMSCRIPTEN__
+                     gui_state(kd, gt_prefix("menu^Exit"),    GUI_MED, GUI_BACK, 0);
++#endif
+ 
+                     /* Hilight the start button. */
+ 
+@@ -259,6 +261,7 @@
+             }
+         }
+ 
++#ifndef __EMSCRIPTEN__
+         if ((id = gui_vstack(root_id)))
+         {
+             const int w = video.device_w;
+@@ -282,6 +285,7 @@
+ 
+             gui_layout(id, -1, -1);
+         }
++#endif
+     }
+ 
+     return root_id;
+diff -ru a/emscripten/ball.mk b/emscripten/ball.mk
+--- a/emscripten/ball.mk	2026-11-04 05:35:27.000000000 -0600
++++ b/emscripten/ball.mk	2026-11-04 19:31:57.283213832 -0600
+@@ -13,7 +13,7 @@
+ ifeq ($(BUILD), devel)
+ CFLAGS := -O1 -g -fsanitize=undefined -fsanitize=address -std=gnu99 -Wall -Ishare -DNDEBUG -DENABLE_FETCH=1 -I$(GL4ES_DIR)/include
+ else
+-CFLAGS := -O3 -std=gnu99 -Wall -Ishare -DNDEBUG -DENABLE_FETCH=1 -I$(GL4ES_DIR)/include
++CFLAGS := -O3 -std=gnu99 -Wall -Ishare -DNDEBUG -DENABLE_FETCH=0 -I$(GL4ES_DIR)/include
+ endif
+ 
+ ifdef PACKAGE_BASE_URL
+@@ -33,14 +33,14 @@
+ LDFLAGS := $(GL4ES_DIR)/lib/libGL.a
+ EM_LDFLAGS := \
+ 	-s ALLOW_MEMORY_GROWTH=1 \
++	-s ENVIRONMENT=web \
+ 	-s FULL_ES2=1 \
+ 	-s INVOKE_RUN=0 \
+ 	-s NO_EXIT_RUNTIME=1 \
+ 	-s EXPORTED_FUNCTIONS=_main,_push_user_event,_config_set \
+-	-s EXPORTED_RUNTIME_METHODS=callMain,ccall,cwrap,FS,IDBFS,pauseMainLoop,resumeMainLoop \
++	-s EXPORTED_RUNTIME_METHODS=callMain,ccall,cwrap,FS,IDBFS,HEAP8 \
+ 	-s HTML5_SUPPORT_DEFERRING_USER_SENSITIVE_REQUESTS=0 \
+ 	-s LLD_REPORT_UNDEFINED \
+-	-s FETCH=1 \
+ 	-s MODULARIZE=1 \
+ 	-s EXPORT_NAME=Neverball_createEmscriptenModule \
+ 	-lidbfs.js \
+@@ -99,7 +99,7 @@
+ 	share/config.c \
+ 	share/dir.c \
+ 	share/fbo.c \
+-	share/fetch_emscripten.c \
++	share/fetch_null.c \
+ 	share/font.c \
+ 	share/fs_common.c \
+ 	share/fs_jpg.c \
+diff -ru a/share/config.c b/share/config.c
+--- a/share/config.c	2026-11-04 05:35:27.000000000 -0600
++++ b/share/config.c	2026-11-04 19:47:30.455878462 -0600
+@@ -194,8 +194,13 @@
+     { &CONFIG_JOYSTICK_RESPONSE,       "joystick_response",       250 },
+     { &CONFIG_JOYSTICK_AXIS_X0,        "joystick_axis_x0",        0 },
+     { &CONFIG_JOYSTICK_AXIS_Y0,        "joystick_axis_y0",        1 },
++#ifdef __EMSCRIPTEN__
++    { &CONFIG_JOYSTICK_AXIS_X1,        "joystick_axis_x1",        2 },
++    { &CONFIG_JOYSTICK_AXIS_Y1,        "joystick_axis_y1",        3 },
++#else
+     { &CONFIG_JOYSTICK_AXIS_X1,        "joystick_axis_x1",        3 },
+     { &CONFIG_JOYSTICK_AXIS_Y1,        "joystick_axis_y1",        4 },
++#endif
+     { &CONFIG_JOYSTICK_AXIS_X0_INVERT, "joystick_axis_x0_invert", 0 },
+     { &CONFIG_JOYSTICK_AXIS_Y0_INVERT, "joystick_axis_y0_invert", 0 },
+     { &CONFIG_JOYSTICK_AXIS_X1_INVERT, "joystick_axis_x1_invert", 0 },
+@@ -207,6 +212,17 @@
+     { &CONFIG_JOYSTICK_BUTTON_Y,      "joystick_button_y",      3 },
+     { &CONFIG_JOYSTICK_BUTTON_L1,     "joystick_button_l1",     4 },
+     { &CONFIG_JOYSTICK_BUTTON_R1,     "joystick_button_r1",     5 },
++#ifdef __EMSCRIPTEN__
++    /* The browser's standard gamepad layout. */
++    { &CONFIG_JOYSTICK_BUTTON_L2,     "joystick_button_l2",     6 },
++    { &CONFIG_JOYSTICK_BUTTON_R2,     "joystick_button_r2",     7 },
++    { &CONFIG_JOYSTICK_BUTTON_SELECT, "joystick_button_select", 8 },
++    { &CONFIG_JOYSTICK_BUTTON_START,  "joystick_button_start",  9 },
++    { &CONFIG_JOYSTICK_DPAD_L,        "joystick_dpad_l",       14 },
++    { &CONFIG_JOYSTICK_DPAD_R,        "joystick_dpad_r",       15 },
++    { &CONFIG_JOYSTICK_DPAD_U,        "joystick_dpad_u",       12 },
++    { &CONFIG_JOYSTICK_DPAD_D,        "joystick_dpad_d",       13 },
++#else
+     { &CONFIG_JOYSTICK_BUTTON_L2,     "joystick_button_l2",     -1 },
+     { &CONFIG_JOYSTICK_BUTTON_R2,     "joystick_button_r2",     -1 },
+     { &CONFIG_JOYSTICK_BUTTON_SELECT, "joystick_button_select", 6 },
+@@ -215,6 +231,7 @@
+     { &CONFIG_JOYSTICK_DPAD_R,        "joystick_dpad_r",        9 },
+     { &CONFIG_JOYSTICK_DPAD_U,        "joystick_dpad_u",       10 },
+     { &CONFIG_JOYSTICK_DPAD_D,        "joystick_dpad_d",       11 },
++#endif
+ 
+     { &CONFIG_WIIMOTE_INVERT_PITCH,      "wiimote_invert_pitch"     , 0 },
+     { &CONFIG_WIIMOTE_INVERT_ROLL,       "wiimote_invert_roll"      , 0 },
+@@ -281,7 +298,13 @@
+     const char *def;
+     char       *cur;
+ } option_s[] = {
++#ifdef __EMSCRIPTEN__
++    /* No one should have to spell a name with a D-pad before their first game;
++       Options still changes it. */
++    { &CONFIG_PLAYER,       "player",       "Player" },
++#else
+     { &CONFIG_PLAYER,       "player",       "" },
++#endif
+     { &CONFIG_BALL_FILE,    "ball_file",    "ball/basic-ball/basic-ball" },
+     { &CONFIG_WIIMOTE_ADDR, "wiimote_addr", "" },
+     { &CONFIG_REPLAY_NAME,  "replay_name",  "%s-%l" },
+diff -ru a/share/fetch_null.c b/share/fetch_null.c
+--- a/share/fetch_null.c	2026-11-04 05:35:27.000000000 -0600
++++ b/share/fetch_null.c	2026-11-04 19:31:57.281749366 -0600
+@@ -14,6 +14,8 @@
+ 
+ #include "fetch.h"
+ 
++unsigned long FETCH_EVENT = (unsigned long) -1;
++
+ void fetch_enable(int enable)
+ {
+ }
+diff -ru a/share/joy.c b/share/joy.c
+--- a/share/joy.c	2026-11-04 05:35:27.000000000 -0600
++++ b/share/joy.c	2026-11-04 19:31:57.281844366 -0600
+@@ -129,6 +129,10 @@
+  */
+ int joy_button(int instance, int b, int d)
+ {
++#ifdef __EMSCRIPTEN__
++    /* The page shows the game only the pads it should read; every press counts. */
++    joy_curr = instance;
++#endif
+     if (joy_curr == instance)
+     {
+         /* Process button event normally. */
+@@ -148,6 +152,9 @@
+  */
+ void joy_axis(int instance, int a, float v)
+ {
++#ifdef __EMSCRIPTEN__
++    joy_curr = instance;
++#endif
+     if (joy_curr == instance)
+     {
+         /* Process axis events from current joystick only. */
+diff -ru a/share/state.c b/share/state.c
+--- a/share/state.c	2026-11-04 05:35:27.000000000 -0600
++++ b/share/state.c	2026-11-04 19:31:57.285637995 -0600
+@@ -12,6 +12,10 @@
+  * General Public License for more details.
+  */
+ 
++#ifdef __EMSCRIPTEN__
++#include <emscripten.h>
++#endif
++
+ #include "vec3.h"
+ #include "glext.h"
+ #include "state.h"
+@@ -128,6 +132,11 @@
+ {
+     struct state *prev = state;
+ 
++#ifdef __EMSCRIPTEN__
++    /* Lets the page's end-to-end check see the game move between screens. */
++    EM_ASM({ Module.neverballStates = (Module.neverballStates | 0) + 1; });
++#endif
++
+     if (state && state->leave)
+         state->leave(state, st, state->gui_id, intent);
+ 
+diff -ru a/share/video.c b/share/video.c
+--- a/share/video.c	2026-11-04 05:35:27.000000000 -0600
++++ b/share/video.c	2026-11-04 19:31:57.286796761 -0600
+@@ -14,6 +14,7 @@
+ 
+ #ifdef __EMSCRIPTEN__
+ #include <gl4esinit.h>
++#include <emscripten.h>
+ #endif
+ 
+ #include <SDL.h>
+@@ -227,7 +228,12 @@
+     int samples = config_get_d(CONFIG_MULTISAMPLE);
+     int vsync   = config_get_d(CONFIG_VSYNC)       ? 1 : 0;
+     int hmd     = config_get_d(CONFIG_HMD)         ? 1 : 0;
++#ifdef __EMSCRIPTEN__
++    /* The page's Picture setting: the car's screen pixels, or one per CSS pixel. */
++    int highdpi = EM_ASM_INT({ return window.neverballSharp ? 1 : 0; });
++#else
+     int highdpi = config_get_d(CONFIG_HIGHDPI)     ? 1 : 0;
++#endif
+ 
+     int dpy = config_get_d(CONFIG_DISPLAY);
+ 

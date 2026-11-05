@@ -580,8 +580,8 @@ clear them to make room.
   frames, as the games poll the mouse. Measured with the CPU slowed 4.5x:
   Arena about 15 fps turning in its first dungeon, Daggerfall about 22 fps
   in Privateer's Hold, about 18,000 DOSBox cycles. Not yet tried in the car.
-- `apps/deathrally` and `apps/wolf3d`: Death Rally and Wolfenstein 3D, the
-  shareware episodes in DOSBox. Both use The Elder Scrolls app's engine
+- `apps/deathrally`, `apps/wolf3d` and `apps/keen1`: Death Rally, Wolfenstein 3D
+  and Commander Keen 1, the shareware episodes in DOSBox. All use The Elder Scrolls app's engine
   build (em-dosbox at the same commit with
   `tools/elderscrolls/em-dosbox-web.patch`, built by `npm run build:dos`,
   `tools/build-dos.mjs`, in the same Docker image; a copy of the engine and
@@ -631,6 +631,19 @@ clear them to make room.
     menus take the first letter as a hotkey (N for New Game). Measured
     with the CPU slowed 4.5x: 70 fps turning at about 12,500 cycles. Not
     yet tried in the car.
+  - Commander Keen 1 (`1keen.zip`, v1.31, 0.2 MB, 1990): id Software's,
+    licensed for distribution by Apogee; its VENDOR.DOC encourages copying
+    without charging, all files unmodified, and asks that advertising says
+    "Apogee" (so the hub's tagline does, in every language). The zip's
+    CK1SW131.SHR is the same installer archive as Wolfenstein 3D's. Its only
+    sound is the PC speaker (`pcSpeaker: true`). The game's speed is
+    the same at any CPU setting, so it runs at a fixed 5,000 cycles rather
+    than `max`: with the CPU slowed 4.5x, about 20 fps either way, at 237 ms/s
+    of task time against 930. Controllers and on-screen buttons have no number keys, so
+    Select and Save 1 press T, F5, 1, Y, Y in turn: at the quit question that's
+    the title, on the map it saves in place 1, at Continue Game it loads it,
+    and each key does nothing where it isn't wanted. The bottom button holds
+    Ctrl then Enter (jump, or OK in the menu).
 - `apps/openttd`: OpenTTD 15.3 (GPL-2.0), compiled to WebAssembly by
   `npm run build:openttd` (`tools/build-openttd.mjs`: the 15.3 tag plus
   `tools/openttd/openttd-web.patch`, built with upstream's own Emscripten
@@ -825,6 +838,17 @@ clear them to make room.
   pixel, Sharp uses them all. Settings are in IDBFS at `/neverball`. `audio.js`
   is the upstream page's sound code under the same license. Measured with the CPU slowed 4.5x
   and a software GPU: about 30 ms/s of script. See `apps/neverputt/NOTICE`.
+- `apps/neverball`: Neverball, the same project's tilt-the-floor marble game (GPL-2.0-or-later),
+  compiled to WebAssembly by `npm run build:neverball` (`tools/build-neverball.mjs`: the same pinned
+  commit and Docker image as Neverputt, with `tools/neverball/neverball-web.patch`). All eight level sets
+  and the balls go in one 54 MB zip preloaded at `/data`, with Neverputt's courses, the Octocat ball (it
+  rests on GitHub's permission to that project) and the Chinese and Korean font left out. The page
+  works like Neverputt's, with its own copy of the upstream `audio.js`, except for two things. The
+  game writes each replay a few bytes at a time as it plays, so `/neverball` (IDBFS) isn't mounted with
+  `autoPersist`, which would write to IndexedDB all through a level; the page syncs it every 5 s, when
+  hidden and at the hub's close handshake. And the player's name defaults to Player, so a first game
+  doesn't start with spelling one on a D-pad. Measured with the CPU slowed 4.5x and a software GPU:
+  100 to 200 ms/s of script, depending on the level, and 37 fps. See `apps/neverball/NOTICE`.
 - `apps/supertux`: SuperTux 0.7.0 (GPL-3.0-or-later), compiled to
   WebAssembly by `npm run build:supertux` (`tools/build-supertux.mjs`: the
   release's source tarball checked against its SHA-256, plus
@@ -1237,7 +1261,8 @@ npm run build:doom                      # Doom and Heretic engines + Freedoom an
 npm run build:scummvm                   # ScummVM engine + free adventures (needs Docker); run before deploying apps
 npm run build:quake                     # Quake engine + LibreQuake (needs Docker); run before deploying apps
 npm run build:openttd                   # OpenTTD engine + its free base sets (needs Docker); run before deploying apps
-npm run build:dos                       # DOSBox engine + the Death Rally and Wolfenstein 3D shareware (needs Docker); run before deploying apps
+npm run build:dos                       # DOSBox engine + the Death Rally, Wolfenstein 3D and Commander Keen 1 shareware (needs Docker); run before deploying apps
+npm run build:neverball                 # Neverball engine + its level sets (needs Docker); run before deploying apps
 npm run build:fheroes2                  # fheroes2 engine for Heroes II (needs Docker); run before deploying apps
 npm run build:openarena                 # Quake III engine + OpenArena (needs Docker); run before deploying apps
 npm run build:blocks                    # ClassiCube engine + its textures, font and sounds (needs Docker); run before deploying apps

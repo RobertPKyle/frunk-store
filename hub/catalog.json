@@ -348,6 +348,19 @@
       "added": "2026-11-01"
     },
     {
+      "id": "keen1",
+      "name": "Commander Keen",
+      "tagline": "Marooned on Mars, id Software's 1990 side-scroller published by Apogee: shareware episode 1 in full, with pogo stick and raygun. With a controller or on screen.",
+      "path": "/keen1/",
+      "icon": "/keen1/icon.svg",
+      "tags": [
+        "Game",
+        "Controller",
+        "Touch"
+      ],
+      "added": "2026-11-04"
+    },
+    {
       "id": "openttd",
       "name": "OpenTTD",
       "tagline": "Build a transport empire with trains, trucks, ships and planes. The open-source Transport Tycoon, made for touch.",
@@ -372,6 +385,7 @@
       "added": "2026-10-28"
     },
     { "id": "pop", "name": "Prince of Persia", "tagline": "The 1989 original on SDLPoP: sixty minutes to escape the dungeons and stop the Vizier. Twelve levels, with a controller or by touch.", "path": "/pop/", "icon": "/pop/icon.svg", "tags": ["Game", "Controller", "Touch"], "added": "2026-10-31" },
+    { "id": "neverball", "name": "Neverball", "tagline": "Tilt the floor to roll the ball, grab the coins and reach the goal before time runs out. Eight level sets in 3D, with high scores and replays. Touch or controller.", "path": "/neverball/", "icon": "/neverball/icon.svg", "tags": ["Game", "Controller", "Touch"], "added": "2026-11-04" },
     { "id": "neverputt", "name": "Neverputt", "tagline": "3D minigolf from the Neverball project: nine courses, 170 holes and up to four players taking turns on one screen. Touch or controller.", "path": "/neverputt/", "icon": "/neverputt/icon.svg", "tags": ["Game", "Controller", "Touch"], "added": "2026-11-04" },
     {
       "id": "supertux",

@@ -1,6 +1,6 @@
 // A DOS game in DOSBox, played with the keyboard, a controller or on-screen
 // buttons: the common part of the shareware DOS game apps (Death Rally,
-// Wolfenstein 3D). The engine is em-dosbox compiled to WebAssembly by
+// Wolfenstein 3D, Commander Keen 1). The engine is em-dosbox compiled to WebAssembly by
 // tools/build-dos.mjs (with tools/elderscrolls/em-dosbox-web.patch), at
 // engine/ in the app; the game's files are packed by tools/supertux/pack.mjs
 // into 1 MB blocks at data/<version>/<n>.bin, all fetched before the game
@@ -30,6 +30,7 @@
 // keys (pad.axes can rename them: { up, down, left, right }).
 // seed: files written into the save overlay the first time ({ 'DIR/FILE':
 // Uint8Array }), such as a sound setup the game would otherwise ask for.
+// pcSpeaker: true for a game whose only sound is the PC speaker.
 //
 // The page needs: #start with #play (and #kept, #status), #loading with
 // #loadTitle #loadText #loadBar, #failed with #failedText #failedOk, #player
@@ -49,7 +50,7 @@ const ENGINE = 'engine/';
 const SAVES = '/save';
 const KEEP = 64;          // blocks kept in memory (64 MB; these games are far smaller)
 const PARALLEL = 6;       // block downloads at once
-const MB = n => `${Math.round(n / 1e6)} MB`;
+const MB = n => n < 1e6 ? 'Under 1 MB' : `${Math.round(n / 1e6)} MB`;
 // ?touch=1 or ?touch=0 overrides it (for testing)
 const touchFirst = params.has('touch') ? params.get('touch') !== '0' : !matchMedia('(hover: hover) and (pointer: fine)').matches;
 
@@ -272,7 +273,7 @@ function dosboxConf() {
     '[midi]', 'mpu401=none', 'mididevice=none',
     '[sblaster]', 'sbtype=sb16', 'sbbase=220', 'irq=7', 'dma=1', 'hdma=5', 'sbmixer=true', 'oplmode=auto', 'oplemu=default', 'oplrate=48000',
     '[gus]', 'gus=false',
-    '[speaker]', 'pcspeaker=false', 'tandy=off', 'disney=false',
+    '[speaker]', `pcspeaker=${G.pcSpeaker ? 'true' : 'false'}`, 'tandy=off', 'disney=false',
     '[joystick]', 'joysticktype=none',
     '[serial]', 'serial1=disabled', 'serial2=disabled', 'serial3=disabled', 'serial4=disabled',
     '[dos]', 'xms=true', 'ems=true', 'umb=true', 'keyboardlayout=none',

@@ -12,10 +12,10 @@ const SLOW = 3000;   // ms to wait for a page before using the cached copy
 // Big downloads the apps keep in IndexedDB themselves (Freedoom's and
 // Blasphemer's WADs, Adventure Games' free games, LibreQuake's paks and music,
 // OpenTTD's base sets, OpenArena's pk3s, SuperTux's, Command & Conquer's and
-// The Elder Scrolls', Death Rally's and Wolfenstein 3D's data blocks, Duke
+// The Elder Scrolls', Death Rally's, Wolfenstein 3D's and Commander Keen's data blocks, Duke
 // Nukem 3D's and the DOS games' shareware zips; and the
 // engine sources, rarely fetched). A second copy here would only fill storage.
-const SKIP = /^\/(cnc\/(data\/(td|ra)\/[0-9a-f]{12}\/\d+\.bin(\.gz)?|engine\/[^/]+\.tar\.gz)|elderscrolls\/(data\/(arena|daggerfall)\/[0-9a-f]{12}\/\d+\.bin(\.gz)?|engine\/[^/]+\.tar\.gz)|(deathrally|wolf3d)\/(data\/([0-9a-f]{12}\/\d+\.bin(\.gz)?|[^/]+\.zip)|engine\/[^/]+\.tar\.gz)|doom\/freedoom\/[^/]+\.wad\.gz|heretic\/blasphemer\/[^/]+\.wad\.gz|adventure\/games\/[^/]+\.zip|quake\/librequake\/([^/]+\.pak\.gz|music\/[^/]+\.ogg)|duke3d\/(shareware\/[^/]+\.zip|engine\/[^/]+\.tar\.gz)|openttd\/data\/[^/]+\.tar\.gz|openarena\/data\/[^/]+\.pk3|supertux\/data\/[0-9a-f]{12}\/\d+\.bin(\.gz)?|(stockfish|neverputt)\/engine\/[^/]+\.tar\.gz)$/;
+const SKIP = /^\/(cnc\/(data\/(td|ra)\/[0-9a-f]{12}\/\d+\.bin(\.gz)?|engine\/[^/]+\.tar\.gz)|elderscrolls\/(data\/(arena|daggerfall)\/[0-9a-f]{12}\/\d+\.bin(\.gz)?|engine\/[^/]+\.tar\.gz)|(deathrally|wolf3d|keen1)\/(data\/([0-9a-f]{12}\/\d+\.bin(\.gz)?|[^/]+\.zip)|engine\/[^/]+\.tar\.gz)|doom\/freedoom\/[^/]+\.wad\.gz|heretic\/blasphemer\/[^/]+\.wad\.gz|adventure\/games\/[^/]+\.zip|quake\/librequake\/([^/]+\.pak\.gz|music\/[^/]+\.ogg)|duke3d\/(shareware\/[^/]+\.zip|engine\/[^/]+\.tar\.gz)|openttd\/data\/[^/]+\.tar\.gz|openarena\/data\/[^/]+\.pk3|supertux\/data\/[0-9a-f]{12}\/\d+\.bin(\.gz)?|(stockfish|neverputt|neverball)\/engine\/[^/]+\.tar\.gz)$/;
 
 // Pages shown from the cache: their files come from the cache first. Lost
 // when the worker stops, which only means going back to network-first.

@@ -94,3 +94,8 @@ tools/.mahjong-build
 tweets/
 tools/.neverputt-build
 apps/neverputt/engine
+tools/.neverball-build
+apps/neverball/engine
+apps/keen1/engine
+apps/keen1/data
+apps/keen1/VENDOR.DOC

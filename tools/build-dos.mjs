@@ -1,5 +1,5 @@
 // Builds the shareware DOS game apps that run in DOSBox: apps/deathrally
-// (Death Rally) and apps/wolf3d (Wolfenstein 3D).
+// (Death Rally), apps/wolf3d (Wolfenstein 3D) and apps/keen1 (Commander Keen 1).
 //
 // - The engine is The Elder Scrolls app's: em-dosbox (DOSBox SVN r4305 ported
 //   to Emscripten, GPL-2.0) at the same pinned commit with
@@ -15,15 +15,17 @@
 //     game's folder.
 //   - Wolfenstein 3D: 1wolf14.zip (v1.4, 1993), whose W3DSW14.SHR is Apogee's
 //     installer archive (PKWARE implode, tools/dos/apogee.mjs).
-//   Every file comes out unchanged, as both licenses ask (they list the
+//   - Commander Keen 1: 1keen.zip (v1.31), whose CK1SW131.SHR is the same kind
+//     of archive.
+//   Every file comes out unchanged, as all three licenses ask (they list the
 //   files). The zip itself is kept in each app's data/ too, for anyone who
 //   wants the release as it was, and its license text is copied to the app's
 //   folder for the page to link. tools/supertux/pack.mjs packs the game's
 //   folder into 1 MB blocks (apps/<app>/data/<version>/<n>.bin) and
 //   data/index.json; the page fetches them all before the game starts.
 //
-//   node tools/build-dos.mjs [deathrally] [wolf3d] [--engine | --data]
-//   (no game: both; --engine: leave data/ as it is; --data: leave engine/)
+//   node tools/build-dos.mjs [deathrally] [wolf3d] [keen1] [--engine | --data]
+//   (no game: all; --engine: leave data/ as it is; --data: leave engine/)
 import { execFileSync } from 'node:child_process';
 import { copyFileSync, cpSync, createReadStream, existsSync, mkdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
@@ -42,6 +44,14 @@ const PATCH = `${root}tools/elderscrolls/em-dosbox-web.patch`;
 // Apogee's FTP server as the Internet Archive saved it on 2015-11-30 (the
 // server itself is gone); archive.org's own copy of the same zip second
 const FTP = 'https://web.archive.org/web/20151130230432id_/ftp://ftp.3drealms.com/share/';
+// An Apogee installer archive, as the game's folder
+const unpackShr = (shr, dir) => (zipDir, out) => {
+  mkdirSync(`${out}${dir}`);
+  for (const { name, data, date } of unshr(readFileSync(`${zipDir}${shr}`))) {
+    writeFileSync(`${out}${dir}/${name}`, data);
+    utimesSync(`${out}${dir}/${name}`, date, date);
+  }
+};
 const GAMES = {
   deathrally: {
     app: 'deathrally', zip: '1ral11.zip', sha256: '4a2c219e1590a4f83199ae416436a8d9fe9899500fdd8bef91b6cea6afa1c31d',
@@ -58,17 +68,28 @@ const GAMES = {
   wolf3d: {
     app: 'wolf3d', zip: '1wolf14.zip', sha256: 'cb2a2ef7ecef14152c65ff93cc3b84fbd3e8eb0c5c1de41a6fc8cdef559451a8',
     urls: [`${FTP}1wolf14.zip`],
-    unpack(zipDir, out) {
-      mkdirSync(`${out}WOLF3D`);
-      for (const { name, data, date } of unshr(readFileSync(`${zipDir}W3DSW14.SHR`))) {
-        writeFileSync(`${out}WOLF3D/${name}`, data);
-        utimesSync(`${out}WOLF3D/${name}`, date, date);
-      }
-    },
+    unpack: unpackShr('W3DSW14.SHR', 'WOLF3D'),
     // the files VENDOR.DOC lists, with their sizes
     files: ['AUDIOHED.WL1', 'AUDIOT.WL1', 'GAMEMAPS.WL1', 'MAPHEAD.WL1', 'VGADICT.WL1', 'VGAGRAPH.WL1', 'VGAHEAD.WL1', 'VSWAP.WL1', 'WOLF3D.EXE', 'W3DHELP.EXE', 'VENDOR.DOC', 'ORDER.FRM'],
     sizes: { 'AUDIOHED.WL1': 1156, 'AUDIOT.WL1': 132613, 'GAMEMAPS.WL1': 27425, 'MAPHEAD.WL1': 402, 'VGADICT.WL1': 1024, 'VGAGRAPH.WL1': 326568, 'VGAHEAD.WL1': 471, 'VSWAP.WL1': 742912, 'WOLF3D.EXE': 109959 },
     dir: 'WOLF3D',
+    license: 'VENDOR.DOC',
+  },
+  keen1: {
+    app: 'keen1', zip: '1keen.zip', sha256: 'c1b6c2ba73183a4e4fa049694a4da68628113229346fc6d0ed410d740d17791b',
+    urls: [`${FTP}1keen.zip`],
+    unpack: unpackShr('CK1SW131.SHR', 'KEEN1'),
+    // the files VENDOR.DOC lists, with their sizes, and the two it comes with
+    files: ['EGAHEAD.CK1', 'EGALATCH.CK1', 'EGASPRIT.CK1', 'ENDTEXT.CK1', 'FINALE.CK1', 'HELPTEXT.CK1', 'KEEN1.EXE',
+      'LEVEL01.CK1', 'LEVEL02.CK1', 'LEVEL03.CK1', 'LEVEL04.CK1', 'LEVEL05.CK1', 'LEVEL06.CK1', 'LEVEL07.CK1', 'LEVEL08.CK1',
+      'LEVEL09.CK1', 'LEVEL10.CK1', 'LEVEL11.CK1', 'LEVEL12.CK1', 'LEVEL13.CK1', 'LEVEL14.CK1', 'LEVEL15.CK1', 'LEVEL16.CK1',
+      'LEVEL80.CK1', 'LEVEL81.CK1', 'LEVEL90.CK1', 'PREVIEW2.CK1', 'PREVIEW3.CK1', 'PREVIEWS.CK1', 'SOUNDS.CK1', 'STORYTXT.CK1',
+      'VENDOR.DOC', 'ORDER.FRM'],
+    sizes: { 'EGAHEAD.CK1': 15568, 'EGALATCH.CK1': 57065, 'EGASPRIT.CK1': 17633, 'ENDTEXT.CK1': 942, 'FINALE.CK1': 8565, 'HELPTEXT.CK1': 1859, 'KEEN1.EXE': 51190,
+      'LEVEL01.CK1': 1368, 'LEVEL02.CK1': 724, 'LEVEL03.CK1': 3474, 'LEVEL04.CK1': 1720, 'LEVEL05.CK1': 810, 'LEVEL06.CK1': 928, 'LEVEL07.CK1': 5650, 'LEVEL08.CK1': 3416,
+      'LEVEL09.CK1': 1638, 'LEVEL10.CK1': 2086, 'LEVEL11.CK1': 1636, 'LEVEL12.CK1': 2178, 'LEVEL13.CK1': 9908, 'LEVEL14.CK1': 7024, 'LEVEL15.CK1': 2234, 'LEVEL16.CK1': 5818,
+      'LEVEL80.CK1': 5638, 'LEVEL81.CK1': 758, 'LEVEL90.CK1': 1262, 'PREVIEW2.CK1': 27886, 'PREVIEW3.CK1': 25429, 'PREVIEWS.CK1': 2160, 'SOUNDS.CK1': 8898, 'STORYTXT.CK1': 3504 },
+    dir: 'KEEN1',
     license: 'VENDOR.DOC',
   },
 };

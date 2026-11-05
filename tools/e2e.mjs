@@ -2504,6 +2504,115 @@ await check('neverputt plays by touch and controller, and keeps what it writes',
   })), 10000);
 });
 
+await check('neverball plays by touch and controller, and writes what it keeps back to IndexedDB', async () => {
+  await openFromHub(/Neverball/);
+  const frame = () => page.frames().find(f => f.url().includes('/neverball/'));
+  const app = appFrame();
+  const stats = () => frame().evaluate(() => window.neverballStats());
+  const until = async (what, fn, ms = 15000) => {
+    for (const t = Date.now(); Date.now() - t < ms; await page.waitForTimeout(100)) if (await fn()) return;
+    throw new Error(`no ${what}`);
+  };
+  // Two pads like the car: the controller's raw device, whose presses must not
+  // count, and the car's standard copy. A button on the raw device is "back".
+  await frame().evaluate(() => {
+    const pad = (id, mapping, index) => ({ id, index, mapping, connected: true, timestamp: 0, axes: [0, 0, 0, 0], buttons: Array.from({ length: 17 }, () => ({ pressed: false, value: 0 })) });
+    window.fakePads = [pad('raw', '', 0), pad('Tesla Virtual Gamepad', 'standard', 1)];
+    window.padPress = async b => {
+      for (const p of window.fakePads.map((p, i) => [p, i === 0 ? 1 : b])) Object.assign(p[0].buttons[p[1]], { pressed: true, value: 1 });
+      await new Promise(r => setTimeout(r, 150));
+      for (const p of window.fakePads.map((p, i) => [p, i === 0 ? 1 : b])) Object.assign(p[0].buttons[p[1]], { pressed: false, value: 0 });
+    };
+  });
+  await app.locator('#play').click();
+  await until('frames', async () => (await stats()).frames > 10, 60000);
+  await page.waitForTimeout(1500);
+  const box = await app.locator('#canvas').boundingBox();
+  const tapAt = async (x, y) => { await page.touchscreen.tap(box.x + box.width * x, box.y + box.height * y); };
+  const moves = async (what, action) => {
+    const before = (await stats()).states;
+    await action();
+    await until(what, async () => (await stats()).states > before);
+    await page.waitForTimeout(1000);
+  };
+  const s = await stats();
+  if (s.width > box.width + 1) throw new Error(`Fast should draw one pixel per CSS pixel: ${s.width} for ${box.width}`);
+  // Touch: Play (no name to spell first), the first set, its first level
+  await moves('level sets after a tap on Play', () => tapAt(0.5, 0.42));
+  await moves('levels after a tap on the first set', () => tapAt(0.3, 0.19));
+  await moves('level intro after a tap on level 01', () => tapAt(0.095, 0.22));
+  // Controller: the bottom button starts it: the view flies in, Ready, Set, Go
+  const atIntro = (await stats()).states;
+  await frame().evaluate(() => padPress(0));
+  await until('play after the bottom button', async () => (await stats()).states >= atIntro + 3, 30000);
+  if (!(await app.locator('#padNote').isVisible())) throw new Error('the controller wasn\'t noticed');
+  await page.waitForTimeout(2500);
+  // The floor beside the ball: no clock, no coins, so it changes only if the ball moves
+  const floor = () => page.screenshot({ clip: { x: box.x + box.width * 0.02, y: box.y + box.height * 0.68, width: box.width * 0.18, height: box.height * 0.24 } });
+  // The share of pixels that clearly changed (at rest, filtering still makes faint differences)
+  const changed = (a, b) => frame().evaluate(async ([a, b]) => {
+    const pixels = async png => {
+      const image = await createImageBitmap(new Blob([Uint8Array.from(atob(png), c => c.charCodeAt(0))], { type: 'image/png' }));
+      const x = new OffscreenCanvas(image.width, image.height).getContext('2d');
+      x.drawImage(image, 0, 0);
+      return x.getImageData(0, 0, image.width, image.height).data;
+    };
+    const [p, q] = [await pixels(a), await pixels(b)];
+    let n = 0;
+    for (let i = 0; i < p.length; i += 4) if (Math.abs(p[i] - q[i]) + Math.abs(p[i + 1] - q[i + 1]) + Math.abs(p[i + 2] - q[i + 2]) > 24) n++;
+    return n / (p.length / 4);
+  }, [a.toString('base64'), b.toString('base64')]);
+  const atRest = async () => {
+    const still = await floor();
+    await page.waitForTimeout(300);
+    const drift = await changed(still, await floor());
+    if (drift > 0.01) throw new Error(`the floor moved by itself (${drift}), so this check would prove nothing`);
+    return still;
+  };
+  // The left stick tilts the floor: here only the raw device's axes, as on a small controller's D-pad in the car
+  let still = await atRest();
+  await frame().evaluate(() => { window.fakePads[0].axes[1] = -1; });
+  await page.waitForTimeout(900);
+  await frame().evaluate(() => { window.fakePads[0].axes[1] = 0; });
+  await page.waitForTimeout(300);
+  if (await changed(still, await floor()) < 0.05) throw new Error('the D-pad didn\'t tilt the floor');
+  // Start pauses; the stick moves to Restart, and the bottom button restarts the level, with the ball back at rest
+  await moves('pause after Start', () => frame().evaluate(() => padPress(9)));
+  await frame().evaluate(() => { window.fakePads[1].axes[0] = 1; });
+  await page.waitForTimeout(200);
+  await frame().evaluate(() => { window.fakePads[1].axes[0] = 0; });
+  await page.waitForTimeout(400);
+  const atPause = (await stats()).states;
+  await frame().evaluate(() => padPress(0));
+  await until('play after Restart', async () => (await stats()).states >= atPause + 3, 30000);
+  await page.waitForTimeout(2500);
+  // Dragging on the left of the screen tilts the floor too
+  still = await atRest();
+  const cdp = await page.context().newCDPSession(page);
+  const touch = (type, x, y) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x: box.x + box.width * x, y: box.y + box.height * y }] });
+  await touch('touchStart', 0.2, 0.7);
+  for (let i = 1; i <= 8; i++) { await touch('touchMove', 0.2, 0.7 - i * 0.04); await page.waitForTimeout(30); }
+  await page.waitForTimeout(1500);
+  await touch('touchEnd');
+  await cdp.detach();
+  await page.waitForTimeout(300);
+  if (await changed(still, await floor()) < 0.05) throw new Error('a drag didn\'t tilt the floor');
+  await page.screenshot({ path: shots + 'neverball.png' });
+  await moves('pause after Menu', () => frame().evaluate(() => document.getElementById('menuBtn').click()));
+  // What the game writes reaches IndexedDB within the page's few seconds
+  await frame().evaluate(() => window.neverballGame().FS.writeFile('/neverball/e2e-check', 'x'));
+  await until('the file in IndexedDB', () => frame().evaluate(() => new Promise(resolve => {
+    const req = indexedDB.open('/neverball');
+    req.onerror = () => resolve(false);
+    req.onsuccess = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains('FILE_DATA')) { db.close(); return resolve(false); }
+      const g = db.transaction('FILE_DATA').objectStore('FILE_DATA').getAllKeys();
+      g.onsuccess = () => { db.close(); resolve(g.result.some(k => /e2e-check/.test(k))); };
+    };
+  })), 10000);
+});
+
 await check('prince of persia starts, moves by touch and controller, quick saves and keeps the save', async () => {
   await openFromHub(/Prince of Persia/);
   const frame = () => page.frames().find(f => f.url().includes('/pop/'));
@@ -2689,6 +2798,104 @@ await check('wolfenstein 3d: starts a game, turns and opens the menu by controll
   await app.locator('#quitBtn').evaluate(b => b.click());
   await app.locator('#start').waitFor({ timeout: 10000 });
   await app.locator('#kept').filter({ hasText: /Downloaded/ }).waitFor({ timeout: 10000 });
+});
+
+await check('commander keen: saves on the map, enters a city and plays by controller, and keeps the save', async () => {
+  await openFromHub(/Commander Keen/);
+  const frame = () => page.frames().find(f => f.url().includes('/keen1/'));
+  const app = appFrame();
+  const stats = () => frame().evaluate(() => window.dosStats());
+  const until = async (what, fn, ms = 30000) => {
+    for (const t = Date.now(); Date.now() - t < ms; await page.waitForTimeout(250)) if (await fn()) return;
+    throw new Error(`no ${what}; DOSBox log: ${(await frame().evaluate(() => window.dosLog.slice(-3).join(' | '))) || 'empty'}`);
+  };
+  const look = () => app.locator('#canvas').screenshot();
+  const saved = () => frame().evaluate(() => window.dosFS().analyzePath('/save/keen1/KEEN1/SAVED1.CK1').exists);
+  // The share of the picture that's the map's red: most of it on the map, only the floor in a city
+  const red = () => frame().evaluate(() => {
+    const c = document.getElementById('canvas');
+    const t = document.createElement('canvas');
+    t.width = c.width; t.height = c.height;
+    const x = t.getContext('2d');
+    x.drawImage(c, 0, 0);
+    const d = x.getImageData(0, 0, c.width, c.height).data;
+    let n = 0;
+    for (let i = 0; i < d.length; i += 4) if (d[i] > 150 && d[i + 1] < 100 && d[i + 2] < 100) n++;
+    return n / (d.length / 4);
+  });
+  const fakePads = () => frame().evaluate(() => {
+    const pad = (id, mapping, index) => ({ id, index, mapping, connected: true, timestamp: 0, axes: [0, 0, 0, 0], buttons: Array.from({ length: 17 }, () => ({ pressed: false, value: 0 })) });
+    const pads = [pad('raw', '', 0), pad('Tesla Virtual Gamepad', 'standard', 1)];
+    navigator.getGamepads = () => pads;
+    window.padPress = async (b, ms = 200) => {
+      Object.assign(pads[1].buttons[b], { pressed: true, value: 1 });
+      await new Promise(r => setTimeout(r, ms));
+      Object.assign(pads[1].buttons[b], { pressed: false, value: 0 });
+    };
+    window.padAxes = async (axes, ms) => {
+      pads[1].axes = axes;
+      await new Promise(r => setTimeout(r, ms));
+      pads[1].axes = [0, 0, 0, 0];
+    };
+  });
+  const pad = async (b, wait = 1500, ms = 200) => { await frame().evaluate(([b, ms]) => padPress(b, ms), [b, ms]); await page.waitForTimeout(wait); };
+  const stick = (axes, ms) => frame().evaluate(([axes, ms]) => padAxes(axes, ms), [axes, ms]);
+  const [A, Y, SELECT, START] = [0, 3, 8, 9];
+
+  await app.locator('#play').click();
+  await app.locator('#player').waitFor({ timeout: 120000 });
+  await fakePads();
+  await until('frames', async () => (await stats()).frames > 5);
+  await page.waitForTimeout(4000);
+  // The bottom button: the title to the menu, New Game (the keen count), the map
+  await pad(A);
+  await pad(A, 3500);
+  await pad(A, 1000);
+  if (!(await app.locator('#padNote').isVisible())) throw new Error('the controller wasn\'t noticed');
+  if (await red() < 0.5) throw new Error(`not on the map: ${await red()}`);
+  // Select saves in place 1 (the only way without number keys)
+  await pad(SELECT, 3000);
+  if (!(await saved())) throw new Error('Select didn\'t save');
+  // Along the wall to the first city, then in; a few steps down until it's beside it
+  await stick([1, 0, 0, 0], 3000);
+  for (let i = 0; i < 25 && await red() > 0.4; i++) {
+    await stick([0, 1, 0, 0], 60);
+    await stick([1, 0, 0, 0], 500);
+    await pad(A, 600, 150);
+  }
+  if (await red() > 0.4) throw new Error('couldn\'t reach the first city');
+  await page.waitForTimeout(2500);
+  await pad(A, 1500);   // the "press a key" sign, if it's still up
+  // The left stick walks: the picture scrolls and the game keeps drawing
+  const standing = await look();
+  const beforeFrames = (await stats()).frames;
+  await stick([1, 0, 0, 0], 2000);
+  if ((await look()).equals(standing)) throw new Error('the left stick didn\'t move Keen');
+  const drawn = (await stats()).frames - beforeFrames;
+  if (drawn < 20) throw new Error(`the game drew only ${drawn} frames in two seconds of walking`);
+  await page.screenshot({ path: shots + 'keen1.png' });
+  // The top button is the status screen; any key closes it
+  const playing = await look();
+  await pad(Y);
+  if ((await look()).equals(playing)) throw new Error('the top button didn\'t show the status');
+  await pad(A);
+  // Start asks about quitting; Select says the title, whose menu is one more press away
+  const before = await look();
+  await pad(START);
+  if ((await look()).equals(before)) throw new Error('Start didn\'t ask about quitting');
+  await pad(SELECT, 3500);
+  // Back at the title, the same presses start a new game on the map
+  await pad(A);
+  await pad(A, 3500);
+  await pad(A, 1000);
+  if (await red() < 0.5) throw new Error('Select didn\'t go back to the title');
+  await app.locator('#quitBtn').evaluate(b => b.click());
+  await app.locator('#start').waitFor({ timeout: 10000 });
+  await app.locator('#kept').filter({ hasText: /Downloaded/ }).waitFor({ timeout: 10000 });
+  // The save is still there next time
+  await app.locator('#play').click();
+  await app.locator('#player').waitFor({ timeout: 30000 });
+  await until('the save after starting again', saved, 10000);
 });
 
 await check('supertux streams its data, starts the story by touch, saves when left and loads the save again', async () => {
