@@ -25,7 +25,7 @@ function say(text, ok = false) {
 async function call(op, data) {
   const res = await fetch(`/api/token?op=${op}`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),
-  });
+  }).catch(() => { throw new Error('No connection. Check it and try again.'); });
   const out = await res.json().catch(() => ({ error: 'Connecting is unavailable right now. Try again in a minute.' }));
   if (!res.ok) throw new Error(out.error || 'Something went wrong.');
   return out;

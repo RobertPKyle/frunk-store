@@ -88,7 +88,8 @@ async function load() {
     showMarket();
   } catch (e) {
     if (which !== loading) return;
-    if (!market) $('chartMsg').textContent = 'Couldn\'t load the token\'s numbers. Check the connection; trying again shortly.';
+    if (market?.range !== range) $('chartMsg').textContent = 'Couldn\'t load the token\'s numbers. Check the connection; trying again shortly.';
+    if (!market) $('liveText').textContent = 'Offline';
   }
   live();
 }
@@ -198,7 +199,13 @@ async function connectCode(gen) {
     sheetTimer = setTimeout(() => connectCode(gen), 15000);
     return;
   }
-  await qr($('connectCode'), `${location.origin}/token/phone/?c=${c.cid}`, 216).catch(() => {});
+  const shown = await qr($('connectCode'), `${location.origin}/token/phone/?c=${c.cid}`, 216).then(() => true, () => false);
+  if (gen !== sheetGen) return;
+  if (!shown) {
+    status.textContent = 'Couldn\'t draw the code. Check the connection; trying again shortly.';
+    sheetTimer = setTimeout(() => connectCode(gen), 15000);
+    return;
+  }
   status.textContent = 'Waiting for your phone…';
   const poll = async () => {
     if (gen !== sheetGen) return;
@@ -231,7 +238,7 @@ $('showBuy').onclick = async () => {
   $('buyRead').hidden = true;
   $('buyCode').hidden = false;
   $('buyTitle').textContent = 'Buy on your phone';
-  await qr($('buyQr'), `${location.origin}/token/phone/?buy`, 216).catch(() => {});
+  await qr($('buyQr'), `${location.origin}/token/phone/?buy`, 216).catch(() => { $('buyQr').textContent = 'Couldn\'t draw the code. Close this and try again with a connection.'; });
 };
 
 $('readRisks').onclick = () => {

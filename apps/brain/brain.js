@@ -80,6 +80,13 @@ function progress(el, fraction, rate) {
   if (rate > 0) step.querySelector('b').textContent = fmt(points({ single: 0, multi: 0, gpu: 0, [PART[el]]: rate })[PART[el]]);
 }
 
+// A hidden page gets little of the computer, so its score would be too low
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden || !run) return;
+  run.abort();
+  $('last').textContent = 'The test stopped because the screen changed. Run it again for a fair score.';
+});
+
 async function test() {
   if (!drawer) { $('last').textContent = 'This browser can\'t run the graphics test (no WebGL2).'; return; }
   run = new AbortController();
@@ -145,11 +152,15 @@ function carButtons() {
 async function submit(car) {
   const sent = mine;
   $('rank').textContent = 'Ranking…';
+  $('resend').hidden = true;
+  // kept here whether or not the leaderboard can be reached
+  store.set(LAST, { total: sent.points.total, car, at: Date.now() });
   try {
     const res = await fetch('/api/brain?op=submit', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...sent.rates, renderer, threads, car }),
+      signal: AbortSignal.timeout(20000),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
@@ -163,7 +174,10 @@ async function submit(car) {
     shareCode();
     store.set(LAST, { total: mine.points.total, group: data.group, car, id: data.id, at: Date.now() });
   } catch (e) {
-    if (sent === mine) $('rank').textContent = `Couldn't reach the leaderboard (${e.message}). Your score stays on this screen.`;
+    if (sent !== mine) return;
+    $('rank').textContent = 'Couldn\'t reach the leaderboard. Your score stays on this screen.';
+    $('resend').hidden = false;
+    $('resend').onclick = () => submit(car);
   }
 }
 
@@ -193,15 +207,19 @@ $('here').addEventListener('click', () => {
 // ---------- leaderboard ----------
 
 async function loadBoard() {
+  $('boardRetry').hidden = true;
   try {
-    const res = await fetch('/api/brain?op=board');
+    const res = await fetch('/api/brain?op=board', { signal: AbortSignal.timeout(20000) });
     if (!res.ok) throw new Error(res.status);
     board = await res.json();
     renderBoard();
   } catch {
+    if (board) return;
     $('boardNote').textContent = 'The leaderboard is offline right now.';
+    $('boardRetry').hidden = false;
   }
 }
+$('boardRetry').addEventListener('click', loadBoard);
 
 function renderBoard() {
   const rows = Object.entries(GROUPS).map(([id, name]) => ({ id, name, ...board.groups[id] })).filter(g => g.n > 0);
@@ -229,6 +247,7 @@ loadBoard();
 $('go').addEventListener('click', () => { $('last').textContent = ''; test(); });
 $('again').addEventListener('click', () => {
   mine = null;
+  $('resend').hidden = true;
   if (board) renderBoard();
   test();
 });

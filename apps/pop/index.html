@@ -13,6 +13,7 @@
   button { font: inherit; color: inherit; cursor: pointer; }
   .btn { min-height: 44px; padding: 8px 16px; border-radius: 12px; background: var(--card); border: 1px solid var(--line); white-space: nowrap; }
   .btn.primary { background: var(--accent); border-color: transparent; color: #221503; font-weight: 700; }
+  .btn.armed { background: #c4503a; border-color: transparent; color: #fff; }
   .btn:disabled { opacity: .5; cursor: default; }
   [hidden] { display: none !important; }
 
@@ -45,7 +46,7 @@
 
   /* ---------- player ---------- */
   #player { position: fixed; inset: 0; display: grid; grid-template-rows: 60px minmax(0, 1fr); grid-template-columns: minmax(0, 1fr); background: #000; }
-  .bar { display: flex; align-items: center; gap: 8px; padding: 8px 10px 8px 110px; background: var(--panel); border-bottom: 1px solid var(--line); }
+  .bar { display: flex; align-items: center; gap: 8px; padding: 8px 10px 8px 110px; overflow-x: auto; scrollbar-width: none; touch-action: pan-x; background: var(--panel); border-bottom: 1px solid var(--line); }
   .bar b { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   #padNote { font-size: 13px; color: var(--muted); white-space: nowrap; }
   .screen { position: relative; min-height: 0; min-width: 0; overflow: hidden; display: grid; place-items: center; }

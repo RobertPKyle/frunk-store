@@ -32,11 +32,18 @@ const state = load();
 let timerEnd = 0, fading = false, lastInput = Date.now();
 
 function load() {
-  const fallback = { levels: {}, timer: 0, h24: false };
+  const fallback = { levels: {}, last: {}, timer: 0, h24: false };
   try { return { ...fallback, ...JSON.parse(localStorage.getItem(STORE_KEY)) }; } catch { return fallback; }
 }
 function save() {
   try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch {}
+}
+// The mix Resume offers: what's left from last time, or what Stop all ended
+const savedMix = () => (Object.keys(state.levels).length ? state.levels : state.last);
+function keepMix() {
+  if (!Object.keys(state.levels).length) return;
+  state.last = state.levels;
+  state.levels = {};
 }
 
 // ---------- clock ----------
@@ -65,7 +72,7 @@ for (const [name, { label }] of Object.entries(SOUNDS)) {
     </button>
     <input type="range" min="0.05" max="1" step="0.01" aria-label="${label} volume">`;
   const btn = tile.querySelector('button'), range = tile.querySelector('input');
-  range.value = state.levels[name] || 0.6;
+  range.value = savedMix()[name] || 0.6;
   btn.onclick = () => setSound(name, amb.voices.has(name) ? 0 : Number(range.value));
   range.oninput = () => setSound(name, Number(range.value));
   tiles[name] = { tile, btn, range };
@@ -83,6 +90,7 @@ async function ensureAudio() {
 
 async function setSound(name, level) {
   await ensureAudio();
+  if (!amb.playing) keepMix();   // a fresh start, not an addition to a mix that's over
   amb.setLevel(name, level);
   if (level > 0) state.levels[name] = level; else delete state.levels[name];
   save();
@@ -97,7 +105,7 @@ function renderTiles() {
     t.btn.setAttribute('aria-pressed', String(on));
     if (state.levels[name]) t.range.value = state.levels[name];
   }
-  $('resume').hidden = amb.playing || !Object.keys(state.levels).length;
+  $('resume').hidden = amb.playing || !Object.keys(savedMix()).length;
   for (const chip of $('presets').querySelectorAll('[data-preset]')) {
     const p = PRESETS[chip.dataset.preset];
     const match = Object.keys(SOUNDS).every(n => (p[n] || 0) === (amb.voices.has(n) ? state.levels[n] || 0 : 0));
@@ -118,7 +126,7 @@ for (const name of Object.keys(PRESETS)) {
 }
 
 // Saved mix from last time; audio can only start after a tap
-$('resume').onclick = () => applyMix({ ...state.levels });
+$('resume').onclick = () => applyMix({ ...savedMix() });
 
 async function applyMix(p) {
   await ensureAudio();
@@ -131,7 +139,7 @@ async function applyMix(p) {
 
 $('stop').onclick = () => {
   amb.stopAll();
-  state.levels = {};
+  keepMix();
   save();
   renderTiles();
   updateWakeLock();
@@ -184,7 +192,10 @@ function setDim(on) {
 }
 $('dimBtn').onclick = () => setDim(true);
 $('dim').onclick = () => { setDim(false); lastInput = Date.now(); };
-addEventListener('pointerdown', () => { lastInput = Date.now(); }, true);
+addEventListener('pointerdown', () => {
+  lastInput = Date.now();
+  if (fading) ensureAudio();   // any touch during the fade means someone's still awake
+}, true);
 
 // The screen stays on while sounds play
 function updateWakeLock() { keepAwake(amb.playing); }

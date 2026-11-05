@@ -9,6 +9,7 @@
 // and when the hub's close handshake asks.
 
 import { keepAwake } from '../_shared/awake.js';
+import { padMenu, reason } from '../_shared/gamepage.js';
 
 const $ = id => document.getElementById(id);
 
@@ -63,6 +64,9 @@ const loadWorld = () => store('readonly', s => s.get('world')).catch(() => null)
 
 // ---------- start ----------
 
+$('failedOk').onclick = () => location.reload();
+padMenu();
+
 let game, saved;
 try {
   if (!document.createElement('canvas').getContext('webgl2')) throw new Error('This browser has no WebGL 2, which the game draws with.');
@@ -74,7 +78,7 @@ try {
   if (!game._c4k_init(saved.seed[0], saved.seed[1])) throw new Error('The graphics chip couldn\'t start the game.');
 } catch (e) {
   $('loading').hidden = true;
-  $('failedText').textContent = e.message || String(e);
+  $('failedText').textContent = reason(e, 'Couldn\'t load the game. Check the connection and try again.');
   $('failed').hidden = false;
   throw e;
 }
@@ -144,6 +148,16 @@ if (parent !== window) parent.postMessage({ frunk: 'save-on-close' }, '*');
 // ---------- screen ----------
 
 const canvas = $('canvas');
+// The graphics chip gave up the game's picture: the world is saved, and a
+// reload brings it back
+canvas.addEventListener('webglcontextlost', e => {
+  e.preventDefault();
+  closing = true;
+  save();
+  $('failedTitle').textContent = 'The picture was lost';
+  $('failedText').textContent = 'The car\'s browser lost the game\'s picture. Your world is saved.';
+  $('failed').hidden = false;
+});
 // Until Detail is picked, it steps down by itself while the game runs
 // slowly, and starts where it got to last time
 let autoDetail = setting.get('detail', null) === null;
@@ -292,29 +306,59 @@ addEventListener('keydown', e => {
 addEventListener('keyup', e => keys.delete(e.code));
 addEventListener('blur', () => keys.clear());
 
-// Controller: standard mapping
+// Controller. The car lists a controller twice, raw and as a "Tesla Virtual
+// Gamepad" with the standard layout: buttons come from standard pads when
+// there are any, and the raw ones add only their D-pad, which may show up
+// nowhere else. Without one, raw pads are read with the usual raw layout.
+// A D-pad walks and turns, with Select held it looks up and down, so a
+// controller without sticks can play too.
+const TURN = 14;
 const padHeld = new Set();
 function readPad() {
-  const move = { x: 0, y: 0, jump: false };
-  for (const pad of navigator.getGamepads?.() || []) {
-    if (!pad || pad.mapping !== 'standard') continue;
-    const dead = v => Math.abs(v) < 0.2 ? 0 : v;
-    move.x += dead(pad.axes[0]);
-    move.y += dead(pad.axes[1]);
-    const lx = dead(pad.axes[2]), ly = dead(pad.axes[3]);
-    if (lx || ly) game._c4k_look(lx * Math.abs(lx) * 14, ly * Math.abs(ly) * 14);
+  const move = { x: 0, y: 0, jump: false, used: false };
+  const pads = [...(navigator.getGamepads?.() || [])].filter(Boolean);
+  const standard = pads.filter(p => p.mapping === 'standard');
+  let lookX = 0, lookY = 0, select = false, up = 0, turn = 0;
+  const dead = v => Math.abs(v) < 0.2 ? 0 : v;
+  for (const pad of pads) {
+    const std = pad.mapping === 'standard';
+    // a raw pad's axes are its D-pad
+    if (!std) {
+      const ax = pad.axes;
+      if (Math.abs(ax[1] || 0) > 0.5) up -= Math.sign(ax[1]);
+      if (Math.abs(ax[0] || 0) > 0.5) turn += Math.sign(ax[0]);
+    }
+    if (standard.length && !std) continue;
     const pressed = i => pad.buttons[i]?.pressed;
+    if (std) {
+      move.x += dead(pad.axes[0] || 0);
+      move.y += dead(pad.axes[1] || 0);
+      lookX += dead(pad.axes[2] || 0);
+      lookY += dead(pad.axes[3] || 0);
+      if (pressed(12)) up += 1;
+      if (pressed(13)) up -= 1;
+      if (pressed(14)) turn -= 1;
+      if (pressed(15)) turn += 1;
+    }
+    const b = std ? { place: [7, 3], dig: [6, 2], prev: 4, next: 5, select: 8 } : { place: [4], dig: [3], prev: 6, next: 7, select: 10 };
+    select ||= pressed(b.select);
     move.jump ||= pressed(0);
-    const edge = (i, on, off) => {
-      const key = `${pad.index}:${i}`;
-      if (pressed(i) && !padHeld.has(key)) { padHeld.add(key); on(); }
-      else if (!pressed(i) && padHeld.has(key)) { padHeld.delete(key); off?.(); }
+    if (pressed(0) || pressed(b.prev) || pressed(b.next) || b.place.some(pressed) || b.dig.some(pressed)) move.used = true;
+    const edge = (what, down, on, off) => {
+      const key = `${pad.index}:${what}`;
+      if (down && !padHeld.has(key)) { padHeld.add(key); on(); }
+      else if (!down && padHeld.has(key)) { padHeld.delete(key); off?.(); }
     };
-    edge(7, () => startRepeat(`pad${pad.index}place`, placeBlock), () => stopRepeat(`pad${pad.index}place`));
-    edge(6, () => startRepeat(`pad${pad.index}break`, breakBlock), () => stopRepeat(`pad${pad.index}break`));
-    edge(4, () => pick(held - 1));
-    edge(5, () => pick(held + 1));
+    edge('place', b.place.some(pressed), () => startRepeat(`pad${pad.index}place`, placeBlock), () => stopRepeat(`pad${pad.index}place`));
+    edge('dig', b.dig.some(pressed), () => startRepeat(`pad${pad.index}break`, breakBlock), () => stopRepeat(`pad${pad.index}break`));
+    edge('prev', pressed(b.prev), () => pick(held - 1));
+    edge('next', pressed(b.next), () => pick(held + 1));
   }
+  if (select) { lookY -= up; up = 0; }
+  lookX += turn;
+  move.y -= up;
+  if (lookX || lookY) game._c4k_look(lookX * Math.abs(lookX) * TURN, lookY * Math.abs(lookY) * TURN);
+  if (move.x || move.y || lookX || lookY) move.used = true;
   return move;
 }
 
@@ -329,6 +373,8 @@ function frame() {
   if (document.hidden) return;
 
   const pad = readPad();
+  // a controller in use: the on-screen controls go until the screen is touched
+  if (pad.used && !touchUi.hidden) touchUi.hidden = true;
   const k = c => keys.has(c) ? 1 : 0;
   const forward = k('KeyW') + k('ArrowUp') - k('KeyS') - k('ArrowDown') - stick.y - pad.y;
   const right = k('KeyD') + k('ArrowRight') - k('KeyA') - k('ArrowLeft') + stick.x + pad.x;

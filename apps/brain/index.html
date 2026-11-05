@@ -60,7 +60,7 @@
   #share { margin-bottom: 12px; text-align: center; }
   #qr { display: inline-block; padding: 8px; background: #fff; border-radius: 10px; line-height: 0; }
   #share p { margin: 6px 0; font-size: 13px; color: var(--muted); }
-  #here { min-height: 40px; padding: 4px 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--card); font-size: 14px; }
+  #here, #boardRetry { min-height: 44px; padding: 4px 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--card); font-size: 14px; }
   .bar { margin-bottom: 8px; }
   .bar div { display: flex; justify-content: space-between; gap: 6px; font-size: 14px; }
   .bar div b { font-variant-numeric: tabular-nums; }
@@ -118,7 +118,7 @@
         <p>Which Tesla is this? Pick one to join the leaderboard.</p>
         <div class="cars" id="cars"></div>
       </div>
-      <div class="row"><button class="ghost" id="again" type="button">Test again</button></div>
+      <div class="row"><button class="ghost" id="resend" type="button" hidden>Send again</button><button class="ghost" id="again" type="button">Test again</button></div>
     </div>
   </div>
   <aside>
@@ -131,6 +131,7 @@
     <h2>Leaderboard</h2>
     <div id="board"></div>
     <p id="boardNote"></p>
+    <button id="boardRetry" type="button" hidden>Try again</button>
     <footer>Points are the middle score of each group. Sending a score shares the points, the graphics chip's name and the car model you pick. Nothing else.</footer>
   </aside>
 </div>

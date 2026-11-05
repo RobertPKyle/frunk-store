@@ -6,13 +6,16 @@
 import { Map as MapView } from './maplibre/maplibre-gl.mjs';
 import { chartStyle } from './map-style.js';
 import { flightName, typeName } from './names.js';
-import { getPlace, herePlace, pickPlace, savePlace } from '../_shared/place.js';
+import { getPlace, herePlace, locationError, pickPlace, savePlace } from '../_shared/place.js';
 import { setMiles, useMiles } from '../_shared/units.js';
 import { keepAwake } from '../_shared/awake.js';
 
 const POLL = 12_000, POLL_IDLE = 30_000, POLL_FAILED = 20_000;
 const IDLE_AFTER = 10 * 60_000;   // no touch for this long: someone's just watching, so ask less
 const STALE = 90_000;             // with no answers at all for this long, planes are dropped
+const WAIT = 20_000;              // a request that hasn't answered by now has failed
+const BASE_RETRY = 30_000;
+const ZOOM_KEY = 'planes.zoom';
 const BLEND = 1_500;              // a corrected position slides into place over this long
 const LIST_MAX = 40;
 const TRAIL_MAX = 60;
@@ -44,6 +47,7 @@ let w = 0, h = 0, dpr = 1;
 let dirty = true, lastDraw = 0;
 let pollTimer = 0, asking = null, askedKey = '', lastGood = 0, failures = 0, lastTouch = Date.now(), everLoaded = false;
 let touchingList = false;
+let baseRetry = 0;
 
 function el(tag, props = {}, ...children) {
   const node = Object.assign(document.createElement(tag), props);
@@ -158,7 +162,7 @@ async function ask() {
   const stop = asking = new AbortController();
   const key = wanted();
   try {
-    const res = await fetch(`/api/planes?${key}`, { signal: stop.signal });
+    const res = await fetch(`/api/planes?${key}`, { signal: AbortSignal.any([stop.signal, AbortSignal.timeout(WAIT)]) });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     askedKey = key;
@@ -169,6 +173,7 @@ async function ask() {
     dirty = true;
     placeTags();
     renderPanel();
+    if (selected?.info?.failed) lookUp(selected);   // the connection's back
   } catch (e) {
     if (stop.signal.aborted) return;
     failures++;
@@ -180,6 +185,10 @@ async function ask() {
 
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) { asking?.abort(); clearTimeout(pollTimer); } else ask();
+});
+addEventListener('online', () => {
+  if (failures) ask();
+  if (baseRetry) retryBase();
 });
 addEventListener('pointerdown', () => {
   const wasIdle = Date.now() - lastTouch > IDLE_AFTER;
@@ -478,10 +487,12 @@ function renderList() {
   for (let i = Math.min(shown.length, LIST_MAX); i < rows.length; i++) rows[i].button.hidden = true;
 
   const n = shown.length;
-  $('summary').textContent = !everLoaded ? 'Finding planes…'
+  // With no answers, an empty map says nothing about the sky
+  const blind = failures > 0 && !n;
+  $('summary').textContent = blind ? 'No flight data right now' : !everLoaded ? 'Finding planes…'
     : n ? `${n} ${n === 1 ? 'plane' : 'planes'} on this map, closest to ${ref.you ? 'you' : 'the center'} first`
       : 'No planes on this map';
-  $('empty').textContent = everLoaded && !n
+  $('empty').textContent = everLoaded && !n && !blind
     ? 'Zoom out to look farther. Volunteers run the receivers behind this data, so remote areas can look empty.' : '';
 }
 
@@ -490,7 +501,8 @@ function renderStatus() {
   const age = lastGood ? Date.now() - lastGood : 0;
   const bad = failures > 0;
   s.className = bad ? 'bad' : '';
-  s.textContent = !bad ? '' : lastGood && age < STALE ? 'Can\'t reach flight data. Positions are estimates until it\'s back.'
+  if (!bad) { if (s.textContent !== 'Finding this car…') s.textContent = ''; return; }
+  s.textContent = lastGood && age < STALE ? `Can't reach flight data. Positions are estimates from ${Math.round(age / 1000)} s ago, until it's back.`
     : 'Can\'t reach flight data. Trying again.';
 }
 
@@ -517,21 +529,23 @@ const DETAILS = 'https://api.adsbdb.com/v0';
 const looked = new Map();
 async function adsbdb(path) {
   if (looked.has(path)) return looked.get(path);
-  const answer = fetch(DETAILS + path)
+  const answer = fetch(DETAILS + path, { signal: AbortSignal.timeout(WAIT) })
     .then(res => (res.ok ? res.json() : null))
     .then(j => j?.response ?? null)
-    .catch(() => null);
+    .catch(() => { looked.delete(path); throw new Error('no answer'); });   // not remembered, so it can be asked again
   looked.set(path, answer);
   return answer;
 }
 
 async function lookUp(p) {
   const hex = p.hex.replace(/^~/, '');
+  let failed = false;
+  const asked = path => adsbdb(path).catch(() => { failed = true; return null; });
   const [craft, flight] = await Promise.all([
-    adsbdb(`/aircraft/${encodeURIComponent(hex)}`),
-    p.callsign ? adsbdb(`/callsign/${encodeURIComponent(p.callsign)}`) : null,
+    asked(`/aircraft/${encodeURIComponent(hex)}`),
+    p.callsign ? asked(`/callsign/${encodeURIComponent(p.callsign)}`) : null,
   ]);
-  const info = { airline: flight?.flightroute?.airline?.name, owner: craft?.aircraft?.registered_owner };
+  const info = { failed, airline: flight?.flightroute?.airline?.name, owner: craft?.aircraft?.registered_owner };
   if (craft?.aircraft) info.type = [craft.aircraft.manufacturer, craft.aircraft.type].filter(Boolean).join(' ');
   const f = flight?.flightroute;
   if (f?.origin && f?.destination) {
@@ -597,7 +611,7 @@ function renderDetail() {
     arrow.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h16M13 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2"/></svg>';
     parts.push(el('div', { className: 'route' }, stop(info.route.from), arrow, stop(info.route.to)));
   } else {
-    parts.push(el('p', { className: 'noroute', textContent: info ? 'Route not known.' : 'Looking up route…' }));
+    parts.push(el('p', { className: 'noroute', textContent: !info ? 'Looking up route…' : info.failed ? 'Can\'t look up the route right now.' : 'Route not known.' }));
   }
 
   if (place && !p.lost) {
@@ -654,13 +668,27 @@ function tapAt(x, y) {
 
 // ---------- map and place ----------
 
+function retryBase() {
+  clearTimeout(baseRetry);
+  baseRetry = 0;
+  map?.setStyle(chartStyle, { diff: false });
+}
+
+function savedZoom() {
+  try {
+    const z = +localStorage.getItem(ZOOM_KEY);
+    if (z >= 6 && z <= 12) return z;
+  } catch {}
+  return 8;
+}
+
 function startMap() {
   try {
     map = new MapView({
       container: 'map',
       style: chartStyle,
       center: [place.lon, place.lat],
-      zoom: 8,
+      zoom: savedZoom(),
       minZoom: 6,
       maxZoom: 12,
       attributionControl: false,   // credited at the bottom of the side panel
@@ -685,11 +713,17 @@ function startMap() {
   map.on('moveend', () => {
     placeTags();
     renderList();
+    try { localStorage.setItem(ZOOM_KEY, map.getZoom().toFixed(2)); } catch {}
     clearTimeout(settle);
     // A pan or zoom that leaves the circle asks right away; others wait their turn
     settle = setTimeout(() => { if (wanted() !== askedKey) ask(); }, 250);
   });
   map.on('resize', () => { resize(); placeTags(); });
+  // The base map's index not arriving would leave it blank for good, so ask again
+  map.on('error', e => {
+    if (baseRetry || !/openfreemap\.org\/planet/.test(e.error?.url || e.error?.message || '')) return;
+    baseRetry = setTimeout(retryBase, BASE_RETRY);
+  });
   document.fonts.load('700 12px "B612 Mono"').then(() => { dirty = true; }).catch(() => {});
   ask();
 }
@@ -711,7 +745,8 @@ function setPlace(p) {
   dirty = true;
 }
 
-function useCar() {
+// At start, a car with no fix yet stays on the saved place. A tap on Here asks.
+function useCar(quiet) {
   if (!navigator.geolocation) { pickPlace().then(setPlace); return; }
   $('status').textContent = 'Finding this car…';
   navigator.geolocation.getCurrentPosition(
@@ -721,7 +756,10 @@ function useCar() {
       savePlace(p);
       setPlace(p);
     },
-    () => { $('status').textContent = ''; pickPlace().then(setPlace); },
+    err => {
+      $('status').textContent = '';
+      if (quiet !== true || !place) pickPlace({ required: !place, note: locationError(err) }).then(setPlace);
+    },
     { timeout: 12000, maximumAge: 60_000 },
   );
 }
@@ -745,7 +783,7 @@ $('unitsBtn').onclick = () => {
   renderPanel();
 };
 $('placeBtn').onclick = () => pickPlace().then(setPlace);
-$('hereBtn').onclick = useCar;
+$('hereBtn').onclick = () => useCar();
 $('backBtn').onclick = () => select(null);
 $('inBtn').onclick = () => map?.zoomIn({ duration: reduceMotion ? 0 : 250 });
 $('outBtn').onclick = () => map?.zoomOut({ duration: reduceMotion ? 0 : 250 });
@@ -766,6 +804,6 @@ new ResizeObserver(() => { resize(); placeTags(); }).observe(canvas.parentElemen
   try { granted = (await navigator.permissions.query({ name: 'geolocation' })).state === 'granted'; } catch {}
   const saved = getPlace();
   if (saved) setPlace(saved);
-  if (granted) useCar();
+  if (granted) useCar(true);
   else if (!saved) setPlace(await pickPlace({ required: true }));
 })();

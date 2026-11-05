@@ -145,10 +145,17 @@ html, body {
   color: rgba(180, 214, 232, .5);
 }
 
-.inspect { right: max(26px, env(safe-area-inset-right)); top: max(26px, env(safe-area-inset-top)); width: 290px; }
 /* below the credit, which stays readable while the card is up */
+.inspect { right: max(26px, env(safe-area-inset-right)); top: calc(max(24px, env(safe-area-inset-top)) + 28px); width: 290px; }
 .away    { right: max(26px, env(safe-area-inset-right)); top: calc(max(24px, env(safe-area-inset-top)) + 28px); width: 340px; }
 .journal { right: max(26px, env(safe-area-inset-right)); bottom: max(26px, env(safe-area-inset-bottom)); width: 340px; max-height: 62vh; overflow-y: auto; }
+
+/* a phone: the journal goes above the buttons, so it can be closed again */
+@media (max-width: 720px) {
+  .journal { left: 16px; right: 16px; width: auto; bottom: calc(max(24px, env(safe-area-inset-bottom)) + 88px); max-height: 50vh; }
+  .away { left: 16px; right: 16px; width: auto; }
+  .inspect { top: 72px; }
+}
 
 /* ---- genome bars -------------------------------------------------------- */
 

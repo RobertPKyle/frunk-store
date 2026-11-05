@@ -20,6 +20,8 @@
 //
 // The engine can't be restarted within a page, so leaving the game reloads it.
 
+import { mbOf } from '../_shared/engine.js';
+import { fetchPackage, padMenu, reason } from '../_shared/gamepage.js';
 import { phonePanel } from '../_shared/phone.js';
 import { MAX_HEROES_FILE, heroesPath, isZip, unzipAll } from '../_shared/roms.js';
 
@@ -214,6 +216,7 @@ function failed(message) {
   $('loading').hidden = true;
 }
 $('failedOk').onclick = () => location.reload();
+padMenu();
 
 // ---------- engine ----------
 
@@ -246,7 +249,7 @@ async function play(btn) {
   starting = true;
   btn?.classList.add('busy');
   // Made inside the tap, so the browser lets it play
-  try { audio = new AudioContext(); } catch { audio = null; }
+  try { audio = new AudioContext(); audio.onstatechange = showSound; } catch { audio = null; }
   if (audio && !settings.get('sound', true)) audio.suspend();
   try {
     loading('fheroes2', 'Loading your game files…', 0.02);
@@ -254,11 +257,12 @@ async function play(btn) {
     if (!files.some(f => f.path === 'data/heroes2.agg')) throw new Error('HEROES2.AGG is missing; add it first');
     await boot(files);
   } catch (e) {
-    if (running) { failed(`Couldn't start fheroes2: ${e && e.message ? e.message : 'something went wrong'}.`); return; }
+    if (running) { failed(`Couldn't start fheroes2: ${reason(e, 'something went wrong')}.`); return; }
     $('loading').hidden = true;
     $('player').hidden = true;
     $('library').hidden = false;
-    status(`Couldn't start fheroes2: ${e && e.message ? e.message : 'check the connection and try again'}.`);
+    status(`Couldn't start fheroes2: ${reason(e)}.`);
+    $('status').scrollIntoView({ block: 'nearest' });
     audio?.close().catch(() => {});
     audio = null;
   } finally {
@@ -268,14 +272,19 @@ async function play(btn) {
 }
 $('playBtn').onclick = () => play($('playBtn'));
 
-function boot(files) {
+async function boot(files) {
+  // Ahead of the engine, which would hang if its own download of this dropped
+  loading('fheroes2', 'Downloading the engine…', 0.05);
+  let pack = await fetchPackage('engine/fheroes2.data', (got, total) => loading('fheroes2', `Downloading the engine… ${mbOf(got, total)}`, 0.05 + 0.85 * got / total));
+  loading('fheroes2', 'Starting…', 0.92);
   return new Promise((resolve, reject) => {
     // The engine's settings, read when its script runs (see the header)
     window.Module = {
       canvas: $('canvas'),
       SDL2: audio ? { audioContext: audio } : {},
-      // The engine's data package, next to its script (the script finds
-      // its .wasm there by itself)
+      getPreloadedPackage: () => { const p = pack; pack = null; return p; },
+      // The engine's files, next to its script (the script finds its .wasm
+      // there by itself)
       locateFile: path => `engine/${path}`,
       preRun: [() => {
         const { FS, ENV, IDBFS } = window;
@@ -300,18 +309,14 @@ function boot(files) {
           window.removeRunDependency('frunk-files');
         });
       }],
-      // "Downloading data... (n/total)" while the engine's own data loads,
-      // then "Running..." as the game starts
+      // "Running..." as the game starts
       setStatus: text => {
-        const m = /\((\d+)\/(\d+)\)/.exec(text || '');
-        if (m) loading('fheroes2', `Downloading the engine… ${mb(+m[1])} of ${mb(+m[2])}`, 0.05 + 0.85 * m[1] / m[2]);
         if (/^Running/.test(text || '') && $('player').hidden) {
           showPlayer();
           resolve();
         }
       },
     };
-    loading('fheroes2', 'Downloading the engine…', 0.05);
     const script = Object.assign(document.createElement('script'), { src: 'engine/fheroes2.js' });
     script.onerror = () => reject(new Error('the engine didn\'t download; check the connection and try again'));
     document.body.append(script);
@@ -319,8 +324,8 @@ function boot(files) {
 }
 
 // An error from the engine stops the game; say so rather than freeze
-addEventListener('error', e => { if (running) failed(`fheroes2 stopped: ${e.message || 'an error'}`); });
-addEventListener('unhandledrejection', e => { if (running) failed(`fheroes2 stopped: ${e.reason?.message || e.reason || 'an error'}`); });
+addEventListener('error', e => { if (running || starting) failed(`fheroes2 stopped: ${reason(e.message, 'check the connection and try again')}`); });
+addEventListener('unhandledrejection', e => { if (running || starting) failed(`fheroes2 stopped: ${reason(e.reason, 'check the connection and try again')}`); });
 
 // The game's own Quit ends the engine, and SDL then shrinks the canvas to
 // nothing (a resolution change can do that for a moment, so it must last);
@@ -373,10 +378,18 @@ function hint(text, ms = 4000) {
 
 // ---------- sound ----------
 
+// The browser may hold the sound back until a tap (a game started from a
+// controller, say); any tap then starts it, and the button says so
+const soundBlocked = () => settings.get('sound', true) && audio && audio.state !== 'running' && !document.hidden;
 function showSound() {
-  $('soundBtn').textContent = settings.get('sound', true) ? 'Sound on' : 'Sound off';
+  $('soundBtn').textContent = !settings.get('sound', true) ? 'Sound off' : soundBlocked() ? 'Tap for sound' : 'Sound on';
 }
+function wakeSound() {
+  if (soundBlocked()) audio.resume().then(showSound, () => {});
+}
+for (const type of ['pointerdown', 'keydown']) addEventListener(type, wakeSound, true);
 $('soundBtn').onclick = () => {
+  if (soundBlocked()) { wakeSound(); return; }
   const on = !settings.get('sound', true);
   settings.set('sound', on);
   showSound();

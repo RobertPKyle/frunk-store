@@ -18,6 +18,7 @@
 // MAME can't be restarted within a page, so leaving a game reloads it.
 
 import { mbOf, wasmProgress } from '../_shared/engine.js';
+import { padMenu } from '../_shared/padmenu.js';
 import { phonePanel } from '../_shared/phone.js';
 import { BY_SET, GAMES, MAX_ROM_FILE, setName } from './games.js';
 
@@ -78,7 +79,23 @@ async function renderLibrary() {
     e.textContent = have.has(set) ? 'Play' : 'Get it from your phone';
     b.append(t, m, ...(about ? [a] : []), e);
     b.onclick = () => (have.has(set) ? play(set) : phone.show());
-    return b;
+    if (!have.has(set)) return b;
+    // a game on this car can be taken off it (its high scores stay)
+    const wrap = document.createElement('div');
+    wrap.className = 'wrap';
+    const del = Object.assign(document.createElement('button'), { type: 'button', className: 'del', textContent: 'Remove' });
+    del.setAttribute('aria-label', `Remove ${title}`);
+    del.onclick = () => {
+      if (del.dataset.armed) {
+        clearTimeout(+del.dataset.armed);
+        db.del(set).catch(() => {}).then(() => { status(''); renderLibrary(); });
+        return;
+      }
+      del.textContent = 'Sure?';
+      del.dataset.armed = setTimeout(() => { delete del.dataset.armed; del.textContent = 'Remove'; }, 3000);
+    };
+    wrap.append(b, del);
+    return wrap;
   };
   $('games').replaceChildren(...GAMES.map(g => card(g.set, g.title, g.maker, g.about)));
   const others = [...have].filter(s => !BY_SET.has(s)).sort();
@@ -202,7 +219,8 @@ async function play(set) {
       running = true;
       $('loading').hidden = true;
       canvas.focus();
-      if (touchFirst) hint('Tap Coin, then Start', 5000);
+      if (padMode || [...(navigator.getGamepads?.() || [])].some(Boolean)) hint('Select for a coin, then Start', 5000);
+      else if (touchFirst) hint('Tap Coin, then Start', 5000);
     } else if (performance.now() - t0 > 60000 && $('failed').hidden) {
       clearInterval(wait);
       failed(whyStopped());
@@ -378,7 +396,7 @@ const contexts = [];
 if (window.AudioContext) {
   const Real = window.AudioContext;
   window.AudioContext = class extends Real {
-    constructor(...args) { super(...args); contexts.push(this); showSound(); }
+    constructor(...args) { super(...args); contexts.push(this); if (!soundOn()) this.suspend(); showSound(); }
   };
 }
 function startSound() { showSound(); }
@@ -446,3 +464,4 @@ if (parent !== window) parent.postMessage({ frunk: 'save-on-close' }, '*');
 addEventListener('error', e => { if (engine && !running) failed(`MAME stopped: ${e.message}`); });
 
 renderLibrary();
+padMenu('#library', '.game, #continue, #fromPhone');

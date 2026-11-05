@@ -3,7 +3,7 @@
 // the Moon, a stargazing rating and the aurora chance (NOAA Kp forecast).
 // Sun and Moon times are computed here with the Star Map's astronomy code.
 import { julianDay, localSiderealTime, toHorizon, sun, moon } from '../_shared/astro.js';
-import { followCar, getPlace, pickPlace } from '../_shared/place.js';
+import { ago, followCar, getPlace, pickPlace } from '../_shared/place.js';
 import { useMiles } from '../_shared/units.js';
 import { weatherIcon, weatherName } from './icons.js';
 
@@ -15,6 +15,9 @@ const UNITS_KEY = 'weather.units';
 const STALE = 30 * 60_000;     // refetch the forecast after 30 minutes
 const KP_STALE = 3 * 3600_000; // Kp forecast bins are 3 hours long
 const HOUR = 3600_000;
+const TOO_OLD = 6 * 24 * HOUR; // a saved 7-day forecast has run out by then
+const NEAR_KM = 60;            // a saved forecast from this close beats a blank screen
+const WAIT = 20_000;           // give up on a request after this long
 
 const $ = id => document.getElementById(id);
 const store = {
@@ -28,6 +31,7 @@ let forecast = null;  // { key, fetched, data }
 let kp = store.get(KP_KEY); // { fetched, data }
 let loading = null;    // place key of the forecast being fetched
 let reload = false;    // the place changed during that fetch
+let failed = false;    // the last update didn't get through
 
 // ---------- units and formatting ----------
 
@@ -45,12 +49,12 @@ function fmt(ms, opts) {
 const clock = ms => fmt(ms, { hour: 'numeric', minute: '2-digit' });
 const hourLabel = ms => fmt(ms, { hour: 'numeric' }).replace(/\s?([AP])M$/i, (_, p) => p.toLowerCase());
 
-function ago(ms) {
-  const min = Math.round((Date.now() - ms) / 60_000);
-  if (min < 1) return 'just now';
-  if (min < 60) return `${min} min ago`;
-  const h = Math.round(min / 60);
-  return h < 48 ? `${h} h ago` : `${Math.round(h / 24)} days ago`;
+// A saved forecast starts on the day it was fetched, so find today in it
+function todayIndex(d) {
+  const now = Date.now();
+  let i = 0;
+  while (i + 1 < d.daily.time.length && d.daily.time[i + 1] * 1000 <= now) i++;
+  return i;
 }
 
 // ---------- Sun and Moon ----------
@@ -99,7 +103,7 @@ function geomagneticLat(lat, lon) {
 // Everything for the "Tonight's sky" card. Before noon, "tonight" is the
 // night that just ended or is still going; after noon it is the coming one.
 function tonight(d) {
-  const midnight = d.daily.time[0] * 1000;
+  const midnight = d.daily.time[todayIndex(d)] * 1000;
   const now = Date.now();
   const start = now < midnight + 12 * HOUR ? midnight - 12 * HOUR : midnight + 12 * HOUR;
   const end = start + 24 * HOUR;
@@ -154,12 +158,14 @@ function setStatus(text) { $('status').textContent = text; }
 function render() {
   $('unitBtn').textContent = units === 'us' ? '°F' : '°C';
   $('placeBtn').textContent = place ? place.name : 'Set location';
-  if (!forecast) return;
-  const d = forecast.data;
+  if (!forecast) { document.querySelector('main').hidden = true; return; }
+  const d = forecast.data, today = todayIndex(d);
   $('error').hidden = true;
   document.querySelector('main').hidden = false;
 
-  // Now
+  // Now: an old copy says how old it is, right where the temperature is read
+  const old = Date.now() - forecast.fetched > 2 * HOUR;
+  $('nowTitle').textContent = old ? `Last known, ${ago(forecast.fetched)}` : 'Now';
   const c = d.current;
   $('nowIcon').innerHTML = weatherIcon(c.weather_code, !!c.is_day);
   $('temp').textContent = temp(c.temperature_2m);
@@ -167,14 +173,20 @@ function render() {
   $('facts').innerHTML = [
     `Feels like <b>${temp(c.apparent_temperature)}</b> · Humidity <b>${c.relative_humidity_2m}%</b>`,
     `Wind <b>${speed(c.wind_speed_10m)} ${compass(c.wind_direction_10m)}</b>, gusts <b>${speed(c.wind_gusts_10m)}</b>`,
-    `Today <b>${temp(d.daily.temperature_2m_max[0])}</b> / <b>${temp(d.daily.temperature_2m_min[0])}</b> · UV <b>${Math.round(d.daily.uv_index_max[0] ?? 0)}</b>`,
-    d.daily.precipitation_sum[0] > 0 ? `Rain or snow today <b>${amount(d.daily.precipitation_sum[0])}</b>` : '',
+    `Today <b>${temp(d.daily.temperature_2m_max[today])}</b> / <b>${temp(d.daily.temperature_2m_min[today])}</b> · UV <b>${Math.round(d.daily.uv_index_max[today] ?? 0)}</b>`,
+    d.daily.precipitation_sum[today] > 0 ? `Rain or snow today <b>${amount(d.daily.precipitation_sum[today])}</b>` : '',
   ].filter(Boolean).map(s => `<span>${s}</span>`).join('');
 
   renderSky(d);
   renderHours(d);
-  renderDays(d);
-  setStatus(navigator.onLine === false ? `Offline · updated ${ago(forecast.fetched)}` : `Updated ${ago(forecast.fetched)}`);
+  renderDays(d, today);
+  if (!loading) setStatus(savedLine());
+}
+
+function savedLine() {
+  const away = forecast.key !== placeKey() ? `, ${Math.round(kmAway(forecast.key))} km away` : '';
+  if (failed) return `Couldn't update · from ${ago(forecast.fetched)}${away}`;
+  return `${navigator.onLine === false ? 'Offline · updated' : 'Updated'} ${ago(forecast.fetched)}${away}`;
 }
 
 function renderSky(d) {
@@ -248,11 +260,12 @@ function renderHours(d) {
   $('hours').innerHTML = cells.join('');
 }
 
-function renderDays(d) {
+function renderDays(d, today) {
   $('days').innerHTML = d.daily.time.map((t, i) => {
+    if (i < today) return '';
     const p = d.daily.precipitation_probability_max[i] ?? 0;
     return `<div class="day">
-      <span class="d">${i === 0 ? 'Today' : fmt(t * 1000 + 12 * HOUR, { weekday: 'short' })}</span>
+      <span class="d">${i === today ? 'Today' : fmt(t * 1000 + 12 * HOUR, { weekday: 'short' })}</span>
       ${weatherIcon(d.daily.weather_code[i], true)}
       <span>${temp(d.daily.temperature_2m_max[i])}</span>
       <span class="lo">${temp(d.daily.temperature_2m_min[i])}</span>
@@ -261,8 +274,13 @@ function renderDays(d) {
   }).join('');
 }
 
-function showError(text) {
+function showError(text, retry) {
   $('error').textContent = text;
+  if (retry) {
+    const b = Object.assign(document.createElement('button'), { className: 'btn', type: 'button', textContent: 'Try again', onclick: () => load(true) });
+    b.style.cssText = 'display:block;margin:12px auto 0';
+    $('error').append(b);
+  }
   $('error').hidden = false;
   document.querySelector('main').hidden = true;
 }
@@ -270,6 +288,11 @@ function showError(text) {
 // ---------- data ----------
 
 const placeKey = () => `${place.lat.toFixed(3)},${place.lon.toFixed(3)}`;
+
+function kmAway(key) {
+  const [lat, lon] = key.split(',').map(Number), r = Math.PI / 180;
+  return Math.hypot(lat - place.lat, (lon - place.lon) * Math.cos(place.lat * r)) * 111;
+}
 
 function forecastUrl() {
   const q = new URLSearchParams({
@@ -285,7 +308,7 @@ function forecastUrl() {
 async function loadKp() {
   if (kp && Date.now() - kp.fetched < KP_STALE) return;
   try {
-    const res = await fetch(KP);
+    const res = await fetch(KP, { signal: AbortSignal.timeout(WAIT) });
     if (!res.ok) return;
     kp = { fetched: Date.now(), data: (await res.json()).filter(b => typeof b.kp === 'number') };
     store.set(KP_KEY, kp);
@@ -298,24 +321,39 @@ async function load(force = false) {
   if (loading) { reload ||= key !== loading; return; }
   if (!forecast || forecast.key !== key) {
     const cached = store.get(CACHE_KEY);
-    forecast = cached?.key === key ? cached : null;
+    const usable = cached?.key && Date.now() - cached.fetched < TOO_OLD && kmAway(cached.key) < NEAR_KM;
+    forecast = usable ? cached : null;
   }
   render();
-  if (!force && forecast && Date.now() - forecast.fetched < STALE) { await loadKp(); render(); return; }
+  // Stars and aurora fill in when they arrive; the forecast doesn't wait for them
+  loadKp().then(() => { if (forecast) render(); });
+  if (!force && forecast?.key === key && Date.now() - forecast.fetched < STALE) { failed = false; return; }
 
   loading = key;
   setStatus('Updating…');
+  if (!forecast) showError('Getting the forecast…');
   try {
-    const [res] = await Promise.all([fetch(forecastUrl()), loadKp()]);
+    const res = await fetch(forecastUrl(), { signal: AbortSignal.timeout(WAIT) });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     if (placeKey() !== key) return; // place changed while loading
     forecast = { key, fetched: Date.now(), data };
+    failed = false;
     store.set(CACHE_KEY, forecast);
+    loading = null;
     render();
   } catch (e) {
-    if (forecast) setStatus(`Offline · updated ${ago(forecast.fetched)}`);
-    else showError(`Couldn't load the forecast (${e.message}). Weather needs a connection the first time.`);
+    failed = true;
+    loading = null;
+    if (placeKey() !== key) return;
+    if (forecast) render();
+    else {
+      setStatus('');
+      const why = e.name === 'TimeoutError' ? 'The connection is too slow right now.'
+        : navigator.onLine === false ? 'There\'s no connection right now.'
+          : e instanceof TypeError ? 'Can\'t reach the forecast service right now.' : `Couldn't load the forecast (${e.message}).`;
+      showError(`${why} Weather needs a connection the first time at a new place.`, true);
+    }
   } finally {
     loading = null;
     if (reload) { reload = false; load(true); }
@@ -340,7 +378,11 @@ $('refreshBtn').onclick = () => load(true);
 addEventListener('online', () => load());
 
 // Refresh when stale, and keep "Now" and "updated" current
-setInterval(() => { if (forecast && Date.now() - forecast.fetched >= STALE) load(); else render(); }, 60_000);
+setInterval(() => {
+  if (document.hidden) return;
+  if (place && (!forecast || forecast.key !== placeKey() || Date.now() - forecast.fetched >= STALE)) load();
+  else render();
+}, 60_000);
 
 if (place) { load(); followCar(setPlace); }
 else pickPlace({ required: true }).then(setPlace);

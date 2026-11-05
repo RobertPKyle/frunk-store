@@ -7,6 +7,8 @@ const FLOATS_PER_INSTANCE = 9; // x, y, w, h, r, g, b, a, shape
 const MAX_INSTANCES = 2048;
 const SHAPE_RECT = 0, SHAPE_CIRCLE = 1, SHAPE_FLAT = 2;
 const ROW_COLORS = [[.95,.33,.37], [.98,.6,.27], [.98,.84,.3], [.36,.85,.55], [.3,.7,.98], [.55,.48,.98], [.9,.45,.85], [.6,.65,.72]];
+const BRICK_W = 88, BRICK_H = 26;
+const SAVE_KEY = 'breakout.game', SOUND_KEY = 'breakout.sound';
 
 const canvas = document.getElementById('c');
 const $ = id => document.getElementById(id);
@@ -106,11 +108,18 @@ function resize() {
 addEventListener('resize', resize);
 resize();
 
+// The graphics chip can drop this page's drawing when memory runs short. The
+// game is saved on the way out, so a reload picks it up.
+canvas.addEventListener('webglcontextlost', e => e.preventDefault());
+canvas.addEventListener('webglcontextrestored', () => location.reload());
+
 // ---------- Audio ----------
 
 let audio;
+let muted = false;
+try { muted = localStorage.getItem(SOUND_KEY) === 'off'; } catch {}
 function beep(freq, dur = 0.06, type = 'square', vol = 0.06) {
-  if (!audio) return;
+  if (!audio || muted) return;
   const o = audio.createOscillator(), g = audio.createGain();
   o.type = type; o.frequency.value = freq;
   g.gain.setValueAtTime(vol, audio.currentTime);
@@ -130,11 +139,11 @@ const ball = { x: 0, y: 0, vx: 0, vy: 0, r: 9, stuck: true };
 let bricks = [], particles = [];
 let state = 'ready'; // ready | play | paused | over
 let score = 0, lives = 3, level = 1;
-let best = 0;
+let best = 0, overAt = 0;
 try { best = Number(localStorage.getItem('breakout.best')) || 0; } catch {}
 
 function buildLevel(n) {
-  const cols = 10, rows = Math.min(4 + n, 8), bw = 88, bh = 26, gap = 8;
+  const cols = 10, rows = Math.min(4 + n, 8), bw = BRICK_W, bh = BRICK_H, gap = 8;
   const left = (W - (cols * bw + (cols - 1) * gap)) / 2;
   bricks = [];
   for (let r = 0; r < rows; r++) {
@@ -173,13 +182,53 @@ function setState(s) {
   state = s;
   const texts = {
     ready: `Level ${level}<small>Tap, press A or Space to launch</small>`,
-    paused: 'Paused<small>Tap to continue</small>',
-    over: `Game over · ${score}<small>Tap to play again</small>`,
+    paused: 'Paused<small>Tap or press A to continue</small>',
+    over: `Game over · ${score}<small>Tap or press A to play again</small>`,
     play: '',
   };
   msg.innerHTML = texts[s];
+  if (s === 'over') overAt = performance.now();
   updateHud();
+  showButtons();
+  saveGame();
 }
+
+// The level, score and bricks stay between visits; the ball waits on the paddle
+function saveGame() {
+  try {
+    if (state === 'over') localStorage.removeItem(SAVE_KEY);
+    else localStorage.setItem(SAVE_KEY, JSON.stringify({ score, lives, level, bricks: bricks.map(b => [b.x, b.y, b.hp, ROW_COLORS.indexOf(b.color)]) }));
+  } catch {}
+}
+
+function loadGame() {
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch {}
+  if (!saved || !(saved.lives > 0) || !(saved.level > 0) || !Array.isArray(saved.bricks) || !saved.bricks.length) return false;
+  score = Number(saved.score) || 0;
+  lives = saved.lives;
+  level = saved.level;
+  bricks = saved.bricks.map(([x, y, hp, c]) => ({ x, y, w: BRICK_W, h: BRICK_H, hp, color: ROW_COLORS[c] || ROW_COLORS[0] }));
+  resetBall();
+  setState('ready');
+  return true;
+}
+
+function togglePause() {
+  if (state === 'play') setState('paused');
+  else if (state === 'paused') setState('play');
+}
+
+function showButtons() {
+  $('pauseBtn').hidden = state !== 'play' && state !== 'paused';
+  $('pauseBtn').textContent = state === 'paused' ? 'Continue' : 'Pause';
+  $('soundBtn').textContent = muted ? 'Sound off' : 'Sound on';
+  $('soundBtn').setAttribute('aria-pressed', String(!muted));
+  $('newBtn').hidden = !((state === 'ready' || state === 'paused') && (score > 0 || level > 1));
+  if ($('newBtn').hidden) sureUntil = 0;
+  $('newBtn').textContent = sureUntil ? 'Sure?' : 'New game';
+}
+let sureUntil = 0;
 
 function updateHud() {
   $('score').textContent = score;
@@ -279,6 +328,7 @@ addEventListener('keydown', e => {
   unlockAudio();
   keys.add(e.key);
   if (e.key === ' ' || e.key === 'Enter') primaryAction();
+  if (e.key === 'Escape' || e.key === 'p') togglePause();
 });
 addEventListener('keyup', e => keys.delete(e.key));
 
@@ -295,8 +345,26 @@ canvas.addEventListener('pointermove', e => {
 function primaryAction() {
   if (state === 'ready') { setState('play'); launch(); }
   else if (state === 'paused') setState('play');
-  else if (state === 'over') newGame();
+  else if (state === 'over' && performance.now() - overAt > 600) newGame();   // not a tap meant for the paddle
 }
+
+$('pauseBtn').addEventListener('click', e => { unlockAudio(); togglePause(); e.currentTarget.blur(); });
+$('soundBtn').addEventListener('click', e => {
+  unlockAudio();
+  muted = !muted;
+  try { localStorage.setItem(SOUND_KEY, muted ? 'off' : 'on'); } catch {}
+  showButtons();
+  e.currentTarget.blur();
+});
+// Starting over loses the level reached, so it takes a second tap
+$('newBtn').addEventListener('click', e => {
+  unlockAudio();
+  e.currentTarget.blur();
+  if (performance.now() < sureUntil) { sureUntil = 0; newGame(); return; }
+  sureUntil = performance.now() + 3000;
+  showButtons();
+  setTimeout(() => { if (performance.now() >= sureUntil) { sureUntil = 0; showButtons(); } }, 3050);
+});
 
 // The car lists each controller twice: the raw device, and a "Tesla Virtual
 // Gamepad" copy with the standard layout and its own button numbers. Read one
@@ -315,13 +383,14 @@ function readGamepad(dt) {
   // edge-triggered buttons
   const now = { fire: pressed(0) || pressed(1), pause: pressed(standard ? 9 : 11) };
   if (now.fire && !padPrev.fire) { unlockAudio(); primaryAction(); }
-  if (now.pause && !padPrev.pause && state === 'play') setState('paused');
+  if (now.pause && !padPrev.pause) togglePause();
   padPrev = now;
 }
 
 document.addEventListener('visibilitychange', () => {
   if (document.hidden && state === 'play') setState('paused');
 });
+addEventListener('pagehide', saveGame);
 
 // ---------- Loop ----------
 
@@ -361,5 +430,5 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 
-newGame();
+if (!loadGame()) newGame();
 requestAnimationFrame(frame);

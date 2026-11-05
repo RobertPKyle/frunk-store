@@ -3,7 +3,7 @@
 // like then, and the fossils found nearby. All of it comes straight from open
 // science services, which allow browsers to ask them directly.
 import { FOSSILS, ICONS, climateAt, periodAt, placesFrom, rockFrom } from './geology.js';
-import { getPlace, herePlace, pickPlace, savePlace } from '../_shared/place.js';
+import { ago, getPlace, herePlace, locationError, pickPlace, savePlace } from '../_shared/place.js';
 import { setMiles, useMiles } from '../_shared/units.js';
 
 const MACROSTRAT = 'https://macrostrat.org/api/v2';
@@ -11,6 +11,9 @@ const PBDB = 'https://paleobiodb.org/data1.2/occs/list.json';
 const GPLATES = 'https://gws.gplates.org/reconstruct/reconstruct_points/';
 const CACHE_KEY = 'under.cache';
 const KEEP_CACHED = 3;
+const WAIT = 25_000;                // a record search that hasn't answered by now has failed
+const SAME_SPOT_KM = 0.15;          // GPS wander, not a move: what's showing still fits
+const SAVED_KM = 1;                 // with no signal, a saved answer from this close will do
 const FRESH = 30 * 86400_000;       // rock changes slowly; catalogs change a little
 const SCALES = ['large', 'medium', 'small', 'tiny'];
 const RECENT = 2.58;                // younger than this counts as the loose top layer
@@ -34,6 +37,7 @@ let miles = useMiles();
 let place = null;      // the saved place
 let spot = null;       // what's being shown: the place, or a point tapped on the map
 let data = null;       // { layers, elevation, hasColumn, fossils, fossilKm }
+let savedNote = '';    // says when this is a saved answer because the records were out of reach
 let selected = 0;
 let loadToken = 0;
 let tab = 'rock';
@@ -47,7 +51,7 @@ function el(tag, props = {}, ...children) {
 }
 
 const fetchJson = async url => {
-  const res = await fetch(url);
+  const res = await fetch(url, { signal: AbortSignal.timeout(WAIT) });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 };
@@ -242,6 +246,7 @@ function renderRock() {
   const chip = el('span', { className: 'period', textContent: period.name });
   chip.style.setProperty('--c', period.color);
   const parts = [
+    ...(savedNote ? [el('p', { className: 'fine', textContent: savedNote })] : []),
     el('p', { className: 'where', textContent: selected ? (l.here ? 'On the bedrock maps here' : 'Deeper in this region') : (spot === place ? 'At the surface under you' : 'At the surface here') }),
     el('h1', { textContent: l.name }),
     el('div', { className: 'age' }, ageRange(l.top, l.bottom), chip),
@@ -275,7 +280,7 @@ async function showDrift(ma, line) {
   const key = `${spot.lat.toFixed(2)},${spot.lon.toFixed(2)},${age}`;
   let answer = plates.get(key);
   if (!answer) {
-    answer = fetchJson(`${GPLATES}?points=${spot.lon.toFixed(3)},${spot.lat.toFixed(3)}&time=${age}&model=${PLATE_MODEL}`).catch(() => null);
+    answer = fetchJson(`${GPLATES}?points=${spot.lon.toFixed(3)},${spot.lat.toFixed(3)}&time=${age}&model=${PLATE_MODEL}`).catch(() => { plates.delete(key); return null; });
     plates.set(key, answer);
   }
   const result = await answer;
@@ -401,6 +406,16 @@ function cacheGet(key) {
   return entry && Date.now() - entry.at < FRESH ? entry.data : null;
 }
 
+// With no signal: any saved answer for this spot, however old, or one close by
+function cacheFallback(lat, lon) {
+  const km = c => {
+    const [a, b] = c.key.split(',').map(Number);
+    return Math.hypot(a - lat, (b - lon) * Math.cos(lat * Math.PI / 180)) * 111;
+  };
+  const best = (store.get(CACHE_KEY) || []).map(entry => ({ entry, km: km(entry) })).filter(c => c.km <= SAVED_KM).sort((a, b) => a.km - b.km)[0];
+  return best && { data: best.entry.data, at: best.entry.at, km: best.km };
+}
+
 function cachePut(key, value) {
   const list = (store.get(CACHE_KEY) || []).filter(c => c.key !== key);
   list.unshift({ key, at: Date.now(), data: value });
@@ -444,6 +459,7 @@ async function showSpot(target) {
   const lat = round3(target.lat), lon = round3(target.lon), key = `${lat},${lon}`;
   selected = 0;
   data = null;
+  savedNote = '';
   showBackRow();
   showFossilCount();
   $('core').replaceChildren();
@@ -456,9 +472,15 @@ async function showSpot(target) {
     data = geology;
   } catch (e) {
     if (token !== loadToken) return;
-    say($('rockPanel'), 'Can\'t reach the geology records. Check the connection, then try again.', () => showSpot(target));
-    setTab('rock');
-    return;
+    const saved = cacheFallback(lat, lon);
+    if (!saved) {
+      say($('rockPanel'), 'Can\'t reach the geology records. Check the connection, then try again.', () => showSpot(target));
+      setTab('rock');
+      return;
+    }
+    data = saved.data;
+    const apart = miles ? `${(saved.km * 0.621371).toFixed(1)} mi` : `${saved.km.toFixed(1)} km`;
+    savedNote = `Can't reach the geology records. This was saved ${ago(saved.at)}${saved.km >= 0.1 ? `, ${apart} from here` : ''}.`;
   }
   renderGround();
   if (!data.layers.length) {
@@ -475,13 +497,17 @@ async function showSpot(target) {
 
 function setPlace(p) {
   if (!p) return;
+  const same = data && spot && spot === place
+    && Math.hypot(p.lat - place.lat, (p.lon - place.lon) * Math.cos(p.lat * Math.PI / 180)) * 111 < SAME_SPOT_KM;
   place = p;
   $('placeBtn').textContent = p.name;
+  if (same) { spot = p; return; }
   showSpot(p);
   if (geoMap) showMap();
 }
 
-function useCar() {
+// At start, a car with no fix yet stays on the saved place. A tap on Here asks.
+function useCar(quiet) {
   if (!navigator.geolocation) { pickPlace().then(setPlace); return; }
   $('placeBtn').textContent = 'Finding this car…';
   navigator.geolocation.getCurrentPosition(
@@ -490,9 +516,9 @@ function useCar() {
       savePlace(p);
       setPlace(p);
     },
-    () => {
+    err => {
       $('placeBtn').textContent = place?.name || 'Set location';
-      pickPlace().then(setPlace);
+      if (quiet !== true || !place) pickPlace({ required: !place, note: locationError(err) }).then(setPlace);
     },
     { timeout: 12000, maximumAge: 60_000 },
   );
@@ -510,15 +536,25 @@ $('unitsBtn').onclick = () => {
   showUnits();
   if (!data) return;
   renderGround();
-  if (data.layers.length) renderRock();
+  if (data.layers.length) {
+    const top = $('rockPanel').scrollTop;
+    renderRock();
+    $('rockPanel').scrollTop = top;
+  }
   if (tab === 'fossils') renderFossils();
 };
 $('placeBtn').onclick = () => pickPlace().then(setPlace);
-$('hereBtn').onclick = useCar;
+$('hereBtn').onclick = () => useCar();
 $('backBtn').onclick = () => { showSpot(place); if (geoMap) showMap(); };
 $('tabRock').onclick = () => setTab('rock');
 $('tabFossils').onclick = () => setTab('fossils');
 $('tabMap').onclick = () => { if (spot) setTab('map'); };
+// The connection's back: fill in whatever didn't arrive
+addEventListener('online', () => {
+  if (!spot) return;
+  if (!data || savedNote) showSpot(spot);
+  else if (data.fossils === null) loadSpotFossils(spot, loadToken);
+});
 
 showUnits();
 
@@ -529,6 +565,6 @@ showUnits();
   try { granted = (await navigator.permissions.query({ name: 'geolocation' })).state === 'granted'; } catch {}
   const saved = getPlace();
   if (saved) setPlace(saved);
-  if (granted) useCar();
+  if (granted) useCar(true);
   else if (!saved) setPlace(await pickPlace({ required: true }));
 })();

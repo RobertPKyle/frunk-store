@@ -48,9 +48,12 @@ async function renderLibrary() {
     if (!res.ok) throw new Error(res.status);
     list = (await res.json()).puzzles;
   } catch {
-    status('Couldn\'t load the list of puzzles. Check the connection and try again.');
+    // tried again until it arrives, so a weak signal needs no reopening
+    status('Couldn\'t load the list of puzzles. Check the connection; trying again…');
+    setTimeout(renderLibrary, 5000);
     return;
   }
+  status('');
   $('list').replaceChildren(...list.map(p => {
     const b = document.createElement('button');
     b.type = 'button';
@@ -411,4 +414,5 @@ addEventListener('message', e => {
 if (parent !== window) parent.postMessage({ frunk: 'save-on-close' }, '*');
 
 renderLibrary();
+import('../_shared/padmenu.js').then(m => m.padMenu('#library', '.puzzle, #continue'), () => {});
 })();

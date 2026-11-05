@@ -1,7 +1,7 @@
 // What's Around Me: Wikipedia articles about places near the car (towns,
 // landmarks, trails, historic sites), on a north-up map and a list. Tap one
 // to read the article. Text is rendered as plain text, never as HTML.
-import { getPlace, herePlace, pickPlace, savePlace } from '../_shared/place.js';
+import { ago, getPlace, herePlace, locationError, pickPlace, savePlace } from '../_shared/place.js';
 import { setMiles, useMiles } from '../_shared/units.js';
 
 const API = 'https://en.wikipedia.org/w/api.php';
@@ -12,6 +12,8 @@ const STALE = 7 * 86400_000; // places don't move; refetch weekly
 const KEEP_ARTICLES = 15;    // read before, readable offline
 const MAX_TEXT = 60_000;     // characters kept per cached article
 const GEO_MAX = 10_000;      // geosearch radius limit, m
+const SAME_SPOT = 200;       // m; the car hasn't really moved, so the saved list still fits
+const WAIT = 15_000;         // give up on a request after this long
 const DEG = Math.PI / 180;
 
 let miles = useMiles();
@@ -35,6 +37,7 @@ let pages = [];      // [{ id, title, desc, lat, lon, thumb, length, dist, beari
 let selected = null; // page id
 let loading = false;
 let reload = false;  // place or distance changed during a search: run it again
+let note = '';       // why this list isn't a fresh one
 
 function el(tag, props = {}, ...children) {
   const node = Object.assign(document.createElement(tag), props);
@@ -76,7 +79,7 @@ const away = p => `${distance(p.dist)} ${compass(p.bearing)}`;
 
 async function api(params) {
   const q = new URLSearchParams({ format: 'json', formatversion: '2', origin: '*', ...params });
-  const res = await fetch(`${API}?${q}`);
+  const res = await fetch(`${API}?${q}`, { signal: AbortSignal.timeout(WAIT) });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const data = await res.json();
   if (data.error) throw new Error(data.error.info || data.error.code);
@@ -96,9 +99,16 @@ async function search(lat, lon, radius) {
   const centers = [[lat, lon, Math.min(radius, GEO_MAX)]];
   if (radius > GEO_MAX) for (let b = 0; b < 360; b += 60) centers.push([...offset(lat, lon, 17_000, b), GEO_MAX]);
   const found = new Map();
+  let partial = false;
   // One request at a time, as Wikimedia asks of API clients
   for (const [la, lo, r] of centers) {
-    const data = await geosearch(la, lo, r);
+    let data;
+    try { data = await geosearch(la, lo, r); } catch (e) {
+      // On a weak signal, what arrived so far is still worth showing
+      if (!found.size) throw e;
+      partial = true;
+      break;
+    }
     for (const p of data.query?.pages || []) {
       const c = p.coordinates?.[0];
       if (!c || found.has(p.pageid)) continue;
@@ -108,7 +118,7 @@ async function search(lat, lon, radius) {
       });
     }
   }
-  return [...found.values()];
+  return { pages: [...found.values()], partial };
 }
 
 async function fetchArticle(title) {
@@ -323,6 +333,7 @@ async function open(id) {
   } catch {
     if (mine !== openSeq) return;
     pane.lastChild.textContent = 'Couldn\'t load this article. It needs a connection the first time you open it.';
+    pane.append(el('button', { className: 'btn', type: 'button', textContent: 'Try again', onclick: () => open(id) }));
   }
   draw();
 }
@@ -346,6 +357,7 @@ function updateSpeakButton() {
 if (synth) {
   updateSpeakButton();
   synth.addEventListener?.('voiceschanged', updateSpeakButton);
+  addEventListener('pagehide', () => synth.cancel());
 }
 
 function stopSpeaking() {
@@ -402,8 +414,10 @@ async function findAndShow(force) {
   const radius = radii()[settings.radius][1];
   const key = `${place.lat.toFixed(3)},${place.lon.toFixed(3)}`;
   const cached = store.get(CACHE_KEY);
-  const usable = cached && cached.key === key && cached.radius >= radius;
+  const moved = cached ? distBearing(place.lat, place.lon, ...cached.key.split(',').map(Number)).dist : Infinity;
+  const usable = moved <= SAME_SPOT && cached.radius >= radius;
   selected = null;
+  note = '';
   closeArticle();
   // A wider search already covers a closer one. Refresh at most once a minute.
   if (usable && (!force || Date.now() - cached.fetched < 60_000) && Date.now() - cached.fetched < STALE) {
@@ -414,18 +428,22 @@ async function findAndShow(force) {
     $('summary').textContent = '';
     try {
       const found = await search(place.lat, place.lon, radius);
-      store.set(CACHE_KEY, { key, radius, fetched: Date.now(), pages: found });
+      store.set(CACHE_KEY, { key, radius: found.partial ? Math.min(radius, GEO_MAX) : radius, fetched: Date.now(), pages: found.pages });
       if (reload) return;   // these results are for the old place or distance
-      pages = found;
+      pages = found.pages;
+      if (found.partial) note = 'The connection dropped, so only the closer places loaded. Tap ↻ for the rest.';
     } catch {
       if (reload) return;
-      if (usable) pages = cached.pages;
-      else { pages = []; setMsg('Couldn\'t reach Wikipedia. Check the connection and tap ↻.'); draw(); return; }
+      // A list from anywhere around here beats an empty screen
+      if (moved < cached?.radius) {
+        pages = cached.pages;
+        note = `Couldn't reach Wikipedia. This list was saved ${ago(cached.fetched)}.`;
+      } else { pages = []; note = 'Couldn\'t reach Wikipedia. Check the connection and tap ↻.'; }
     }
   }
   measure();
   pages = pages.filter(p => p.dist <= radius);
-  setMsg(pages.length ? '' : 'No Wikipedia articles this close. Try a wider distance.');
+  setMsg(note || (pages.length ? '' : 'No Wikipedia articles this close. Try a wider distance.'));
   showPlace();
   renderList();
   draw();
@@ -438,7 +456,8 @@ function setPlace(p) {
   load();
 }
 
-function locate() {
+// At start, a car with no fix yet stays on the saved place. A tap on Here asks.
+function locate(quiet) {
   if (!navigator.geolocation) { pickPlace().then(setPlace); return; }
   setMsg('Finding this car\'s location…');
   navigator.geolocation.getCurrentPosition(
@@ -447,7 +466,11 @@ function locate() {
       savePlace(p);
       setPlace(p);
     },
-    () => { setMsg('Couldn\'t get this car\'s location. Pick a place instead.'); pickPlace().then(setPlace); },
+    err => {
+      if (quiet === true && place) { showPlace(); load(); return; }
+      setMsg('');
+      pickPlace({ required: !place, note: locationError(err) }).then(setPlace);
+    },
     { timeout: 12000, maximumAge: 60_000 },
   );
 }
@@ -495,8 +518,9 @@ document.querySelectorAll('[data-sort]').forEach(b => {
 });
 
 $('placeBtn').onclick = () => pickPlace().then(setPlace);
-$('hereBtn').onclick = locate;
+$('hereBtn').onclick = () => locate();
 $('refreshBtn').onclick = () => load(true);
+addEventListener('online', () => { if (place && (note || !pages.length)) load(true); });
 
 // ---------- start ----------
 
@@ -505,7 +529,7 @@ $('refreshBtn').onclick = () => load(true);
 (async () => {
   let granted = false;
   try { granted = (await navigator.permissions.query({ name: 'geolocation' })).state === 'granted'; } catch {}
-  if (granted) { locate(); return; }
+  if (granted) { locate(true); return; }
   if (place) { showPlace(); load(); return; }
   setPlace(await pickPlace({ required: true }));
 })();

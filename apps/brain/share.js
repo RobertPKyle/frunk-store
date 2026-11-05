@@ -14,7 +14,7 @@ const fmt = n => Math.round(n).toLocaleString('en-US');
 async function load() {
   const id = location.hash.slice(1);
   if (!/^[A-Za-z0-9_-]{12}$/.test(id)) throw new Error('This link is damaged. Scan the code on the car again.');
-  const res = await fetch(`/api/brain?op=result&id=${id}`);
+  const res = await fetch(`/api/brain?op=result&id=${id}`).catch(() => { throw new Error('Can\'t load the score. Check the connection, then reload this page.'); });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
   return data;

@@ -168,6 +168,10 @@ function resize() {
 addEventListener('resize', resize);
 resize();
 
+// The graphics chip can drop this page's drawing when memory runs short
+canvas.addEventListener('webglcontextlost', e => e.preventDefault());
+canvas.addEventListener('webglcontextrestored', () => location.reload());
+
 let frames = 0, windowStart = performance.now();
 function adapt(now) {
   frames++;
@@ -204,6 +208,7 @@ function stepSparks(dt) {
 
 let last = performance.now();
 function frame(now) {
+  if (now - last > 500) { frames = 0; windowStart = now; }   // back from hidden: not a slow frame
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
   if (Math.random() < dt * 6) flickerTarget = 0.75 + Math.random() * 0.5;
@@ -241,32 +246,44 @@ const amb = new Ambient();
 const soundBtn = document.getElementById('sound');
 const volume = document.getElementById('volume');
 const cricketsBtn = document.getElementById('crickets');
-let soundOn = false, cricketsOn = false;
+let soundOn = false, cricketsOn = false, soundWasOn = false;
 
 try {
   const saved = JSON.parse(localStorage.getItem('campfire.settings')) || {};
   if (saved.volume) volume.value = saved.volume;
   cricketsOn = !!saved.crickets;
+  soundWasOn = !!saved.sound;
 } catch {}
 const save = () => {
-  try { localStorage.setItem('campfire.settings', JSON.stringify({ volume: volume.value, crickets: cricketsOn })); } catch {}
+  try { localStorage.setItem('campfire.settings', JSON.stringify({ volume: volume.value, crickets: cricketsOn, sound: soundOn })); } catch {}
 };
 
 async function applySound() {
+  soundBtn.textContent = soundOn ? 'Sound on' : 'Sound off';
+  soundBtn.setAttribute('aria-pressed', String(soundOn));
+  cricketsBtn.setAttribute('aria-pressed', String(cricketsOn));
+  save();
   if (soundOn) await amb.start();
   if (amb.ctx) {
     amb.setLevel('fire', soundOn ? Number(volume.value) : 0);
     amb.setLevel('crickets', soundOn && cricketsOn ? Number(volume.value) * 0.6 : 0);
   }
-  soundBtn.textContent = soundOn ? 'Sound on' : 'Sound off';
-  soundBtn.setAttribute('aria-pressed', String(soundOn));
-  cricketsBtn.setAttribute('aria-pressed', String(cricketsOn));
-  save();
 }
 soundBtn.onclick = () => { soundOn = !soundOn; applySound(); };
 cricketsBtn.onclick = () => { cricketsOn = !cricketsOn; if (cricketsOn) soundOn = true; applySound(); };
 volume.oninput = () => { if (!soundOn) soundOn = true; applySound(); };
 cricketsBtn.setAttribute('aria-pressed', String(cricketsOn));
+
+// Sound stays on between visits. The tap that opened the app usually allows it;
+// if the browser holds it back, the next tap on the fire brings it.
+if (soundWasOn) {
+  amb.start().catch(() => {});
+  setTimeout(() => {
+    const on = () => { if (!soundOn) { soundOn = true; applySound(); } };
+    if (amb.ctx.state === 'running') return on();
+    addEventListener('pointerdown', e => { if (!e.target.closest('#controls')) on(); }, { capture: true, once: true });
+  }, 300);
+}
 
 // Controls fade away so the fire fills the screen; any tap brings them back
 const controls = document.getElementById('controls');

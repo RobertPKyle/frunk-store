@@ -18,6 +18,7 @@
 //
 // The engine can't be restarted within a page, so leaving a game reloads it.
 
+import { fetchChunks, padMenu, reason } from '../_shared/gamepage.js';
 import { phonePanel } from '../_shared/phone.js';
 import { MAX_WAD_FILE, cleanName, findWad, maybeWad } from '../_shared/roms.js';
 
@@ -243,18 +244,11 @@ function loading(title, text, part) {
 // Downloads a free game, gzipped, with progress; keeps it for next time
 async function downloadFree(entry) {
   const g = entry.free;
-  const res = await fetch(`blasphemer/${g.file}.wad.gz`);
-  if (!res.ok || !res.body) throw new Error(`download failed (${res.status})`);
-  const reader = res.body.getReader();
-  const chunks = [];
   let got = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    chunks.push(value);
-    got += value.length;
+  const chunks = await fetchChunks(`blasphemer/${g.file}.wad.gz`, n => {
+    got += n;
     loading(entry.title, `Downloading ${mb(got)} of ${mb(g.download)}…`, 0.9 * got / g.download);
-  }
+  });
   loading(entry.title, 'Unpacking…', 0.92);
   const data = new Uint8Array(await new Response(new Blob(chunks).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer());
   if (data.length !== g.size) throw new Error('the download was damaged');
@@ -384,6 +378,13 @@ async function boot(entry, data, resume) {
   showSound();
   fit();
   module.callMain(args);
+  // The first time, how the game's menu works on the screen
+  if (!matchMedia('(hover: hover) and (pointer: fine)').matches && !settings.get('hinted', false)) {
+    settings.set('hinted', true);
+    $('hint').textContent = 'Menu opens the game\'s menu: the stick moves, FIRE picks, USE goes back';
+    $('hint').hidden = false;
+    setTimeout(() => { $('hint').hidden = true; }, 9000);
+  }
   frames = 0;
   fpsSince = performance.now();
   raf = requestAnimationFrame(loop);
@@ -397,7 +398,7 @@ async function play(entry, btn, resume) {
   starting = true;
   btn?.classList.add('busy');
   // Made inside the tap, so the browser lets it play
-  try { audio = new AudioContext({ sampleRate: 44100 }); } catch { audio = null; }
+  try { audio = new AudioContext({ sampleRate: 44100 }); audio.onstatechange = showSound; } catch { audio = null; }
   if (audio && !settings.get('sound', true)) audio.suspend();
   try {
     loading(entry.title, 'Loading…', 0);
@@ -409,9 +410,10 @@ async function play(entry, btn, resume) {
   } catch (e) {
     // The engine is up and can't start again within this page, so the
     // library's buttons would do nothing: back to it by reloading
-    if (engine) { failed(`Couldn't start ${entry.title}: ${e && e.message ? e.message : 'something went wrong'}.`); return; }
+    if (engine) { failed(`Couldn't start ${entry.title}: ${reason(e, 'something went wrong')}.`); return; }
     $('loading').hidden = true;
-    status(`Couldn't start ${entry.title}: ${e && e.message ? e.message : 'check the connection and try again'}.`);
+    status(`Couldn't start ${entry.title}: ${reason(e)}.`);
+    $('status').scrollIntoView({ block: 'nearest' });
     audio?.close().catch(() => {});
     audio = null;
     renderFree();
@@ -425,10 +427,18 @@ async function play(entry, btn, resume) {
 
 // ---------- sound ----------
 
+// The browser may hold the sound back until a tap (a game started from a
+// controller, say); any tap then starts it, and the button says so
+const soundBlocked = () => settings.get('sound', true) && audio && audio.state !== 'running' && !document.hidden;
 function showSound() {
-  $('soundBtn').textContent = settings.get('sound', true) ? 'Sound on' : 'Sound off';
+  $('soundBtn').textContent = !settings.get('sound', true) ? 'Sound off' : soundBlocked() ? 'Tap for sound' : 'Sound on';
 }
+function wakeSound() {
+  if (soundBlocked()) audio.resume().then(showSound, () => {});
+}
+for (const type of ['pointerdown', 'keydown']) addEventListener(type, wakeSound, true);
 $('soundBtn').onclick = () => {
+  if (soundBlocked()) { wakeSound(); return; }
   const on = !settings.get('sound', true);
   settings.set('sound', on);
   showSound();
@@ -531,6 +541,7 @@ let padMode = false;
 function setPadMode(on) {
   if (on === padMode) return;
   padMode = on;
+  if (on) wakeSound();
   $('player').classList.toggle('pad', on);
   fit();
 }
@@ -663,8 +674,10 @@ document.addEventListener('visibilitychange', () => {
   if (document.hidden) {
     audio?.suspend();
     saveAll();
-  } else if (audio && settings.get('sound', true)) {
-    audio.resume();
+  } else {
+    if (audio && settings.get('sound', true)) audio.resume();
+    // Back to a game in progress: paused in its menu, not straight into a fight
+    if ((engine._web_state() & 15) === 1) press('menu');
   }
 });
 
@@ -688,6 +701,7 @@ $('addFiles').onclick = () => ownGames(() => {
   input.click();
 });
 $('fromPhone').onclick = () => ownGames(phone.show);
+padMenu();
 
 renderFree();
 renderMine();

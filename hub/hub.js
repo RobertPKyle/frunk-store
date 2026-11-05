@@ -25,6 +25,8 @@ let pushedHistory = false; // true when the open app added a history entry
 // second for { frunk: 'closed' } before unloading it, so it can save first.
 let saveOnClose = false;
 let opened = 0;            // counts openApp calls, so a late unload can't hit a newer app
+let leaving = false;       // the Apps button went back; the page hasn't heard yet
+let keysToApp = false;     // opened from the keyboard: the app gets the keys once it loads
 
 const store = {
   get(key, fallback) { try { return JSON.parse(localStorage.getItem('hub.' + key)) ?? fallback; } catch { return fallback; } },
@@ -149,7 +151,7 @@ function renderGrid() {
       el('p', {}, appTagline(app)),
       el('div', { class: 'tags' }, ...app.tags.map(tag => el('span', { class: 'tag' }, tagName(tag)))),
     );
-    card.addEventListener('click', () => launch(app.id));
+    card.addEventListener('click', e => launch(app.id, e.detail === 0));   // no clicks counted: a key or the controller
     return card;
   }));
 }
@@ -192,7 +194,8 @@ searchForm.addEventListener('submit', e => {
 // know what the site is, so the row takes the place of the lede.
 function renderRecent() {
   if (!catalog) return;
-  const apps = store.get('recent', []).map(id => catalog.apps.find(a => a.id === id)).filter(Boolean).slice(0, RECENT);
+  const apps = store.get('recent', []).map(id => catalog.apps.find(a => a.id === id))
+    .filter(app => app && !(app.id === 'token' && lang.startsWith('zh'))).slice(0, RECENT);   // as in the footer
   recentRow.replaceChildren(...apps.map(app => {
     const b = el('button', { class: 'recent-app', type: 'button' },
       el('img', { src: appsOrigin + app.icon, alt: '', width: 28, height: 28 }), el('span', {}, appName(app)));
@@ -228,7 +231,9 @@ document.addEventListener('visibilitychange', () => stayAwake(awake));
 
 // A tap on an app. Someone who used full screen last time gets it again:
 // it can only be asked for during a tap, so this is the first chance.
-function launch(id) {
+function launch(id, byKey = false) {
+  if (!runner.hidden) return;   // a held Enter repeats its click
+  keysToApp = byKey;
   if (store.get('fullscreen', false) && !document.fullscreenElement) document.documentElement.requestFullscreen?.().catch(() => {});
   openApp(id, { push: true });
 }
@@ -243,6 +248,7 @@ function freshFrame() {
   next.addEventListener('load', () => {
     try { if (next.contentWindow.location.href === 'about:blank') return; } catch {}   // the app's origin can't be read
     loading.hidden = true;
+    if (keysToApp) next.focus();
   });
   frame.replaceWith(next);
   frame = next;
@@ -263,6 +269,8 @@ function openApp(id, { push }) {
   saveOnClose = false;
   remember(id);
   stayAwake(app.tags.includes('Game'));
+  // focus left on the card behind the app: Enter or Space meant for the game would open it again
+  document.activeElement?.blur();
   freshFrame();
   // an app that has its own translations is told the hub's language
   frame.src = appsOrigin + app.path + (app.langs?.includes(lang) ? `#lang=${lang}` : '');
@@ -304,6 +312,11 @@ addEventListener('message', e => {
 
 document.getElementById('home').addEventListener('click', () => {
   if (pushedHistory) {
+    // A second tap before the page hears of the first would go back past the
+    // hub. The timer is for an app whose frame has its own page to go back to.
+    if (leaving) return;
+    leaving = true;
+    setTimeout(() => { leaving = false; }, 1000);
     history.back(); // popstate closes the app, keeps the car's back button in sync
   } else {
     history.replaceState(null, '', '/');
@@ -312,7 +325,8 @@ document.getElementById('home').addEventListener('click', () => {
 });
 
 addEventListener('popstate', e => {
-  pushedHistory = false;
+  pushedHistory = leaving = false;
+  if (e.state?.app && !catalog) return;   // no app list yet: init opens it from the address
   if (e.state?.app) openApp(e.state.app, { push: false });
   else closeApp();
 });

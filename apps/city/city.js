@@ -103,6 +103,7 @@ tilesImg.src = 'engine/tiles.png';
 const spritesImg = new Image();
 spritesImg.src = 'engine/sprites.png';
 const images = Promise.all([tilesImg.decode(), spritesImg.decode()]);
+images.catch(() => ask('Can\'t load the city\'s pictures', 'Check the connection, then try again.', [['Try again', () => location.reload()]]));
 
 function drawTile(ctx, v, x, y, size = T) {
   ctx.drawImage(tilesImg, (v & 31) * T, (v >> 5) * T, T, T, x, y, size, size);
@@ -1076,12 +1077,19 @@ const pad = { cursor: null, prev: [], dir: null, nextMove: 0, painting: null };
 function pollPads(now) {
   const pads = navigator.getGamepads ? [...navigator.getGamepads()].filter(p => p && p.connected) : [];
   if (!pads.length) return;
+  // The car lists each controller twice, the raw device and a standard copy, with
+  // different numbers for the same press (A is raw 0, standard 1). Buttons and the
+  // right stick come from standard pads when there are any; raw axes agree on the left stick.
+  const standard = pads.filter(p => p.mapping === 'standard');
+  const [A, B] = standard.length ? [1, 0] : [0, 1];
   const down = [];
   let ax = 0, ay = 0, rx = 0, ry = 0;
+  for (const p of standard.length ? standard : pads) p.buttons.forEach((b, i) => { if (b.pressed) down[i] = true; });
   for (const p of pads) {
-    p.buttons.forEach((b, i) => { if (b.pressed) down[i] = true; });
     if (Math.abs(p.axes[0]) > Math.abs(ax)) ax = p.axes[0];
     if (Math.abs(p.axes[1]) > Math.abs(ay)) ay = p.axes[1];
+  }
+  for (const p of standard) {
     if (Math.abs(p.axes[2] || 0) > Math.abs(rx)) rx = p.axes[2];
     if (Math.abs(p.axes[3] || 0) > Math.abs(ry)) ry = p.axes[3];
   }
@@ -1090,8 +1098,8 @@ function pollPads(now) {
   pad.prev = down;
   if (!city) return;
   if (openOverlay()) {
-    if ((pressed(1) || pressed(9)) && !forcedBudget) closeSheets();
-    if (pressed(0) && forcedBudget) $('budgetForm').requestSubmit();
+    if ((pressed(B) || pressed(9)) && !forcedBudget) closeSheets();
+    if (pressed(A) && forcedBudget) $('budgetForm').requestSubmit();
     return;
   }
   if (pressed(9)) togglePause();
@@ -1136,16 +1144,16 @@ function pollPads(now) {
     if (sy > ch - m - T * view.zoom) view.y += (sy - (ch - m - T * view.zoom)) / view.zoom;
     clampView();
   }
-  if (pressed(1)) lookAt(pad.cursor.x, pad.cursor.y);
-  if (pressed(0)) {
+  if (pressed(B)) lookAt(pad.cursor.x, pad.cursor.y);
+  if (pressed(A)) {
     applyAt(pad.cursor);
     pad.painting = tool().kind === 'paint' ? pad.cursor : null;
-  } else if (down[0] && pad.painting && moved) {
+  } else if (down[A] && pad.painting && moved) {
     line4(pad.painting, pad.cursor, applyAt);
     pad.painting = pad.cursor;
   }
-  if (!down[0]) pad.painting = null;
-  if (moved || pressed(0) || pressed(4) || pressed(5)) {
+  if (!down[A]) pad.painting = null;
+  if (moved || pressed(A) || pressed(4) || pressed(5)) {
     if ($('query').hidden) cursor = outline(pad.cursor);
     dirty = true;
   }

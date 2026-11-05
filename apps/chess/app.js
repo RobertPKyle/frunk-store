@@ -8,6 +8,9 @@
 const LICHESS_DAILY_URL = 'https://lichess.org/api/puzzle/daily';
 const LICHESS_NEXT_URL = 'https://lichess.org/api/puzzle/next';   // a random one
 const CACHE_KEY = 'frunk.chess.puzzle';
+const SOLVED_KEY = 'frunk.chess.solved';   // ids of puzzles solved here, newest last
+const KEEP_SOLVED = 60;
+const FETCH_LIMIT = 10000;   // ms; a fading connection may never answer
 const FILES = 'abcdefgh';
 
 const boardEl = document.getElementById('board');
@@ -16,6 +19,7 @@ const subEl = document.getElementById('sub');
 const resetBtn = document.getElementById('reset');
 const hintBtn = document.getElementById('hint');
 const nextBtn = document.getElementById('next');
+const retryBtn = document.getElementById('retry');
 
 let game = null;       // chess.js instance at the puzzle position
 let puzzle = null;     // { id, rating, fen, solution[] }
@@ -27,6 +31,8 @@ let solved = false;
 let solver = 'w';      // the side the player controls; the board stays flipped to it
 let hintLevel = 0;     // 0 = none, 1 = show the piece to move, 2 = show the destination
 let last = null;       // the move just played, { from, to }, tinted on the board
+let replyTimer = 0;    // the opponent's reply on its way
+let savedCopy = false; // the puzzle came from this screen's copy, with no connection
 
 function pieceKey({ type, color }) { return color + type.toUpperCase(); }
 
@@ -88,6 +94,7 @@ function finish() {
   busy = false;
   selected = null;
   targets.clear();
+  rememberSolved(puzzle.id);
   const yourMoves = Math.ceil(step / 2);
   setSub(`Puzzle #${puzzle.id} · ${puzzle.rating} elo · solved in ${yourMoves} move${yourMoves === 1 ? '' : 's'}`);
   nextBtn.classList.add('primary');
@@ -98,7 +105,7 @@ function opponentReply() {
   if (step >= puzzle.solution.length) { finish(); return; }
   busy = true;
   render();
-  setTimeout(() => {
+  replyTimer = setTimeout(() => {
     const m = { from: puzzle.solution[step].slice(0, 2), to: puzzle.solution[step].slice(2, 4), promotion: puzzle.solution[step][4] };
     applyMove(m);
     step++;
@@ -145,7 +152,18 @@ boardEl.addEventListener('click', e => {
   render();
 });
 
+function solvedIds() {
+  try { return JSON.parse(localStorage.getItem(SOLVED_KEY)) || []; } catch { return []; }
+}
+
+function rememberSolved(id) {
+  const ids = solvedIds().filter(x => x !== id);
+  ids.push(id);
+  try { localStorage.setItem(SOLVED_KEY, JSON.stringify(ids.slice(-KEEP_SOLVED))); } catch {}
+}
+
 function start() {
+  clearTimeout(replyTimer);
   game = new Chess(puzzle.fen);
   solver = game.turn();
   step = 0;
@@ -155,8 +173,9 @@ function start() {
   solved = false;
   hintLevel = 0;
   last = null;
-  nextBtn.classList.remove('primary');
-  setSub(`Puzzle #${puzzle.id} · ${puzzle.rating} elo`);
+  const before = solvedIds().includes(puzzle.id);
+  nextBtn.classList.toggle('primary', before);
+  setSub(`Puzzle #${puzzle.id} · ${puzzle.rating} elo${before ? ' · you solved this one' : ''}${savedCopy ? ' · saved copy' : ''}`);
   render();
 }
 
@@ -169,7 +188,7 @@ hintBtn.addEventListener('click', () => {
 });
 
 async function fetchPuzzle(url) {
-  const r = await fetch(url, { headers: { Accept: 'application/json' }, cache: 'no-store' });
+  const r = await fetch(url, { headers: { Accept: 'application/json' }, cache: 'no-store', signal: AbortSignal.timeout(FETCH_LIMIT) });
   if (!r.ok) throw new Error('HTTP ' + r.status);
   const d = await r.json();
   const p = {
@@ -184,22 +203,32 @@ async function fetchPuzzle(url) {
 
 async function load() {
   let p = null;
+  retryBtn.hidden = true;
+  statusEl.textContent = "Loading today's puzzle…";
+  setSub('');
+  savedCopy = false;
   try {
     p = await fetchPuzzle(LICHESS_DAILY_URL);
   } catch {
-    try { p = JSON.parse(localStorage.getItem(CACHE_KEY)); } catch { p = null; }
+    try { p = JSON.parse(localStorage.getItem(CACHE_KEY)); savedCopy = true; } catch { p = null; }
   }
   if (!p || !p.fen || !p.solution) {
     statusEl.textContent = "Couldn't load today's puzzle";
-    setSub('Check the connection and reload.');
+    setSub('Check the connection, then try again.');
     resetBtn.hidden = true;
     hintBtn.hidden = true;
+    retryBtn.hidden = false;
     return;
   }
   puzzle = p;
+  resetBtn.hidden = false;
+  hintBtn.hidden = false;
+  if (savedCopy) document.querySelector('h1').textContent = 'Chess puzzle';
   start();
   nextBtn.hidden = false;
 }
+retryBtn.addEventListener('click', load);
+addEventListener('online', () => { if (!puzzle) load(); });
 
 // Another puzzle; the one on the board stays if none comes
 let fetching = false;
@@ -210,6 +239,7 @@ nextBtn.addEventListener('click', async () => {
   statusEl.textContent = 'Loading a puzzle…';
   try {
     puzzle = await fetchPuzzle(LICHESS_NEXT_URL);
+    savedCopy = false;
     document.querySelector('h1').textContent = 'Chess puzzle';
     start();
   } catch {

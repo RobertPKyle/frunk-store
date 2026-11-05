@@ -6,8 +6,10 @@
 // waiting for a long time before it fails. So when an app's page doesn't
 // arrive within a few seconds, the cached copy is shown, and the files that
 // page loads come from the cache too, keeping its code all from one version.
+// A file that stalls after its page came does the same, a little later.
 const CACHE = 'frunk-apps-v2';
-const SLOW = 3000;   // ms to wait for a page before using the cached copy
+const SLOW = 3000;        // ms to wait for a page before using the cached copy
+const SLOW_FILE = 6000;   // the same for a file: a stall, as the time ends when its headers come
 
 // Big downloads the apps keep in IndexedDB themselves (Freedoom's and
 // Blasphemer's WADs, Adventure Games' free games, LibreQuake's paks and music,
@@ -75,9 +77,37 @@ async function ask(req, cached) {
   return res.status === 304 ? old : res;
 }
 
+// An app opened with no connection and no copy here. In place of the browser's
+// error page, which looks broken and has no way to try again. The headers are
+// the ones vercel.json gives every page: the hub's frame won't show one without.
+function offlinePage() {
+  return new Response(`<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>No connection</title>
+<style>
+  html, body { height: 100%; margin: 0; background: #0b0d10; color: #eef1f5; font: 17px/1.45 system-ui, sans-serif; }
+  body { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 64px 24px 24px; box-sizing: border-box; text-align: center; }
+  h1 { margin: 0; font-size: 24px; } p { margin: 0; max-width: 28em; color: #8d96a5; }
+  button { min-height: 48px; margin-top: 8px; padding: 10px 22px; border: 0; border-radius: 12px; background: #ffb547; color: #111418; font: inherit; font-weight: 700; }
+</style></head><body>
+<h1>No connection</h1>
+<p>This app isn't saved on this browser yet, so it needs the internet the first time. It opens by itself when the connection comes back.</p>
+<button type="button" onclick="location.reload()">Try again</button>
+<script>addEventListener('online', () => location.reload());</script>
+</body></html>`, {
+    status: 503,
+    headers: {
+      'Content-Type': 'text/html; charset=utf-8',
+      'Cross-Origin-Opener-Policy': 'same-origin',
+      'Cross-Origin-Embedder-Policy': 'require-corp',
+      'Cross-Origin-Resource-Policy': 'cross-origin',
+    },
+  });
+}
+
 async function respond(e, req) {
-  const cache = await caches.open(CACHE);
-  const cached = cache.match(req);
+  const cache = await caches.open(CACHE).catch(() => null);
+  if (!cache) return fetch(req);   // storage trouble shouldn't take the apps down
+  const cached = cache.match(req).catch(() => undefined);
   const page = req.mode === 'navigate';
   if (!page && fromCache.has(e.clientId)) {
     const hit = await cached;
@@ -93,17 +123,16 @@ async function respond(e, req) {
   });
   e.waitUntil(network.then(() => saved).catch(() => {}));
 
-  if (!page) return network.catch(async err => (await cached) || Promise.reject(err));
-
   const hit = await cached;
-  if (!hit) return network;
+  if (!hit) return page ? network.catch(offlinePage) : network;
   return new Promise(resolve => {
     const useCache = () => {
       if (fromCache.size > 50) fromCache.clear();
-      if (e.resultingClientId) fromCache.add(e.resultingClientId);
+      const client = page ? e.resultingClientId : e.clientId;
+      if (client) fromCache.add(client);
       resolve(hit);
     };
-    const timer = setTimeout(useCache, SLOW);
+    const timer = setTimeout(useCache, page ? SLOW : SLOW_FILE);
     network.then(res => { clearTimeout(timer); resolve(res); }, () => { clearTimeout(timer); useCache(); });
   });
 }

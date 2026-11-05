@@ -365,13 +365,20 @@ setRed(state.red);
 if (state.lat == null) pickPlace({ required: true }).then(setPlace);
 else { $('placeBtn').textContent = state.place; followCar(setPlace); }
 
-fetch('sky.json')
-  .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
-  .then(data => {
-    // attach each named star's magnitude once, instead of looking it up per frame
-    const mags = new Map(data.stars.map(([ra, dec, mag]) => [`${ra},${dec}`, mag]));
-    data.names = data.names.map(([ra, dec, name]) => [ra, dec, name, mags.get(`${ra},${dec}`) ?? 9]);
-    sky = data;
-    redraw();
-  })
-  .catch(e => { $('when').textContent = `Star data failed to load (${e.message})`; });
+// Tries again until it arrives: nothing can be drawn without it
+function loadSky() {
+  fetch('sky.json', { signal: AbortSignal.timeout(30_000) })
+    .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
+    .then(data => {
+      // attach each named star's magnitude once, instead of looking it up per frame
+      const mags = new Map(data.stars.map(([ra, dec, mag]) => [`${ra},${dec}`, mag]));
+      data.names = data.names.map(([ra, dec, name]) => [ra, dec, name, mags.get(`${ra},${dec}`) ?? 9]);
+      sky = data;
+      redraw();
+    })
+    .catch(() => {
+      $('when').textContent = 'No star data yet. Trying again…';
+      setTimeout(loadSky, 10_000);
+    });
+}
+loadSky();

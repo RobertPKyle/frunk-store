@@ -16,8 +16,14 @@
   .btn[aria-pressed="true"] { border-color: #ff6b5a; color: #ff8a7a; }
 
   .bottom { position: fixed; left: 10px; right: 10px; bottom: 10px; display: flex; align-items: center; gap: 10px; padding: 8px 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; }
-  .bottom input { flex: 1; min-width: 80px; accent-color: var(--accent); height: 32px; }
+  .bottom input { flex: 1; min-width: 80px; accent-color: var(--accent); height: 44px; }
   #when { min-width: 120px; font-variant-numeric: tabular-nums; color: var(--accent); }
+  /* A phone's width: the zoom buttons stay on screen */
+  @media (max-width: 480px) {
+    .bottom { gap: 6px; padding: 8px 6px; }
+    .bottom input { min-width: 40px; }
+    #when { min-width: 0; font-size: 13px; }
+  }
 
   #tip { position: fixed; padding: 6px 10px; border-radius: 10px; background: var(--panel); border: 1px solid var(--line); font-size: 14px; pointer-events: none; transform: translate(-50%, calc(-100% - 12px)); white-space: nowrap; }
   #tip[hidden] { display: none; }

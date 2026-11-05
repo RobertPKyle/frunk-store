@@ -9,6 +9,7 @@ const PALETTE_OFFSET = OUT_BYTES;
 const PAGES = 257;
 const ITER_STEPS = [128, 256, 512, 1024, 2048];
 const HOME = { cx: -0.6, cy: 0, span: 3.4 };  // span = complex width shown
+const VIEW_KEY = 'fractal.view';
 
 const canvas = document.getElementById('c');
 const ctx = canvas.getContext('2d');
@@ -110,6 +111,7 @@ async function renderFrame(quality) {
 
   const zoom = HOME.span / (view.scale * canvas.clientWidth);
   info.textContent = `${engine.label} · SIMD · ${ms} ms · ${w}×${h} · zoom ${zoom < 1e4 ? zoom.toFixed(1) : zoom.toExponential(1)}×`;
+  if (quality === 1) { try { localStorage.setItem(VIEW_KEY, JSON.stringify(view)); } catch {} }
 }
 
 async function requestRender(quality = 1) {
@@ -143,6 +145,15 @@ function zoomAt(px, py, factor) {
 function resetView() {
   view.cx = HOME.cx; view.cy = HOME.cy;
   view.scale = HOME.span / canvas.clientWidth;
+}
+
+// Where you left off last time
+function restoreView() {
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem(VIEW_KEY)); } catch {}
+  if (!saved || ![saved.cx, saved.cy, saved.scale].every(Number.isFinite) || saved.scale <= 0 || !ITER_STEPS.includes(saved.maxIter)) return;
+  Object.assign(view, saved);
+  itersBtn.textContent = `${view.maxIter} iter`;
 }
 
 // --- Touch / mouse ---
@@ -248,7 +259,11 @@ addEventListener('gamepadconnected', () => {
 
 // --- Start ---
 
-addEventListener('resize', () => { sizeCanvas(); requestRender(1); });
+addEventListener('resize', () => {
+  if (!engine) return;   // still starting: the first frame sizes itself
+  sizeCanvas();
+  requestRender(1);
+});
 
 (async () => {
   if (typeof WebAssembly !== 'object') return fail('This browser has no WebAssembly support.');
@@ -259,5 +274,6 @@ addEventListener('resize', () => { sizeCanvas(); requestRender(1); });
   }
   sizeCanvas();
   resetView();
+  restoreView();
   requestRender(1);
 })();

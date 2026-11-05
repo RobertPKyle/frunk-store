@@ -45,6 +45,21 @@ export function savePlace(place) {
   try { localStorage.setItem(KEY, JSON.stringify(place)); } catch {}
 }
 
+// How long ago something was fetched, for a saved copy's label
+export function ago(ms) {
+  const min = Math.round((Date.now() - ms) / 60_000);
+  if (min < 1) return 'just now';
+  if (min < 60) return `${min} min ago`;
+  const h = Math.round(min / 60);
+  return h < 48 ? `${h} h ago` : `${Math.round(h / 24)} days ago`;
+}
+
+// What to tell someone when the browser couldn't give the car's location
+export function locationError(err) {
+  if (err?.code === 1) return 'This site isn\'t allowed to use the car\'s location. Search or pick a place below.';
+  return 'Couldn\'t get the car\'s location just now. Search or pick a place below.';
+}
+
 // A place from the car's location, named the same way by every app
 export const herePlace = (lat, lon) => ({ lat, lon, name: `Here (${lat.toFixed(1)}°, ${lon.toFixed(1)}°)` });
 
@@ -95,12 +110,13 @@ function el(tag, props = {}, ...children) {
 }
 
 // Shows the picker and resolves with the chosen place (also saved), or with
-// null if the user closes it. With required, there is no close button.
-export function pickPlace({ required = false } = {}) {
+// null if the user closes it. With required, there is no close button. A note
+// shows beside the location button, to say why the picker opened.
+export function pickPlace({ required = false, note = '' } = {}) {
   if (!document.getElementById('fp-style')) document.head.append(el('style', { id: 'fp-style', textContent: CSS }));
 
   return new Promise(resolve => {
-    const status = el('span', { className: 'fp-status' });
+    const status = el('span', { className: 'fp-status', textContent: note });
     const list = el('div', { className: 'fp-list' });
     const search = el('input', { className: 'fp-search', type: 'search', placeholder: 'Search any town or park', enterKeyHint: 'search' });
     const geoBtn = el('button', { className: 'fp-btn', type: 'button', textContent: "Use this car's location" });
@@ -112,7 +128,10 @@ export function pickPlace({ required = false } = {}) {
       list,
     );
 
+    let done = false;
     function finish(place) {
+      if (done) return;   // a location that arrives after another choice must not replace it
+      done = true;
       if (place) savePlace(place);
       root.remove();
       resolve(place);
@@ -138,7 +157,7 @@ export function pickPlace({ required = false } = {}) {
         const mine = ++seq;
         status.textContent = 'Searching…';
         try {
-          const res = await fetch(`${GEOCODE}?name=${encodeURIComponent(q)}&count=12&language=en&format=json`);
+          const res = await fetch(`${GEOCODE}?name=${encodeURIComponent(q)}&count=12&language=en&format=json`, { signal: AbortSignal.timeout(10_000) });
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           const { results = [] } = await res.json();
           if (mine !== seq) return;
@@ -146,8 +165,12 @@ export function pickPlace({ required = false } = {}) {
           list.replaceChildren(...results.map(r => option(r.name, [r.admin1, r.country].filter(Boolean).join(', '),
             { lat: r.latitude, lon: r.longitude, name: r.name, tz: r.timezone })));
         } catch {
-          if (mine === seq) status.textContent = 'Search needs a connection. Pick from the list instead.';
+          if (mine !== seq) return;
+          status.textContent = 'Search needs a connection. Pick from the list instead.';
           showPresets();
+          // The list works without one, so narrow it down to what was typed
+          const hits = CITIES.filter(([name]) => name.toLowerCase().includes(q.toLowerCase()));
+          if (hits.length) list.replaceChildren(...hits.map(([name, lat, lon]) => option(name, '', { lat, lon, name })));
         }
       }, 400);
     };
@@ -159,7 +182,7 @@ export function pickPlace({ required = false } = {}) {
         pos => {
           finish(herePlace(pos.coords.latitude, pos.coords.longitude));
         },
-        err => { status.textContent = `Couldn't get location (${err.message || 'denied'}). Search or pick a place below.`; },
+        err => { status.textContent = locationError(err); },
         { timeout: 12000, maximumAge: 600_000 },
       );
     };

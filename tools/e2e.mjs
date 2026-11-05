@@ -44,10 +44,10 @@ page.on('console', m => {
 });
 
 let failed = 0;
-// ONLY=freedoom node tools/e2e.mjs runs just the checks with that in their name
+// ONLY=freedoom node tools/e2e.mjs runs just the checks with that in their name (a|b for several)
 const only = process.env.ONLY;
 async function check(name, fn) {
-  if (only && !name.includes(only) && name !== 'no console or page errors') return;
+  if (only && !only.split('|').some(o => name.includes(o)) && name !== 'no console or page errors') return;
   try { await fn(); console.log(`ok   ${name}`); }
   catch (e) {
     if (e.message.startsWith('SKIP: ')) { console.log(`skip ${name}\n     ${e.message.slice(6)}`); return; }
@@ -487,7 +487,10 @@ await check('planes overhead shows planes, details and only routes that fit', as
     home = await frame.evaluate(() => JSON.parse(localStorage.getItem('frunk.place')));
 
     // The list shows plain names, closest first, and sorts out on the next answer
+    // (with a saved place, the first answer came before home was known, so the
+    // corrected positions need their 1.5 s slide before the tap below)
     await frame.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+    await page.waitForTimeout(2000);
     await appFrame().locator('.row').filter({ hasText: 'United 100' }).waitFor();
     await appFrame().locator('.row').filter({ hasText: 'SkyWest 3883' }).waitFor();
     await appFrame().locator('#summary').filter({ hasText: '2 planes on this map' }).waitFor();
@@ -701,7 +704,7 @@ await check("what's under me shows the rock layers, fossils and the map", async 
     const savedPlace = await frame.evaluate(() => localStorage.getItem('frunk.place'));
     const go = async name => {
       if (!(await app.locator('.fp-picker').isVisible())) await app.locator('#placeBtn').click();
-      await app.getByRole('button', { name }).click();
+      await app.locator('.fp-picker').getByRole('button', { name }).click();
     };
     const picker = app.locator('.fp-picker');
     await picker.or(app.locator('#rockPanel h1')).first().waitFor({ timeout: 30000 });
@@ -767,7 +770,7 @@ await check('road trip postcard draws a card and hands it to the phone', async (
   const picker = app.locator('.fp-picker');
   await picker.or(app.locator('#qr a')).first().waitFor({ timeout: 20000 });
   if (!(await picker.isVisible())) await app.locator('#placeBtn').click();
-  await app.getByRole('button', { name: 'Moab' }).click();
+  await picker.getByRole('button', { name: 'Moab' }).click();
 
   // The name comes from the place chosen, the map fills the letters, and the code follows
   await app.locator('#names .chip[aria-pressed="true"]').filter({ hasText: 'Moab' }).waitFor({ timeout: 20000 });
@@ -1321,7 +1324,7 @@ await check('retro console plays a GBA game with a controller and resumes it', a
   const big = await screen.evaluate(c => c.getBoundingClientRect().width);
   if (!(big > small) || await appFrame().locator('.side.left').isVisible()) throw new Error(`screen didn't grow for the controller (${small} -> ${big} px)`);
   // Leaving and coming back picks up on the same page
-  await appFrame().getByRole('button', { name: 'Games' }).click();
+  await frame().evaluate(() => document.getElementById('quitBtn').click());
   await appFrame().locator('#free .game').filter({ hasText: 'Attack on Voxelburg' }).click();
   await page.waitForTimeout(1500);
   if (!(await screen.screenshot()).equals(controls)) throw new Error('did not resume where it left off');
@@ -1555,7 +1558,6 @@ await check('retro console plays Genesis and PC Engine games, and the former ear
   await appFrame().locator('.pill[data-b=start]').click();
   await page.waitForTimeout(1500);
   if ((await mdScreen.screenshot()).equals(title)) throw new Error('Start did nothing in KłełeAtoms');
-  await appFrame().locator('#player').screenshot({ path: shots + 'genesis.png' });
   await appFrame().getByRole('button', { name: 'Games' }).click();
   // the worker writes its snapshot (about 1 MB) after Games is tapped
   let mdSaved = 0;
@@ -2729,7 +2731,7 @@ await check('death rally: starts a game by controller, types a name with the car
   if ((await look()).equals(racing)) throw new Error('Start didn\'t open the race menu');
   // Quit writes the overlay drive to IndexedDB and goes back to the start
   // (a script click: after a screenshot, headless Chrome's clicks miss in the frame)
-  await app.locator('#quitBtn').evaluate(b => b.click());
+  await app.locator('#quitBtn').evaluate(b => (b.click(), b.click()));
   await app.locator('#start').waitFor({ timeout: 10000 });
   await app.locator('#kept').filter({ hasText: /Downloaded/ }).waitFor({ timeout: 10000 });
   const kept = await frame().evaluate(() => new Promise(resolve => {
@@ -2795,7 +2797,7 @@ await check('wolfenstein 3d: starts a game, turns and opens the menu by controll
   await frame().evaluate(() => padPress(9));
   await page.waitForTimeout(2000);
   if ((await look()).equals(playing)) throw new Error('Start didn\'t open the menu');
-  await app.locator('#quitBtn').evaluate(b => b.click());
+  await app.locator('#quitBtn').evaluate(b => (b.click(), b.click()));
   await app.locator('#start').waitFor({ timeout: 10000 });
   await app.locator('#kept').filter({ hasText: /Downloaded/ }).waitFor({ timeout: 10000 });
 });
@@ -2889,7 +2891,7 @@ await check('commander keen: saves on the map, enters a city and plays by contro
   await pad(A, 3500);
   await pad(A, 1000);
   if (await red() < 0.5) throw new Error('Select didn\'t go back to the title');
-  await app.locator('#quitBtn').evaluate(b => b.click());
+  await app.locator('#quitBtn').evaluate(b => (b.click(), b.click()));
   await app.locator('#start').waitFor({ timeout: 10000 });
   await app.locator('#kept').filter({ hasText: /Downloaded/ }).waitFor({ timeout: 10000 });
   // The save is still there next time
@@ -2990,7 +2992,7 @@ await check('command & conquer plays a mission by touch, saves it, keeps the sav
   await page.screenshot({ path: shots + 'cnc.png' });
   // Quit writes the saves to IndexedDB (IDBFS) and goes back to the start
   // (a script click: after a screenshot, headless Chrome's clicks miss in the frame)
-  await app.locator('#quitBtn').evaluate(b => b.click());
+  await app.locator('#quitBtn').evaluate(b => (b.click(), b.click()));
   await app.locator('#start').waitFor({ timeout: 10000 });
   const saves = await frame().evaluate(() => new Promise(resolve => {
     const req = indexedDB.open('/home/web_user/.config/vanilla-conquer');
@@ -3009,7 +3011,7 @@ await check('command & conquer plays a mission by touch, saves it, keeps the sav
   await app.locator('#player').waitFor({ timeout: 120000 });
   await until('red alert frames', async () => (await stats()).frames > 120, 60000);
   if ((await stats()).game !== 'ra') throw new Error('not red alert');
-  await app.locator('#quitBtn').evaluate(b => b.click());
+  await app.locator('#quitBtn').evaluate(b => (b.click(), b.click()));
   await app.locator('#start').waitFor({ timeout: 10000 });
 });
 
@@ -3113,7 +3115,7 @@ await check('elder scrolls: arena makes a character by touch and controller, fig
   await page.screenshot({ path: shots + 'elderscrolls.png' });
   // Quit writes the overlay drive to IndexedDB (IDBFS) and goes back to the start
   // (a script click: after a screenshot, headless Chrome's clicks miss in the frame)
-  await app.locator('#quitBtn').evaluate(b => b.click());
+  await app.locator('#quitBtn').evaluate(b => (b.click(), b.click()));
   await app.locator('#start').waitFor({ timeout: 10000 });
   const saved = await frame().evaluate(() => new Promise(resolve => {
     const req = indexedDB.open('/save');
@@ -3133,7 +3135,7 @@ await check('elder scrolls: arena makes a character by touch and controller, fig
   await until('daggerfall frames', async () => (await stats()).frames > 60, 90000);
   if ((await stats()).game !== 'daggerfall') throw new Error('not daggerfall');
   if (!(await app.locator('#failed').isHidden())) throw new Error(await app.locator('#failedText').textContent());
-  await app.locator('#quitBtn').evaluate(b => b.click());
+  await app.locator('#quitBtn').evaluate(b => (b.click(), b.click()));
   await app.locator('#start').waitFor({ timeout: 10000 });
 });
 

@@ -3,12 +3,13 @@
 // player adds from the phone or a USB drive, kept in IndexedDB. A game plays
 // in play.html in a frame of its own, thrown away to quit.
 
+import { padMenu } from '../_shared/padmenu.js';
 import { phonePanel } from '../_shared/phone.js';
 import { COVER_H, COVER_W, isCart, readCart } from './cart.js';
 import { allCarts, deleteCart, putCart } from './store.js';
 
 const $ = id => document.getElementById(id);
-const CRT = 'tic80.crt';
+const CRT = 'tic80.crt', LAST = 'tic80.last';
 const pref = {
   get: key => { try { return localStorage.getItem(key); } catch { return null; } },
   set: (key, value) => { try { localStorage.setItem(key, value); } catch {} },
@@ -51,20 +52,26 @@ function card({ title, author, desc, art, onPlay, onRemove }) {
 // "Deck http://deck.itch.io" -> "Deck"
 const person = s => (s || '').replace(/\s*(https?:\/\/|www\.)\S*/g, '').trim();
 
+let listFailed = false;
 async function renderGames() {
   try {
     const { games } = await (await fetch('games.json')).json();
     $('games').replaceChildren(...games.map(g => card({
       title: g.title, author: person(g.author), desc: g.note || g.desc, art: g.cover ? `games/${g.id}.png` : null,
-      onPlay: () => play(g.player, `games/${g.id}.tic`),
+      onPlay: () => play(g.player, `games/${g.id}.tic`, g.title),
     })));
     $('credits').replaceChildren(...games.map(g => {
       const p = document.createElement('p');
       p.textContent = `${g.title}: ${person(g.author)}, ${g.license}. Source: ${g.source.replace(/^https:\/\//, '')}`;
       return p;
     }));
+    if (listFailed) status('');
+    listFailed = false;
   } catch {
-    status('The game list didn\'t load. Check the connection and reopen Tiny Games.');
+    // tried again until it arrives, so a weak signal needs no reopening
+    listFailed = true;
+    status('The game list didn\'t load. Check the connection; trying again…');
+    setTimeout(renderGames, 5000);
   }
 }
 
@@ -76,13 +83,26 @@ function coverUrl(px) {
   return c.toDataURL();
 }
 
+// The last game played, one tap away
+function renderContinue(carts) {
+  let last = null;
+  try { last = JSON.parse(pref.get(LAST)); } catch {}
+  const mine = /^mine\/([\w-]+)\.tic$/.exec(last?.cart || '');
+  const there = last && (!mine || carts.some(c => c.id === mine[1]));
+  $('continue').hidden = !there;
+  if (!there) return;
+  $('continue').textContent = `Continue ${last.title}`;
+  $('continue').onclick = () => play(last.player, last.cart, last.title);
+}
+
 async function renderMine() {
   const carts = (await allCarts()).sort((a, b) => b.added - a.added);
+  renderContinue(carts);
   $('mineEmpty').hidden = carts.length > 0;
   $('mine').replaceChildren(...await Promise.all(carts.map(async c => card({
     title: c.title, author: person(c.author), desc: c.desc,
     art: coverUrl((await readCart(c.bytes))?.cover),
-    onPlay: () => play(c.player, `mine/${c.id}.tic`),
+    onPlay: () => play(c.player, `mine/${c.id}.tic`, c.title),
     onRemove: async () => { await deleteCart(c.id).catch(() => {}); renderMine(); },
   }))));
 }
@@ -128,14 +148,18 @@ $('fileInput').addEventListener('change', async () => {
 
 let frame = null;
 
-function play(player, cart) {
+let slowTimer = 0;
+
+function play(player, cart, title) {
   stop();
   status('');
+  pref.set(LAST, JSON.stringify({ player, cart, title }));
   const q = new URLSearchParams({ player, cart });
   if ($('crt').checked) q.set('crt', '1');
   frame = Object.assign(document.createElement('iframe'), { title: 'Game', src: `play.html?${q}` });
   frame.allow = 'fullscreen; gamepad; autoplay; cross-origin-isolated';
-  $('playStatus').textContent = 'Starting…';
+  $('playStatus').textContent = `Starting ${title}…`;
+  slowTimer = setTimeout(() => { $('playStatus').textContent = 'Still loading. The signal may be weak.'; }, 15000);
   $('stage').prepend(frame);
   $('stage').hidden = false;
   $('library').hidden = true;
@@ -143,15 +167,18 @@ function play(player, cart) {
 }
 
 function stop() {
+  clearTimeout(slowTimer);
+  const was = frame;
   frame?.remove();
   frame = null;
   $('stage').hidden = true;
   $('library').hidden = false;
+  if (was) allCarts().then(renderContinue);
 }
 
 addEventListener('message', e => {
   if (e.origin !== location.origin || e.source !== frame?.contentWindow) return;
-  if (e.data?.tic80 === 'started') $('playStatus').textContent = '';
+  if (e.data?.tic80 === 'started') { clearTimeout(slowTimer); $('playStatus').textContent = ''; }
   if (e.data?.tic80 === 'failed') { stop(); status(e.data.text || 'The game stopped.'); }
 });
 $('back').addEventListener('click', stop);
@@ -162,3 +189,4 @@ $('crt').checked = pref.get(CRT) === '1';
 $('crt').addEventListener('change', () => pref.set(CRT, $('crt').checked ? '1' : '0'));
 renderGames();
 renderMine();
+padMenu('#library', '.pick, #continue, #phoneBtn');

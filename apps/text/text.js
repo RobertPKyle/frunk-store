@@ -554,6 +554,7 @@ async function play(entry, btn) {
       setLog([['(Your progress was from a different release of this story file, so it starts over.)\n\n', NOTE]]);
     }
     settings.set('last', entry.key);
+    status('');
     go();
   } catch (e) {
     showLibrary();

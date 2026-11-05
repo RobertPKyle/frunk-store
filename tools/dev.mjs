@@ -75,5 +75,5 @@ async function serve(dir, port, host) {
   }).listen(port, host, () => console.log(`${dir}: http://${host}:${port}`));
 }
 
-await serve('hub', 5173, 'localhost');
-await serve('apps', 5174, '127.0.0.1');
+await serve('hub', +process.env.HUB_PORT || 5173, 'localhost');
+await serve('apps', +process.env.APPS_PORT || 5174, '127.0.0.1');

@@ -47,6 +47,8 @@ let wantPlaying = false, pendingSeek = 0, dragging = false, pausedAt = 0;
 let openToken = 0, retryTimer = 0, retryDelay = 5;
 let lastTime = 0, lastMoved = 0;
 let sleepIndex = 0, sleepEnd = 0, fading = false;
+let finishedBook = null;   // heard to the end: no place to keep any more
+let moreFailed = false;   // the full catalog couldn't load
 
 function el(tag, props = {}, ...children) {
   const node = Object.assign(document.createElement(tag), props);
@@ -119,6 +121,7 @@ async function loadMore() {
   const res = await fetch('more.json');
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   moreBooks = (await res.json()).books.map(rowToBook);
+  moreFailed = false;
   return moreBooks;
 }
 
@@ -158,7 +161,8 @@ function renderShelves() {
   if (!query && chip === 'all') parts.push(...(keepListening() || []));
   const name = query ? (list.length ? `Books matching “${query}”` : `Nothing matches “${query}”`) : CHIPS.find(c => c[0] === chip)[1];
   parts.push(el('h2', { textContent: name }));
-  if (query && !list.length) parts.push(el('p', { className: 'note', textContent: 'Try fewer words, or just the author\'s last name.' }));
+  if (query && moreFailed) parts.push(el('p', { className: 'note', textContent: 'The full catalog didn\'t load, so this looked through the most listened books only. Check the connection, then search again.' }));
+  else if (query && !list.length) parts.push(el('p', { className: 'note', textContent: 'Try fewer words, or just the author\'s last name.' }));
   if (!query && !list.length) parts.push(el('p', { className: 'note', textContent: `No ${settings.lang} books on this shelf. Try another shelf or language.` }));
   const limit = query ? Math.min(shown, SEARCH_MAX) : shown;
   parts.push(el('div', { className: 'grid' }, ...list.slice(0, limit).map(coverWithAction)));
@@ -203,7 +207,7 @@ $('search').addEventListener('input', () => {
     shown = PAGE;
     renderChips();
     // Searching looks through the whole catalog, so it's worth the wait the first time
-    if (query) { try { await loadMore(); } catch {} }
+    if (query) { try { await loadMore(); } catch { moreFailed = true; } }
     renderShelves();
     $('shelves').scrollTop = 0;
   }, 200);
@@ -235,7 +239,8 @@ const FOLDER = id => `https://archive.org/download/${encodeURIComponent(id)}/`;
 const collate = new Intl.Collator('en', { numeric: true, sensitivity: 'base' });
 
 async function fetchBook(book) {
-  const res = await fetch(`https://archive.org/metadata/${encodeURIComponent(book.id)}`);
+  // A connection that fades out never answers, so it gets a time limit and a Try again
+  const res = await fetch(`https://archive.org/metadata/${encodeURIComponent(book.id)}`, { signal: AbortSignal.timeout(25000) });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const meta = await res.json();
   const files = meta.files || [];
@@ -330,7 +335,11 @@ function renderChapters() {
     const row = el('button', { className: 'ch', type: 'button' },
       el('i', { textContent: String(i + 1) }), el('span', { textContent: c.title }), el('small', { textContent: c.len ? clock(c.len) : '' }));
     row.setAttribute('aria-current', String(i === now));
-    row.onclick = () => listen(viewing, i, 0, true);
+    row.onclick = () => {
+      // The chapter the book is at carries on from its place, rather than starting over
+      if (i !== shownChapter()) listen(viewing, i, 0, true);
+      else if (loaded !== viewing || !wantPlaying) play();
+    };
     return row;
   }));
 }
@@ -349,6 +358,7 @@ function scrollToChapter() {
 
 function listen(book, ch, t, play) {
   if (loaded !== book) { savePosition(); loaded = book; }
+  if (book === finishedBook) finishedBook = null;
   chapter = ch;
   wantPlaying = play;
   pendingSeek = t;
@@ -378,9 +388,12 @@ function play() {
   if (!book?.chapters) return;
   if (book !== loaded || !audio.src) {
     const saved = savedFor(book);
-    listen(book, saved.ch, saved.t, true);
+    // Back after a while: a few seconds of context, as after a long pause
+    const away = saved.at && Date.now() - saved.at > 60_000;
+    listen(book, saved.ch, away ? Math.max(0, saved.t - RESUME_REWIND) : saved.t, true);
     return;
   }
+  if (book === finishedBook) { listen(book, 0, 0, true); return; }
   wantPlaying = true;
   renderPlayer();
   renderBar();
@@ -393,6 +406,7 @@ function play() {
 function pause() {
   wantPlaying = false;
   pausedAt = Date.now();
+  stopFade();
   audio.pause();
   savePosition();
   setStatus('');
@@ -418,7 +432,7 @@ function retry() {
 }
 
 function skip(by) {
-  if (!loaded || loaded !== viewing) return;
+  if (!loaded || !Number.isFinite(audio.duration)) return;
   audio.currentTime = Math.max(0, Math.min((audio.duration || 0) - 1, audio.currentTime + by));
   renderPlayer();
 }
@@ -464,7 +478,7 @@ function renderBar() {
 }
 
 function savePosition(at = audio.currentTime || pendingSeek) {
-  if (!loaded?.chapters) return;
+  if (!loaded?.chapters || loaded === finishedBook) return;
   const before = loaded.chapters.slice(0, chapter).reduce((sum, c) => sum + c.len, 0);
   progress[loaded.id] = {
     ch: chapter, t: Math.max(0, at), pct: Math.min(1, (before + at) / (loaded.seconds || 1)), at: Date.now(),
@@ -477,9 +491,10 @@ function savePosition(at = audio.currentTime || pendingSeek) {
 
 function finished() {
   wantPlaying = false;
+  finishedBook = loaded;
   delete progress[loaded.id];
   store.set(PROGRESS_KEY, progress);
-  setStatus('The end.');
+  setStatus('The end. Play starts the book again.');
   stopSleep();
   renderPlayer();
   renderBar();
@@ -513,7 +528,11 @@ audio.addEventListener('error', () => {
   retryTimer = setTimeout(retry, retryDelay * 1000);
   retryDelay = Math.min(30, retryDelay * 2);
 });
-addEventListener('online', () => { if (wantPlaying && audio.error) retry(); });
+addEventListener('online', () => {
+  if (wantPlaying && audio.error) retry();
+  if (!shelfBooks.length) loadLibrary();
+  if (viewing?.failed && !$('bookView').hidden) { viewing.failed = false; openBook(viewing); }
+});
 
 const seek = $('seek');
 seek.addEventListener('input', () => {
@@ -677,7 +696,8 @@ $('nextBtn').onclick = () => nextChapter(1);
 showSpeed();
 showSleep();
 
-(async () => {
+async function loadLibrary() {
+  $('shelves').replaceChildren(el('p', { className: 'note', textContent: 'Loading the library…' }));
   try {
     const res = await fetch('shelf.json');
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -686,7 +706,9 @@ showSleep();
     shelfKeys = data.shelves;
     shelfBooks = data.books.map(rowToBook);
   } catch (e) {
-    $('shelves').replaceChildren(el('p', { className: 'note', textContent: 'Can\'t load the library. Check the connection, then reopen this app.' }));
+    const again = el('button', { className: 'btn', type: 'button', textContent: 'Try again' });
+    again.onclick = loadLibrary;
+    $('shelves').replaceChildren(el('p', { className: 'note', textContent: 'Can\'t load the library. Check the connection, then try again.' }), again);
     return;
   }
   if (!languages.includes(settings.lang)) {
@@ -696,4 +718,5 @@ showSleep();
   renderLangs();
   renderChips();
   renderShelves();
-})();
+}
+loadLibrary();

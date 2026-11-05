@@ -30,7 +30,7 @@
   .game p { margin: 2px 0 0; font-size: 14px; color: #d3d0e0; }
   .wrap { position: relative; display: grid; }
   .wrap .game { padding-right: 90px; }
-  .wrap .del { position: absolute; top: 6px; right: 6px; min-height: 36px; min-width: 36px; padding: 0 10px; border-radius: 10px; background: transparent; border: 1px solid var(--line); color: var(--muted); font-size: 13px; }
+  .wrap .del { position: absolute; top: 6px; right: 6px; min-height: 44px; min-width: 44px; padding: 0 10px; border-radius: 10px; background: transparent; border: 1px solid var(--line); color: var(--muted); font-size: 13px; }
   .add { display: flex; gap: 8px; flex-wrap: wrap; margin: 4px 0 6px; }
   .note { font-size: 13px; color: var(--muted); margin: 6px 2px; max-width: 60em; }
   #addMsg:empty, #status:empty { display: none; }
@@ -80,6 +80,12 @@
   #canvas { display: block; background: #000; }
   /* typing goes through this field, so the car shows its keyboard */
   #kb { position: absolute; left: 0; bottom: 0; width: 1px; height: 1px; opacity: 0; border: 0; padding: 0; font-size: 16px; }
+  @media (max-width: 640px) {
+    /* the bar scrolls sideways rather than cut off Games */
+    .bar { padding-left: 100px; overflow-x: auto; touch-action: pan-x; scrollbar-width: none; }
+    .bar b { display: none; }
+    .bar .btn { padding: 8px; font-size: 13px; }
+  }
   #hint { position: absolute; left: 50%; top: 10px; transform: translateX(-50%); padding: 6px 12px; border-radius: 10px; background: rgba(19, 21, 31, .85);
           border: 1px solid var(--line); font-size: 14px; color: var(--text); pointer-events: none; white-space: nowrap; }
 </style>

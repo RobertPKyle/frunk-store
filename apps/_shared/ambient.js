@@ -287,7 +287,13 @@ export class Ambient {
       const comp = this.ctx.createDynamicsCompressor();
       comp.threshold.value = -16; comp.ratio.value = 4;
       this.master.connect(comp).connect(this.ctx.destination);
-      if (this.ctx instanceof AudioContext) this.timer = setInterval(() => this.tick(), 100);
+      if (this.ctx instanceof AudioContext) {
+        this.timer = setInterval(() => this.tick(), 100);
+        // The browser can suspend sound while the screen is off: bring it back
+        const wake = () => { if (this.voices.size && this.ctx.state !== 'running') this.ctx.resume().catch(() => {}); };
+        document.addEventListener('visibilitychange', wake);
+        addEventListener('pointerdown', wake, { capture: true, passive: true });
+      }
     }
     if (this.ctx instanceof AudioContext && this.ctx.state === 'suspended') await this.ctx.resume();
   }

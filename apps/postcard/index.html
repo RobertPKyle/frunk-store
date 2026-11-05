@@ -45,7 +45,10 @@
 
   @media (max-width: 640px) {
     .work { grid-template-columns: 1fr; grid-template-rows: auto auto; }
-    .send { flex-direction: row; }
+    .send { flex-direction: row; flex-wrap: wrap; }
+    .send p:not(.credit) { flex: 1 1 140px; }
+    #status, .send .credit { flex-basis: 100%; }
+    #status:empty { display: none; }
     .row > span { width: 52px; }
   }
 </style>

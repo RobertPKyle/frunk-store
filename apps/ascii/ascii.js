@@ -8,6 +8,7 @@
 import { FONT } from './font.js';
 import { CTRL, KEY_SLOTS } from './runtime.js';
 import { keepAwake } from '../_shared/awake.js';
+import { padMenu } from '../_shared/padmenu.js';
 
 const GAMES = [
   { id: 'caverns', title: 'Caverns of Kroz II', year: 1990, levels: 40, goal: 'the Priceless Amulet',
@@ -74,14 +75,17 @@ const saveFile = (game, name, records) => files('readwrite', s => (records ? s.p
 
 // ---------- library ----------
 
-function renderLibrary() {
+async function renderLibrary() {
+  // the games a save is waiting in
+  const keys = await files('readonly', s => s.getAllKeys()).catch(() => []);
+  const saved = new Set(keys.filter(k => /\.SAV$/i.test(k)).map(k => k.split('/')[0]));
   $('games').replaceChildren(...GAMES.map(g => {
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'game';
     b.append(
       Object.assign(document.createElement('b'), { textContent: g.title }),
-      Object.assign(document.createElement('small'), { textContent: `${g.year} · ${g.levels} levels · find ${g.goal}` }),
+      Object.assign(document.createElement('small'), { textContent: `${g.year} · ${g.levels} levels · find ${g.goal}${saved.has(g.id) ? ' · saved game' : ''}` }),
       Object.assign(document.createElement('p'), { textContent: g.about }),
     );
     b.onclick = () => play(g, b);
@@ -306,7 +310,19 @@ function applySpeed() {
   if (run) run.ctrl[CTRL.SPEED] = value;
 }
 
-$('quitBtn').onclick = () => stop();
+// Leaving ends the game. With a level going, it asks for a second tap.
+$('quitBtn').onclick = () => {
+  const b = $('quitBtn');
+  if (b.dataset.armed || !run?.ctrl[CTRL.PX]) return stop();
+  b.dataset.armed = setTimeout(disarmQuit, 3000);
+  b.textContent = 'Sure?';
+};
+function disarmQuit() {
+  const b = $('quitBtn');
+  clearTimeout(+b.dataset.armed);
+  delete b.dataset.armed;
+  b.textContent = 'Games';
+}
 
 // The question on screen, with an answer button for each choice
 function promptKeys(text) {
@@ -433,6 +449,8 @@ async function play(game, button) {
     drawn: new Uint16Array(2000).fill(0xffff), checked: 0, promptSig: null, audio,
   };
   run.screen.fill(32 | 7 << 8);
+  // on the screen until the game has downloaded and clears it
+  [...'Loading...'].forEach((ch, i) => { run.screen[12 * 80 + 35 + i] = ch.charCodeAt(0) | 7 << 8; });
   applySpeed();
   let port = null;
   if (audio) {
@@ -477,6 +495,8 @@ function stop() {
   r.worker.terminate();
   r.audio?.close().catch(() => {});
   keepAwake(false);
+  disarmQuit();
+  renderLibrary();
   $('player').hidden = true;
   $('prompt').hidden = true;
   $('line').hidden = true;
@@ -517,3 +537,4 @@ window.asciiState = () => run && { text: screenText(), px: run.ctrl[CTRL.PX], py
 renderLibrary();
 applySound();
 applySpeed();
+padMenu('#library', '.game');

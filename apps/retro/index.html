@@ -31,7 +31,7 @@
   .game p { margin: 2px 0 0; font-size: 14px; color: #c9c6dc; }
   .wrap { position: relative; display: grid; }
   .wrap .game { padding-right: 90px; }
-  .wrap .del { position: absolute; top: 6px; right: 6px; min-height: 36px; min-width: 36px; padding: 0 10px; border-radius: 10px; background: transparent; border: 1px solid var(--line); color: var(--muted); font-size: 13px; }
+  .wrap .del { position: absolute; top: 6px; right: 6px; min-height: 44px; min-width: 44px; padding: 0 10px; border-radius: 10px; background: transparent; border: 1px solid var(--line); color: var(--muted); font-size: 13px; }
   .add { display: flex; gap: 8px; flex-wrap: wrap; margin: 4px 0 6px; }
   .note { font-size: 13px; color: var(--muted); margin: 6px 2px; max-width: 60em; }
   #addMsg:empty, #status:empty { display: none; }
@@ -48,7 +48,7 @@
   .sheet.terms { flex-direction: column; align-items: stretch; gap: 0; max-width: 560px; }
   .terms h2 { margin: 0 0 8px; font-size: 19px; color: var(--text); letter-spacing: 0; text-transform: none; }
   .terms p { margin: 0 0 10px; font-size: 15px; color: #c9c6dc; }
-  .overlay { position: fixed; inset: 0; z-index: 5; display: grid; place-items: center; padding: 64px 16px 16px; background: rgba(5, 5, 10, .88); }
+  .overlay { position: fixed; inset: 0; z-index: 5; display: grid; place-items: center; padding: 64px 16px 16px; background: rgba(5, 5, 10, .88); overflow-y: auto; touch-action: pan-y; }
   .sheet { display: flex; gap: 22px; align-items: center; max-width: 680px; padding: 18px; border-radius: 18px; background: var(--panel); border: 1px solid var(--line); }
   .qr { flex: none; display: grid; place-items: center; width: 236px; height: 236px; border-radius: 12px; background: #fff; }
   .qr a { display: block; }
@@ -71,6 +71,7 @@
   canvas { display: block; image-rendering: pixelated; image-rendering: crisp-edges; background: #000; }
   #paused { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; gap: 6px; background: rgba(0, 0, 0, .6); font-size: 22px; font-weight: 700; cursor: pointer; }
   #paused small { font-size: 14px; font-weight: 400; color: #c9c6dc; }
+  #player:not(.pad) .padonly { display: none; }
   .side { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px; padding: 4px; }
   .side.left { grid-column: 1; grid-row: 2; }
   .side.right { grid-column: 3; grid-row: 2; }
@@ -114,7 +115,7 @@
   #display { image-rendering: auto; }
   .ab button.on, .pill.on, .cpad button.on { filter: brightness(1.4); transform: scale(.94); }
   .pills { display: flex; gap: 8px; }
-  .pill { min-height: 40px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--line); background: #1d1d29; font-size: 13px; color: var(--muted); }
+  .pill { min-height: 44px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--line); background: #1d1d29; font-size: 13px; color: var(--muted); }
   /* a controller is in use: the game takes the on-screen buttons' room */
   #player.pad .side { display: none; }
   #player.pad .screen { grid-column: 1 / -1; }
@@ -134,6 +135,10 @@
     .screen { grid-column: 1 / 3; grid-row: 2; }
     .side.left { grid-column: 1; grid-row: 3; }
     .side.right { grid-column: 2; grid-row: 3; }
+    /* every button in the bar has to fit beside the hub's Apps button */
+    .bar { padding-left: 100px; gap: 4px; justify-content: flex-end; }
+    .bar b, #fps { display: none; }
+    .bar .btn { padding: 8px; font-size: 13px; }
   }
 </style>
 </head>
@@ -162,7 +167,7 @@
 
     <div class="legal">
       <p>Plays NES, Game Boy, Game Boy Color, Game Boy Advance, Master System, Game Gear, SG-1000, Atari Lynx, PC Engine / TurboGrafx-16 (HuCards) and Mega Drive / Genesis games (.nes, .gb, .gbc, .gba, .sms, .gg, .sg, .lnx, .lyx, .o, .pce, .md, .gen, .bin, .smd, also zipped). Mega CD, 32X and PC Engine CD games aren't supported, nor are the few Mega Drive games that save to EEPROM chips or are bigger than 4 MB (Super Street Fighter II). Games remember your progress: they pick up where you left off, and Reset starts over (keeping in-game saves).</p>
-      <p>Controls: a USB or Bluetooth controller, the on-screen buttons, or a keyboard (arrows, Z = B, X = A, Q = L, W = R, Enter = Start, Shift = Select). On Sega's consoles, B is button 1, A is button 2, and Start is the Master System's Pause button. On the PC Engine, B is II, A is I, and Start is Run. On the Mega Drive, a controller's left, bottom and right buttons are A, B and C (keys A, Z and X); the six-button pad's X, Y and Z are L, the top button and R, and Mode is Select. On the Lynx, Start is Pause, and Option 1 and 2 are the top buttons (L and R on a controller; Select is Option 1 too). With a controller, the on-screen buttons hide to make the game bigger; touch the screen to bring them back. Switching the controller off pauses the game, and Start resumes it.</p>
+      <p>Controls: a USB or Bluetooth controller, the on-screen buttons, or a keyboard (arrows, Z = B, X = A, Q = L, W = R, Enter = Start, Shift = Select). On Sega's consoles, B is button 1, A is button 2, and Start is the Master System's Pause button. On the PC Engine, B is II, A is I, and Start is Run. On the Mega Drive, a controller's left, bottom and right buttons are A, B and C (keys A, Z and X); the six-button pad's X, Y and Z are L, the top button and R, and Mode is Select. On the Lynx, Start is Pause, and Option 1 and 2 are the top buttons (L and R on a controller; Select is Option 1 too). With a controller, the on-screen buttons hide to make the game bigger; touch the screen to bring them back. Switching the controller off pauses the game, and Start resumes it. Select and Start together pause too, and Select then goes back to the games, where the D-pad and a face button pick one.</p>
       <p>Emulators: jsnes (Apache License 2.0) for NES, mGBA (Mozilla Public License 2.0, source at github.com/thenick775/mgba) for Game Boy, Gearsystem (GNU GPL 3 or later, source at frunk-apps.vercel.app/retro/sms/gearsystem-web-src.tar.gz) for Sega's consoles, Geargrafx (GNU GPL 3 or later, source at frunk-apps.vercel.app/retro/pce/geargrafx-web-src.tar.gz) for the PC Engine, clownmdemu (GNU AGPL 3 or later, source at frunk-apps.vercel.app/retro/md/clownmdemu-web-src.tar.gz) for the Mega Drive, Gearlynx (GNU GPL 3 or later, source at frunk-apps.vercel.app/retro/lynx/gearlynx-web-src.tar.gz) for the Atari Lynx. The Lynx starts without Atari's boot ROM: a stand-in modeled on Handy's (K. Wilkins, zlib license) loads each game. The free games are by their authors, under the licenses shown on each card; source code is kept next to each game.</p>
       <p>Not affiliated with or endorsed by Nintendo, Sega, NEC or Konami. Play only while parked.</p>
     </div>
@@ -222,7 +227,7 @@
     <canvas id="lynxScreen" width="160" height="102" hidden></canvas>
     <!-- n64js finds its canvas by this id -->
     <canvas id="display" width="320" height="240" hidden></canvas>
-    <div id="paused" hidden>Paused<small>Tap here or press Start to resume</small></div>
+    <div id="paused" hidden>Paused<small>Tap here or press Start to resume</small><small class="padonly">Select goes back to the games</small></div>
   </div>
   <div class="side right">
     <button class="pill shoulder" type="button" data-b="r">R</button>

@@ -21,7 +21,8 @@
   #who { padding: 12px 14px; border-radius: 12px; background: var(--card); border: 1px solid var(--line); margin-bottom: 10px; }
   #who b { overflow-wrap: anywhere; }
   .note { font-size: 14px; color: var(--muted); margin: 6px 2px 12px; }
-  #msg { margin: 0 0 12px; color: var(--bad); }
+  /* sticks to the top of the screen, as Save is far down the list on a phone */
+  #msg { position: sticky; top: 0; z-index: 1; margin: 0 -16px 12px; padding: 8px 16px; background: var(--bg); color: var(--bad); }
   #msg.ok { color: var(--ok); }
   #msg:empty { display: none; }
   #ideas { list-style: none; margin: 0; padding: 0; }

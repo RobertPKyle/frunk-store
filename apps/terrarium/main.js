@@ -176,6 +176,14 @@ renderer.applyQuality(QUALITY.FULL);
 ui.setChrome(true);
 loop.start();
 
+// A tank is for leaving running, so the screen stays on. Loaded apart from the
+// rest, so that a missing file can never stop the tank.
+import('/_shared/awake.js').then(function (m) { m.keepAwake(true); })['catch'](function () {});
+
+// Reading a card counts as being here: the journal shouldn't fade mid-scroll
+overlay.addEventListener('pointerdown', function () { idle.poke(); }, true);
+overlay.addEventListener('scroll', function () { idle.poke(); }, true);
+
 if (awaySummary) {
   ui.showAway(awaySummary);
   var obs = awaySummary.observations;

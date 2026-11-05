@@ -19,6 +19,7 @@
 // Continue loads it. The engine can't be restarted within a page, so
 // leaving a game reloads it.
 
+import { fetchChunks, padMenu, reason } from '../_shared/gamepage.js';
 import { phonePanel } from '../_shared/phone.js';
 import { MAX_DUKE_FILE, dukePath, isZip, unzipAll } from '../_shared/roms.js';
 
@@ -260,18 +261,11 @@ function loading(title, text, part) {
 // it and keeps them for next time
 async function downloadFree(game) {
   if (await readFile('shareware/DUKE3D.GRP')) return;
-  const res = await fetch(SHAREWARE.zip);
-  if (!res.ok || !res.body) throw new Error(`download failed (${res.status})`);
-  const reader = res.body.getReader();
-  const chunks = [];
   let got = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    chunks.push(value);
-    got += value.length;
+  const chunks = await fetchChunks(SHAREWARE.zip, n => {
+    got += n;
     loading(game.title, `Downloading ${mb(got)} of ${mb(SHAREWARE.size)}…`, 0.85 * got / SHAREWARE.size);
-  }
+  });
   loading(game.title, 'Unpacking…', 0.88);
   const zip = new Uint8Array(await new Blob(chunks).arrayBuffer());
   const shr = (await unzipAll(zip, 64 * 1048576))?.find(e => /DN3DSW13\.SHR$/i.test(e.name));
@@ -441,7 +435,7 @@ async function play(game, btn, resume) {
   // Made inside the tap, so the browser lets it play. At the game's own
   // 48 kHz: the browser converts it for the speakers off the main thread,
   // where SDL would otherwise do it between the game's frames.
-  try { audio = new AudioContext({ sampleRate: 48000 }); } catch { audio = null; }
+  try { audio = new AudioContext({ sampleRate: 48000 }); audio.onstatechange = showSound; } catch { audio = null; }
   if (audio && !settings.get('sound', true)) audio.suspend();
   try {
     loading(game.title, 'Loading…', 0);
@@ -451,11 +445,12 @@ async function play(game, btn, resume) {
   } catch (e) {
     // The engine is up and can't start again within this page, so the
     // library's buttons would do nothing: back to it by reloading
-    if (duke) { failed(`Couldn't start ${game.title}: ${e && e.message ? e.message : 'something went wrong'}.`); return; }
+    if (duke) { failed(`Couldn't start ${game.title}: ${reason(e, 'something went wrong')}.`); return; }
     $('loading').hidden = true;
     $('player').hidden = true;
     $('library').hidden = false;
-    status(`Couldn't start ${game.title}: ${e && e.message ? e.message : 'check the connection and try again'}.`);
+    status(`Couldn't start ${game.title}: ${reason(e)}.`);
+    $('status').scrollIntoView({ block: 'nearest' });
     audio?.close().catch(() => {});
     audio = null;
     renderFree();
@@ -469,10 +464,18 @@ async function play(game, btn, resume) {
 
 // ---------- sound ----------
 
+// The browser may hold the sound back until a tap (a game started from a
+// controller, say); any tap then starts it, and the button says so
+const soundBlocked = () => settings.get('sound', true) && audio && audio.state !== 'running' && !document.hidden;
 function showSound() {
-  $('soundBtn').textContent = settings.get('sound', true) ? 'Sound on' : 'Sound off';
+  $('soundBtn').textContent = !settings.get('sound', true) ? 'Sound off' : soundBlocked() ? 'Tap for sound' : 'Sound on';
 }
+function wakeSound() {
+  if (soundBlocked()) audio.resume().then(showSound, () => {});
+}
+for (const type of ['pointerdown', 'keydown']) addEventListener(type, wakeSound, true);
 $('soundBtn').onclick = () => {
+  if (soundBlocked()) { wakeSound(); return; }
   const on = !settings.get('sound', true);
   settings.set('sound', on);
   showSound();
@@ -554,6 +557,7 @@ let padMode = false;
 function setPadMode(on) {
   if (on === padMode) return;
   padMode = on;
+  if (on) wakeSound();
   $('player').classList.toggle('pad', on);
 }
 
@@ -841,8 +845,10 @@ document.addEventListener('visibilitychange', () => {
   if (document.hidden) {
     audio?.suspend();
     saveAll();
-  } else if (audio && settings.get('sound', true)) {
-    audio.resume();
+  } else {
+    if (audio && settings.get('sound', true)) audio.resume();
+    // Back to a game in progress: paused in its menu, not straight into a fight
+    if (mode === 'game') tapKey('escape');
   }
 });
 
@@ -866,6 +872,7 @@ $('addFiles').onclick = () => ownGames(() => {
   input.click();
 });
 $('fromPhone').onclick = () => ownGames(phone.show);
+padMenu();
 
 renderFree();
 renderMine();

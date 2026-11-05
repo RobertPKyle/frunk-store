@@ -104,6 +104,18 @@
   #helpText code { font: 14px ui-monospace, "DejaVu Sans Mono", monospace; color: var(--accent2); }
   .touchhelp { margin: 0 0 12px; padding: 10px 12px; border-radius: 12px; background: var(--card); }
   #loading { position: fixed; inset: 0; z-index: 4; display: grid; place-content: center; text-align: center; background: var(--bg); color: var(--muted); }
+  /* phones: the keys go under the board, and every bar button fits */
+  @media (max-width: 640px) {
+    #puzzle { grid-template-rows: 60px minmax(0, 1fr) auto; grid-template-columns: minmax(0, 1fr); }
+    .bar { padding-left: 100px; gap: 4px; }
+    .title b { display: none; }
+    .bar .btn { padding: 8px 6px; font-size: 14px; }
+    .side { flex-direction: row; flex-wrap: wrap; max-height: 40vh; border-left: 0; border-top: 1px solid var(--line); }
+    .side > li { flex: 1 1 28%; }
+    .side .grow { display: none; }
+    #keys { flex-basis: 100%; grid-template-columns: repeat(6, 1fr); }
+    #keys .btn.wide { grid-column: span 2; }
+  }
   #toast { position: fixed; left: 50%; bottom: 18px; z-index: 10; transform: translateX(-50%); max-width: min(560px, calc(100% - 32px)); padding: 10px 14px;
            border-radius: 12px; background: #2a2f3d; border: 1px solid var(--line); font-size: 15px; pointer-events: none; }
 </style>

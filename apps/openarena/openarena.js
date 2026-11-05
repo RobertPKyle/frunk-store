@@ -15,6 +15,8 @@
 // The game's settings (q3config.cfg) are copied to IndexedDB whenever the
 // page is hidden or left. One match per page: leaving it reloads the page.
 
+import { fetchChunks, padMenu, reason } from '../_shared/gamepage.js';
+
 const $ = id => document.getElementById(id);
 const settings = {
   get(key, fallback) { try { const v = JSON.parse(localStorage.getItem('openarena.' + key)); return v ?? fallback; } catch { return fallback; } },
@@ -178,17 +180,10 @@ async function files(arena) {
   let got = 0;
   const out = new Map();
   for (const f of missing) {
-    const res = await fetch(`data/${f.file}`, { cache: 'no-store' });
-    if (!res.ok || !res.body) throw new Error(`download failed (${res.status})`);
-    const reader = res.body.getReader();
-    const chunks = [];
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      chunks.push(value);
-      got += value.length;
+    const chunks = await fetchChunks(`data/${f.file}`, n => {
+      got += n;
       loading(arena.title, `Downloading ${mb(got)} of ${mb(total)}…`, 0.9 * got / total);
-    }
+    }, { cache: 'no-store' });
     const data = new Uint8Array(await new Blob(chunks).arrayBuffer());
     if (data.length !== f.bytes) throw new Error('the download was damaged');
     out.set(f.file, data);
@@ -242,6 +237,13 @@ function failed(message) {
   $('loading').hidden = true;
 }
 $('failedOk').onclick = () => location.reload();
+// The graphics chip gave up the game's picture: it can't come back in this page
+$('canvas').addEventListener('webglcontextlost', e => {
+  e.preventDefault();
+  saveConfig();
+  failed('The car\'s browser lost the game\'s picture. Start again to carry on.');
+});
+padMenu();
 
 // The game's size in the screen's pixels: CSS pixels, or every device pixel
 // with Sharp graphics
@@ -327,11 +329,13 @@ async function play(arena, btn) {
   } catch (e) {
     // The engine is up and can't start again within this page, so the
     // library's buttons would do nothing: back to it by reloading
-    if (q3) { failed(`Couldn't start ${arena.title}: ${e && e.message ? e.message : 'something went wrong'}.`); return; }
+    if (q3) { failed(`Couldn't start ${arena.title}: ${reason(e, 'something went wrong')}.`); return; }
     $('loading').hidden = true;
     $('player').hidden = true;
     $('library').hidden = false;
-    status(`Couldn't start ${arena.title}: ${e && e.message ? e.message : 'check the connection and try again'}.`);
+    $('failed').hidden = true;   // the engine may have said so too
+    status(`Couldn't start ${arena.title}: ${reason(e)}.`);
+    $('status').scrollIntoView({ block: 'nearest' });
     audio?.close().catch(() => {});
     audio = null;
     renderLibrary();

@@ -26,7 +26,7 @@ export function phonePanel({ app, save, onSaved, onClose = () => {}, notPlayable
   // partial holds games still arriving: id -> { name, parts, got: [], item }.
   // done holds the ids of games already saved: a phone that retried an upload
   // can send a piece twice.
-  const transfer = { session: null, key: null, taken: 0, timer: 0, busy: false, gen: 0, partial: new Map(), done: new Set() };
+  const transfer = { session: null, key: null, taken: 0, timer: 0, busy: false, gen: 0, tries: 0, partial: new Map(), done: new Set() };
 
   async function api(op, params = {}, method = 'GET') {
     const q = new URLSearchParams({ op, ...params });
@@ -41,7 +41,8 @@ export function phonePanel({ app, save, onSaved, onClose = () => {}, notPlayable
     try {
       const raw = crypto.getRandomValues(new Uint8Array(32));
       const key = await crypto.subtle.importKey('raw', raw, 'AES-GCM', false, ['decrypt']);
-      const res = await api('open', {}, 'POST');
+      // a call that hangs on a weak signal counts as failed
+      const res = await fetch('/api/transfer?op=open', { method: 'POST', cache: 'no-store', signal: AbortSignal.timeout(15000) });
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || res.status);
       const session = await res.json();
       if (gen !== transfer.gen) {   // closed while waiting
@@ -50,6 +51,7 @@ export function phonePanel({ app, save, onSaved, onClose = () => {}, notPlayable
       }
       transfer.session = session;
       transfer.key = key;
+      transfer.tries = 0;
       transfer.taken = 0;
       transfer.partial.clear();
       transfer.done.clear();
@@ -64,9 +66,16 @@ export function phonePanel({ app, save, onSaved, onClose = () => {}, notPlayable
       transfer.timer = setInterval(pollTransfer, 2500);
     } catch (e) {
       if (gen !== transfer.gen) return;
-      status.textContent = /\d{3}|unavailable/.test(String(e.message)) || e instanceof TypeError
-        ? 'Sending from a phone isn\'t available right now. Check the connection and try again.'
-        : String(e.message);
+      if (/\d{3}|unavailable/.test(String(e.message)) || e instanceof TypeError || e.name === 'TimeoutError') {
+        // keeps trying while the panel is open, more slowly each time, so a
+        // weak signal needs nothing from the player
+        clearInterval(transfer.timer);
+        transfer.session = null;
+        status.textContent = 'Sending from a phone isn\'t available right now. Check the connection; trying again…';
+        setTimeout(() => { if (gen === transfer.gen) openTransfer(); }, Math.min(60000, 5000 * 2 ** transfer.tries++));
+      } else {
+        status.textContent = String(e.message);
+      }
     }
   }
 
@@ -87,7 +96,15 @@ export function phonePanel({ app, save, onSaved, onClose = () => {}, notPlayable
         if (file.ok || file.status === 404) transfer.taken = i;
         if (file.status === 404) continue;
         if (!file.ok) break;
-        await receive(new Uint8Array(await file.arrayBuffer()));
+        // The server deletes a piece as it's handed over, so one dropped here is gone
+        let data;
+        try {
+          data = new Uint8Array(await file.arrayBuffer());
+        } catch {
+          $('transferStatus').textContent = 'A piece was lost on a weak signal. If a game stays stuck below, send it again.';
+          continue;
+        }
+        await receive(data);
       }
     } catch {
       // offline for a moment; the next poll retries
@@ -146,6 +163,7 @@ export function phonePanel({ app, save, onSaved, onClose = () => {}, notPlayable
   }
 
   function show() {
+    transfer.tries = 0;
     $('received').replaceChildren();
     $('transfer').hidden = false;
     openTransfer();

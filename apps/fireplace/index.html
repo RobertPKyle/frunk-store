@@ -19,6 +19,8 @@
   input[type=range] { width: 160px; accent-color: #e0a24a; height: 32px; }
   #fps { position: fixed; top: 10px; right: 12px; font-size: 12px; color: rgba(255, 220, 180, .35); }
   #error { position: fixed; inset: 0; display: grid; place-items: center; padding: 24px; text-align: center; }
+  /* without this the empty overlay sits over the controls and takes every tap */
+  #error[hidden] { display: none; }
 </style>
 </head>
 <body>

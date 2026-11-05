@@ -249,7 +249,7 @@ function play(world, btn) {
     print: remember,
     printErr: remember,
     setStatus: () => {},
-    onAbort: what => failed(`The game stopped: ${what}`),
+    onAbort: what => failed(/fetch/i.test(what) ? 'Couldn\'t load the game. Check the connection and try again.' : `The game stopped: ${what}`),
   };
   const s = document.createElement('script');
   s.src = 'engine/ClassiCube.js';
@@ -390,4 +390,5 @@ if (parent !== window) parent.postMessage({ frunk: 'save-on-close' }, '*');
 addEventListener('error', e => { if (game && !ready) failed(`The game stopped: ${e.message}`); });
 
 renderLibrary();
+import('../_shared/gamepage.js').then(m => m.padMenu(), () => {});
 })();

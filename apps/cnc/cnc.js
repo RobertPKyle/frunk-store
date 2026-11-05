@@ -21,6 +21,8 @@
 // finger dragging draws a selection box, two fingers move the map
 // (web_scroll), and a finger held still right-clicks.
 
+import { fetchBlock, padMenu, reason, secondTap } from '../_shared/gamepage.js';
+
 (() => {
 
 const $ = id => document.getElementById(id);
@@ -81,10 +83,7 @@ const blockKey = (g, n) => `${g}/${indexes[g].version}/${n}`;
 async function download(g, n) {
   const ix = indexes[g];
   const packed = ix.gz.includes(n);
-  const res = await fetch(`${DATA}${g}/${ix.version}/${n}.bin${packed ? '.gz' : ''}`);
-  if (!res.ok) throw new Error(`block ${n}: HTTP ${res.status}`);
-  const body = packed ? res.body.pipeThrough(new DecompressionStream('gzip')) : res.body;
-  const buf = await new Response(body).arrayBuffer();
+  const buf = await fetchBlock(`${DATA}${g}/${ix.version}/${n}.bin${packed ? '.gz' : ''}`, packed);
   stats.fetched++;
   // ArrayBuffers, not Blobs: Blobs from IndexedDB have failed to read in the car
   idb.put(blockKey(g, n), buf).catch(() => {});
@@ -194,7 +193,15 @@ function missing(fd, iov, iovcnt) {
   inGame = false;
   const t = performance.now();
   const slow = setTimeout(() => { $('wait').hidden = false; }, 300);
-  return Promise.all(want.map(load)).finally(() => {
+  // No connection: the game waits for one, rather than fail on the read
+  const fetched = () => Promise.all(want.map(load)).catch(async () => {
+    $('wait').textContent = 'No connection…';
+    $('wait').hidden = false;
+    await new Promise(r => setTimeout(r, 5000));
+    return fetched();
+  });
+  return fetched().finally(() => {
+    $('wait').textContent = 'Loading…';
     inGame = true;
     for (const b of want) pinned.delete(b);
     clearTimeout(slow);
@@ -256,7 +263,7 @@ $('all').onclick = async () => {
     }, 4);
     status('Everything is downloaded. Both games play without a connection now.');
   } catch (err) {
-    status(`The download stopped (${err.message}). Try again to carry on where it stopped.`);
+    status(`The download stopped (${reason(err, 'the connection dropped')}). Try again to carry on where it stopped.`);
   }
   filling = false;
   showKept();
@@ -293,12 +300,14 @@ function loading(text, fraction) {
   if (fraction != null) $('loadBar').value = fraction;
 }
 
-function failed(message) {
+function failed(message, title) {
+  if (title) $('failedTitle').textContent = title;
   $('failedText').textContent = message || 'Something went wrong.';
   $('failed').hidden = false;
   $('loading').hidden = true;
 }
 $('failedOk').onclick = () => location.reload();
+padMenu();
 
 // The game's sound: every AudioContext it makes (Emscripten's OpenAL makes one)
 const contexts = [];
@@ -401,10 +410,10 @@ async function play(g) {
     await each(boot, async n => {
       await load(n);
       done++;
-      loading('Loading the game…', done / boot);
+      loading(`Loading the game… ${done} of ${boot} MB`, done / boot);
     });
   } catch (err) {
-    return failed(`Couldn't download the game (${err.message}). Check the connection and try again.`);
+    return failed(`Couldn't download the game. ${reason(err, 'Check the connection and try again.')}`, 'Couldn\'t start the game');
   }
   loading('Starting…', null);
   start();
@@ -419,7 +428,7 @@ async function start() {
   try {
     ({ default: createConquer } = await import(`./${engine}.js`));
   } catch {
-    return failed('Couldn\'t load the game. Check the connection and try again.');
+    return failed('Couldn\'t load the game. Check the connection and try again.', 'Couldn\'t start the game');
   }
   const config = {
     canvas,
@@ -464,7 +473,7 @@ async function start() {
       WebAssembly.instantiateStreaming(fetch(`${engine}.wasm`), imports).then(r => {
         memory = r.instance.exports.memory;
         done(r.instance, r.module);
-      }, err => failed(`Couldn't start the game (${err.message}).`));
+      }, err => failed(`Couldn't load the game. ${reason(err, 'Check the connection and try again.')}`, 'Couldn\'t start the game'));
       return {};
     },
     preRun: [Mod => {
@@ -698,12 +707,12 @@ setInterval(() => {
 // ---------- leaving ----------
 
 let leaving = false;
-$('quitBtn').onclick = async () => {
+secondTap($('quitBtn'), async () => {
   if (leaving) return;
   leaving = true;
   await syncfs();
   location.reload();
-};
+});
 
 document.addEventListener('visibilitychange', () => {
   if (!running) return;

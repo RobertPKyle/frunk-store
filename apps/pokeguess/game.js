@@ -382,8 +382,8 @@ for (const id of ['minGen', 'maxGen']) {
 }
 $('names').append(...LANGS.map(([code, name]) => new Option(name, code)));
 
-$('dailyTab').addEventListener('click', () => setMode('daily'));
-$('freeTab').addEventListener('click', () => setMode('free'));
+$('dailyTab').addEventListener('click', () => { if (dex) setMode('daily'); });
+$('freeTab').addEventListener('click', () => { if (dex) setMode('free'); });
 $('newGame').addEventListener('click', () => { newFree(Number($('minGen').value), Number($('maxGen').value)); $('error').textContent = ''; render(); });
 $('again').addEventListener('click', () => { newFree(game.min, game.max); render(); });
 $('names').addEventListener('change', e => setNames(e.target.value));
@@ -412,7 +412,25 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') $('help').hi
 document.addEventListener('visibilitychange', () => { if (!document.hidden && game) tick(); });
 setInterval(() => { if (game) tick(); }, 30000);
 
-dex = await (await fetch('data/pokedex.json')).json();
+// The game's data. Without it there's no game, so it says so and offers a retry.
+while (!dex) {
+  try {
+    const res = await fetch('data/pokedex.json');
+    if (!res.ok) throw new Error(res.status);
+    dex = await res.json();
+  } catch {
+    $('guessForm').hidden = true;
+    $('lede').textContent = "Can't load the game. Check the connection, then try again.";
+    $('loadRetry').hidden = false;
+    await new Promise(done => {
+      $('loadRetry').onclick = done;
+      addEventListener('online', done, { once: true });
+    });
+    $('lede').textContent = 'Loading…';
+  }
+}
+$('loadRetry').hidden = true;
+$('guessForm').hidden = false;
 {
   const seen = new Set(), pool = [];
   for (const key of Object.keys(dex)) {

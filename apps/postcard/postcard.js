@@ -3,11 +3,12 @@
 // server stores anything. See card.js.
 import { PALETTES, STYLES, drawCard, encode, loadFonts, loadMap, loadRidges } from './card.js';
 import { qr } from '../_shared/qr.js';
-import { getPlace, herePlace, pickPlace, savePlace } from '../_shared/place.js';
+import { getPlace, herePlace, locationError, pickPlace, savePlace } from '../_shared/place.js';
 
 const SETTINGS_KEY = 'postcard.settings';
 const LINES = ['Wish you were here', 'Made it!', 'Charging up', 'Camping tonight', 'Road trip!', 'Having a great time', 'Greetings from the road'];
 const MAX_NAME = 28, MAX_LINE = 42;
+const WAIT = 12_000;     // past this, the card goes ahead without what's still on its way
 
 const $ = id => document.getElementById(id);
 const card = $('card');
@@ -26,6 +27,7 @@ let names = [];          // what this spot could be called
 let customName = false, customLine = !LINES.includes(saved.line) && !!saved.line, paletteChosen = false;
 let mapImage = null, mapKey = '', ridges = null, ridgesKey = '';
 let token = 0;
+let lookedUp = true;     // false: the town's name or the weather didn't arrive
 
 function el(tag, props = {}, ...children) {
   const node = Object.assign(document.createElement(tag), props);
@@ -107,19 +109,20 @@ async function lookUpNames(p) {
   if (!/^Here\b/.test(p.name)) list.push(p.name);
   let area = '';
   try {
-    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${p.lat.toFixed(2)}&lon=${p.lon.toFixed(2)}&zoom=12&accept-language=en`);
+    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${p.lat.toFixed(2)}&lon=${p.lon.toFixed(2)}&zoom=12&accept-language=en`, { signal: AbortSignal.timeout(WAIT) });
     if (res.ok) {
       const a = (await res.json()).address || {};
       const local = a.city || a.town || a.village || a.hamlet || a.municipality || a.suburb;
       for (const n of [local, a.county, a.state, a.country]) if (n && !list.includes(n)) list.push(n);
       area = a.state || a.country || '';
     }
+    return { list: list.filter(n => n.length <= MAX_NAME), area, ok: res.ok };
   } catch {}
-  return { list: list.filter(n => n.length <= MAX_NAME), area };
+  return { list: list.filter(n => n.length <= MAX_NAME), area, ok: false };
 }
 
 async function lookUpWeather(p) {
-  const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${p.lat.toFixed(2)}&longitude=${p.lon.toFixed(2)}&current=temperature_2m,weather_code,is_day&temperature_unit=${useFahrenheit() ? 'fahrenheit' : 'celsius'}&timezone=auto`);
+  const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${p.lat.toFixed(2)}&longitude=${p.lon.toFixed(2)}&current=temperature_2m,weather_code,is_day&temperature_unit=${useFahrenheit() ? 'fahrenheit' : 'celsius'}&timezone=auto`, { signal: AbortSignal.timeout(WAIT) });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 }
@@ -156,10 +159,18 @@ async function setPlace(p) {
   spec.area = '';
   renderNames();
   changed();
+  await lookUp(p, mine);
+}
+
+// The town's name and the weather. Run again when a connection comes back; a
+// name someone typed stays.
+async function lookUp(p, mine) {
   const [found, weather] = await Promise.all([lookUpNames(p), lookUpWeather(p).catch(() => null)]);
   if (mine !== token) return;
+  lookedUp = found.ok && !!weather;
   names = found.list;
   if (names[0] && !customName) spec.name = names[0];
+  if (!found.ok && !names.length) setStatus('No connection for the town\'s name. You can type your own.');
   spec.area = found.area && found.area !== spec.name ? found.area : '';
   if (weather?.current) {
     const c = weather.current;
@@ -174,7 +185,8 @@ async function setPlace(p) {
   changed();
 }
 
-function useCar() {
+// At start, a car with no fix yet uses the saved place. A tap on Here asks.
+function useCar(quiet) {
   if (!navigator.geolocation) { pickPlace().then(setPlace); return; }
   $('placeBtn').textContent = 'Finding this car…';
   navigator.geolocation.getCurrentPosition(
@@ -183,9 +195,11 @@ function useCar() {
       savePlace(p);
       setPlace(p);
     },
-    () => {
+    err => {
       $('placeBtn').textContent = place?.name || 'Set location';
-      pickPlace().then(setPlace);
+      const had = quiet === true && (place || getPlace());
+      if (had) setPlace(had);
+      else pickPlace({ required: !place, note: locationError(err) }).then(setPlace);
     },
     { timeout: 12000, maximumAge: 60_000 },
   );
@@ -284,7 +298,12 @@ function renderLooks() {
 }
 
 $('placeBtn').onclick = () => pickPlace().then(setPlace);
-$('hereBtn').onclick = useCar;
+$('hereBtn').onclick = () => useCar();
+addEventListener('online', () => {
+  if (!place) return;
+  if (!lookedUp) lookUp(place, token);
+  loadAssets();
+});
 
 // ---------- start ----------
 
@@ -298,7 +317,7 @@ renderLooks();
   let granted = false;
   try { granted = (await navigator.permissions.query({ name: 'geolocation' })).state === 'granted'; } catch {}
   const had = getPlace();
-  if (granted) useCar();
+  if (granted) useCar(true);
   else if (had) setPlace(had);
   else setPlace(await pickPlace({ required: true }));
 })();

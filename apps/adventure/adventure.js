@@ -25,6 +25,7 @@
 // ScummVM can't be restarted within a page, so leaving a game reloads it.
 
 import { mbOf, wasmProgress } from '../_shared/engine.js';
+import { padMenu } from '../_shared/padmenu.js';
 import { phonePanel } from '../_shared/phone.js';
 import { cleanName, isZip, unzipAll } from '../_shared/roms.js';
 
@@ -121,20 +122,22 @@ const listGames = () => store('readonly', s => s.getAllKeys()).catch(() => []);
 const getGame = id => store('readonly', s => s.get(id));
 const putGame = game => store('readwrite', s => s.put(game));
 const deleteGame = id => store('readwrite', s => s.delete(id));
-// Everything but the files, which can be hundreds of MB per game
+// Everything but the files, which can be hundreds of MB per game. Reading a
+// stored game brings all of them into memory, so this is kept apart and only
+// new games are read.
 async function gameInfo() {
-  const out = [];
-  await store('readonly', s => {
-    const req = s.openCursor();
-    req.onsuccess = () => {
-      const c = req.result;
-      if (!c) return;
-      const { files, ...info } = c.value;
-      out.push(info);
-      c.continue();
-    };
-    return req;
-  }).catch(() => {});
+  const known = settings.get('index', {}), out = [], index = {};
+  for (const id of await listGames()) {
+    let info = known[id];
+    if (!info) {
+      const game = await getGame(id).catch(() => null);
+      if (!game) continue;
+      info = { id, title: game.title, size: game.size, added: game.added };
+    }
+    index[id] = info;
+    out.push(info);
+  }
+  settings.set('index', index);
   return out;
 }
 
@@ -143,6 +146,8 @@ async function renameGame(id, title) {
   if (!game || game.title === title) return;
   game.title = title;
   await putGame(game).catch(() => {});
+  const index = settings.get('index', {});
+  if (index[id]) { index[id].title = title; settings.set('index', index); }
 }
 
 // A game's files with the folder they were zipped in (if all share one)
@@ -490,7 +495,8 @@ async function play(entry, btn, resume) {
     $('loading').hidden = true;
     $('player').hidden = true;
     $('library').hidden = false;
-    status(`Couldn't start ${entry.title}: ${e && e.message ? e.message : 'check the connection and try again'}.`);
+    // a dropped download says only "network error"
+    status(`Couldn't start ${entry.title}: ${e instanceof TypeError || !e?.message ? 'check the connection and try again' : e.message}.`);
     audio?.close().catch(() => {});
     audio = null;
     engine = null;
@@ -802,3 +808,4 @@ try {
 renderFree();
 renderMine();
 renderContinue();
+padMenu('#library', '.game, #continue, #fromPhone');

@@ -56,7 +56,7 @@
 
   /* ---------- player ---------- */
   #player { position: fixed; inset: 0; display: grid; grid-template-rows: 60px minmax(0, 1fr); grid-template-columns: minmax(0, 1fr); background: #000; }
-  .bar { display: flex; align-items: center; gap: 8px; padding: 8px 10px 8px 110px; background: var(--panel); border-bottom: 1px solid var(--line); }
+  .bar { display: flex; align-items: center; gap: 8px; padding: 8px 10px 8px 110px; overflow-x: auto; scrollbar-width: none; touch-action: pan-x; background: var(--panel); border-bottom: 1px solid var(--line); }
   .bar b { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   #fps { font: inherit; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; background: none; border: 0; padding: 12px 4px; }
   .screen { position: relative; min-height: 0; min-width: 0; overflow: hidden; }

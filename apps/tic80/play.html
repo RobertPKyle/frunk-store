@@ -92,13 +92,14 @@ if (!PLAYERS.includes(player) || !/^(games|mine)\/[\w-]+\.tic$/.test(cart)) {
   window.Module = {
     canvas: document.getElementById('canvas'),
     arguments: [cart],
-    onAbort: what => fail(`The game stopped: ${what}`),
+    // the player has downloaded and is about to run
+    onRuntimeInitialized: () => parent.postMessage({ tic80: 'started' }, location.origin),
+    onAbort: what => fail(/fetch|load/i.test(String(what)) ? 'The player didn\'t load. Check the connection and try again.' : `The game stopped: ${what}`),
   };
   const script = Object.assign(document.createElement('script'), { src: `players/${player}/tic80.js` });
   script.onerror = () => fail('The player didn\'t load. Check the connection.');
   document.body.append(script);
   document.getElementById('canvas').focus();
-  parent.postMessage({ tic80: 'started' }, location.origin);
 }
 
 // Emscripten ends its start-up with an 'unwind' throw; that's not a failure

@@ -68,6 +68,12 @@ worker the files the page loaded, so even the first app opened works offline
 afterwards. `npm run dev` answers with ETags, 304s and byte ranges as Vercel
 does.
 
+A file that stalls for 6 seconds and has a cached copy comes from the cache,
+in both workers. An app that isn't cached and can't be reached opens a "No
+connection" page with Try again, and reloads itself when the connection
+returns. The hub's worker also saves every language file at install and keeps
+one copy of the hub's shell for all `/app/x` paths.
+
 Engines big enough to look stuck while they download (Adventure Games,
 Arcade, OpenTTD) load their wasm through `apps/_shared/engine.js`, which
 counts what has arrived and shows it ("Loading the arcade… 12 of 39 MB").
@@ -1251,6 +1257,19 @@ clear them to make room.
   Sounds plays, while Campfire shows, and on the phone page while it sends
   games. The browser drops the lock when the page is hidden, so it's taken
   again when the page shows.
+- `apps/_shared/gamepage.js`: shared by the engine ports. Downloads that resume
+  with a byte range after a drop or stall, a plain reason when one fails, a
+  second tap on Quit for games that keep only what the player saved, and a
+  controller on the start screens (D-pad or stick moves, a face button or Start
+  presses; on the "I own my games" notice Cancel is lit first).
+- `apps/_shared/padmenu.js`: a controller in the game lists of Retro Console,
+  Arcade, Tiny Games, Adventure Games, Logic Puzzles and ASCII Quests. It starts
+  only once Chrome reports a controller. Retro Console also keeps a small index
+  of the player's games (`retro.index`, and `adventure.index` in Adventure
+  Games) so its list doesn't read every game into memory.
+- `apps/_shared/phone.js`: asks for a new code by itself when one can't be
+  fetched, waiting 5 s up to 60 s, and says to send a game again if a piece
+  is lost on the way.
 
 ## Commands
 

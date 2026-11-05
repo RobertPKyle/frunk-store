@@ -15,6 +15,7 @@ const MAX_DOWN = 250e6;        // stop early on very fast links to limit data us
 const MAX_UP = 100e6;
 const MAX_POST = 8e6;
 const HISTORY = 'speedtest.history';
+const WAIT = 15_000;           // a ping that hasn't answered by now has failed
 
 const $ = id => document.getElementById(id);
 const store = {
@@ -27,6 +28,7 @@ const median = xs => { const s = [...xs].sort((a, b) => a - b); const m = s.leng
 
 let running = null;   // AbortController of the test in progress
 let uploadData = null;
+let clearTimer = 0;
 
 try { performance.setResourceTimingBufferSize(1000); } catch {}
 
@@ -41,7 +43,7 @@ function serverTime(res) {
 // Which Cloudflare data center answers, as an airport code (ORD, SJC, …)
 async function server(signal) {
   try {
-    const text = await (await fetch(`https://speed.cloudflare.com/cdn-cgi/trace?r=${nonce()}`, { cache: 'no-store', signal })).text();
+    const text = await (await fetch(`https://speed.cloudflare.com/cdn-cgi/trace?r=${nonce()}`, { cache: 'no-store', signal: AbortSignal.any([signal, AbortSignal.timeout(WAIT)]) })).text();
     return (text.match(/^colo=([A-Z]{3})$/m) || [])[1] || '';
   } catch { return ''; }
 }
@@ -49,7 +51,7 @@ async function server(signal) {
 async function ping(signal) {
   const url = `${DOWN}?bytes=0&r=${nonce()}`;
   const t0 = performance.now();
-  const res = await fetch(url, { cache: 'no-store', signal });
+  const res = await fetch(url, { cache: 'no-store', signal: AbortSignal.any([signal, AbortSignal.timeout(WAIT)]) });
   const t1 = performance.now();
   await res.arrayBuffer();
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -105,6 +107,7 @@ async function download(onRate, signal) {
   const stream = async () => {
     while (!stop.signal.aborted) {
       const res = await fetch(`${DOWN}?bytes=${CHUNK}&r=${nonce()}`, { cache: 'no-store', signal: stop.signal });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);   // an error page isn't speed
       const reader = res.body.getReader();
       for (;;) {
         const { done, value } = await reader.read();
@@ -209,6 +212,7 @@ function gauge(value, kind, unit = 'Mbps') {
 // ---------- results ----------
 
 const fmt = v => v == null || !isFinite(v) ? '–' : v < 10 ? v.toFixed(1) : String(Math.round(v));
+const whenText = t => new Intl.DateTimeFormat([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }).format(t);
 
 function tile(id, value, text) {
   const b = $(id).querySelector('b');
@@ -267,7 +271,7 @@ function showHistory() {
   $('history').replaceChildren(...list.map(r => {
     const row = document.createElement('div');
     row.className = 'h';
-    const when = new Intl.DateTimeFormat([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }).format(r.t);
+    const when = whenText(r.t);
     const d = document.createElement('span'); d.className = 'd'; d.textContent = `↓ ${fmt(r.down)}`;
     const u = document.createElement('span'); u.className = 'u'; u.textContent = `↑ ${fmt(r.up)}`;
     const meta = document.createElement('small');
@@ -309,13 +313,21 @@ async function run() {
     r.colo = await server(signal);
     $('server').textContent = r.colo ? `Server: Cloudflare ${r.colo}` : '';
     const pings = [];
-    for (let i = 0; i < PINGS && !signal.aborted; i++) {
-      pings.push(await ping(signal));
-      gauge(median(pings), 'ping', 'ms ping');
+    // A lost ping happens on a weak signal; two in a row end this part
+    for (let i = 0, lost = 0; i < PINGS && !signal.aborted && lost < 2; i++) {
+      try {
+        pings.push(await ping(signal));
+        lost = 0;
+        gauge(median(pings), 'ping', 'ms ping');
+      } catch (e) {
+        if (signal.aborted) break;
+        lost++;
+      }
     }
     if (signal.aborted) throw new Error('stopped');
+    if (!pings.length) throw new Error('no answer');
     r.ping = median(pings);
-    r.jitter = pings.slice(1).reduce((s, p, i) => s + Math.abs(p - pings[i]), 0) / (pings.length - 1);
+    r.jitter = pings.length > 1 ? pings.slice(1).reduce((s, p, i) => s + Math.abs(p - pings[i]), 0) / (pings.length - 1) : null;
     showResult(r);
 
     phase('Testing download…');
@@ -330,18 +342,22 @@ async function run() {
     phase('Testing upload…');
     pinger = during(signal);
     busy = pingWhile(pinger.signal);
-    const up = await upload(v => gauge(v, 'up'), signal).finally(() => pinger.abort());
+    // The download's result still counts when no upload gets through
+    const up = await upload(v => gauge(v, 'up'), signal).catch(() => null).finally(() => pinger.abort());
     if (signal.aborted) throw new Error('stopped');
-    r.up = up.mbps;
-    r.busyUp = busy.length ? median(busy) : null;
-    r.mb = (down.bytes + up.bytes) / 1e6;
+    if (up) {
+      r.up = up.mbps;
+      r.busyUp = busy.length ? median(busy) : null;
+    }
+    r.mb = (down.bytes + (up?.bytes || 0)) / 1e6;
     showResult(r);
     showVerdict(r);
     saveHistory(r);
     gauge(r.down, 'down');
-    phase(`Done. Used about ${Math.round(r.mb)} MB of data.`);
+    phase(up ? `Done. Used about ${Math.round(r.mb)} MB of data.` : `No upload got through, so that part has no result. Used about ${Math.round(r.mb)} MB of data.`);
   } catch (e) {
     if (signal.aborted) phase('Stopped.');
+    else if (r.ping != null) phase('The server answers, but no data came through in time. The signal may be too weak. Try again in a moment.');
     else phase('Couldn\'t reach the test server. Check the connection and try again.');
     gauge(null, 'down');
   } finally {
@@ -352,6 +368,24 @@ async function run() {
 }
 
 $('go').onclick = () => { if (running) running.abort(); else run(); };
-$('clear').onclick = () => { store.set(HISTORY, []); showHistory(); };
+// Clearing takes a second tap, as it can't be undone
+$('clear').onclick = () => {
+  const b = $('clear');
+  clearTimeout(clearTimer);
+  if (b.textContent === 'Clear') {
+    b.textContent = 'Tap again to clear';
+    clearTimer = setTimeout(() => { b.textContent = 'Clear'; }, 4000);
+    return;
+  }
+  b.textContent = 'Clear';
+  store.set(HISTORY, []);
+  showHistory();
+};
 
 showHistory();
+// The last result shows until a new test starts
+const last = store.get(HISTORY)?.[0];
+if (last) {
+  showResult(last);
+  phase(`Last test: ${whenText(last.t)}.`);
+}

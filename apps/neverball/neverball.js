@@ -8,6 +8,9 @@
 // seconds rather than at every write (IDBFS's autoPersist), and when the page
 // is hidden or left. Sound goes through audio.js.
 
+import { fetchPackage, padMenu, reason } from '../_shared/gamepage.js';
+import { mbOf } from '../_shared/engine.js';
+
 (() => {
 
 const $ = id => document.getElementById(id);
@@ -24,13 +27,16 @@ const touchFirst = params.has('touch') ? params.get('touch') !== '0' : !matchMed
 let started = false, running = false, game = null, frames = 0;
 
 function loading(text) { $('loading').hidden = false; $('loadText').textContent = text; }
-function failed(text) {
+const NO_LOAD = 'Couldn\'t load the game. Check the connection and try again.';
+function failed(text, title) {
+  if (title) $('failedTitle').textContent = title;
   running = false;
   $('loading').hidden = true;
   $('failedText').textContent = text;
   $('failed').hidden = false;
 }
 $('failedOk').onclick = () => location.reload();
+padMenu();
 
 // ---------- controller ----------
 
@@ -140,17 +146,18 @@ async function play() {
   if (touchFirst) canvas.requestPointerLock = () => {};
   canvas.addEventListener('webglcontextlost', e => { e.preventDefault(); failed('The car\'s browser lost the game\'s picture. Start again to carry on.'); });
   try {
+    // Ahead of the engine, so a dropped connection carries on where it
+    // stopped; the engine on its own would hang
+    let pack = await fetchPackage(ENGINE + 'neverball.data', (got, total) => loading(`Loading… ${mbOf(got, total)}`));
+    loading('Starting…');
     await loadScript(ENGINE + 'neverball.js');
     game = await window.Neverball_createEmscriptenModule({
       canvas,
+      getPreloadedPackage: () => { const p = pack; pack = null; return p; },
       locateFile: path => ENGINE + path,
       print: line => { if (window.neverballDebug) console.log(line); },
       printErr: line => { if (window.neverballDebug) console.warn(line); },
-      setStatus: text => {
-        const m = /\((\d+)\/(\d+)\)/.exec(text || '');
-        if (m) loading(`Loading… ${Math.round(m[1] / 1048576)} of ${Math.round(m[2] / 1048576)} MB`);
-      },
-      onAbort: what => failed(`The game stopped: ${what}`),
+      onAbort: what => (running ? failed(`The game stopped: ${what}`) : failed(reason(what, NO_LOAD), 'Couldn\'t start the game')),
       preMainLoop: () => { frames++; },
     });
     const FS = game.FS;
@@ -170,7 +177,8 @@ async function play() {
   } catch (err) {
     if (err === 'unwind' || err?.name === 'ExitStatus') return;
     console.warn(err?.stack || err);
-    failed(err?.message || String(err));
+    if (running) failed(err?.message || String(err));
+    else failed(reason(err, NO_LOAD), 'Couldn\'t start the game');
   }
 }
 $('play').onclick = $('play2').onclick = play;

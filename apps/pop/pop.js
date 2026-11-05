@@ -11,6 +11,8 @@
 // (IDBFS) and written back every few seconds, when the page is hidden and
 // when it's left (the hub's Apps button asks first).
 
+import { fetchPackage, padMenu, reason, secondTap } from '../_shared/gamepage.js';
+
 (() => {
 
 const $ = id => document.getElementById(id);
@@ -27,13 +29,16 @@ const touchFirst = params.has('touch') ? params.get('touch') !== '0' : !matchMed
 let started = false, running = false, FS = null;
 
 function loading(text) { $('loading').hidden = false; $('loadText').textContent = text; }
-function failed(text) {
+const NO_LOAD = 'Couldn\'t load the game. Check the connection and try again.';
+function failed(text, title) {
+  if (title) $('failedTitle').textContent = title;
   running = false;
   $('loading').hidden = true;
   $('failedText').textContent = text;
   $('failed').hidden = false;
 }
 $('failedOk').onclick = () => location.reload();
+padMenu();
 
 // ---------- keys ----------
 
@@ -188,14 +193,22 @@ async function play() {
   $('touch').hidden = true;
   const canvas = $('canvas');
   let firstFrame = true;
+  // Ahead of the engine, which would hang if its own download of this dropped
+  let pack;
+  try {
+    pack = await fetchPackage(`${ENGINE}prince.data`);
+  } catch (err) {
+    return failed(reason(err, NO_LOAD), 'Couldn\'t start the game');
+  }
   window.Module = {
     canvas,
+    getPreloadedPackage: () => { const p = pack; pack = null; return p; },
     thisProgram: '/pop/prince',           // the game looks for its data next to the program
     locateFile: path => ENGINE + path,
     print: line => { if (window.popDebug) console.log(line); },
     printErr: line => console.warn(line),
     setStatus: () => {},
-    onAbort: what => failed(`The game stopped: ${what}`),
+    onAbort: what => (window.Module?.popFrames ? failed(`The game stopped: ${what}`) : failed(reason(what, NO_LOAD), 'Couldn\'t start the game')),
     preRun: [M => {
       M.FS.mkdir(SAVE);
       M.FS.mount(M.IDBFS, {}, SAVE);
@@ -227,7 +240,7 @@ async function play() {
   };
   const s = document.createElement('script');
   s.src = ENGINE + 'prince.js';
-  s.onerror = () => failed('Couldn\'t load the game. Check the connection and try again.');
+  s.onerror = () => failed(NO_LOAD, 'Couldn\'t start the game');
   document.body.append(s);
 }
 $('play').onclick = $('play2').onclick = play;
@@ -241,12 +254,12 @@ async function save() {
 }
 
 let leaving = false;
-$('quitBtn').onclick = async () => {
+secondTap($('quitBtn'), async () => {
   if (leaving) return;
   leaving = true;
   await save();
   location.reload();
-};
+});
 
 document.addEventListener('visibilitychange', () => {
   if (!running) return;
@@ -269,8 +282,8 @@ addEventListener('message', async e => {
 });
 if (parent !== window) parent.postMessage({ frunk: 'save-on-close' }, '*');
 
-addEventListener('error', e => { if (started) failed(`The game stopped: ${e.message}`); });
-addEventListener('unhandledrejection', e => { if (started && /promising|suspend|RuntimeError/i.test(String(e.reason))) failed(`The game stopped: ${e.reason}`); });
+addEventListener('error', e => { if (started && $('failed').hidden) failed(`The game stopped: ${e.message}`); });
+addEventListener('unhandledrejection', e => { if (started && $('failed').hidden && /promising|suspend|RuntimeError/i.test(String(e.reason))) failed(`The game stopped: ${e.reason}`); });
 
 showKept();
 })();

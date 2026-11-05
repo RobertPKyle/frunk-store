@@ -7,13 +7,17 @@
 // so the car's location stays here. Tides and alerts come straight from NOAA
 // and the National Weather Service, which allow browsers.
 import { julianDay, localSiderealTime, sun, toHorizon } from '../_shared/astro.js';
-import { getPlace, herePlace, pickPlace, savePlace } from '../_shared/place.js';
+import { ago as agoFrom, getPlace, herePlace, locationError, pickPlace, savePlace } from '../_shared/place.js';
 import { setMiles, useMiles } from '../_shared/units.js';
 
 const TIDE_API = 'https://api.tidesandcurrents.noaa.gov/api/prod/datagetter';
 const ALERT_API = 'https://api.weather.gov/alerts/active';
 const UNITS_KEY = 'weather.units';      // the °F/°C choice Weather keeps
 const REFRESH = 10 * 60_000;
+const WAIT = 20_000;     // a request that hasn't answered by now has failed
+const CACHE_KEY = 'beach.cache';
+const CACHE_FOR = 48 * 3600_000;   // readings older than this say little about the water now
+const CACHE_KM = 25;     // how far the car can move and still use them
 const LIST_SIZE = 30;
 const FAR_KM = 150;      // beyond this, the app says these readings aren't about here
 const TIDE_KM = 60;      // tides change along a coast, so only a close station counts
@@ -33,6 +37,10 @@ let pinned = null;         // a station picked from the list, or null for the ne
 let tide = null;           // { name, list: [{ at, v, high }] }
 let tideNote = '';
 let alerts = null;         // [] when checked and clear, null when there's no alert service here
+let alertsFailed = false;  // the check for alerts didn't get through
+let seaNote = '';          // says when these readings are a saved copy
+let savedAt = 0;           // when that copy was saved
+let rawSea = null;         // the latest readings, nearest first, as they'd be saved
 let loadedAt = 0;
 let loadToken = 0;
 let tideStations = null;
@@ -53,7 +61,7 @@ function el(tag, props = {}, ...children) {
 }
 
 const fetchJson = async url => {
-  const res = await fetch(url);
+  const res = await fetch(url, { signal: AbortSignal.timeout(WAIT) });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 };
@@ -330,6 +338,7 @@ function setReading(bigId, value) {
 function render() {
   if (!place || !stations) { drawScene(null); return; }
   $('status').textContent = '';
+  $('savedNote').textContent = seaNote;
   const p = picks();
   const now = Date.now();
   const nearest = stations[0];
@@ -396,7 +405,10 @@ function renderAlerts() {
     $('alertBox').hidden = true;
   }
   // Only by the water: an all-clear means nothing a long way inland
-  $('alertNote').textContent = alerts && !list.length && stations[0].km <= FAR_KM ? 'No National Weather Service beach alerts for this spot right now.' : '';
+  const byWater = stations[0].km <= FAR_KM;
+  $('alertNote').textContent = !byWater ? ''
+    : alerts && !list.length ? 'No National Weather Service beach alerts for this spot right now.'
+      : alertsFailed && !list.length ? 'Couldn\'t check for beach alerts just now.' : '';
 }
 
 function renderList() {
@@ -462,13 +474,14 @@ async function loadTide(p) {
 }
 
 async function loadAlerts(p) {
+  alertsFailed = false;
   if (!inUS(p)) return null;
   try {
     const data = await fetchJson(`${ALERT_API}?point=${p.lat.toFixed(2)},${p.lon.toFixed(2)}`);
     const seen = new Set();
     return data.features.map(f => f.properties)
       .filter(a => BEACH_ALERT.test(a.event || '') && !seen.has(a.event) && seen.add(a.event));
-  } catch { return null; }
+  } catch { alertsFailed = true; return null; }
 }
 
 function withPlace(raw) {
@@ -484,28 +497,75 @@ function withPlace(raw) {
   return list.sort((a, b) => a.km - b.km);
 }
 
+// The closest stations and the tide table, so the last readings show at once
+// next time, and with no signal at all
+function savedSea() {
+  try {
+    const c = JSON.parse(localStorage.getItem(CACHE_KEY));
+    return c && Date.now() - c.saved < CACHE_FOR && kmBetween(place, c) < CACHE_KM ? c : null;
+  } catch { return null; }
+}
+
+function remember(p) {
+  if (!rawSea) return;
+  const entry = { lat: p.lat, lon: p.lon, saved: loadedAt, ...rawSea, tide };
+  try { localStorage.setItem(CACHE_KEY, JSON.stringify(entry)); } catch {}
+}
+
 async function load() {
   if (!place) return;
   const mine = ++loadToken;
   const p = place;
-  if (!stations) { drawScene(null); showStatus('Reading the buoys…'); }
-  const [sea, tideResult, alertResult] = await Promise.allSettled([fetchJson('/api/beach'), loadTide(p), loadAlerts(p)]);
-  if (mine !== loadToken) return;      // another place was picked meanwhile
-  tide = tideResult.value?.tide || null;
-  tideNote = tideResult.value?.note || '';
-  alerts = alertResult.value ?? null;
-  if (sea.status === 'fulfilled') {
-    loadedAt = Date.now();
-    const pinnedId = pinned?.id;
-    stations = withPlace(sea.value);
-    pinned = stations.find(s => s.id === pinnedId) || null;
+  const saved = stations ? null : savedSea();
+  if (saved) {
+    stations = withPlace(saved);
+    tide = saved.tide;
+    savedAt = saved.saved;
+    seaNote = `Saved readings from ${agoFrom(savedAt)}. Checking for new ones…`;
     renderList();
     render();
-  } else if (stations) {
-    render();      // the readings on screen stay, with their age showing
-  } else {
-    drawScene(null);
-    showStatus("Can't reach the buoy readings. Check the connection.", true);
+  } else if (!stations) { drawScene(null); showStatus('Reading the buoys…'); }
+
+  // The tide and the alerts fill in as they arrive, so the slowest doesn't hold up the sea
+  loadTide(p).then(result => {
+    if (mine !== loadToken) return;
+    // Tide predictions hold for days, so a failed refresh keeps the ones on hand
+    if (result.tide || !tide) {
+      tide = result.tide || null;
+      tideNote = result.note || '';
+    }
+    remember(p);
+    if (stations) render();
+  });
+  loadAlerts(p).then(result => {
+    if (mine !== loadToken) return;
+    alerts = result;
+    if (stations) render();
+  });
+  try {
+    const sea = await fetchJson('/api/beach');
+    if (mine !== loadToken) return;      // another place was picked meanwhile
+    loadedAt = Date.now();
+    savedAt = 0;
+    seaNote = '';
+    const pinnedId = pinned?.id;
+    stations = withPlace(sea);
+    pinned = stations.find(s => s.id === pinnedId) || null;
+    const keep = new Set(stations.slice(0, LIST_SIZE).map(s => s.id));
+    rawSea = { owners: sea.owners, rows: sea.rows.filter(r => keep.has(r[0])) };
+    remember(p);
+    renderList();
+    render();
+  } catch {
+    if (mine !== loadToken) return;
+    if (stations) {
+      // The readings on screen stay, with their age showing
+      if (savedAt) seaNote = `Can't reach the buoys. Saved readings from ${agoFrom(savedAt)}.`;
+      render();
+    } else {
+      drawScene(null);
+      showStatus("Can't reach the buoy readings. Check the connection.", true);
+    }
   }
 }
 
@@ -517,9 +577,13 @@ function setPlace(p) {
   if (moved) {
     pinned = null;
     stations = null;
+    rawSea = null;
+    savedAt = 0;
+    seaNote = '';
     tide = null;
     tideNote = '';
     alerts = null;
+    alertsFailed = false;
     $('waterText').hidden = true;
     $('title').textContent = '';
     $('where').textContent = '';
@@ -529,6 +593,7 @@ function setPlace(p) {
     $('alertBtn').hidden = true;
     $('alertBox').hidden = true;
     $('alertNote').textContent = '';
+    $('savedNote').textContent = '';
     $('pickBeach').hidden = true;
     load();
   } else if (stations) {
@@ -536,7 +601,8 @@ function setPlace(p) {
   }
 }
 
-function useCar() {
+// At start, a car with no fix yet stays on the saved place. A tap on Here asks.
+function useCar(quiet) {
   if (!navigator.geolocation) { pickPlace().then(setPlace); return; }
   $('placeBtn').textContent = 'Finding this car…';
   navigator.geolocation.getCurrentPosition(
@@ -546,9 +612,9 @@ function useCar() {
       setPlace(p);
       $('placeBtn').textContent = p.name;
     },
-    () => {
+    err => {
       $('placeBtn').textContent = place?.name || 'Set location';
-      pickPlace().then(setPlace);
+      if (quiet !== true || !place) pickPlace({ required: !place, note: locationError(err) }).then(setPlace);
     },
     { timeout: 12000, maximumAge: 60_000 },
   );
@@ -591,7 +657,7 @@ $('tempBtn').onclick = () => {
 };
 $('placeBtn').onclick = () => pickPlace().then(setPlace);
 $('pickBeach').onclick = () => pickPlace().then(setPlace);
-$('hereBtn').onclick = useCar;
+$('hereBtn').onclick = () => useCar();
 
 showUnits();
 
@@ -604,12 +670,13 @@ setInterval(() => { if (!document.hidden) load(); }, REFRESH);
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden && place && Date.now() - loadedAt > REFRESH) load();
 });
+addEventListener('online', () => { if (place && Date.now() - loadedAt > REFRESH) load(); });
 
 (async () => {
   let granted = false;
   try { granted = (await navigator.permissions.query({ name: 'geolocation' })).state === 'granted'; } catch {}
   const saved = getPlace();
   if (saved) setPlace(saved);
-  if (granted) useCar();
+  if (granted) useCar(true);
   else if (!saved) setPlace(await pickPlace({ required: true }));
 })();

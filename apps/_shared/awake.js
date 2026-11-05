@@ -11,7 +11,8 @@ async function update() {
     asking = true;
     try {
       lock = await navigator.wakeLock.request('screen');
-      lock.addEventListener('release', () => { lock = null; });
+      // update: wanted again while it was still letting go
+      lock.addEventListener('release', () => { lock = null; update(); });
     } catch {}
     asking = false;
     if (!wanted) update();   // turned off while asking

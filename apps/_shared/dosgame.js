@@ -37,6 +37,8 @@
 // with #title #wait #padNote #menuBtn #keysBtn #smoothBtn #soundBtn #quitBtn,
 // #screen > #canvas, #touch (buttons with data-key="name name"), #kbd.
 
+import { fetchBlock, padMenu, reason, secondTap } from './gamepage.js';
+
 export function dosGame(G) {
 
 const $ = id => document.getElementById(id);
@@ -89,10 +91,7 @@ const blockKey = n => `${index.version}/${n}`;
 
 async function download(n) {
   const packed = index.gz.includes(n);
-  const res = await fetch(`${DATA}${index.version}/${n}.bin${packed ? '.gz' : ''}`);
-  if (!res.ok) throw new Error(`block ${n}: HTTP ${res.status}`);
-  const body = packed ? res.body.pipeThrough(new DecompressionStream('gzip')) : res.body;
-  const buf = await new Response(body).arrayBuffer();
+  const buf = await fetchBlock(`${DATA}${index.version}/${n}.bin${packed ? '.gz' : ''}`, packed);
   stats.fetched++;
   // ArrayBuffers, not Blobs: Blobs from IndexedDB have failed to read in the car
   idb.put(blockKey(n), buf).catch(() => {});
@@ -240,12 +239,14 @@ function loading(text, fraction) {
   if (fraction != null) $('loadBar').value = fraction;
 }
 
-function failed(message) {
+function failed(message, title) {
+  if (title) $('failedTitle').textContent = title;
   $('failedText').textContent = message || 'Something went wrong.';
   $('failed').hidden = false;
   $('loading').hidden = true;
 }
 $('failedOk').onclick = () => location.reload();
+padMenu();
 
 // The game's sound: every AudioContext it makes (SDL makes one)
 const contexts = [];
@@ -340,10 +341,10 @@ async function play() {
     await each(index.blocks, async n => {
       await load(n);
       done++;
-      loading('Loading the game…', done / index.blocks);
+      loading(index.bytes > 2e6 ? `Loading the game… ${Math.min(done, Math.round(index.bytes / 1e6))} of ${MB(index.bytes)}` : 'Loading the game…', done / index.blocks);
     });
   } catch (err) {
-    return failed(`Couldn't download the game (${err.message}). Check the connection and try again.`);
+    return failed(`Couldn't download the game. ${reason(err, 'Check the connection and try again.')}`, 'Couldn\'t start the game');
   }
   loading('Starting…', null);
   start();
@@ -357,7 +358,7 @@ async function start() {
     // relative to the page, not this module
     ({ default: createDosbox } = await import(new URL(`${ENGINE}dosbox.js`, location.href).href));
   } catch {
-    return failed('Couldn\'t load the game. Check the connection and try again.');
+    return failed('Couldn\'t load the game. Check the connection and try again.', 'Couldn\'t start the game');
   }
   const config = {
     canvas,
@@ -385,7 +386,7 @@ async function start() {
       WebAssembly.instantiateStreaming(fetch(`${ENGINE}dosbox.wasm`), imports).then(r => {
         memory = r.instance.exports.memory;
         done(r.instance, r.module);
-      }, err => failed(`Couldn't start the game (${err.message}).`));
+      }, err => failed(`Couldn't load the game. ${reason(err, 'Check the connection and try again.')}`, 'Couldn\'t start the game'));
       return {};
     },
     preRun: [Mod => {
@@ -717,12 +718,12 @@ setInterval(() => {
 // ---------- leaving ----------
 
 let leaving = false;
-$('quitBtn').onclick = async () => {
+secondTap($('quitBtn'), async () => {
   if (leaving) return;
   leaving = true;
   await syncfs();
   location.reload();
-};
+});
 
 document.addEventListener('visibilitychange', () => {
   if (!running) return;

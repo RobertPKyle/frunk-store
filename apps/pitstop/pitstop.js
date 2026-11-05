@@ -1,7 +1,7 @@
 // Pit Stop: restrooms, coffee, food, shops and parks within walking distance
 // of where the car is parked, from OpenStreetMap. Shows what's open now, and
 // a QR code that opens walking directions on a phone.
-import { getPlace, herePlace, pickPlace, savePlace } from '../_shared/place.js';
+import { ago, getPlace, herePlace, locationError, pickPlace, savePlace } from '../_shared/place.js';
 import { DAYS, openState, parseHours } from './hours.js';
 import { setMiles, useMiles } from '../_shared/units.js';
 
@@ -11,6 +11,7 @@ const STALE = 86400_000;   // the server's copy is at most a day old too
 const KEEP_CACHED = 6;     // spots kept for offline use
 const STEP = 0.005;        // the server's location grid, degrees
 const API_RADII = [500, 1000, 2000];
+const WAIT = 75_000;       // the server gives up after a minute, so this is a dead connection
 const DEG = Math.PI / 180;
 
 const US = /-US$/.test(navigator.language);   // 12-hour clock
@@ -54,6 +55,7 @@ let selected = null; // place id
 let loading = false;
 let reload = false;  // place or distance changed during a search: run it again
 let fetchedAt = 0;
+let note = '';       // why this list isn't a fresh one
 
 function el(tag, props = {}, ...children) {
   const node = Object.assign(document.createElement(tag), props);
@@ -155,7 +157,7 @@ const apiRadius = m => API_RADII.find(r => r >= m) || API_RADII[API_RADII.length
 async function fetchPlaces(lat, lon, r, force) {
   const url = `/api/places?lat=${snap(lat)}&lon=${snap(lon)}&r=${r}`;
   for (let attempt = 0; ; attempt++) {
-    const res = await fetch(url, { cache: force ? 'no-cache' : 'default' });
+    const res = await fetch(url, { cache: force ? 'no-cache' : 'default', signal: AbortSignal.timeout(WAIT) });
     if (res.ok) return (await res.json()).places;
     const error = (await res.json().catch(() => ({}))).error || `HTTP ${res.status}`;
     // OpenStreetMap's servers are often busy; one more try usually works
@@ -204,10 +206,10 @@ function renderList() {
   const what = settings.group === 'all' ? 'places' : GROUPS[settings.group].label.toLowerCase();
   const openNow = list.filter(p => p.state?.open).length;
   $('summary').textContent = list.length
-    ? `${list.length} ${what} within ${where}${openNow ? ` · ${openNow} open now` : ''}${list.length > 150 ? ' · closest 150 shown' : ''}`
+    ? `${list.length} ${what} within ${where}${openNow ? ` · ${openNow} open now` : ''}${list.length > 150 ? ' · closest 150 shown' : ''}${Date.now() - fetchedAt > 3600_000 ? ` · list from ${ago(fetchedAt)}` : ''}`
     : '';
-  if (places.length && !list.length) setMsg(`No ${what} found within ${where}. Try a wider distance.`);
-  else if (places.length) setMsg('');
+  if (places.length && !list.length) setMsg(note || `No ${what} found within ${where}. Try a wider distance.`);
+  else if (places.length) setMsg(note);
 }
 
 function markSelected() {
@@ -349,7 +351,7 @@ function facts(p) {
   return out;
 }
 
-function open(id) {
+function open(id, keepScroll) {
   const p = places.find(q => q.id === id);
   if (!p) return;
   selected = id;
@@ -380,7 +382,7 @@ function open(id) {
       el('div', {}, ...(side.length ? side : [el('p', { className: 'raw', textContent: 'No hours or details listed.' })]))),
     el('div', { className: 'credit', textContent: `From OpenStreetMap. Something wrong or missing? Anyone can fix it at openstreetmap.org/${type}/${p.id.slice(1)}` }));
   $('detail').hidden = false;
-  $('detail').scrollTop = 0;
+  if (!keepScroll) $('detail').scrollTop = 0;
   $('detailTools').hidden = false;
   draw();
 }
@@ -416,13 +418,17 @@ async function findAndShow(force) {
   const hit = cache.find(c => c.key === key && c.r >= r);
   selected = null;
   closeDetail();
+  note = '';
   if (hit && !force && Date.now() - hit.fetched < STALE) {
     places = hit.places;
     fetchedAt = hit.fetched;
   } else {
     setMsg('Asking OpenStreetMap what\'s nearby… The first look at a new spot can take a minute or two.');
-    $('list').replaceChildren();
-    $('summary').textContent = '';
+    // A refresh leaves the list up, as it may not get through
+    if (!hit) {
+      $('list').replaceChildren();
+      $('summary').textContent = '';
+    }
     try {
       const found = await fetchPlaces(place.lat, place.lon, r, force);
       const entry = { key, r, fetched: Date.now(), places: found };
@@ -436,12 +442,22 @@ async function findAndShow(force) {
       fetchedAt = entry.fetched;
     } catch (e) {
       if (reload) return;
-      if (hit) { places = hit.places; fetchedAt = hit.fetched; }
-      else { places = []; setMsg(`${navigator.onLine === false ? 'No connection.' : e.message} Tap ↻ to try again.`); draw(); return; }
+      // A saved list from around here beats an empty screen, even for a smaller circle
+      const near = hit || cache.find(c => {
+        const [lat, lon] = c.key.split(',').map(Number);
+        return distBearing(place.lat, place.lon, lat, lon).dist < c.r;
+      });
+      const why = navigator.onLine === false ? 'No connection.' : e.name === 'TimeoutError' ? 'The connection is too slow right now.'
+        : e instanceof TypeError ? 'Couldn\'t reach the server.' : `${e.message.replace(/\.$/, '')}.`;
+      if (near) {
+        places = near.places;
+        fetchedAt = near.fetched;
+        note = `${why} This list was saved ${ago(near.fetched)}.`;
+      } else { places = []; setMsg(`${why} Tap ↻ to try again.`); $('list').replaceChildren(); showPlace(); draw(); return; }
     }
   }
   measure();
-  setMsg(places.length ? '' : 'Nothing listed on OpenStreetMap near here yet. Try a wider distance.');
+  setMsg(note || (places.length ? '' : 'Nothing listed on OpenStreetMap near here yet. Try a wider distance.'));
   showPlace();
   renderList();
   draw();
@@ -453,7 +469,7 @@ setInterval(() => {
   measure();
   renderList();
   draw();
-  if (selected && !$('detail').hidden) open(selected);
+  if (selected && !$('detail').hidden) open(selected, true);
 }, 60_000);
 
 function setPlace(p) {
@@ -463,7 +479,8 @@ function setPlace(p) {
   load();
 }
 
-function locate() {
+// At start, a car with no fix yet stays on the saved place. A tap on Here asks.
+function locate(quiet) {
   if (!navigator.geolocation) { pickPlace().then(setPlace); return; }
   setMsg('Finding this car\'s location…');
   navigator.geolocation.getCurrentPosition(
@@ -472,7 +489,11 @@ function locate() {
       savePlace(p);
       setPlace(p);
     },
-    () => { setMsg('Couldn\'t get this car\'s location. Pick a place instead.'); pickPlace().then(setPlace); },
+    err => {
+      if (quiet === true && place) { showPlace(); load(); return; }
+      setMsg('');
+      pickPlace({ required: !place, note: locationError(err) }).then(setPlace);
+    },
     { timeout: 12000, maximumAge: 60_000 },
   );
 }
@@ -528,7 +549,8 @@ $('unitsBtn').onclick = () => {
 };
 
 $('placeBtn').onclick = () => pickPlace().then(setPlace);
-$('hereBtn').onclick = locate;
+$('hereBtn').onclick = () => locate();
+addEventListener('online', () => { if (place && (note || !places.length)) load(true); });
 // A minute after the last look, ↻ asks again; before that the copy is fresh
 $('refreshBtn').onclick = () => load(Date.now() - fetchedAt > 60_000);
 
@@ -539,7 +561,7 @@ $('refreshBtn').onclick = () => load(Date.now() - fetchedAt > 60_000);
 (async () => {
   let granted = false;
   try { granted = (await navigator.permissions.query({ name: 'geolocation' })).state === 'granted'; } catch {}
-  if (granted) { locate(); return; }
+  if (granted) { locate(true); return; }
   if (place) { showPlace(); load(); return; }
   setPlace(await pickPlace({ required: true }));
 })();

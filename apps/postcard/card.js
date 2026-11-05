@@ -102,9 +102,15 @@ export async function loadMap(lat, lon) {
     },
   });
   try {
-    await new Promise(resolve => {
+    await new Promise((resolve, reject) => {
       const stop = setTimeout(resolve, 15_000);   // a slow connection still gets whatever arrived
       map.once('idle', () => { clearTimeout(stop); resolve(); });
+      // Without the map's index there's nothing to wait for, and a blank map isn't one to keep
+      map.on('error', e => {
+        if (!/\/planet$/.test(e.error?.url || '')) return;
+        clearTimeout(stop);
+        reject(new Error('no map'));
+      });
     });
     const copy = document.createElement('canvas');
     copy.width = 1024;
@@ -127,10 +133,10 @@ export async function loadRidges(lat, lon) {
     const lons = Array.from({ length: POINTS }, (_, i) => (lon - span + 2 * span * i / (POINTS - 1)).toFixed(3));
     const url = `https://api.open-meteo.com/v1/elevation?latitude=${lons.map(() => la.toFixed(3)).join(',')}&longitude=${lons.join(',')}`;
     // Open-Meteo sometimes turns away a burst of requests, so each gets a second try
-    let res = await fetch(url);
+    let res = await fetch(url, { signal: AbortSignal.timeout(20_000) });
     if (!res.ok) {
       await new Promise(r => setTimeout(r, 2500));
-      res = await fetch(url);
+      res = await fetch(url, { signal: AbortSignal.timeout(20_000) });
     }
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return (await res.json()).elevation;

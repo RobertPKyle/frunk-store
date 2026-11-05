@@ -12,6 +12,7 @@
 // (nes.js, gba.js, sms.js, lynx.js, pce.js, md.js or n64.js) as sets of button
 // names, plus the players' analog sticks for the N64.
 
+import { padMenu } from '../_shared/padmenu.js';
 import { phonePanel } from '../_shared/phone.js';
 import { MAX_FILE, SYSTEMS, cleanName, findGame, isColor, maybeGame } from '../_shared/roms.js';
 import { createNes } from './nes.js';
@@ -113,7 +114,23 @@ async function store(mode, fn) {
   });
 }
 
-const listRoms = () => store('readonly', s => s.getAll()).catch(() => []);
+// What the library shows of each game. Reading the stored games would bring
+// every ROM into memory, so this is kept apart and only new ones are read.
+async function listRoms() {
+  const ids = await store('readonly', s => s.getAllKeys()).catch(() => []);
+  const known = settings.get('index', {}), out = {};
+  for (const id of ids) {
+    let info = known[id];
+    if (!info) {
+      const r = await getRom(id).catch(() => null);
+      if (!r) continue;
+      info = { title: r.title, system: r.system, size: r.size };
+    }
+    out[id] = info;
+  }
+  settings.set('index', out);
+  return Object.entries(out).map(([id, info]) => ({ id, ...info }));
+}
 const getRom = id => store('readonly', s => s.get(id));
 const putRom = rom => store('readwrite', s => s.put(rom));
 const deleteRom = id => store('readwrite', s => s.delete(id));
@@ -132,18 +149,19 @@ async function saveGame(name, file) {
 
 async function addFiles(files) {
   const msg = $('addMsg');
-  let added = 0, skipped = 0;
+  let added = 0, skipped = 0, unsaved = 0;
   msg.textContent = 'Adding…';
   for (const file of files) {
     if (!maybeGame(file.name) || file.size > MAX_FILE) { skipped++; continue; }
     try {
       if (await saveGame(file.name, new Uint8Array(await file.arrayBuffer()))) added++;
       else skipped++;
-    } catch { skipped++; }
+    } catch { unsaved++; }
   }
+  const full = unsaved ? ` ${unsaved} couldn't be saved: this screen's storage may be full.` : '';
   msg.textContent = added
-    ? `Added ${added} game${added === 1 ? '' : 's'}.${skipped ? ` Skipped ${skipped} file${skipped === 1 ? '' : 's'} that weren't games.` : ''}`
-    : files.length ? 'No game files (.nes, .gb, .gbc, .gba, .sms, .gg, .sg, .lnx, .lyx, .o, .pce, .md, .gen, .bin, .smd or .zip) found there.' : '';
+    ? `Added ${added} game${added === 1 ? '' : 's'}.${skipped ? ` Skipped ${skipped} file${skipped === 1 ? '' : 's'} that weren't games.` : ''}${full}`
+    : unsaved ? full.trim() : files.length ? 'No game files (.nes, .gb, .gbc, .gba, .sms, .gg, .sg, .lnx, .lyx, .o, .pce, .md, .gen, .bin, .smd or .zip) found there.' : '';
   renderMine();
 }
 
@@ -225,7 +243,7 @@ async function renderMine() {
     del.textContent = 'Remove';
     del.setAttribute('aria-label', `Remove ${r.title}`);
     del.onclick = () => confirmTap(del, async () => {
-      await deleteRom(r.id);
+      await deleteRom(r.id).catch(() => {});
       renderMine();
       renderContinue();
     });
@@ -244,7 +262,7 @@ async function renderContinue() {
   btn.hidden = true;
   if (!last) return;
   const free = last.free && GAMES.find(g => g.id === last.free && playable(g.system));
-  const found = last.mine && await getRom(last.mine).catch(() => null);
+  const found = last.mine && (await listRoms()).find(r => r.id === last.mine);
   const mine = found && playable(found.system || 'nes') ? found : null;
   if (!free && !mine) return;
   btn.textContent = `Continue ${free ? free.title : mine.title}`;
@@ -359,6 +377,9 @@ const readPads = () => padsToPlayers([...(navigator.getGamepads ? navigator.getG
 // Start that resumed a paused game stays away from the game until released,
 // so it doesn't also open the game's own pause menu
 let swallowStart = false;
+// Select and Start together pause, and Select then goes back to the games, so
+// a controller doesn't need the screen. Each waits to be let go first.
+let padCombo = false, swallowSelect = false;
 
 function readInput() {
   const now = [new Set(keyboard), new Set()];
@@ -379,6 +400,9 @@ function readInput() {
   }
   pads.forEach((set, i) => { for (const b of set) now[i].add(b); });
   if (pads.some(set => set.size)) setPadMode(true);
+  const combo = pads[0].has('select') && pads[0].has('start');
+  if (combo && !padCombo) setPaused(true);
+  padCombo = combo;
   if (swallowStart) {
     if (now[0].has('start')) now[0].delete('start');
     else swallowStart = false;
@@ -524,9 +548,11 @@ function loop(t) {
     // start counting afresh when the game comes back
     frames = core.frames; fpsSince = t; refreshes = 0;
     // Start on a controller resumes (once it has been let go since pausing)
-    const start = readPads()[0].has('start');
+    const held = readPads()[0], start = held.has('start'), select = held.has('select');
     if (paused && start && !swallowStart) { swallowStart = true; setPaused(false); }
     else if (paused) swallowStart = start;
+    if (paused && select && !swallowSelect && !start) { quit(); return; }
+    swallowSelect = select;
     return;
   }
   refreshes++;
@@ -572,7 +598,7 @@ addEventListener('resize', fit);
 // Pausing saves the game's progress; returns when it's saved
 function setPaused(p) {
   paused = p;
-  swallowStart = true;   // Start must be let go, then pressed, to resume
+  swallowStart = swallowSelect = true;   // Start must be let go, then pressed, to resume
   $('paused').hidden = !p;
   $('pauseBtn').textContent = p ? 'Resume' : 'Pause';
   if (!core) return Promise.resolve();
@@ -718,3 +744,4 @@ $('addFolder').onclick = () => ownGames(() => pick('folderInput'));
 renderFree();
 renderMine();
 renderContinue();
+padMenu('#library', '.game, #continue, #fromPhone');

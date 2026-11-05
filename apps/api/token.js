@@ -126,7 +126,7 @@ async function rangeCandles(pool, range) {
 
 async function market(request) {
   const range = new URL(request.url).searchParams.get('range') || '1d';
-  if (!RANGES[range]) return fail(400, 'Unknown range.');
+  if (!Object.hasOwn(RANGES, range)) return fail(400, 'Unknown range.');
   const s = await stats().then(v => (lastStats = v), e => {
     if (!lastStats) throw e;
     console.error('token stats:', e.message);

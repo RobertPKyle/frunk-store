@@ -4,13 +4,14 @@
 // with SGP4 in a worker, and the sky dome shows what is overhead right now.
 import { json2satrec, propagate, gstime, eciToEcf, ecfToLookAngles } from './satellite.js';
 import { julianDay, localSiderealTime, toHorizon, sun } from '../_shared/astro.js';
-import { followCar, getPlace, pickPlace } from '../_shared/place.js';
+import { ago, followCar, getPlace, pickPlace } from '../_shared/place.js';
 
 const CELESTRAK = group => `https://celestrak.org/NORAD/elements/gp.php?GROUP=${group}&FORMAT=json`;
 const GROUPS = ['stations', 'visual', 'last-30-days'];
 const HOUR = 3600_000, DAY = 24 * HOUR;
 const REFRESH = 8 * HOUR;     // orbit data age before we fetch again
 const MIN_REFETCH = 2 * HOUR; // CelesTrak asks for no more than one download per 2 hours
+const WAIT = 30_000;          // give up on a download after this long
 const HOURS_AHEAD = 48;
 const DEG = 180 / Math.PI;
 
@@ -35,6 +36,10 @@ let computedAt = 0, computing = false, worker = null;
 let selected = null;       // { id, start }
 let oldest = null;         // epoch of the stalest orbit data, ms
 let fetchedAt = null;
+let loadingData = false;
+let answerTap = false;     // refresh was tapped, so say how it went
+let notice = '';           // that answer
+let noticeTimer = 0;
 let stars = [];
 let dots = [];             // live dots drawn on the dome, for tap lookup
 
@@ -70,12 +75,11 @@ function prettyName(name) {
 
 // ---------- orbit data ----------
 
-async function loadGroup(group, force) {
-  const cached = store.get(`sats.${group}`);
+async function loadGroup(group, force, cached) {
   const age = cached ? Date.now() - cached.fetched : Infinity;
   if (cached && age < (force ? MIN_REFETCH : REFRESH)) return cached;
   try {
-    const res = await fetch(CELESTRAK(group));
+    const res = await fetch(CELESTRAK(group), { signal: AbortSignal.timeout(WAIT) });
     // CelesTrak answers with a plain-text note instead of JSON when asked too often
     const data = JSON.parse(await res.text());
     if (!res.ok || !Array.isArray(data)) throw new Error('bad response');
@@ -124,24 +128,59 @@ function buildSats(groups) {
   return [...out.values()].sort((a, b) => order[a.kind] - order[b.kind]);
 }
 
+function useGroups(results) {
+  // A group that didn't arrive only means fewer satellites
+  const groups = Object.fromEntries(GROUPS.map((g, i) => [g, results[i]?.data || []]));
+  fetchedAt = Math.min(...results.filter(Boolean).map(r => r.fetched));
+  sats = buildSats(groups);
+  oldest = Math.min(...sats.map(s => Date.parse(s.omm.EPOCH + 'Z')));
+  updateFooter();
+  compute();
+}
+
+function say(text, stay) {
+  notice = text;
+  clearTimeout(noticeTimer);
+  if (!stay) noticeTimer = setTimeout(() => { notice = ''; if (sats.length) renderList(); }, 8000);
+  $('msg').textContent = text;
+}
+
 async function loadData(force = false) {
-  $('msg').textContent = '';
-  try {
-    const results = await Promise.all(GROUPS.map(g => loadGroup(g, force)));
-    const groups = Object.fromEntries(GROUPS.map((g, i) => [g, results[i].data]));
-    fetchedAt = Math.min(...results.map(r => r.fetched));
-    sats = buildSats(groups);
-    oldest = Math.min(...sats.map(s => Date.parse(s.omm.EPOCH + 'Z')));
-    updateFooter();
-    compute();
-  } catch {
-    $('hero').innerHTML = '<div class="k">No orbit data yet</div><div class="sub">The tracker needs a connection the first time. After that it works offline for days.</div>';
+  if (force) {
+    answerTap = true;
+    say('Checking for new orbit data…', true);
   }
+  if (loadingData) return;
+  loadingData = true;
+  // What's saved shows right away, so a weak signal never holds up the passes
+  const saved = GROUPS.map(g => store.get(`sats.${g}`));
+  const shown = saved.some(Boolean) && !sats.length;
+  if (shown) useGroups(saved);
+  const settled = await Promise.allSettled(GROUPS.map((g, i) => loadGroup(g, force, saved[i])));
+  loadingData = false;
+  const results = settled.map(r => r.value);
+  const newer = results.some((r, i) => r && r.fetched !== saved[i]?.fetched);
+  const tapped = answerTap;
+  answerTap = false;
+  if (results.some(Boolean)) {
+    if (newer) useGroups(results);
+    if (tapped) {
+      const stale = Date.now() - fetchedAt >= MIN_REFETCH;
+      say(newer && !stale ? 'Orbit data updated.' : stale ? `Couldn't reach CelesTrak. Using orbit data from ${ago(fetchedAt)}.` : `Orbit data is up to date, from ${ago(fetchedAt)}.`);
+    }
+    return;
+  }
+  say('');
+  $('hero').innerHTML = '<div class="k">No orbit data yet</div><div class="sub">The tracker needs a connection the first time. After that it works offline for days.</div><button class="btn" type="button" style="margin-top:10px">Try again</button>';
+  $('hero').querySelector('button').onclick = () => {
+    $('hero').innerHTML = '<div class="k">Loading orbit data…</div>';
+    loadData();
+  };
 }
 
 function updateFooter() {
   const days = Math.floor((Date.now() - oldest) / DAY);
-  const age = days >= 7 ? ` · Orbit data is ${days} days old, so times may be a few minutes off` : '';
+  const age = days >= 7 ? ` · Orbit data is ${days} days old, so times may be a few minutes off` : ` · Fetched ${ago(fetchedAt)}`;
   $('foot').textContent = `Orbit data from CelesTrak${age} · Times in this car's time zone`;
 }
 
@@ -246,7 +285,7 @@ function renderList() {
   const scroll = list.scrollTop;
   list.replaceChildren(frag);
   list.scrollTop = scroll;
-  $('msg').textContent = computing && !items.length ? 'Working out passes…' : (!computing && !items.length && sats.length ? 'No visible passes in the next 2 nights.' : '');
+  $('msg').textContent = notice || (computing && !items.length ? 'Working out passes…' : (!computing && !items.length && sats.length ? 'No visible passes in the next 2 nights.' : ''));
   draw();
 }
 
@@ -344,7 +383,7 @@ function draw() {
     ctx.fillStyle = label === 'N' ? '#ff8a7a' : 'rgba(200,215,240,.8)';
     ctx.fillText(label, x, y);
   }
-  $('live').textContent = `${counts.up} tracked satellites above the horizon now${counts.visible ? `, ${counts.visible} visible` : ''}`;
+  $('live').textContent = !sats.length ? '' : `${counts.up} tracked satellites above the horizon now${counts.visible ? `, ${counts.visible} visible` : ''}`;
 }
 
 function drawSelected(v) {
@@ -465,13 +504,15 @@ function setPlace(p) {
 }
 $('placeBtn').onclick = () => pickPlace().then(setPlace);
 $('refreshBtn').onclick = () => loadData(true);
+addEventListener('online', () => { if (!sats.length) loadData(); });
 
 addEventListener('resize', () => { layout(); draw(); });
 
 // Live dots every 2 seconds; the list and hero every 30 seconds
-setInterval(() => { if (place && sats.length) draw(); }, 2000);
+setInterval(() => { if (place && sats.length && !document.hidden) draw(); }, 2000);
 setInterval(() => {
-  if (!place || !sats.length) return;
+  if (!place || !sats.length || document.hidden) return;
+  updateFooter();
   if (!computing && Date.now() - computedAt > 6 * HOUR) compute();
   else renderList();
 }, 30_000);

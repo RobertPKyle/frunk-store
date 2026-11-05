@@ -70,8 +70,8 @@
   /* ---------- player ---------- */
   /* The game fills the room under the bar. The on-screen controls float
      over its lower corners, above the status bar, as in mobile Doom ports. */
-  #player { position: fixed; inset: 0; display: grid; grid-template-rows: 60px 1fr; background: #000; }
-  .bar { display: flex; align-items: center; gap: 8px; padding: 8px 10px 8px 110px; background: var(--panel); border-bottom: 1px solid var(--line); }
+  #player { position: fixed; inset: 0; display: grid; grid-template-rows: 60px minmax(0, 1fr); grid-template-columns: minmax(0, 1fr); background: #000; }
+  .bar { display: flex; align-items: center; gap: 8px; padding: 8px 10px 8px 110px; overflow-x: auto; scrollbar-width: none; touch-action: pan-x; background: var(--panel); border-bottom: 1px solid var(--line); }
   .bar b { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   #fps { font: inherit; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; background: none; border: 0; padding: 12px 4px; }
   .screen { position: relative; display: flex; align-items: center; justify-content: center; min-height: 0; min-width: 0; }
@@ -90,6 +90,8 @@
   .weap, .strafe { display: flex; gap: 8px; }
   .weap button, .strafe button { width: 62px; height: 42px; border-radius: 12px; background: rgba(40, 28, 22, .5); color: #fff; font-size: 14px; border: 1px solid rgba(255, 190, 150, .3); }
   [data-b].on { filter: brightness(1.5); transform: scale(.94); }
+  #hint { position: absolute; left: 50%; top: 12px; transform: translateX(-50%); max-width: 90%; padding: 6px 12px; border-radius: 10px; background: rgba(0, 0, 0, .75);
+          font-size: 14px; text-align: center; pointer-events: none; }
   /* a controller is in use: no on-screen controls */
   #player.pad .side { display: none; }
 
@@ -194,6 +196,7 @@
         <button class="use" type="button" data-b="use">USE</button>
       </div>
     </div>
+    <div id="hint" hidden></div>
   </div>
 </section>
 

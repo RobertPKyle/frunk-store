@@ -22,6 +22,7 @@
 
 import { MidiPlayer } from './midi.js';
 import { mbOf, wasmProgress } from '../_shared/engine.js';
+import { fetchChunks, fetchPackage, padMenu, reason } from '../_shared/gamepage.js';
 
 // The base sets: [name, tar size, gzipped size]
 const SETS = [['opengfx-8.0', 5396480, 3578953], ['opensfx-1.0.3', 13291520, 11596681], ['openmsx-0.4.2', 798720, 150332]];
@@ -154,17 +155,10 @@ async function downloadSets() {
   const have = new Set(await fileIds());
   for (const [name, size, gz] of SETS) {
     if (have.has(name)) { got += gz; continue; }
-    const res = await fetch(`data/${name}.tar.gz`);
-    if (!res.ok || !res.body) throw new Error(`download failed (${res.status})`);
-    const reader = res.body.getReader();
-    const chunks = [];
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      chunks.push(value);
-      got += value.length;
+    const chunks = await fetchChunks(`data/${name}.tar.gz`, n => {
+      got += n;
       loading('OpenTTD', `Downloading ${mb(got)} of ${mb(download)}…`, 0.9 * got / download);
-    }
+    });
     loading('OpenTTD', 'Unpacking…', 0.9 * got / download);
     const data = new Uint8Array(await new Response(new Blob(chunks).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer());
     if (data.length !== size) throw new Error('the download was damaged');
@@ -223,14 +217,18 @@ function failed(message) {
   $('loading').hidden = true;
 }
 $('failedOk').onclick = () => location.reload();
+padMenu();
 
 async function boot(resume) {
   loading('OpenTTD', 'Starting…', 0.95);
   const { default: createOpenTTD } = await import('./engine/openttd.js');
+  // Ahead of the engine, which would hang if its own download of this dropped
+  let pack = await fetchPackage(new URL('engine/openttd.data', location.href).href, (got, total) => loading('OpenTTD', `Loading the game engine… ${mbOf(got, total)}`, 0.9));
   const log = [];
   const keep = line => { log.push(line); if (log.length > 40) log.shift(); };
   const module = await createOpenTTD({
     canvas: $('canvas'),
+    getPreloadedPackage: () => { const p = pack; pack = null; return p; },
     locateFile: path => new URL(`engine/${path}`, location.href).href,
     instantiateWasm: wasmProgress(new URL('engine/openttd.wasm', location.href).href, {
       progress: (got, total) => loading('OpenTTD', `Loading the game engine… ${mbOf(got, total)}`, 0.9 + 0.08 * got / total),
@@ -298,7 +296,7 @@ async function play(btn, resume) {
   starting = true;
   btn?.classList.add('busy');
   // Made inside the tap, so the browser lets it play
-  try { audio = new AudioContext({ sampleRate: 44100 }); } catch { audio = null; }
+  try { audio = new AudioContext({ sampleRate: 44100 }); audio.onstatechange = showSound; } catch { audio = null; }
   if (audio) music.connect(audio);
   if (audio && !settings.get('sound', true)) audio.suspend();
   try {
@@ -308,11 +306,11 @@ async function play(btn, resume) {
   } catch (e) {
     // The engine is up and can't start again within this page, so the
     // library's buttons would do nothing: back to it by reloading
-    if (ottd) { failed(`Couldn't start OpenTTD: ${e && e.message ? e.message : 'something went wrong'}.`); return; }
+    if (ottd) { failed(`Couldn't start OpenTTD: ${reason(e, 'something went wrong')}.`); return; }
     $('loading').hidden = true;
     $('player').hidden = true;
     $('library').hidden = false;
-    status(`Couldn't start OpenTTD: ${e && e.message ? e.message : 'check the connection and try again'}.`);
+    status(`Couldn't start OpenTTD: ${reason(e)}.`);
     audio?.close().catch(() => {});
     audio = null;
     renderFree();
@@ -346,10 +344,18 @@ function loop(t) {
 
 // ---------- sound ----------
 
+// The browser may hold the sound back until a tap (a game started from a
+// controller, say); any tap then starts it, and the button says so
+const soundBlocked = () => settings.get('sound', true) && audio && audio.state !== 'running' && !document.hidden;
 function showSound() {
-  $('soundBtn').textContent = settings.get('sound', true) ? 'Sound on' : 'Sound off';
+  $('soundBtn').textContent = !settings.get('sound', true) ? 'Sound off' : soundBlocked() ? 'Tap for sound' : 'Sound on';
 }
+function wakeSound() {
+  if (soundBlocked()) audio.resume().then(showSound, () => {});
+}
+for (const type of ['pointerdown', 'keydown']) addEventListener(type, wakeSound, true);
 $('soundBtn').onclick = () => {
+  if (soundBlocked()) { wakeSound(); return; }
   const on = !settings.get('sound', true);
   settings.set('sound', on);
   showSound();

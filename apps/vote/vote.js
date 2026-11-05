@@ -22,7 +22,7 @@ function say(text, ok = false) {
 async function call(op, data) {
   const res = await fetch(`${API}?op=${op}`, data ? {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),
-  } : {});
+  } : {}).catch(() => { throw new Error('No connection. Check it and try again.'); });
   const out = await res.json().catch(() => ({ error: 'Voting is unavailable right now. Try again in a minute.' }));
   if (res.status === 401) signOut();
   if (!res.ok) throw new Error(out.error || 'Something went wrong.');
@@ -123,11 +123,19 @@ function render() {
   }));
 }
 
+let retry = 0;
 async function load() {
+  clearTimeout(retry);
   const [list, results] = await Promise.all([
-    fetch('ideas.json').then(r => r.json()),
+    fetch('ideas.json').then(r => r.json()).catch(() => null),
     call('results').catch(e => { say(e.message); return { ideas: {}, wallets: 0, min: 100000 }; }),
   ]);
+  if (!list) {
+    say('Couldn\'t load the ideas. Check the connection; trying again shortly.');
+    retry = setTimeout(load, 10000);
+    return;
+  }
+  if ($('msg').textContent.startsWith('Couldn\'t load')) say('');
   counts = results.ideas;
   voters = results.wallets;
   $('min').textContent = amount(results.min);
@@ -161,7 +169,8 @@ $('save').onclick = async () => {
 
 $('send').onclick = async () => {
   const text = $('idea').value.trim();
-  if (busy || !session || !text) return;
+  if (busy || !session) return;
+  if (!text) { say('Write your suggestion first.'); return; }
   busy = true;
   try {
     await call('suggest', { token: session.token, text });
