@@ -131,6 +131,7 @@
     "puzzles": { "name": "Logische puzzels", "tagline": "Veertig klassieke logische puzzels van Simon Tatham, van Solo (sudoku) tot Mines en Net, met eindeloos nieuwe borden in elk formaat." },
     "pokeguess": { "name": "Raad de Pokémon van de dag", "tagline": "Raad de geheime Pokémon van vandaag in acht pogingen aan de hand van generatie, types, lengte en gewicht. Voor iedereen dezelfde, plus vrij spel met de generaties die je kiest." },
     "mahjong": { "name": "Mahjong", "tagline": "Hongkongse of Taiwanese regels tegen drie bots. Elke hand wordt voor je geteld, met hints, en je gaat verder waar je was." },
+    "wagon": { "name": "Huifkartocht 1848", "tagline": "Leid vijf kolonisten 3200 km naar het westen met een ossenwagen: koop voorraden, steek rivieren over, jaag op voedsel en wees de wintersneeuw voor. Aanraking of controller." },
     "stockfish": { "name": "Schaken tegen Stockfish", "tagline": "Hele partijen tegen Stockfish 19, van een mild beginnersniveau tot volle sterkte. Neem zetten terug, vraag om een hint en ga later verder waar je was." },
     "chess": { "name": "Schaakpuzzel", "tagline": "Los de dagelijkse schaakpuzzel van Lichess op je scherm op." },
     "terrarium": { "tagline": "Een aquarium dat doorleeft terwijl je weg bent. Voer het en zie het evolueren. Door Jason Goldfeder." }

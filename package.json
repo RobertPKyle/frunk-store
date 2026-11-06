@@ -36,7 +36,8 @@
     "build:battleship": "node tools/build-battleship.mjs",
     "dev": "node tools/dev.mjs",
     "test:e2e": "node tools/e2e.mjs",
-    "test:mahjong": "node tools/test-mahjong.mjs"
+    "test:mahjong": "node tools/test-mahjong.mjs",
+    "test:wagon": "node tools/test-wagon.mjs"
   },
   "devDependencies": {
     "esbuild": "^0.28.2",

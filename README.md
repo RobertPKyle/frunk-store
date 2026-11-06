@@ -1200,6 +1200,25 @@ clear them to make room.
   page's fonts and a car may have no Chinese font. The app's own text comes in
   English, Traditional and Simplified Chinese. A catalog entry's `langs` lists the
   languages an app has, and the hub passes the current one as `#lang=`.
+- `apps/wagon`: Wagon Trail 1848, a game written for this site: lead a party
+  of five by ox wagon from Independence, Missouri, to the Willamette Valley,
+  about 1,950 miles over 16 stops (rivers, forts, landmarks), with a fork at
+  South Pass (Fort Bridger or the dry Sublette Cutoff) and one at The Dalles
+  (the Barlow Road toll or three Columbia rapids to steer through). It isn't a
+  copy of any older trail game: the name, rules, numbers, text and pictures are
+  its own; the history (mileages, who ran each post in 1848) is from common
+  accounts, not checked by a historian. `game.js` holds the rules and state, a
+  plain object saved in localStorage after each day, with its own seeded random
+  numbers; it doesn't touch the page, so `npm run test:wagon` plays
+  thousands of journeys with a sensible player for each trade and start month:
+  a merchant leaving in April arrives nearly every time, a farmer loses about
+  one traveler, and a July start loses people to the cold. `scene.js` draws the
+  land rolling past on a canvas (about 30 frames a second while the wagon moves
+  or rain falls), and `hunt.js` is the hunt: a tap shoots at that spot, or a
+  controller moves a sight and A shoots; bullets take a moment to arrive, cover
+  stops them, and only so much meat can be carried back. Other screens use the
+  shared start-screen controller in `apps/_shared/gamepage.js`. Not yet tried
+  in the car.
 - `apps/pokeguess`: Daily Pokémon Guess. Squirdle by Fireblend (Apache
   License 2.0, github.com/Fireblend/squirdle), reworked for the car: guess
   a secret Pokémon in up to 8 tries from hints on its generation, types,

@@ -523,6 +523,20 @@
       ]
     },
     {
+      "id": "wagon",
+      "name": "Wagon Trail 1848",
+      "tagline": "Lead five settlers 2,000 miles west by ox wagon: buy supplies, ford rivers, hunt for food and beat the winter snow. Touch or controller.",
+      "path": "/wagon/",
+      "icon": "/wagon/icon.svg",
+      "added": "2026-11-05",
+      "tags": [
+        "Game",
+        "Controller",
+        "Touch",
+        "Offline"
+      ]
+    },
+    {
       "id": "stockfish",
       "name": "Chess vs Stockfish",
       "tagline": "Full games against Stockfish 19, from a gentle beginner level up to full strength. Take back a move, ask for a hint and pick up where you left off.",

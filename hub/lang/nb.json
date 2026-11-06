@@ -131,6 +131,7 @@
     "puzzles": { "name": "Logikkoppgaver", "tagline": "Førti klassiske logikkoppgaver av Simon Tatham, fra Solo (sudoku) til Mines og Net, med uendelig mange nye brett i alle størrelser." },
     "pokeguess": { "name": "Dagens Pokémon-gjetting", "tagline": "Gjett dagens hemmelige Pokémon på åtte forsøk ut fra generasjon, typer, høyde og vekt. Samme for alle, pluss fritt spill med de generasjonene du vil." },
     "mahjong": { "name": "Mahjong", "tagline": "Hongkong- eller Taiwan-regler mot tre roboter. Hver hånd telles for deg, med hint, og du fortsetter der du slapp." },
+    "wagon": { "name": "Vogntoget 1848", "tagline": "Led fem nybyggere 3 200 km vestover med oksevogn: kjøp forsyninger, kryss elver, jakt på mat og kom fram før vintersnøen. Berøring eller kontroller." },
     "stockfish": { "name": "Sjakk mot Stockfish", "tagline": "Hele partier mot Stockfish 19, fra et snilt nybegynnernivå til full styrke. Ta tilbake trekk, be om et hint og fortsett der du slapp." },
     "chess": { "name": "Sjakkoppgave", "tagline": "Løs den daglige sjakkoppgaven fra Lichess på skjermen." },
     "terrarium": { "tagline": "Et akvarium som lever videre mens du er borte. Gi det mat og se det utvikle seg. Av Jason Goldfeder." }

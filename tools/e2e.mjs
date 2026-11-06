@@ -1120,6 +1120,110 @@ await check('mahjong plays offline after one visit', async () => {
   }
 });
 
+await check('wagon trail sets out, crosses a river, hunts, resumes and finishes down the Columbia', async () => {
+  await openFromHub(/Wagon Trail 1848/);
+  const app = appFrame();
+  const frame = () => page.frames().find(f => f.url().includes('/wagon/'));
+  const state = () => frame().evaluate(() => { const s = window.wagonTest.state(); return s && { phase: s.phase, at: s.at, leg: !!s.leg, ammo: s.ammo, food: s.food, oxen: s.oxen, ended: s.ended }; });
+  await frame().evaluate(() => { localStorage.removeItem('wagon1848.save'); window.wagonTest.speed(30); });
+  await app.locator('#newBtn').click();
+  if (await app.locator('#dialog').isVisible()) await app.locator('#dlgBtns button', { hasText: 'Start a new one' }).click();
+  await app.locator('.pick', { hasText: 'Merchant' }).click();
+  await app.locator('button', { hasText: 'Next' }).click();
+  await app.locator('.pick', { hasText: 'April' }).click();
+  // the store: six oxen, 1000 lb of food, ten sets of clothing, ten boxes of bullets
+  const plus = async (row, n) => { for (let i = 0; i < n; i++) await app.locator('.good').nth(row).locator('button').nth(1).click(); };
+  await plus(0, 6); await plus(1, 20); await plus(2, 10); await plus(3, 10);
+  if ((await app.locator('#storeTotal').textContent()) !== 'Bill: $500.00') throw new Error(`bill ${await app.locator('#storeTotal').textContent()}`);
+  await app.locator('#storeBuy').click();
+  let s = await state();
+  if (s.phase !== 'trail' || s.oxen !== 6 || s.food !== 1000 || s.ammo !== 200) throw new Error(`after the store: ${JSON.stringify(s)}`);
+
+  // roll on to the Kansas River, answering what happens on the way
+  const closeDialogs = async () => { while (await app.locator('#dialog').isVisible()) await app.locator('#dlgBtns button').first().click(); };
+  for (let i = 0; ; i++) {
+    if (i > 300) throw new Error('never reached the river');
+    s = await state();
+    if (s.phase === 'river') break;
+    if (await app.locator('#dialog').isVisible()) { await app.locator('#dlgBtns button').first().click(); continue; }
+    const go = app.locator('#go');
+    if (await go.isVisible() && !(await go.textContent()).includes('Stop')) await go.click();
+    await page.waitForTimeout(100);
+  }
+  await closeDialogs();
+  await app.locator('#panel .opts button', { hasText: 'Ferry' }).click();
+  await closeDialogs();
+  s = await state();
+  if (s.phase !== 'trail' || s.at !== 'kansas') throw new Error(`after the ferry: ${JSON.stringify(s)}`);
+  await page.screenshot({ path: shots + 'wagon.png' });
+
+  // a hunt: five shots, each one a bullet
+  await app.locator('#huntBtn').click();
+  const field = app.locator('#hunt canvas');
+  await field.waitFor();
+  for (let i = 0; i < 5; i++) { await field.tap({ position: { x: 150 + i * 100, y: 300 } }); await page.waitForTimeout(150); }
+  await app.locator('#huntDone').click();
+  await app.locator('#dlgTitle', { hasText: 'Hunting' }).waitFor({ timeout: 5000 });
+  await closeDialogs();
+  const used = await frame().evaluate(() => window.wagonTest.state().lastHunt.used);
+  if (used !== 5) throw new Error(`five taps used ${used} bullets`);
+
+  // it carries on after closing the app
+  await page.click('#home');
+  await page.waitForSelector('#runner', { state: 'hidden' });
+  await openFromHub(/Wagon Trail 1848/);
+  await app.locator('#continue', { hasText: 'Kansas River' }).or(app.locator('#continue', { hasText: 'miles' })).first().click();
+  await app.locator('#go', { hasText: 'Leave Kansas River' }).waitFor();
+
+  // skip ahead to The Dalles and raft the Columbia, steering by the river's description
+  await frame().evaluate(() => window.wagonTest.set((s, G) => { s.at = 'dalles'; s.leg = null; s.took.southpass = 'bridger'; s.miles = 1857; s.food = 400; }));
+  await app.locator('#go', { hasText: 'Choose the way on' }).click();
+  await app.locator('#dlgBtns button', { hasText: 'Raft down the Columbia' }).click();
+  for (let i = 0; i < 3 && (await state()).phase === 'raft'; i++) {
+    const way = await frame().evaluate(() => {
+      const t = document.querySelector('#panel .lede').textContent;
+      return ['left', 'middle', 'right'].find(w => {
+        const G = { 'A rocky island': 'right', 'Boulders show': 'middle', 'The current pulls': 'left', 'Mist rises': 'left', 'Whirlpools spin': 'right', 'A sunken log': 'middle' };
+        return Object.entries(G).some(([k, v]) => t.includes(k) && v === w);
+      });
+    });
+    await app.locator('#panel button', { hasText: `Steer ${way}` }).click();
+    await closeDialogs();
+  }
+  s = await state();
+  if (s.phase !== 'end' || s.ended !== 'won') throw new Error(`after the rapids: ${JSON.stringify(s)}`);
+  await app.locator('#end h2', { hasText: 'Willamette Valley' }).waitFor();
+  await app.locator('#end table.score').waitFor();
+  await page.screenshot({ path: shots + 'wagon-end.png' });
+  await app.locator('#end button', { hasText: 'Best journeys' }).click();
+  if (!(await app.locator('#dlgBody table.score tr').count())) throw new Error('no best journey kept');
+  await closeDialogs();
+});
+
+await check('wagon trail plays offline after one visit', async () => {
+  const context = await browser.newContext({ viewport: { width: 773, height: 601 } });
+  try {
+    const p = await context.newPage();
+    await p.goto(`${appsBase}/wagon/`);
+    const urls = ['/wagon/', '/wagon/app.js', '/wagon/game.js', '/wagon/text.js', '/wagon/scene.js', '/wagon/hunt.js', '/_shared/gamepage.js', '/sw-register.js'];
+    for (let tries = 0; ; tries++) {
+      const missing = await p.evaluate(async urls => {
+        const hits = await Promise.all(urls.map(url => caches.match(url)));
+        return urls.filter((_, i) => !hits[i]);
+      }, urls);
+      if (!missing.length) break;
+      if (tries === 120) throw new Error(`not cached: ${missing}`);
+      await p.waitForTimeout(250);
+    }
+    await context.setOffline(true);
+    await p.reload();
+    await p.locator('#newBtn').click();
+    await p.locator('.pick', { hasText: 'Farmer' }).waitFor();
+  } finally {
+    await context.close();
+  }
+});
+
 await check('terrarium runs, feeds and catches up after time away', async () => {
   await openFromHub(/Terrarium/);
   const tank = () => page.frames().find(f => f.url().includes('/terrarium/'));
