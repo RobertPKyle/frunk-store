@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Cosmo's Cosmic Adventure</title>
+<style>
+  :root { --bg: #0b0d1a; --panel: #151a2e; --card: #1f2640; --line: rgba(200, 210, 245, .16); --text: #eef1fb; --muted: #a3abc6;
+          --accent: #6fd04a; --accent2: #c0392b; --danger: #d9694a; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 16px/1.4 system-ui, sans-serif; overflow: hidden;
+               -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; touch-action: none; }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  .btn { min-height: 44px; padding: 8px 16px; border-radius: 12px; background: var(--card); border: 1px solid var(--line); white-space: nowrap; }
+  .btn.primary { background: var(--accent); border-color: transparent; color: #0d2306; font-weight: 700; }
+  .btn.on { background: var(--accent2); border-color: transparent; color: #fff; }
+  .btn.armed { background: #c4503a; border-color: transparent; color: #fff; }
+  .btn:disabled { opacity: .5; cursor: default; }
+  [hidden] { display: none !important; }
+
+  /* ---------- start ---------- */
+  #start { display: flex; flex-direction: column; height: 100%; }
+  /* left padding keeps clear of the hub's Apps button */
+  header { display: flex; align-items: center; gap: 10px; min-height: 60px; padding: 8px 12px 8px 110px; border-bottom: 1px solid var(--line); }
+  header h1 { margin: 0; font-size: 18px; font-weight: 600; flex: 1; }
+  .scroll { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 14px 16px 20px; touch-action: pan-y; }
+  .hero { display: flex; gap: 16px; align-items: center; max-width: 760px; padding: 16px; border-radius: 16px; background: var(--panel); border: 1px solid var(--line); }
+  .hero img { width: 84px; height: 84px; flex: none; }
+  .hero h2 { margin: 0 0 6px; font-size: 20px; color: var(--text); letter-spacing: 0; text-transform: none; }
+  .hero p { margin: 0 0 10px; color: #dbe0f0; }
+  h2 { margin: 18px 2px 8px; font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .note { font-size: 13px; color: var(--muted); margin: 6px 2px; max-width: 60em; }
+  #status:empty { display: none; }
+  table.keys { border-collapse: collapse; font-size: 13px; color: var(--muted); margin: 4px 2px; }
+  table.keys th, table.keys td { text-align: left; padding: 3px 14px 3px 0; vertical-align: top; }
+  table.keys th { color: var(--text); font-weight: 600; }
+  .legal { margin-top: 18px; font-size: 12px; color: var(--muted); user-select: text; -webkit-user-select: text; max-width: 60em; }
+  .legal p { margin: 4px 0; }
+  .legal a { color: var(--muted); }
+
+  /* ---------- overlays ---------- */
+  .overlay { position: fixed; inset: 0; z-index: 5; display: grid; place-items: center; padding: 64px 16px 16px; background: rgba(5, 6, 14, .9); }
+  .sheet { display: flex; flex-direction: column; max-width: 560px; padding: 18px; border-radius: 18px; background: var(--panel); border: 1px solid var(--line); }
+  .sheet h2 { margin: 0 0 8px; font-size: 19px; color: var(--text); letter-spacing: 0; text-transform: none; }
+  .sheet p { margin: 0 0 10px; font-size: 15px; color: #dbe0f0; overflow-wrap: anywhere; }
+
+  /* ---------- loading ---------- */
+  #loading { position: fixed; inset: 0; z-index: 4; display: grid; place-content: center; gap: 14px; text-align: center; background: var(--bg); padding: 16px; }
+  #loading b { font-size: 20px; }
+  #loadText { color: var(--muted); font-size: 15px; }
+  progress { width: min(320px, 80vw); height: 8px; accent-color: var(--accent); }
+
+  /* ---------- player ---------- */
+  #player { position: fixed; inset: 0; display: grid; grid-template-rows: 60px minmax(0, 1fr); grid-template-columns: minmax(0, 1fr); background: #000; }
+  .bar { display: flex; align-items: center; gap: 8px; padding: 8px 10px 8px 110px; overflow-x: auto; scrollbar-width: none; touch-action: pan-x; background: var(--panel); border-bottom: 1px solid var(--line); }
+  .bar b { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #wait, #padNote { font-size: 13px; color: var(--muted); white-space: nowrap; }
+  .screen { position: relative; min-height: 0; min-width: 0; overflow: hidden; }
+  #canvas { position: absolute; display: block; border: 0; padding: 0; background: #000; outline: none; image-rendering: pixelated; }
+  #canvas.smooth { image-rendering: auto; }
+  /* focused to bring up the car's keyboard; what's typed goes to the game */
+  #kbd { position: absolute; left: 0; bottom: 0; width: 1px; height: 1px; opacity: 0; border: 0; padding: 0; }
+
+  /* ---------- on-screen controls ---------- */
+  .touch { position: absolute; inset: 0; pointer-events: none; }
+  .touch button {
+    position: absolute; pointer-events: auto; width: 72px; height: 72px; border-radius: 50%; font-size: 14px; font-weight: 700;
+    background: rgba(16, 20, 40, .55); border: 2px solid rgba(210, 220, 250, .35); color: #fff; touch-action: none;
+    display: grid; place-items: center; line-height: 1.1; text-align: center; padding: 0;
+  }
+  .touch button.held, .touch button:active { background: rgba(111, 208, 74, .55); border-color: var(--accent); }
+  .touch .arrow { font-size: 28px; }
+  /* a D-pad on the left */
+  #tUp { left: 88px; bottom: 170px; }
+  #tDown { left: 88px; bottom: 14px; }
+  #tLeft { left: 12px; bottom: 92px; }
+  #tRight { left: 164px; bottom: 92px; }
+  /* the actions on the right */
+  #tJump { right: 12px; bottom: 14px; width: 88px; height: 88px; }
+  #tBomb { right: 110px; bottom: 14px; width: 80px; height: 80px; }
+  #tYes { right: 12px; bottom: 112px; width: 64px; height: 64px; }
+  #tSave { right: 12px; bottom: 186px; width: 64px; height: 64px; }
+  #tLoad { right: 86px; bottom: 186px; width: 64px; height: 64px; }
+  @media (max-width: 640px) {
+    .bar .btn { padding: 8px 10px; }
+    #padNote { display: none; }
+  }
+  /* the bar is full at the car's width: every button stays on it */
+  @media (max-width: 800px) { .bar { gap: 6px; } .bar .btn { padding: 8px 10px; } }
+</style>
+</head>
+<body>
+<section id="start">
+  <header>
+    <h1>Cosmo's Cosmic Adventure</h1>
+  </header>
+  <div class="scroll">
+    <div class="hero">
+      <img src="icon.svg" alt="">
+      <div>
+        <h2>Cosmo's Cosmic Adventure: Forbidden Planet</h2>
+        <p>Apogee's 1992 platformer in bright EGA with AdLib music. A comet forces Cosmo's family down on a strange planet and his parents vanish: find them, clinging to walls with suction-cup hands, bouncing on enemies and dropping bombs. Shareware episode 1, in full.</p>
+        <div class="row">
+          <button class="btn primary play" id="play" type="button">Play</button>
+          <span class="note" id="kept"></span>
+        </div>
+      </div>
+    </div>
+    <p class="note" id="status" aria-live="polite"></p>
+
+    <h2>Controls</h2>
+    <table class="keys">
+      <tr><th></th><th>Controller</th><th>On screen</th></tr>
+      <tr><td>Walk; look up and down</td><td>Left stick or D-pad</td><td>▲ ▼ ◀ ▶</td></tr>
+      <tr><td>Jump (Cosmo clings to walls by himself)</td><td>Bottom button, right trigger or shoulder</td><td>Jump</td></tr>
+      <tr><td>Drop a bomb</td><td>Right button, left trigger or shoulder</td><td>Bomb</td></tr>
+      <tr><td>Title to the main menu, past a hint or a "press any key"</td><td>Bottom button</td><td>A tap on the picture</td></tr>
+      <tr><td>Begin a new game, in the main menu</td><td>Bottom button</td><td>Jump</td></tr>
+      <tr><td>Quit question (Esc)</td><td>Start, then the left button for yes or Start to carry on</td><td>Menu, then Yes, or Menu to carry on</td></tr>
+      <tr><td>Save in place 1, while playing</td><td>Select</td><td>Save 1</td></tr>
+      <tr><td>Load place 1, in the main menu</td><td>Top button</td><td>Load 1</td></tr>
+    </table>
+    <p class="note">The game saves where the level began. Keyboard brings up the car's keyboard for the game's other keys (the main menu's letters, a number for one of the nine save places, your name for the high scores, which Start skips). A keyboard plugged into the car works too: arrows move, Ctrl jumps, Alt drops a bomb, F1 is the help menu with saving and loading, Esc quits.</p>
+
+    <div class="legal">
+      <p>Cosmo's Cosmic Adventure: Forbidden Planet &copy; 1992 Apogee Software, Ltd. This is the shareware episode 1 (version 1.2) exactly as Apogee released it (<a href="data/1cosmo.zip">1cosmo.zip</a>, from Apogee's own FTP server as saved by the Internet Archive), whose license encourages everyone to copy and pass it around without charging, with every file included unchanged, which this app does: <a href="VENDOR.DOC" target="_blank">VENDOR.DOC</a>. frunk.store charges nothing for it. Episodes 2 and 3 are not included. Unofficial; not affiliated with or endorsed by Apogee Software / 3D Realms.</p>
+      <p>Engine: DOSBox (the DOSBox Team, GPL version 2) as ported to the browser by Boris Gjenero's em-dosbox. This is a modified version, compiled to WebAssembly with the changes in <a href="engine/em-dosbox-web.patch" target="_blank">em-dosbox-web.patch</a>, built by tools/build-dos.mjs in github.com/RobertPKyle/frunk-store; license: <a href="engine/COPYING" target="_blank">COPYING</a>; source: <a href="engine/em-dosbox-e1f72dd-web-src.tar.gz">em-dosbox-e1f72dd-web-src.tar.gz</a>. See <a href="NOTICE" target="_blank">/cosmo/NOTICE</a>.</p>
+      <p>Play only while parked.</p>
+    </div>
+  </div>
+</section>
+
+<section id="loading" hidden aria-live="polite">
+  <b id="loadTitle">Cosmo's Cosmic Adventure</b>
+  <span id="loadText"></span>
+  <progress id="loadBar" max="1" value="0" hidden></progress>
+</section>
+
+<section id="failed" class="overlay" hidden aria-labelledby="failedTitle">
+  <div class="sheet">
+    <h2 id="failedTitle">The game stopped</h2>
+    <p id="failedText"></p>
+    <div class="row"><button class="btn primary" id="failedOk" type="button">Start again</button></div>
+  </div>
+</section>
+
+<section id="player" hidden>
+  <div class="bar">
+    <b id="title">Cosmo's Cosmic Adventure</b>
+    <span id="wait" hidden>Loading…</span>
+    <span id="padNote" hidden>Controller</span>
+    <button class="btn" id="menuBtn" type="button">Menu</button>
+    <button class="btn" id="keysBtn" type="button">Keyboard</button>
+    <button class="btn" id="smoothBtn" type="button">Sharp</button>
+    <button class="btn" id="soundBtn" type="button">Sound on</button>
+    <button class="btn" id="quitBtn" type="button">Quit</button>
+  </div>
+  <div class="screen" id="screen">
+    <canvas id="canvas" tabindex="-1" oncontextmenu="event.preventDefault()"></canvas>
+    <div class="touch" id="touch" hidden>
+      <button type="button" id="tUp" class="arrow" data-key="up" aria-label="Up">▲</button>
+      <button type="button" id="tDown" class="arrow" data-key="down" aria-label="Down">▼</button>
+      <button type="button" id="tLeft" class="arrow" data-key="left" aria-label="Left">◀</button>
+      <button type="button" id="tRight" class="arrow" data-key="right" aria-label="Right">▶</button>
+      <button type="button" id="tSave" data-key="">Save 1</button>
+      <button type="button" id="tLoad" data-key="">Load 1</button>
+      <button type="button" id="tYes" data-key="y enter">Yes</button>
+      <button type="button" id="tBomb" data-key="lalt">Bomb</button>
+      <button type="button" id="tJump" data-key="b lctrl">Jump</button>
+    </div>
+    <input id="kbd" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="Type into the game">
+  </div>
+</section>
+
+<script type="module" src="cosmo.js"></script>
+<script src="/sw-register.js"></script>
+</body>
+</html>

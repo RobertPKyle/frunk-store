@@ -2907,7 +2907,7 @@ await check('wolfenstein 3d: starts a game, turns and opens the menu by controll
 });
 
 await check('commander keen: saves on the map, enters a city and plays by controller, and keeps the save', async () => {
-  await openFromHub(/Commander Keen/);
+  await openFromHub(/^Commander Keen$/);
   const frame = () => page.frames().find(f => f.url().includes('/keen1/'));
   const app = appFrame();
   const stats = () => frame().evaluate(() => window.dosStats());
@@ -2995,6 +2995,574 @@ await check('commander keen: saves on the map, enters a city and plays by contro
   await pad(A, 3500);
   await pad(A, 1000);
   if (await red() < 0.5) throw new Error('Select didn\'t go back to the title');
+  await app.locator('#quitBtn').evaluate(b => (b.click(), b.click()));
+  await app.locator('#start').waitFor({ timeout: 10000 });
+  await app.locator('#kept').filter({ hasText: /Downloaded/ }).waitFor({ timeout: 10000 });
+  // The save is still there next time
+  await app.locator('#play').click();
+  await app.locator('#player').waitFor({ timeout: 30000 });
+  await until('the save after starting again', saved, 10000);
+});
+
+await check('commander keen 4: saves by Select, enters the Border Village, plays by controller, and loads the save', async () => {
+  await openFromHub(/Commander Keen 4/);
+  const frame = () => page.frames().find(f => f.url().includes('/keen4/'));
+  const app = appFrame();
+  const stats = () => frame().evaluate(() => window.dosStats());
+  const frames = () => frame().evaluate(() => window.keenFrames());
+  const until = async (what, fn, ms = 30000) => {
+    for (const t = Date.now(); Date.now() - t < ms; await page.waitForTimeout(250)) if (await fn()) return;
+    throw new Error(`no ${what}; DOSBox log: ${(await frame().evaluate(() => window.dosLog.slice(-3).join(' | '))) || 'empty'}`);
+  };
+  const look = () => app.locator('#canvas').screenshot();
+  const saved = () => frame().evaluate(() => window.dosFS().analyzePath('/save/keen4/KEEN4/SAVEGAM0.CK4').exists);
+  // The share of the picture that's the map's bright green (trees and grass); a level shows little of it
+  const green = () => frame().evaluate(() => {
+    const c = document.getElementById('canvas');
+    const t = document.createElement('canvas');
+    t.width = c.width; t.height = c.height;
+    const x = t.getContext('2d');
+    x.drawImage(c, 0, 0);
+    const d = x.getImageData(0, 0, c.width, c.height).data;
+    let n = 0;
+    for (let i = 0; i < d.length; i += 4) if (d[i + 1] > 150 && d[i] < 120 && d[i + 2] < 120) n++;
+    return n / (d.length / 4);
+  });
+  const fakePads = () => frame().evaluate(() => {
+    const pad = (id, mapping, index) => ({ id, index, mapping, connected: true, timestamp: 0, axes: [0, 0, 0, 0], buttons: Array.from({ length: 17 }, () => ({ pressed: false, value: 0 })) });
+    const pads = [pad('raw', '', 0), pad('Tesla Virtual Gamepad', 'standard', 1)];
+    navigator.getGamepads = () => pads;
+    window.padPress = async (b, ms = 200) => {
+      Object.assign(pads[1].buttons[b], { pressed: true, value: 1 });
+      await new Promise(r => setTimeout(r, ms));
+      Object.assign(pads[1].buttons[b], { pressed: false, value: 0 });
+    };
+    window.padAxes = async (axes, ms) => {
+      pads[1].axes = axes;
+      await new Promise(r => setTimeout(r, ms));
+      pads[1].axes = [0, 0, 0, 0];
+    };
+  });
+  const pad = async (b, wait = 1500, ms = 200) => { await frame().evaluate(([b, ms]) => padPress(b, ms), [b, ms]); await page.waitForTimeout(wait); };
+  const stick = (axes, ms) => frame().evaluate(([axes, ms]) => padAxes(axes, ms), [axes, ms]);
+  const [A, Y, SELECT, START] = [0, 3, 8, 9];
+
+  await app.locator('#play').click();
+  await app.locator('#player').waitFor({ timeout: 120000 });
+  await fakePads();
+  await until('frames', async () => (await frames()) > 5);
+  await page.waitForTimeout(3000);
+  // The bottom button: past the hardware screen and the intro to the title, the menu, New Game, Normal
+  await pad(A, 2000);
+  await pad(A, 2000);
+  await pad(A, 1500);
+  await pad(A, 1500);
+  await pad(A, 4000);
+  if (!(await app.locator('#padNote').isVisible())) throw new Error('the controller wasn\'t noticed');
+  if (await green() < 0.3) throw new Error(`not on the map: ${await green()}`);
+  // Select saves in place 1: the menu, Save Game, the place, its name, back to the game
+  await pad(SELECT, 6500);
+  if (!(await saved())) throw new Error('Select didn\'t save');
+  if (await green() < 0.3) throw new Error(`Select didn't go back to the map: ${await green()}`);
+  // Left to the path, up between the fences of the Border Village, then in
+  await stick([-1, 0, 0, 0], 1500);
+  await stick([0, -1, 0, 0], 1600);
+  await pad(A, 3500);
+  if (await green() > 0.15) throw new Error(`not in the level: ${await green()}`);
+  // The left stick walks: the picture scrolls and the game keeps drawing
+  const standing = await look();
+  const beforeFrames = await frames();
+  await stick([-1, 0, 0, 0], 2000);
+  if ((await look()).equals(standing)) throw new Error('the left stick didn\'t move Keen');
+  const drawn = (await frames()) - beforeFrames;
+  if (drawn < 20) throw new Error(`the game drew only ${drawn} frames in two seconds of walking`);
+  await page.screenshot({ path: shots + 'keen4.png' });
+  // The top button is the status window; any key closes it
+  await page.waitForTimeout(1000);
+  const playing = await look();
+  await pad(Y, 1500);
+  if ((await look()).equals(playing)) throw new Error('the top button didn\'t show the status');
+  await pad(Y, 1500);
+  // Start opens the menu; the bottom button is Return to Game
+  const before = await look();
+  await pad(START, 1500);
+  if ((await look()).equals(before)) throw new Error('Start didn\'t open the menu');
+  const menu = await look();
+  await pad(A, 1500);
+  if ((await look()).equals(menu)) throw new Error('the bottom button didn\'t go back to the game');
+  await app.locator('#quitBtn').evaluate(b => (b.click(), b.click()));
+  await app.locator('#start').waitFor({ timeout: 10000 });
+  await app.locator('#kept').filter({ hasText: /Downloaded/ }).waitFor({ timeout: 10000 });
+  // The save is still there next time, and Load Game brings it back on the map
+  await app.locator('#play').click();
+  await app.locator('#player').waitFor({ timeout: 30000 });
+  await fakePads();
+  await until('the save after starting again', saved, 10000);
+  await page.waitForTimeout(3000);
+  await pad(A, 2000);
+  await pad(A, 2000);
+  await pad(A, 1500);
+  await stick([0, 1, 0, 0], 200);
+  await page.waitForTimeout(800);
+  await pad(A, 1500);    // Load Game
+  await pad(A, 4000);    // place 1
+  if (await green() < 0.3) throw new Error(`the save didn't load on the map: ${await green()}`);
+});
+
+await check('duke nukem ii: starts and plays by controller, saves in place 1 and loads it, quits by Start and Y, and keeps the save', async () => {
+  await openFromHub(/Duke Nukem II/);
+  const frame = () => page.frames().find(f => f.url().includes('/duke2/'));
+  const app = appFrame();
+  const stats = () => frame().evaluate(() => window.dosStats());
+  const until = async (what, fn, ms = 30000) => {
+    for (const t = Date.now(); Date.now() - t < ms; await page.waitForTimeout(250)) if (await fn()) return;
+    throw new Error(`no ${what}; DOSBox log: ${(await frame().evaluate(() => window.dosLog.slice(-3).join(' | '))) || 'empty'}`);
+  };
+  const look = () => app.locator('#canvas').screenshot();
+  // what the page reads from the picture: the status bar under the game, a
+  // menu's frame, the main menu, the quit question
+  const playing = () => frame().evaluate(() => window.duke2.playing());
+  const question = () => frame().evaluate(() => window.duke2.question());
+  const inMenu = () => frame().evaluate(() => window.duke2.inMenu());
+  const mainMenu = () => frame().evaluate(() => window.duke2.mainMenu());
+  const saved = () => frame().evaluate(() => window.dosFS().analyzePath('/save/duke2/DUKE2/NUKEM2.-S1').exists);
+  const fakePads = () => frame().evaluate(() => {
+    const pad = (id, mapping, index) => ({ id, index, mapping, connected: true, timestamp: 0, axes: [0, 0, 0, 0], buttons: Array.from({ length: 17 }, () => ({ pressed: false, value: 0 })) });
+    const pads = [pad('raw', '', 0), pad('Tesla Virtual Gamepad', 'standard', 1)];
+    navigator.getGamepads = () => pads;
+    window.padPress = async (b, ms = 200) => {
+      Object.assign(pads[1].buttons[b], { pressed: true, value: 1 });
+      await new Promise(r => setTimeout(r, ms));
+      Object.assign(pads[1].buttons[b], { pressed: false, value: 0 });
+    };
+    window.padAxes = async (axes, ms) => {
+      pads[1].axes = axes;
+      await new Promise(r => setTimeout(r, ms));
+      pads[1].axes = [0, 0, 0, 0];
+    };
+  });
+  const pad = async (b, wait = 1500, ms = 200) => { await frame().evaluate(([b, ms]) => padPress(b, ms), [b, ms]); await page.waitForTimeout(wait); };
+  const stick = (axes, ms) => frame().evaluate(([axes, ms]) => padAxes(axes, ms), [axes, ms]);
+  const [A, B, Y, LB, SELECT, START] = [0, 1, 3, 4, 8, 9];
+
+  await app.locator('#play').click();
+  await app.locator('#player').waitFor({ timeout: 120000 });
+  await fakePads();
+  await until('frames', async () => (await stats()).frames > 5);
+  // Start (Esc) skips the intro to the main menu
+  for (let i = 0; i < 12 && !(await mainMenu()); i++) await pad(START, 1300);
+  await until('the main menu', mainMenu, 5000);
+  if (!(await app.locator('#padNote').isVisible())) throw new Error('the controller wasn\'t noticed');
+  // The bottom button (Space): Start a New Game, episode 1, Medium
+  await page.waitForTimeout(800);
+  for (let i = 0; i < 4 && !(await playing()); i++) await pad(A, 2500);
+  await until('the game', playing, 15000);
+  await page.waitForTimeout(2000);
+  // The left stick walks: the picture scrolls and the game keeps drawing
+  const standing = await look();
+  const beforeFrames = (await stats()).frames;
+  await stick([1, 0, 0, 0], 2000);
+  if ((await look()).equals(standing)) throw new Error('the left stick didn\'t move Duke');
+  const drawn = (await stats()).frames - beforeFrames;
+  if (drawn < 20) throw new Error(`the game drew only ${drawn} frames in two seconds of walking`);
+  await pad(B, 800);   // fire
+  await pad(A, 1200);  // jump
+  await page.screenshot({ path: shots + 'duke2.png' });
+  // Select saves in place 1 as DUKE: the save menu, a name, back to the game
+  await pad(SELECT, 0);
+  await until('the save menu', inMenu, 4000);
+  await until('the save', saved, 10000);
+  await until('the game after saving', playing, 10000);
+  // The left shoulder loads place 1: the restore menu, then the game again
+  await stick([-1, 0, 0, 0], 1000);
+  await pad(LB, 0);
+  await until('the restore menu', inMenu, 4000);
+  await until('the game after loading', playing, 15000);
+  await page.waitForTimeout(1500);
+  // Start asks about quitting; the bottom button carries on; Start then Y quits to the menus
+  if (await question()) throw new Error('a question is up already');
+  await pad(START);
+  if (!(await question())) throw new Error('Start didn\'t ask about quitting');
+  await pad(A);
+  if (await question() || !(await playing())) throw new Error('the bottom button didn\'t carry on');
+  await pad(START);
+  if (!(await question())) throw new Error('Start didn\'t ask about quitting the second time');
+  await pad(Y, 3000);
+  if (await playing()) throw new Error('Y didn\'t quit the game');
+  await app.locator('#quitBtn').evaluate(b => (b.click(), b.click()));
+  await app.locator('#start').waitFor({ timeout: 10000 });
+  await app.locator('#kept').filter({ hasText: /Downloaded/ }).waitFor({ timeout: 10000 });
+  // Next time the save is still there, with its name (the game only writes
+  // the names when it's quit from its own menu; the page adds them)
+  await app.locator('#play').click();
+  await app.locator('#player').waitFor({ timeout: 30000 });
+  await until('the save after starting again', saved, 10000);
+  const name = await frame().evaluate(() => String.fromCharCode(...window.dosFS().readFile('/save/duke2/DUKE2/NUKEM2.-NM').subarray(0, 4)));
+  if (name !== 'duke') throw new Error(`place 1 is named "${name}"`);
+});
+
+await check('cosmo: begins by controller, saves in place 1, walks, quits to the title and loads the save', async () => {
+  await openFromHub(/Cosmo's Cosmic Adventure/);
+  const frame = () => page.frames().find(f => f.url().includes('/cosmo/'));
+  const app = appFrame();
+  const stats = () => frame().evaluate(() => window.dosStats());
+  const until = async (what, fn, ms = 30000) => {
+    for (const t = Date.now(); Date.now() - t < ms; await page.waitForTimeout(250)) if (await fn()) return;
+    throw new Error(`no ${what}; DOSBox log: ${(await frame().evaluate(() => window.dosLog.slice(-3).join(' | '))) || 'empty'}`);
+  };
+  const look = () => app.locator('#canvas').screenshot();
+  const saved = () => frame().evaluate(() => window.dosFS().analyzePath('/save/cosmo/COSMO/COSMO1.SV1').exists);
+  // What's on the 320x200 picture: the status bar's brown and cyan at the bottom while playing,
+  // and the grey of the game's boxes in the middle (the main menu fills it, a hint or question less)
+  const screen = () => frame().evaluate(() => {
+    const c = document.getElementById('canvas');
+    const t = document.createElement('canvas');
+    t.width = c.width; t.height = c.height;
+    const x = t.getContext('2d');
+    x.drawImage(c, 0, 0);
+    const d = x.getImageData(0, 0, c.width, c.height).data;
+    const share = (x0, y0, w, h, rgb) => {
+      let n = 0;
+      for (let y = y0; y < y0 + h; y++) for (let i = x0; i < x0 + w; i++) {
+        const p = (y * c.width + i) * 4;
+        if (d[p] === rgb[0] && d[p + 1] === rgb[1] && d[p + 2] === rgb[2]) n++;
+      }
+      return n / (w * h);
+    };
+    return { brown: share(0, 160, 320, 40, [170, 85, 0]), cyan: share(0, 160, 320, 40, [85, 255, 255]), grey: share(80, 40, 160, 60, [85, 85, 85]) };
+  });
+  const playing = async () => { const s = await screen(); return s.brown > 0.4 && s.cyan > 0.01 && s.grey < 0.15; };
+  const menu = async () => (await screen()).grey > 0.6;
+  const fakePads = () => frame().evaluate(() => {
+    const pad = (id, mapping, index) => ({ id, index, mapping, connected: true, timestamp: 0, axes: [0, 0, 0, 0], buttons: Array.from({ length: 17 }, () => ({ pressed: false, value: 0 })) });
+    const pads = [pad('raw', '', 0), pad('Tesla Virtual Gamepad', 'standard', 1)];
+    navigator.getGamepads = () => pads;
+    window.padPress = async (b, ms = 200) => {
+      Object.assign(pads[1].buttons[b], { pressed: true, value: 1 });
+      await new Promise(r => setTimeout(r, ms));
+      Object.assign(pads[1].buttons[b], { pressed: false, value: 0 });
+    };
+    window.padAxes = async (axes, ms) => {
+      pads[1].axes = axes;
+      await new Promise(r => setTimeout(r, ms));
+      pads[1].axes = [0, 0, 0, 0];
+    };
+  });
+  const pad = async (b, wait = 1500, ms = 200) => { await frame().evaluate(([b, ms]) => padPress(b, ms), [b, ms]); await page.waitForTimeout(wait); };
+  const stick = (axes, ms) => frame().evaluate(([axes, ms]) => padAxes(axes, ms), [axes, ms]);
+  const [A, X, Y, SELECT, START] = [0, 2, 3, 8, 9];
+
+  await app.locator('#play').click();
+  await app.locator('#player').waitFor({ timeout: 120000 });
+  await fakePads();
+  await until('frames', async () => (await stats()).frames > 5);
+  await page.waitForTimeout(3000);
+  // The bottom button: the title to the main menu, then B for Begin
+  await pad(A, 2500);
+  if (!(await app.locator('#padNote').isVisible())) throw new Error('the controller wasn\'t noticed');
+  await until('the main menu', menu, 10000);
+  await pad(A, 500);
+  await until('the first level', playing);
+  await page.waitForTimeout(1500);
+  // Select saves in place 1 (F1, S, 1, Enter: the only way without number keys)
+  await pad(SELECT, 4000);
+  await until('the save', saved, 10000);
+  await until('the game after saving', playing, 10000);
+  // The left stick walks: the picture scrolls and the game keeps drawing, until the hint globe
+  // next to the start has its say
+  const standing = await look();
+  const beforeFrames = (await stats()).frames;
+  await stick([1, 0, 0, 0], 2000);
+  if ((await look()).equals(standing)) throw new Error('the left stick didn\'t move Cosmo');
+  const drawn = (await stats()).frames - beforeFrames;
+  if (drawn < 10) throw new Error(`the game drew only ${drawn} frames in two seconds of walking`);
+  await page.screenshot({ path: shots + 'cosmo.png' });
+  // the hint's text types itself out first, then any key closes it
+  for (let i = 0; i < 6 && !(await playing()); i++) await pad(A, 1500);
+  if (!(await playing())) throw new Error('the bottom button didn\'t close the hint');
+  // Start asks about quitting; the left button says yes: the high scores, then the title
+  const before = await look();
+  await pad(START);
+  if ((await look()).equals(before)) throw new Error('Start didn\'t ask about quitting');
+  await pad(X, 3000);
+  if (await playing()) throw new Error('the left button didn\'t quit');
+  // Any button past the high scores and the title to the main menu; the top button loads place 1
+  for (let i = 0; i < 4 && !(await menu()); i++) await pad(A, 2500);
+  if (!(await menu())) throw new Error('not back at the main menu');
+  await pad(Y, 2000);
+  await until('the saved game', playing);
+  await app.locator('#quitBtn').evaluate(b => (b.click(), b.click()));
+  await app.locator('#start').waitFor({ timeout: 10000 });
+  await app.locator('#kept').filter({ hasText: /Downloaded/ }).waitFor({ timeout: 10000 });
+  // The save is still there next time
+  await app.locator('#play').click();
+  await app.locator('#player').waitFor({ timeout: 30000 });
+  await until('the save after starting again', saved, 10000);
+});
+
+await check('hocus pocus: starts a game by controller, walks, jumps, saves with Select and keeps the save', async () => {
+  await openFromHub(/Hocus Pocus/);
+  const frame = () => page.frames().find(f => f.url().includes('/hocus/'));
+  const app = appFrame();
+  const stats = () => frame().evaluate(() => window.dosStats());
+  const until = async (what, fn, ms = 30000) => {
+    for (const t = Date.now(); Date.now() - t < ms; await page.waitForTimeout(250)) if (await fn()) return;
+    throw new Error(`no ${what}; DOSBox log: ${(await frame().evaluate(() => window.dosLog.slice(-3).join(' | '))) || 'empty'}`);
+  };
+  const look = () => frame().evaluate(() => document.getElementById('canvas').toDataURL());
+  // The name of save place 1 in HOCUS.SAV (the game's settings, saves and high scores in one file)
+  const slot1 = () => frame().evaluate(() => {
+    const p = '/save/hocus/HOCUS/HOCUS.SAV';
+    return window.dosFS().analyzePath(p).exists ? Array.from(window.dosFS().readFile(p).slice(0x54, 0x5c)).join(',') : '';
+  });
+  // The share of a row near the bottom that's the status bar's pink stone: only while playing
+  const bar = () => frame().evaluate(() => {
+    const c = document.getElementById('canvas');
+    const t = document.createElement('canvas');
+    t.width = c.width; t.height = c.height;
+    const x = t.getContext('2d');
+    x.drawImage(c, 0, 0);
+    const d = x.getImageData(0, Math.round(c.height * 0.9), c.width, 1).data;
+    let n = 0;
+    for (let i = 0; i < d.length; i += 4) if (d[i] > 120 && d[i] - d[i + 2] > 10 && d[i + 1] > 70) n++;
+    return n / (d.length / 4);
+  });
+  const fakePads = () => frame().evaluate(() => {
+    const pad = (id, mapping, index) => ({ id, index, mapping, connected: true, timestamp: 0, axes: [0, 0, 0, 0], buttons: Array.from({ length: 17 }, () => ({ pressed: false, value: 0 })) });
+    const pads = [pad('raw', '', 0), pad('Tesla Virtual Gamepad', 'standard', 1)];
+    navigator.getGamepads = () => pads;
+    window.padPress = async (b, ms = 200) => {
+      Object.assign(pads[1].buttons[b], { pressed: true, value: 1 });
+      await new Promise(r => setTimeout(r, ms));
+      Object.assign(pads[1].buttons[b], { pressed: false, value: 0 });
+    };
+    window.padAxes = async (axes, ms) => {
+      pads[1].axes = axes;
+      await new Promise(r => setTimeout(r, ms));
+      pads[1].axes = [0, 0, 0, 0];
+    };
+  });
+  const pad = async (b, wait = 1500, ms = 200) => { await frame().evaluate(([b, ms]) => padPress(b, ms), [b, ms]); await page.waitForTimeout(wait); };
+  const stick = (axes, ms) => frame().evaluate(([axes, ms]) => padAxes(axes, ms), [axes, ms]);
+  const [A, SELECT, START] = [0, 8, 9];
+
+  await app.locator('#play').click();
+  await app.locator('#player').waitFor({ timeout: 120000 });
+  await fakePads();
+  await until('frames', async () => (await stats()).frames > 5);
+  await page.waitForTimeout(3000);
+  // The bottom button: "Press a key", the Apogee logo, the title, Begin a new game, the first
+  // episode, the middle skill level, then the first hint
+  for (const wait of [2500, 3000, 2500, 2500, 2500, 3000, 2000]) await pad(A, wait);
+  await until('the first level (status bar)', async () => await bar() > 0.3, 10000);
+  if (!(await app.locator('#padNote').isVisible())) throw new Error('the controller wasn\'t noticed');
+  // The left stick walks: the picture scrolls and the game keeps drawing
+  const standing = await look();
+  const beforeFrames = (await stats()).frames;
+  await stick([1, 0, 0, 0], 2000);
+  if ((await look()) === standing) throw new Error('the left stick didn\'t move Hocus');
+  const drawn = (await stats()).frames - beforeFrames;
+  if (drawn < 20) throw new Error(`the game drew only ${drawn} frames in two seconds of walking`);
+  await page.screenshot({ path: shots + 'hocus.png' });
+  // The bottom button jumps (the picture changes mid-jump)
+  const ground = await look();
+  await pad(A, 0, 300);
+  if ((await look()) === ground) throw new Error('the bottom button didn\'t jump');
+  await page.waitForTimeout(1000);
+  // Select is the save places; the bottom button picks place 1 and keeps the empty name
+  const empty = await slot1();
+  await pad(SELECT, 1500);
+  if (await bar() > 0.3) throw new Error('Select didn\'t show the save places');
+  await pad(A, 1500);
+  await pad(A, 2000);
+  const saved = await slot1();
+  if (saved === empty) throw new Error('Select, then the bottom button twice, didn\'t save');
+  if (await bar() < 0.3) throw new Error('not back in the game after saving');
+  // Start is the playing menu; Start again goes back
+  await pad(START, 1500);
+  if (await bar() > 0.3) throw new Error('Start didn\'t open the menu');
+  await pad(START, 1500);
+  await app.locator('#quitBtn').evaluate(b => (b.click(), b.click()));
+  await app.locator('#start').waitFor({ timeout: 10000 });
+  await app.locator('#kept').filter({ hasText: /Downloaded/ }).waitFor({ timeout: 10000 });
+  // The save is still there next time
+  await app.locator('#play').click();
+  await app.locator('#player').waitFor({ timeout: 30000 });
+  await until('the save after starting again', async () => (await slot1()) === saved, 10000);
+});
+
+await check('rise of the triad: starts a game by controller, turns, fires, quicksaves and keeps its data', async () => {
+  await openFromHub(/Rise of the Triad/);
+  const frame = () => page.frames().find(f => f.url().includes('/rott/'));
+  const app = appFrame();
+  const stats = () => frame().evaluate(() => window.dosStats());
+  const until = async (what, fn, ms = 30000) => {
+    for (const t = Date.now(); Date.now() - t < ms; await page.waitForTimeout(250)) if (await fn()) return;
+    throw new Error(`no ${what}; DOSBox log: ${(await frame().evaluate(() => window.dosLog.slice(-3).join(' | '))) || 'empty'}`);
+  };
+  const look = () => app.locator('#canvas').screenshot();
+  const exists = path => frame().evaluate(p => window.dosFS().analyzePath(p).exists, path);
+  await app.locator('#play').click();
+  await app.locator('#player').waitFor({ timeout: 120000 });
+  // the sound setup the game asks for, written by the page before it starts
+  if (!(await exists('/save/rott/ROTT/SOUND.ROT'))) throw new Error('SOUND.ROT wasn\'t seeded');
+  await frame().evaluate(() => {
+    const pad = (id, mapping, index) => ({ id, index, mapping, connected: true, timestamp: 0, axes: [0, 0, 0, 0], buttons: Array.from({ length: 17 }, () => ({ pressed: false, value: 0 })) });
+    const pads = [pad('raw', '', 0), pad('Tesla Virtual Gamepad', 'standard', 1)];
+    navigator.getGamepads = () => pads;
+    window.padPress = async (b, ms = 200) => {
+      Object.assign(pads[1].buttons[b], { pressed: true, value: 1 });
+      await new Promise(r => setTimeout(r, ms));
+      Object.assign(pads[1].buttons[b], { pressed: false, value: 0 });
+    };
+    window.padAxes = async (axes, ms) => {
+      pads[1].axes = axes;
+      await new Promise(r => setTimeout(r, ms));
+      pads[1].axes = [0, 0, 0, 0];
+    };
+  });
+  const pad = async (b, wait = 2500, ms = 150) => { await frame().evaluate(([b, ms]) => padPress(b, ms), [b, ms]); await page.waitForTimeout(wait); };
+  const [A, SELECT, START] = [0, 8, 9];
+  await until('frames', async () => (await stats()).frames > 5);
+  await page.waitForTimeout(6000);
+  // The bottom button: past the Apogee logo and the title to the menu, New
+  // Game, the first player, the difficulty (one more is a shot in the game)
+  for (let i = 0; i < 6; i++) await pad(A);
+  await page.waitForTimeout(8000);
+  if (!(await app.locator('#padNote').isVisible())) throw new Error('the controller wasn\'t noticed');
+  // the left stick turns: the view changes and the game keeps drawing
+  const standing = await look();
+  const beforeFrames = (await stats()).frames;
+  await frame().evaluate(() => padAxes([-1, 0, 0, 0], 2000));
+  await page.waitForTimeout(300);
+  if ((await look()).equals(standing)) throw new Error('the left stick didn\'t turn');
+  const drawn = (await stats()).frames - beforeFrames;
+  if (drawn < 40) throw new Error(`the game drew only ${drawn} frames in two seconds of turning`);
+  await page.screenshot({ path: shots + 'rott.png' });
+  // Select quicksaves: the first time the save menu, whose first place and
+  // default name the bottom button takes
+  await pad(SELECT, 3000);
+  await pad(A, 2500);
+  await pad(A, 4000);
+  await until('a saved game', () => exists('/save/rott/ROTT/ROTTGAM0.ROT'), 15000);
+  // Start (Esc) opens the game's menu
+  const playing = await look();
+  await pad(START, 2000);
+  if ((await look()).equals(playing)) throw new Error('Start didn\'t open the menu');
+  await app.locator('#quitBtn').evaluate(b => (b.click(), b.click()));
+  await app.locator('#start').waitFor({ timeout: 10000 });
+  await app.locator('#kept').filter({ hasText: /Downloaded/ }).waitFor({ timeout: 10000 });
+});
+
+await check('blake stone: starts a mission by touch, plays and saves by controller, and keeps the save', async () => {
+  await openFromHub(/Blake Stone/);
+  const frame = () => page.frames().find(f => f.url().includes('/blake/'));
+  const app = appFrame();
+  const stats = () => frame().evaluate(() => window.dosStats());
+  const until = async (what, fn, ms = 30000) => {
+    for (const t = Date.now(); Date.now() - t < ms; await page.waitForTimeout(250)) if (await fn()) return;
+    throw new Error(`no ${what}; DOSBox log: ${(await frame().evaluate(() => window.dosLog.slice(-3).join(' | '))) || 'empty'}`);
+  };
+  const look = () => app.locator('#canvas').screenshot();
+  const saved = () => frame().evaluate(() => window.dosFS().analyzePath('/save/blake/BSTONE/SAVEGAM0.BS1').exists);
+  // The game's 320x200 picture, read back from the canvas
+  const pixels = () => frame().evaluate(() => {
+    const c = document.getElementById('canvas');
+    const t = document.createElement('canvas');
+    t.width = c.width; t.height = c.height;
+    const x = t.getContext('2d');
+    x.drawImage(c, 0, 0);
+    return Array.from(x.getImageData(0, 0, c.width, c.height).data);
+  });
+  // The title: BLAKE's red at (100,39). The main menu: the LINC frame's light
+  // blue at (5,100) and the blinking green bar on the chosen line at x=90
+  // (lines 9 pixels apart from y=51: 0 New Mission, 8 Save Mission)
+  const isTitle = async () => { const d = await pixels(); const i = (39 * 320 + 100) * 4; return d[i] > 90 && d[i + 1] < 30 && d[i + 2] < 30; };
+  const menuRow = async () => {
+    for (let k = 0; k < 10; k++) {
+      const d = await pixels();
+      const f = (100 * 320 + 5) * 4;
+      if (d[f + 2] > 120 && d[f] > 60) {
+        for (let y = 45; y < 170; y++) { const i = (y * 320 + 90) * 4; if (d[i] < 10 && d[i + 1] > 50 && d[i + 1] < 90 && d[i + 2] < 10) return Math.floor((y - 51) / 9); }
+      }
+      await page.waitForTimeout(120);
+    }
+    return null;
+  };
+  const tap = async (id, wait) => {
+    const b = await app.locator(id).boundingBox();
+    await page.touchscreen.tap(b.x + b.width / 2, b.y + b.height / 2);
+    await page.waitForTimeout(wait);
+  };
+  // Menu lines move one per press, but a press the page holds past ~300 ms
+  // repeats, so each step checks where the bar is
+  const toRow = async (row, step) => {
+    let r = await menuRow();
+    for (let i = 0; i < 24 && r !== row; i++) { await step(); r = await menuRow(); }
+    if (r !== row) throw new Error(`couldn't reach menu line ${row} (at ${r})`);
+  };
+
+  await app.locator('#play').click();
+  await app.locator('#player').waitFor({ timeout: 120000 });
+  if (!(await app.locator('#touch').isVisible())) throw new Error('no on-screen buttons on a touch screen');
+  await until('the title', isTitle, 60000);
+  // On-screen buttons only: ▼ leaves the title (once it takes keys), ▲ to
+  // New Mission, OK through mission 1, the difficulty, the briefing and the
+  // "find the RED access card" note
+  for (let i = 0; i < 30 && await menuRow() == null; i++) await tap('#tDown', 600);
+  await toRow(0, () => tap('#tUp', 900));
+  for (let i = 0; i < 3; i++) await tap('#tOk', 2500);
+  await tap('#tOk', 9000);
+  await tap('#tOk', 1500);
+  const standing = await look();
+  for (let i = 0; i < 6; i++) await tap('#tLeft', 150);
+  await page.waitForTimeout(500);
+  if ((await look()).equals(standing)) throw new Error('the on-screen ◀ didn\'t turn');
+  // Two pads like the car: the controller's raw device and the car's standard copy
+  await frame().evaluate(() => {
+    const pad = (id, mapping, index) => ({ id, index, mapping, connected: true, timestamp: 0, axes: [0, 0, 0, 0], buttons: Array.from({ length: 17 }, () => ({ pressed: false, value: 0 })) });
+    const pads = [pad('raw', '', 0), pad('Tesla Virtual Gamepad', 'standard', 1)];
+    navigator.getGamepads = () => pads;
+    window.padPress = async (b, ms = 200) => {
+      Object.assign(pads[1].buttons[b], { pressed: true, value: 1 });
+      await new Promise(r => setTimeout(r, ms));
+      Object.assign(pads[1].buttons[b], { pressed: false, value: 0 });
+    };
+    window.padAxes = async (axes, ms) => {
+      pads[1].axes = axes;
+      await new Promise(r => setTimeout(r, ms));
+      pads[1].axes = [0, 0, 0, 0];
+    };
+  });
+  const pad = async (b, wait = 1500, ms = 200) => { await frame().evaluate(([b, ms]) => padPress(b, ms), [b, ms]); await page.waitForTimeout(wait); };
+  const stick = (axes, ms) => frame().evaluate(([axes, ms]) => padAxes(axes, ms), [axes, ms]);
+  const [A, START, DOWN] = [0, 9, 13];
+  // The left stick turns: the view changes and the game keeps drawing
+  let before = await look();
+  const beforeFrames = (await stats()).frames;
+  await stick([-1, 0, 0, 0], 2000);
+  await page.waitForTimeout(300);
+  if ((await look()).equals(before)) throw new Error('the left stick didn\'t turn');
+  const drawn = (await stats()).frames - beforeFrames;
+  if (drawn < 30) throw new Error(`the game drew only ${drawn} frames in two seconds of turning`);
+  if (!(await app.locator('#padNote').isVisible())) throw new Error('the controller wasn\'t noticed');
+  // The right stick strafes
+  before = await look();
+  await stick([0, 0, 1, 0], 1000);
+  await page.waitForTimeout(300);
+  if ((await look()).equals(before)) throw new Error('the right stick didn\'t strafe');
+  await page.screenshot({ path: shots + 'blake.png' });
+  // Start opens the menu; Save Mission, the first place, Enter: saved with no name
+  await pad(START, 2500);
+  if (await menuRow() == null) throw new Error('Start didn\'t open the menu');
+  await toRow(8, () => pad(DOWN, 900, 60));
+  await pad(A, 2500);
+  await pad(A, 2500);
+  await pad(A, 3000);
+  if (!(await saved())) throw new Error('the controller didn\'t save');
+  // Start again goes back to the mission
+  await pad(START, 2500);
+  if (await menuRow() != null) throw new Error('Start didn\'t close the menu');
   await app.locator('#quitBtn').evaluate(b => (b.click(), b.click()));
   await app.locator('#start').waitFor({ timeout: 10000 });
   await app.locator('#kept').filter({ hasText: /Downloaded/ }).waitFor({ timeout: 10000 });

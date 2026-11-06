@@ -478,7 +478,10 @@ const tapKey = name => { keyDown(name); keyUp(name); };
 const keysDown = names => { for (const n of names) keyDown(n); };
 const keysUp = names => { for (const n of names) keyUp(n); };
 
-const seen = h => performance.now() - h.since >= 70 && (!running || M._web_frames() - h.frame >= 2 || performance.now() - h.since >= 600);
+// a key is let go once the game has drawn 2 frames since, or after 200 ms on a
+// still picture: under DOSBox's 500 ms key repeat and the ~300 ms some games
+// (Blake Stone's menus) count as a second press
+const seen = h => performance.now() - h.since >= 70 && (!running || M._web_frames() - h.frame >= 2 || performance.now() - h.since >= 200);
 function releaseDue() {
   for (const [name, k] of heldKeys) {
     if (!k.release || !seen(k)) continue;
@@ -559,8 +562,11 @@ function readPad(p, s) {
 const BUTTONS = ['a', 'b', 'x', 'y', 'lb', 'rb', 'ls', 'rs', 'start', 'back'];
 const AXES = { up: 'up', down: 'down', left: 'left', right: 'right', ...(G.pad.axes || {}) };
 const padHeld = new Map();        // button or axis -> the key names it holds
-function padHold(what, names) {
+// v is the pad entry: key names, or a function giving them (or doing its own
+// thing), called once per press
+function padHold(what, v) {
   if (padHeld.has(what)) return;
+  const names = keysOf(v);
   padHeld.set(what, names);
   keysDown(names);
 }
@@ -588,23 +594,23 @@ function pad() {
   }
   // the right stick, where a game uses it
   if (G.pad.rx) {
-    if (s.rx < -0.5) padHold('rx-', keysOf(G.pad.rx[0])); else padLet('rx-');
-    if (s.rx > 0.5) padHold('rx+', keysOf(G.pad.rx[1])); else padLet('rx+');
+    if (s.rx < -0.5) padHold('rx-', G.pad.rx[0]); else padLet('rx-');
+    if (s.rx > 0.5) padHold('rx+', G.pad.rx[1]); else padLet('rx+');
   }
   if (G.pad.ry) {
-    if (s.ry < -0.5) padHold('ry-', keysOf(G.pad.ry[0])); else padLet('ry-');
-    if (s.ry > 0.5) padHold('ry+', keysOf(G.pad.ry[1])); else padLet('ry+');
+    if (s.ry < -0.5) padHold('ry-', G.pad.ry[0]); else padLet('ry-');
+    if (s.ry > 0.5) padHold('ry+', G.pad.ry[1]); else padLet('ry+');
   }
   // the triggers
   for (const [t, v] of [['lt', s.lt], ['rt', s.rt]]) {
     if (!G.pad[t]) continue;
-    if (v > 0.5) padHold(t, keysOf(G.pad[t]));
+    if (v > 0.5) padHold(t, G.pad[t]);
     else if (v < 0.3) padLet(t);
   }
   // the buttons: each holds its keys while it's down
   for (const b of BUTTONS) {
     if (!G.pad[b]) continue;
-    if (s.held.has(b)) padHold(b, keysOf(G.pad[b]));
+    if (s.held.has(b)) padHold(b, G.pad[b]);
     else padLet(b);
   }
 }

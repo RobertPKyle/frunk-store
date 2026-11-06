@@ -1,0 +1,50 @@
+Blake Stone: Aliens of Gold (apps/blake)
+
+Unofficial, not affiliated with or endorsed by JAM Productions, Apogee
+Software or 3D Realms. "Blake Stone: Aliens of Gold" is a trademark of its
+owner; VENDOR.DOC lists it among Apogee's trademarks for this release.
+
+Engine (engine/)
+  DOSBox, by the DOSBox Team (https://www.dosbox.com), SVN r4305, as ported
+  to Emscripten by Boris Gjenero as em-dosbox
+  (https://github.com/dreamlayers/em-dosbox, branch em-dosbox-svn-sdl2,
+  commit e1f72dd11513c9ddc6e2a9c1f08ff50581c320f7, 2023-01-06).
+  License: GNU General Public License, version 2 (engine/COPYING).
+
+  This is a modified version of the program, the same build as The Elder
+  Scrolls app's: frunk.store's changes for the browser are in
+  engine/em-dosbox-web.patch (also tools/elderscrolls/em-dosbox-web.patch
+  in https://github.com/RobertPKyle/frunk-store, whose tools/build-dos.mjs
+  builds it with Emscripten 4.0.10), each change marked "[frunk]". The
+  complete patched source the build came from is
+  engine/em-dosbox-e1f72dd-web-src.tar.gz.
+  The changes: linked as an ES module with JSPI in place of Asyncify, so
+  DOSBox's own loop and its file reads can wait for the page; it lets the
+  page run through a MessageChannel message rather than a timer, and uses
+  up to 90% of the CPU rather than 60%; no splash screen and no DOSBox
+  hotkeys; the page can type keys and read how many frames were drawn and
+  where the game has the mouse pointer; and the pointer goes where it is
+  on the screen even when a game narrows the mouse's range. Built without
+  em-dosbox's function-array CPU cores, which are slower in WebAssembly.
+
+  Libraries compiled into it: Emscripten's SDL2 port (zlib license);
+  Emscripten itself (MIT / University of Illinois/NCSA licenses).
+
+Game (data/)
+  Blake Stone: Aliens of Gold, shareware episode 1 (Mission 1: Star
+  Institute), version 3.0. Copyright 1994 JAM Productions, licensed for
+  exclusive distribution by Apogee Software, Ltd. data/1bs30.zip is the
+  shareware as Apogee released it (sha256
+  9a7e39037689cb84054bd3ddca290ab3644e327f951eb08e7ad79500e9c0dfb3), from
+  Apogee's FTP server (ftp.3drealms.com/share/1bs30.zip) as the Internet
+  Archive saved it on 2015-11-30. Its license (VENDOR.DOC, also in the
+  game's folder) encourages everyone to copy, upload and pass the program
+  around without charging for it, with all of its files as released
+  included without modification; the game's folder here (BSTONE/, out of
+  the zip's BSSW30.SHR, a self-extracting zip, unpacked by unzip) is every
+  file, unchanged, cut into 1 MB blocks (data/<version>/) for downloading,
+  which the page joins back into the same files. frunk.store charges
+  nothing for this app.
+
+Page (index.html, blake.js, icon.svg) and the common DOS game page
+(apps/_shared/dosgame.js): by frunk.store.

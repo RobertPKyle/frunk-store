@@ -1,5 +1,7 @@
 // Builds the shareware DOS game apps that run in DOSBox: apps/deathrally
-// (Death Rally), apps/wolf3d (Wolfenstein 3D) and apps/keen1 (Commander Keen 1).
+// (Death Rally), apps/wolf3d (Wolfenstein 3D), apps/keen1 (Commander Keen 1),
+// and the games in tools/dos/games/ (Keen 4, Duke Nukem II, Cosmo, Hocus
+// Pocus, Rise of the Triad, Blake Stone).
 //
 // - The engine is The Elder Scrolls app's: em-dosbox (DOSBox SVN r4305 ported
 //   to Emscripten, GPL-2.0) at the same pinned commit with
@@ -24,10 +26,12 @@
 //   folder into 1 MB blocks (apps/<app>/data/<version>/<n>.bin) and
 //   data/index.json; the page fetches them all before the game starts.
 //
-//   node tools/build-dos.mjs [deathrally] [wolf3d] [keen1] [--engine | --data]
+// More games (one file each, in the same shape) are in tools/dos/games/.
+//
+//   node tools/build-dos.mjs [deathrally] [wolf3d] [keen1] [<game> ...] [--engine | --data]
 //   (no game: all; --engine: leave data/ as it is; --data: leave engine/)
 import { execFileSync } from 'node:child_process';
-import { copyFileSync, cpSync, createReadStream, existsSync, mkdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
+import { copyFileSync, cpSync, createReadStream, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { pack } from './supertux/pack.mjs';
@@ -93,8 +97,14 @@ const GAMES = {
     license: 'VENDOR.DOC',
   },
 };
+// More games, one file each: tools/dos/games/<app>.mjs default-exports
+// ({ FTP, unpackShr, run }) => the game's entry, in the same shape as above
+for (const f of readdirSync(`${root}tools/dos/games`).filter(f => f.endsWith('.mjs')).sort()) {
+  const id = f.slice(0, -4);
+  GAMES[id] = (await import(`./dos/games/${f}`)).default({ FTP, unpackShr, run: (...a) => run(...a) });
+}
 
-const run = (cmd, args, opts = {}) => execFileSync(cmd, args, { stdio: 'inherit', ...opts });
+const run =(cmd, args, opts = {}) => execFileSync(cmd, args, { stdio: 'inherit', ...opts });
 const args = process.argv.slice(2);
 const engineOnly = args.includes('--engine');
 const dataOnly = args.includes('--data');

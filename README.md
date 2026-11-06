@@ -586,8 +586,12 @@ clear them to make room.
   frames, as the games poll the mouse. Measured with the CPU slowed 4.5x:
   Arena about 15 fps turning in its first dungeon, Daggerfall about 22 fps
   in Privateer's Hold, about 18,000 DOSBox cycles. Not yet tried in the car.
-- `apps/deathrally`, `apps/wolf3d` and `apps/keen1`: Death Rally, Wolfenstein 3D
-  and Commander Keen 1, the shareware episodes in DOSBox. All use The Elder Scrolls app's engine
+- `apps/deathrally`, `apps/wolf3d`, `apps/keen1`, `apps/keen4`, `apps/duke2`,
+  `apps/cosmo`, `apps/hocus`, `apps/rott` and `apps/blake`: Death Rally,
+  Wolfenstein 3D, Commander Keen 1 and 4, Duke Nukem II, Cosmo's Cosmic
+  Adventure, Hocus Pocus, Rise of the Triad and Blake Stone, the shareware
+  episodes in DOSBox (each game after the first three is one file in
+  `tools/dos/games/`). All use The Elder Scrolls app's engine
   build (em-dosbox at the same commit with
   `tools/elderscrolls/em-dosbox-web.patch`, built by `npm run build:dos`,
   `tools/build-dos.mjs`, in the same Docker image; a copy of the engine and
@@ -650,6 +654,64 @@ clear them to make room.
     the title, on the map it saves in place 1, at Continue Game it loads it,
     and each key does nothing where it isn't wanted. The bottom button holds
     Ctrl then Enter (jump, or OK in the menu).
+  - Commander Keen 4 (`4keen.zip`, v1.4, 0.7 MB, 1991): Secret of the
+    Oracle, the shareware episode of id Software's Goodbye, Galaxy!,
+    licensed for distribution by Apogee; its VENDOR.DOC has the same terms
+    as Keen 1's, word for word. CK4SW14.SHR is the usual installer archive.
+    The game finds AdLib music and sound itself. It holds its 35 fps cap at
+    any setting, so it runs at a fixed 6,000 cycles: with the CPU slowed
+    4.5x, about 360 ms/s of task time against 830 at `max`. The page starts
+    it as `KEEN4E.EXE /NOMOUSE`, as taps moved DOSBox's mouse and with it
+    the menu cursor. Select and the on-screen Save 1 save in place 1 through
+    the game's own menu (F3, then S, Enter, 1 and so on), waiting until the
+    menu is drawn.
+  - Cosmo's Cosmic Adventure (`1cosmo.zip`, v1.2, 0.6 MB, 1992): Apogee's
+    own, with the same VENDOR.DOC terms as Keen 1, so the tagline says
+    "Apogee". COSSW12.SHR is the usual installer archive. AdLib music plus
+    PC speaker effects (`pcSpeaker: true`). Below about 7,000 cycles the
+    menus stop taking keys, so it runs at a fixed 10,000: with the CPU
+    slowed 4.5x, 605 ms/s against 970 at `max`, at the same game speed. Pad
+    buttons press the game's letters and numbers, each harmless where it
+    isn't wanted: A is B+Ctrl, X is Y+Enter, Select saves (F1 S 1 Enter), Y
+    loads (R 1 Enter). The keys go 900 ms apart, and the function starts
+    only on a new press.
+  - Hocus Pocus (`1hp11.zip`, v1.1, 0.9 MB, 1994): Moonlite Software's,
+    published by Apogee; its VENDOR.DOC has Keen 1's terms (copy freely
+    without charge, files unmodified, "Apogee" in all advertising).
+    HPSW11.SHR is a self-extracting zip. The game won't start without
+    HOCUS.SAV (settings, nine save places and high scores in one file), so
+    the page seeds the one its own SETUP.EXE wrote with a Sound Blaster. Its
+    menus read typed characters and Ctrl+Enter isn't Enter, so the bottom
+    button presses Y, Backspace, Enter, then Ctrl (Yes, an empty save name,
+    OK, jump), and Select is F2. It draws about 18 fps at any CPU speed, so
+    it runs at 8,000 cycles: with the CPU slowed 4.5x, 17.6 fps at about 520
+    ms/s of task time against 970 at max.
+  - Rise of the Triad (`1rott13.zip`, v1.3, 3.7 MB, 1995): Apogee's own; its
+    VENDOR.DOC has Keen 1's terms. ROTTSW13.SHR is a self-extracting zip
+    that unzip reads. The game won't start without SOUND.ROT, so the page
+    seeds it (Sound Blaster at 220h, as SETUP.EXE wrote it) along with a
+    CONFIG.ROT at low detail, with the mouse off and the weapon swap moved
+    from Enter to Q, so the bottom button can be Ctrl and Enter. With the
+    CPU slowed 4.5x: 27 fps turning at low detail, 18 at medium or high.
+    Select quicksaves (F6).
+  - Blake Stone: Aliens of Gold (`1bs30.zip`, v3.0, 1.5 MB, 1993–94): JAM
+    Productions' game on the Wolfenstein 3D engine with textured floors and
+    ceilings, licensed to Apogee. Its VENDOR.DOC terms match Keen 1's, so
+    the tagline says "Apogee" in every language. The zip's `BSSW30.SHR` is a
+    self-extracting zip, not Apogee's installer archive, so `unzip` reads
+    it. With the CPU slowed 4.5x, `max` cycles (about 15k) gives 27–32 fps
+    at full load; 12,000 gives 21–27.
+  - Duke Nukem II (`4duke.zip`, v1.0, 1.1 MB, 1993): Apogee's own; its
+    VENDOR.DOC has Keen 1's terms word for word. DN2SW10.SHR is a self-
+    extracting zip that unzip reads. It runs at `max` (about 18,000 cycles
+    with the CPU slowed 4.5x, 16.7 to 17.2 fps, the game's own rate being
+    17.5). The bottom button presses Space, not Enter, because an Enter
+    still held when the save-name prompt opens saves an empty name. Select
+    and the on-screen Save 1 save in slot 1 as "duke" while playing, reading
+    the save menu's arrow from the picture to reach slot 1; the left
+    shoulder and Load 1 restore it. The game writes save names (NUKEM2.-NM)
+    only when quit from its own menu, so before DOSBox starts the page names
+    any unnamed save "duke".
 - `apps/openttd`: OpenTTD 15.3 (GPL-2.0), compiled to WebAssembly by
   `npm run build:openttd` (`tools/build-openttd.mjs`: the 15.3 tag plus
   `tools/openttd/openttd-web.patch`, built with upstream's own Emscripten

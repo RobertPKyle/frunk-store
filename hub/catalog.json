@@ -362,6 +362,84 @@
       "added": "2026-11-04"
     },
     {
+      "id": "keen4",
+      "name": "Commander Keen 4",
+      "tagline": "Secret of the Oracle, id Software's 1991 sequel published by Apogee: the shareware episode of Goodbye, Galaxy! in full, with AdLib music, a world map and a pogo stick. With a controller or on screen.",
+      "path": "/keen4/",
+      "icon": "/keen4/icon.svg",
+      "tags": [
+        "Game",
+        "Controller",
+        "Touch"
+      ],
+      "added": "2026-11-06"
+    },
+    {
+      "id": "duke2",
+      "name": "Duke Nukem II",
+      "tagline": "Apogee's 1993 VGA sequel: aliens kidnap Duke, and he blasts his way out. Shareware episode 1 in full, with AdLib music and saves. With a controller or on screen.",
+      "path": "/duke2/",
+      "icon": "/duke2/icon.svg",
+      "tags": [
+        "Game",
+        "Controller",
+        "Touch"
+      ],
+      "added": "2026-11-06"
+    },
+    {
+      "id": "cosmo",
+      "name": "Cosmo's Cosmic Adventure",
+      "tagline": "Forbidden Planet, Apogee's 1992 platformer: shareware episode 1 in full, with suction-cup hands, bombs and AdLib music. With a controller or on screen.",
+      "path": "/cosmo/",
+      "icon": "/cosmo/icon.svg",
+      "tags": [
+        "Game",
+        "Controller",
+        "Touch"
+      ],
+      "added": "2026-11-06"
+    },
+    {
+      "id": "hocus",
+      "name": "Hocus Pocus",
+      "tagline": "Moonlite Software's 1994 VGA platformer published by Apogee: an apprentice wizard zaps monsters with lightning and collects magic crystals. Shareware episode 1 in full, with a controller or on screen.",
+      "path": "/hocus/",
+      "icon": "/hocus/icon.svg",
+      "tags": [
+        "Game",
+        "Controller",
+        "Touch"
+      ],
+      "added": "2026-11-06"
+    },
+    {
+      "id": "rott",
+      "name": "Rise of the Triad",
+      "tagline": "The HUNT Begins, Apogee's 1995 first-person shooter: shareware episode 1 in full, ten levels with rocket launchers and flying platforms. With a controller or on screen.",
+      "path": "/rott/",
+      "icon": "/rott/icon.svg",
+      "tags": [
+        "Game",
+        "Controller",
+        "Touch"
+      ],
+      "added": "2026-11-06"
+    },
+    {
+      "id": "blake",
+      "name": "Blake Stone",
+      "tagline": "Aliens of Gold, JAM Productions' 1993 shooter published by Apogee: secret agent Blake Stone against a mutant army, shareware episode 1 in full. With a controller or on screen.",
+      "path": "/blake/",
+      "icon": "/blake/icon.svg",
+      "tags": [
+        "Game",
+        "Controller",
+        "Touch"
+      ],
+      "added": "2026-11-06"
+    },
+    {
       "id": "openttd",
       "name": "OpenTTD",
       "tagline": "Build a transport empire with trains, trucks, ships and planes. The open-source Transport Tycoon, made for touch.",
