@@ -1,5 +1,5 @@
-// Solana wallets on a phone page, for signing a sign-in message (the vote,
-// the token screen's wallet connection). Never for transactions.
+// Solana wallets on a phone page, for signing a sign-in message (the vote).
+// Never for transactions.
 //
 // Wallets are found through the Wallet Standard, which Phantom, Solflare,
 // Backpack and others use, both as browser extensions and inside their

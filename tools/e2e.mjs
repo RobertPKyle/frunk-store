@@ -199,30 +199,30 @@ await check('hub switches language and remembers it', async () => {
   if (!(await page.locator('#grid .card h2').allTextContents()).includes('Brick Breaker')) throw new Error('cards not back in English');
 });
 
-await check('referral shows only in the Americas and Europe, token not in Chinese', async () => {
+await check('referral shows only in the Americas and Europe', async () => {
   const cases = [
-    ['America/Denver', 'en', true, true],
-    ['America/Toronto', 'en', true, true],
-    ['Pacific/Honolulu', 'en', true, true],
-    ['Europe/Berlin', 'de', true, true],
-    ['America/Los_Angeles', 'zh-Hant', true, false],
-    ['Asia/Taipei', 'zh-Hant', false, false],
-    ['Asia/Hong_Kong', 'en', false, true],
-    ['Asia/Singapore', 'zh-Hans', false, false],
-    ['Asia/Tokyo', 'ja', false, true],
-    ['Australia/Sydney', 'en', false, true],
-    ['UTC', 'en', true, true],
-    ['UTC', 'zh-Hant', false, false],
+    ['America/Denver', 'en', true],
+    ['America/Toronto', 'en', true],
+    ['Pacific/Honolulu', 'en', true],
+    ['Europe/Berlin', 'de', true],
+    ['America/Los_Angeles', 'zh-Hant', true],
+    ['Asia/Taipei', 'zh-Hant', false],
+    ['Asia/Hong_Kong', 'en', false],
+    ['Asia/Singapore', 'zh-Hans', false],
+    ['Asia/Tokyo', 'ja', false],
+    ['Australia/Sydney', 'en', false],
+    ['UTC', 'en', true],
+    ['UTC', 'zh-Hant', false],
   ];
-  for (const [timezoneId, code, referral, token] of cases) {
+  for (const [timezoneId, code, referral] of cases) {
     const context = await browser.newContext({ viewport: { width: 773, height: 601 }, timezoneId });
     try {
       const p = await context.newPage();
       await p.addInitScript(c => localStorage.setItem('hub.lang', JSON.stringify(c)), code);
       await p.goto(base + '/');
       await p.waitForSelector('.card');
-      const shown = [await p.locator('.referral').isVisible(), await p.locator('.token').isVisible()];
-      if (shown[0] !== referral || shown[1] !== token) throw new Error(`${timezoneId} in ${code}: referral ${shown[0]}, token ${shown[1]}`);
+      const shown = await p.locator('.referral').isVisible();
+      if (shown !== referral) throw new Error(`${timezoneId} in ${code}: referral ${shown}`);
     } finally {
       await context.close();
     }
@@ -4562,85 +4562,6 @@ await check('hub and a cached app open offline and on a slow connection', async 
   } finally {
     await context.setOffline(false);
     errors.length = before;
-  }
-});
-
-await check('token chart, wallet and buying on the phone from the hub footer', async () => {
-  await page.goto(base + '/');
-  await page.waitForSelector('.card');
-  if (await page.locator('#grid .card h2').filter({ hasText: 'FrunkStore Token' }).count()) throw new Error('the token screen is on the grid');
-  await page.locator('#openToken').click();
-  await page.waitForURL(/\/app\/token$/);
-  await page.waitForSelector('#loading', { state: 'hidden' });
-  const app = appFrame();
-  // live numbers from DexScreener and GeckoTerminal, through /api/token
-  await app.locator('#price').filter({ hasText: /^\$\d/ }).waitFor({ timeout: 20000 });
-  await app.locator('#chartMsg').waitFor({ state: 'hidden', timeout: 45000 });   // a busy chart source is asked again after 30 s
-  await app.getByRole('button', { name: '1H', exact: true }).click();
-  await app.locator('#readout').filter({ hasText: / Vol / }).waitFor({ timeout: 45000 });
-  const lit = await app.locator('#chart').evaluate(c => {
-    const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
-    let n = 0;
-    for (let i = 3; i < d.length; i += 4) if (d[i]) n++;
-    return n / (d.length / 4);
-  });
-  if (lit < 0.01) throw new Error(`chart nearly empty (${(lit * 100).toFixed(2)}% drawn)`);
-  console.log(`     ${await app.locator('#price').textContent()} ${await app.locator('#change').textContent()}, mcap ${await app.locator('#mcap').textContent()}`);
-
-  // Buying: the risks first, then a code to the phone page
-  await app.getByRole('button', { name: 'Buy on your phone' }).click();
-  if (await app.locator('#risks li').count() < 6) throw new Error('the risks are missing');
-  if (!(await app.getByRole('button', { name: 'Show the code for my phone' }).isDisabled())) throw new Error('the code shows before the risks are accepted');
-  await app.locator('#accept').check();
-  await app.getByRole('button', { name: 'Show the code for my phone' }).click();
-  const buyLink = await app.locator('#buyQr a').getAttribute('href');
-  if (!buyLink.endsWith('/token/phone/?buy')) throw new Error(`buy code is ${buyLink}`);
-  await page.screenshot({ path: shots + 'token-buy.png' });
-  await app.locator('#buySheet [data-close]').click();
-
-  // Connecting: a code to the phone page; a signed-in wallet shows its balance
-  await app.getByRole('button', { name: 'Connect wallet' }).click();
-  const code = new URL(await app.locator('#connectCode a').getAttribute('href'));
-  if (code.pathname !== '/token/phone/' || !code.searchParams.get('c')) throw new Error(`connect code is ${code}`);
-  await page.screenshot({ path: shots + 'token-connect.png' });
-  if (!dev) return;
-  const holderWallet = await holderPhone(appsBase, 150000);
-  const post = async (op, data) => (await fetch(`${appsBase}/api/token?op=${op}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) })).json();
-  const cid = code.searchParams.get('c');
-  const { message } = await post('nonce', { address: holderWallet.address, cid });
-  if (!message?.includes('Connect this wallet to the FrunkStore token screen')) throw new Error(`nonce: ${JSON.stringify(message)}`);
-  const linked = await post('connect', { cid, message, signature: holderWallet.sign(message) });
-  if (!linked.ok) throw new Error(`connect: ${JSON.stringify(linked)}`);
-  await app.locator('#tokens').filter({ hasText: '150,000 FrunkStore' }).waitFor({ timeout: 10000 });
-  if (await app.locator('#kind').textContent() !== 'Signed in') throw new Error('not shown as signed in');
-  await page.screenshot({ path: shots + 'token.png' });
-
-  // The phone page: watching an address without signing, and the buying links after the risks
-  const phone = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, hasTouch: true, isMobile: true });
-  phone.on('pageerror', e => errors.push(`token phone pageerror: ${e.message}`));
-  try {
-    const watched = await holderPhone(appsBase, 150000);
-    await watched.setTokens(2500);
-    const car = await post('connect-open', {});
-    await phone.goto(`${appsBase}/token/phone/?c=${car.cid}`);
-    if (await phone.locator('#buy').isVisible()) throw new Error('buying shows on the connect page');
-    const phantom = await phone.getByRole('link', { name: 'Open in Phantom' }).getAttribute('href');
-    if (!phantom.includes(encodeURIComponent(`?c=${car.cid}`))) throw new Error('Phantom link drops the car code');
-    await phone.locator('#address').fill(watched.address);
-    await phone.getByRole('button', { name: 'Show it on my car' }).click();
-    await phone.locator('#connectMsg').filter({ hasText: 'Connected: 2,500 FrunkStore' }).waitFor({ timeout: 5000 });
-    const got = await post('connect-poll', { cid: car.cid, secret: car.secret });
-    if (got.address !== watched.address || got.signed) throw new Error(`watch-only poll: ${JSON.stringify(got)}`);
-
-    await phone.goto(`${appsBase}/token/phone/?buy`);
-    await phone.locator('#market b').waitFor({ timeout: 20000 });
-    if (await phone.locator('#phantomSwap').isVisible()) throw new Error('buy links show before the risks are accepted');
-    await phone.locator('#accept').check();
-    const swap = await phone.getByRole('link', { name: 'Buy in Phantom' }).getAttribute('href');
-    if (swap !== 'https://phantom.app/ul/v1/swap?buy=solana%3A101%2Faddress%3A9T1DbbiKfhfubEabDj5SWSMzBuyU4tJHkpSgR51Tpump') throw new Error(`Phantom swap link is ${swap}`);
-    await phone.screenshot({ path: shots + 'token-phone.png', fullPage: true });
-  } finally {
-    await phone.close();
   }
 });
 

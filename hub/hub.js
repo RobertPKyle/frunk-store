@@ -89,8 +89,6 @@ function referralHere() {
 function applyLang() {
   root.lang = lang;
   document.querySelector('.referral').hidden = !referralHere();
-  // the community token isn't promoted to Chinese readers
-  document.querySelector('.token').hidden = lang.startsWith('zh');
   for (const node of document.querySelectorAll('[data-i18n]')) node.innerHTML = t(node.dataset.i18n);
   for (const node of document.querySelectorAll('[data-i18n-label]')) node.setAttribute('aria-label', t(node.dataset.i18nLabel));
   for (const node of document.querySelectorAll('[data-i18n-title]')) node.title = t(node.dataset.i18nTitle);
@@ -111,8 +109,7 @@ function el(tag, attrs = {}, ...children) {
   return node;
 }
 
-// Apps marked unlisted aren't on the grid: they open from elsewhere on the
-// page (the token's chart, from the footer).
+// Apps marked unlisted aren't on the grid
 const listed = () => catalog.apps.filter(app => !app.unlisted);
 
 // A "New" or "Updated" badge while the catalog's date for it is recent, until
@@ -195,7 +192,7 @@ searchForm.addEventListener('submit', e => {
 function renderRecent() {
   if (!catalog) return;
   const apps = store.get('recent', []).map(id => catalog.apps.find(a => a.id === id))
-    .filter(app => app && !(app.id === 'token' && lang.startsWith('zh'))).slice(0, RECENT);   // as in the footer
+    .filter(Boolean).slice(0, RECENT);
   recentRow.replaceChildren(...apps.map(app => {
     const b = el('button', { class: 'recent-app', type: 'button' },
       el('img', { src: appsOrigin + app.icon, alt: '', width: 28, height: 28 }), el('span', {}, appName(app)));
@@ -532,23 +529,6 @@ async function init() {
     history.replaceState(null, '', '/');
   }
 }
-
-// Copies the community token's address; selects it when the clipboard is
-// off limits, so it can still be copied by hand
-document.getElementById('copyToken').addEventListener('click', async e => {
-  const btn = e.currentTarget;
-  const code = document.getElementById('tokenAddress');
-  try {
-    await navigator.clipboard.writeText(code.textContent);
-    btn.textContent = t('copied');
-  } catch {
-    getSelection().selectAllChildren(code);
-    btn.textContent = t('selected');
-  }
-  setTimeout(() => { btn.textContent = t('copy'); }, 2000);
-});
-
-document.getElementById('openToken').addEventListener('click', () => launch('token'));
 
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
 // The page stays hidden (the head's i18n-wait) until its language is in

@@ -227,17 +227,6 @@
       ]
     },
     {
-      "id": "token",
-      "name": "FrunkStore Token",
-      "tagline": "The community token's live price chart, your wallet's balance, and a way to buy it on your phone.",
-      "path": "/token/",
-      "icon": "/token/icon.svg",
-      "tags": [
-        "Tool"
-      ],
-      "unlisted": true
-    },
-    {
       "id": "craft4k",
       "name": "Craft 4K",
       "tagline": "Notch's tiny Minecraft4k rebuilt in C++ and ray-marched on the graphics chip: a big block world with sun shadows, day and night, and mirrors to build with.",

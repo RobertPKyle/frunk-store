@@ -1,6 +1,5 @@
-// Solana helpers shared by the vote (vote.js) and the token screen
-// (token.js): the FrunkStore mint, wallet addresses, signed messages and
-// balances.
+// Solana helpers for the vote (vote.js): the FrunkStore mint, wallet
+// addresses, signed messages and balances.
 
 import { createPublicKey, verify } from 'node:crypto';
 import { redis } from './_lib.js';
