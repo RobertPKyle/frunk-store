@@ -89,6 +89,8 @@ function referralHere() {
 function applyLang() {
   root.lang = lang;
   document.querySelector('.referral').hidden = !referralHere();
+  // the tokens aren't promoted to Chinese readers
+  document.querySelector('.token').hidden = lang.startsWith('zh');
   for (const node of document.querySelectorAll('[data-i18n]')) node.innerHTML = t(node.dataset.i18n);
   for (const node of document.querySelectorAll('[data-i18n-label]')) node.setAttribute('aria-label', t(node.dataset.i18nLabel));
   for (const node of document.querySelectorAll('[data-i18n-title]')) node.title = t(node.dataset.i18nTitle);
@@ -528,6 +530,22 @@ async function init() {
   } else if (deepLink) {
     history.replaceState(null, '', '/');
   }
+}
+
+// Copies a token's address; selects it when the clipboard is off limits, so
+// it can still be copied by hand
+for (const btn of document.querySelectorAll('.token-copy')) {
+  btn.addEventListener('click', async () => {
+    const code = btn.parentElement.querySelector('code');
+    try {
+      await navigator.clipboard.writeText(code.textContent);
+      btn.textContent = t('copied');
+    } catch {
+      getSelection().selectAllChildren(code);
+      btn.textContent = t('selected');
+    }
+    setTimeout(() => { btn.textContent = t('copy'); }, 2000);
+  });
 }
 
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});

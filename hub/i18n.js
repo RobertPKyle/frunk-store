@@ -25,6 +25,8 @@ export const EN_UI = {
   filterCamp: 'Camp Mode',
   filterRoad: 'Road Trip',
   filterTools: 'Tools',
+  copied: 'Copied',
+  selected: 'Selected',
   badgeNew: 'New',
   badgeUpdated: 'Updated',
   searchNone: 'No apps match “{query}”.',

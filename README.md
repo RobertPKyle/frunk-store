@@ -31,7 +31,7 @@ app runs.
 
 The referral offer in the footer shows only in the Americas and Europe, going by
 the browser's time zone; a zone that says nothing (UTC) falls back on the
-language.
+language. The token addresses in the footer are hidden in the Chinese hub.
 
 An app's catalog entry can carry `"added"` or `"updated"` with a date
 (`YYYY-MM-DD`). For 14 days after it, the app's card shows a New or Updated
