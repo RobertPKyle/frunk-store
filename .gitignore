@@ -117,3 +117,9 @@ apps/blake/VENDOR.DOC
 apps/duke2/engine
 apps/duke2/data
 apps/duke2/VENDOR.DOC
+tools/.roguerogue-build
+apps/roguerogue/game
+tools/.critter-build
+apps/critter/engine
+tools/.rocks-build
+apps/rocks/engine

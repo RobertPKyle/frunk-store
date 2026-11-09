@@ -1,0 +1,451 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 65a17e6..7098bc9 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -28,14 +28,13 @@ endif()
+ if(EMSCRIPTEN)
+     string(REGEX REPLACE "\n *" " " EMSCRIPTEN_FLAGS "
+         -fno-rtti
+-        -Oz
++        -O2
+         -s USE_SDL=2
+         -s USE_SDL_IMAGE=2
+         -s SDL2_IMAGE_FORMATS='[\"png\"]'
+         -s USE_SDL_MIXER=2
+         -s USE_ZLIB=1
+         -s USE_LIBPNG=1
+-        -s USE_ICU=1
+     ")
+ #-s USE_OGG=1
+ #-s USE_VORBIS=1
+@@ -43,7 +42,6 @@ if(EMSCRIPTEN)
+ #-fno-exceptions
+ #-s FULL_ES3=1
+     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${EMSCRIPTEN_FLAGS} -s USE_WEBGL2=1")
+-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --shell-file ${PROJECT_SOURCE_DIR}/critter-template.html")
+ endif()
+ 
+ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -I${PROJECT_SOURCE_DIR}/3rdparty/glm")
+diff --git a/data/system/Menu.xml b/data/system/Menu.xml
+index 8753110..291b73a 100644
+--- a/data/system/Menu.xml
++++ b/data/system/Menu.xml
+@@ -122,8 +122,8 @@
+             Info="Goto https://github.com/leethomason for details."
+             Position="500.0 300.0" />
+         <TextItem
+-            Text="-- Lunar Gravity & Burkey (Soundtrack) --"
+-            Info="Critical: Lunar Gravity's Millennium Remake"
++            Text="-- Centurion_of_war (Soundtrack) --"
++            Info="Overdrive, from OpenGameArt.org (CC0)."
+             Position="500.0 270.0" />
+         <TextItem
+             Text="-- PhysicsFS --"
+@@ -157,21 +157,6 @@
+             Info="Video related tweaks."
+             Position="500.0 440.0">
+ 
+-            <Bool
+-                Text="Fullscreen"
+-                Info="Toggle between fullscreen and windowed mode."
+-                Position="220.0 460.0"
+-                Variable="fullscreen" />
+-            <Resolution
+-                Text="Resolution: "
+-                Info="Change resolution. Click resolution to change and box to accept."
+-                Position="220.0 420.0" />
+-            <Bool
+-                Text="Allow Skewed Resolution"
+-                Info="Allow resolutions that do not have an aspect ratio or 4:3."
+-                Position="220.0 380.0"
+-                Variable="allowAnyAspectRatio" />
+-
+             <Bool
+                 Text="Show FPS"
+                 Info="Show or hide frames per second counter."
+@@ -204,12 +189,6 @@
+                 Info="Turn music on or off."
+                 Position="220.0 460.0"
+                 Variable="playMusic" />
+-            <Bool
+-                Text="Play default soundtrack"
+-                Info="Play default or custom soundtrack."
+-                Position="220.0 420.0"
+-                Variable="playDefaultSoundtrack" />
+-
+             <Float
+                 Text="Music Volume"
+                 Info="Change music volume."
+@@ -253,10 +232,4 @@
+ 
+     </Menu>
+ 
+-    <ActionItem
+-        Text="Quit"
+-        Action="Quit"
+-        Info="I had enough, thank you!"
+-        Position="500.0 130.0"/>
+-
+ </Menu>
+diff --git a/game/CMakeLists.txt b/game/CMakeLists.txt
+index ad44179..ca794b2 100644
+--- a/game/CMakeLists.txt
++++ b/game/CMakeLists.txt
+@@ -86,18 +86,21 @@ set_property(DIRECTORY ${PROJECT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT critter
+ 
+ if(EMSCRIPTEN)
+     message(STATUS "Setting compilation target to EMSCRIPTEN")
+-    set(CMAKE_EXECUTABLE_SUFFIX ".html")
++    set(CMAKE_EXECUTABLE_SUFFIX ".js")
+     string(REGEX REPLACE "\n *" " " EMSCRIPTEN_LINK_FLAGS "
+-        -Oz
++        -O2
+         -s USE_SDL=2
+         -s USE_SDL_IMAGE=2
+         -s SDL2_IMAGE_FORMATS='[\"png\"]'
+         -s USE_ZLIB=1
+         -s USE_LIBPNG=1
+-        -s USE_ICU=1
++        -s INITIAL_MEMORY=64MB
+         -s ALLOW_MEMORY_GROWTH=1
+-        -s EXPORTED_FUNCTIONS='[_main]'
+-        -s EXPORTED_RUNTIME_METHODS=['UTF8ToString']
++        -s MODULARIZE=1
++        -s EXPORT_NAME=createCritter
++        -s INVOKE_RUN=0
++        -s EXPORTED_FUNCTIONS='[_main,_malloc,_free,_web_key,_web_move,_web_menu_point,_web_mouse_button,_web_state,_web_name,_web_save,_web_score,_web_hero_x,_web_energy]'
++        -s EXPORTED_RUNTIME_METHODS='[UTF8ToString,stringToUTF8,lengthBytesUTF8,FS,IDBFS,callMain,HEAP8]'
+         --preload-file ${CMAKE_SOURCE_DIR}/resource.dat@resource.dat
+         -lidbfs.js
+     ")
+diff --git a/game/Game.cpp b/game/Game.cpp
+index 3b17128..bc08bbb 100644
+--- a/game/Game.cpp
++++ b/game/Game.cpp
+@@ -88,7 +88,7 @@ bool Game::init(void) {
+         return false;
+     }
+ 
+-    AudioS::instance()->setDefaultSoundtrack("music/lg-criti.ogg");
++    AudioS::instance()->setDefaultSoundtrack("music/overdrive.ogg");
+     if (!AudioS::instance()->init()) {
+         return false;
+     }
+diff --git a/game/Hero.hpp b/game/Hero.hpp
+index 551164a..48ac7ce 100644
+--- a/game/Hero.hpp
++++ b/game/Hero.hpp
+@@ -58,6 +58,10 @@ public:
+ 
+     bool alive(void) { return _isAlive; }
+ 
++    // for the page's end-to-end check
++    float webX(void) { return pInfo ? pInfo->position.x : 0.0f; }
++    float webEnergy(void) { return _weaponEnergy; }
++
+     void alive(bool a) { _isAlive = a; }
+ 
+     void addEnergy(int val);
+diff --git a/game/Input.cpp b/game/Input.cpp
+index d685f11..c44f30c 100644
+--- a/game/Input.cpp
++++ b/game/Input.cpp
+@@ -155,7 +155,7 @@ bool Input::tryGetTrigger(Trigger& trigger, bool& isDown) {
+                 ConfigS::instance()->updateKeyword("fullscreen", w);
+             }
+ 
+-#ifndef NO_QUICK_EXIT
++#if !defined(NO_QUICK_EXIT) && !defined(EMSCRIPTEN)
+             if ((event.key.keysym.sym == SDLK_BACKQUOTE) ||
+                 ((event.key.keysym.sym == SDLK_q) && (event.key.keysym.mod & MAIN_MODIFIER))) {
+                 GameState::isAlive = false;
+diff --git a/game/MenuManager.cpp b/game/MenuManager.cpp
+index 2be196d..c3d1793 100644
+--- a/game/MenuManager.cpp
++++ b/game/MenuManager.cpp
+@@ -374,6 +374,12 @@ bool MenuManager::canReturnToGame(void) {
+     return (_prevContext == Context::eInGame) || (_prevContext == Context::ePaused);
+ }
+ 
++void MenuManager::webPoint(float x, float y) {
++    _prevMouseX = _mouseX = x;
++    _prevMouseY = _mouseY = y;
++    activateSelectableUnderMouse();
++}
++
+ void MenuManager::updateMousePosition(const Trigger& trigger) {
+     if (VideoS::instance()->isFullscreen()) {
+         _mouseX += trigger.fData1;
+diff --git a/game/MenuManager.hpp b/game/MenuManager.hpp
+index e165843..8f18457 100644
+--- a/game/MenuManager.hpp
++++ b/game/MenuManager.hpp
+@@ -50,6 +50,9 @@ public:
+     void reset(void);
+     void reload(void);
+ 
++    // a tap: where the pointer is, in the menu's own 1000x750 space
++    void webPoint(float x, float y);
++
+ private:
+     virtual ~MenuManager();
+     MenuManager(void);
+diff --git a/game/TextInput.hpp b/game/TextInput.hpp
+index 682b58b..d05b357 100644
+--- a/game/TextInput.hpp
++++ b/game/TextInput.hpp
+@@ -29,6 +29,7 @@ public:
+     bool isOn(void) { return _isOn; }
+ 
+     const std::string& getText(void) { return _line; }
++    void setText(const std::string& text) { _line = text; }
+ 
+ private:
+     TextInput(const TextInput&);
+diff --git a/game/Video.cpp b/game/Video.cpp
+index 8c16d7b..b75fabe 100644
+--- a/game/Video.cpp
++++ b/game/Video.cpp
+@@ -257,6 +257,15 @@ bool Video::init(void) {
+     return true;
+ }
+ 
++void Video::webSetName(const std::string& name) {
++    if (!_textInput.isOn()) {
++        return;
++    }
++    _textInput.setText(name);
++    ScoreKeeperS::instance()->setName(name);
++    _textInput.turnOff();
++}
++
+ #define DEBUG_OPENGL 1
+ #if defined(DEBUG_OPENGL) && !defined(EMSCRIPTEN)
+ void GLAPIENTRY
+@@ -656,7 +665,7 @@ bool Video::update(void) {
+ 
+                 ScoreKeeperS::instance()->setName(_textInput.getText());
+             } else {
+-                string moremorequickquick = "Press right mouse button to restart";
++                string moremorequickquick = "Play again, or open the menu";
+                 smallFont.setColor(1.0f, 0.852f, 0.0f, 1.0f);
+                 smallFont.DrawString(moremorequickquick.c_str(), 215, 140, 1.0f, 1.0f);
+             }
+diff --git a/game/Video.hpp b/game/Video.hpp
+index 3299ad8..1b38a08 100644
+--- a/game/Video.hpp
++++ b/game/Video.hpp
+@@ -38,6 +38,10 @@ public:
+ 
+     int getWidth(void) { return _width; }
+ 
++    // the page's name box, in place of typing at the game-over screen
++    bool webNameWanted(void) { return _textInput.isOn(); }
++    void webSetName(const std::string& name);
++
+     int getHeight(void) { return _height; }
+ 
+     bool isFullscreen(void) { return _isFullscreen; }
+diff --git a/game/Web.cpp b/game/Web.cpp
+new file mode 100644
+index 0000000..53172e0
+--- /dev/null
++++ b/game/Web.cpp
+@@ -0,0 +1,93 @@
++// What the page calls: frunk.store's web build reads touch and controllers in
++// JavaScript and passes them on through these functions.
++#if defined(EMSCRIPTEN)
++#include <string>
++
++#include <SDL.h>
++#include <emscripten.h>
++
++#include "Trace.hpp"
++#include "Config.hpp"
++#include "Context.hpp"
++#include "GameState.hpp"
++#include "Hero.hpp"
++#include "Input.hpp"
++#include "MenuManager.hpp"
++#include "ScoreKeeper.hpp"
++#include "Video.hpp"
++
++extern "C" {
++
++// a key, as the game's own bindings and menus read it
++EMSCRIPTEN_KEEPALIVE void web_key(int sym, int down) {
++    SDL_Event e;
++    SDL_memset(&e, 0, sizeof(e));
++    e.type = down ? SDL_KEYDOWN : SDL_KEYUP;
++    e.key.state = down ? SDL_PRESSED : SDL_RELEASED;
++    e.key.keysym.sym = sym;
++    e.key.keysym.scancode = SDL_GetScancodeFromKey(sym);
++    SDL_PushEvent(&e);
++}
++
++// a press of the left mouse button, which the menus use
++EMSCRIPTEN_KEEPALIVE void web_mouse_button(int button, int down) {
++    SDL_Event e;
++    SDL_memset(&e, 0, sizeof(e));
++    e.type = down ? SDL_MOUSEBUTTONDOWN : SDL_MOUSEBUTTONUP;
++    e.button.button = button;
++    e.button.state = down ? SDL_PRESSED : SDL_RELEASED;
++    SDL_PushEvent(&e);
++}
++
++// moves the ship by pixels of the drawing, as the mouse does
++EMSCRIPTEN_KEEPALIVE void web_move(float dx, float dy) {
++    if (GameState::context == Context::eInGame) {
++        HeroS::instance()->move(dx, dy);
++    }
++}
++
++// the menu pointer, in fractions of the picture from the top left
++EMSCRIPTEN_KEEPALIVE void web_menu_point(float x, float y) {
++    if (GameState::context == Context::eMenu) {
++        MenuManagerS::instance()->webPoint(x * 1000.0f, 750.0f - y * 750.0f);
++    }
++}
++
++// bits 0-2: the context (1 menu, 2 in game, 3 paused, 4 camera);
++// 8: the ship is alive; 16: the top-ten name is wanted
++EMSCRIPTEN_KEEPALIVE int web_state(void) {
++    int state = (int)GameState::context;
++    if (HeroS::instance()->alive()) {
++        state |= 8;
++    }
++    if (VideoS::instance()->webNameWanted()) {
++        state |= 16;
++    }
++    return state;
++}
++
++EMSCRIPTEN_KEEPALIVE float web_hero_x(void) {
++    return HeroS::instance()->webX();
++}
++
++EMSCRIPTEN_KEEPALIVE float web_energy(void) {
++    return HeroS::instance()->webEnergy();
++}
++
++EMSCRIPTEN_KEEPALIVE int web_score(void) {
++    return ScoreKeeperS::instance()->getCurrentScore();
++}
++
++// the name for a top-ten finish, then back to the menu as Enter would
++EMSCRIPTEN_KEEPALIVE void web_name(const char* name) {
++    VideoS::instance()->webSetName(name);
++}
++
++// writes settings and scores to their files; the page then syncs IndexedDB
++EMSCRIPTEN_KEEPALIVE void web_save(void) {
++    ConfigS::instance()->saveToFile();
++    ScoreKeeperS::instance()->save();
++}
++
++}  // extern "C"
++#endif
+diff --git a/game/main.cpp b/game/main.cpp
+index 2ddbe23..fe36822 100644
+--- a/game/main.cpp
++++ b/game/main.cpp
+@@ -3,6 +3,11 @@
+ //
+ // Copyright (C) 2004-2023 Frank Becker
+ //
++#if defined(EMSCRIPTEN)
++#include <emscripten.h>
++#include <emscripten/html5.h>
++#endif
++#include "Value.hpp"
+ #include "SDL.h"  //needed for SDL_main
+ 
+ #include "Trace.hpp"
+@@ -101,6 +106,19 @@ void init(int argc, char* argv[]) {
+     // process command line arguments...
+     cfg->updateFromCommandLine(argc, argv);
+ 
++#if defined(EMSCRIPTEN)
++    // the page chooses the drawing size; there's no full screen from in here
++    {
++        int w = EM_ASM_INT({ return Module.critterWidth | 0; });
++        int h = EM_ASM_INT({ return Module.critterHeight | 0; });
++        if (w && h) {
++            cfg->updateKeyword("width", new Value(w));
++            cfg->updateKeyword("height", new Value(h));
++        }
++        cfg->updateKeyword("fullscreen", new Value(false));
++    }
++#endif
++
+     // to dump or not to dump...
+     cfg->getBoolean("developer", GameState::isDeveloper);
+     if (GameState::isDeveloper) {
+@@ -108,8 +126,6 @@ void init(int argc, char* argv[]) {
+     }
+ }
+ #if defined(EMSCRIPTEN)
+-#include <emscripten.h>
+-#include <emscripten/html5.h>
+ bool configInitialized = false;
+ 
+ void emPreInitLoop() {
+@@ -121,11 +137,13 @@ void emPreInitLoop() {
+             configInitialized = true;
+ 
+             if (!GameS::instance()->init()) {
++                EM_ASM({ Module.critterFailed = 1; });
+                 emscripten_cancel_main_loop();
+                 //emscripten_exit_with_live_runtime();
++            } else {
++                EM_ASM({ Module.critterReady = 1; });
+             }
+         } else {
+-            emscripten_request_pointerlock("#canvas", true);
+             Game::gameLoop();
+         }
+     }
+@@ -134,26 +152,7 @@ void emPreInitLoop() {
+ 
+ int main(int argc, char* argv[]) {
+ #if defined(EMSCRIPTEN)
+-    EM_ASM(var path = Module.UTF8ToString($0);
+-    // Make a directory other than '/'
+-    FS.mkdir(path);
+-    // Then mount with IDBFS type
+-    FS.mount(IDBFS, {}, path);
+-
+-    // Then sync
+-    FS.syncfs(
+-        true,
+-        function(err) {
+-        if (err) {
+-            console.log('FS.syncfs error: ' + err)
+-        }
+-        else {
+-            console.log('Mounted IDBFS at: ' + path);
+-            Module.askUserToStart();
+-        }
+-    });
+-    , "Critter");
+-
++    // (the page has already mounted /Critter from IndexedDB and set readyToStart)
+     // 0 fps means to use requestAnimationFrame; non-0 means to use setTimeout.
+     emscripten_set_main_loop(emPreInitLoop, 0, 1);
+     return 0;
+diff --git a/mooflu.common/utilssdl/Audio.cpp b/mooflu.common/utilssdl/Audio.cpp
+index 61008d8..102073b 100644
+--- a/mooflu.common/utilssdl/Audio.cpp
++++ b/mooflu.common/utilssdl/Audio.cpp
+@@ -137,7 +137,11 @@ bool Audio::init(void) {
+         }
+ 
+         //Note: set rate to 48000 (ogg playback on VM didn't work with DEFAULT (22050))
++#if defined(EMSCRIPTEN)
++        if (Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, MIX_DEFAULT_CHANNELS, 2048) < 0) {
++#else
+         if (Mix_OpenAudio(48000, MIX_DEFAULT_FORMAT, MIX_DEFAULT_CHANNELS, 1024) < 0) {
++#endif
+             LOG_WARNING << "Open Audio failed: " << SDL_GetError() << "\n";
+             _audioEnabled = false;
+             return false;

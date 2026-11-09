@@ -1,0 +1,361 @@
+--- pristine/src/api.c
++++ src/src/api.c
+@@ -24,6 +24,9 @@
+ static void ExecuteAsThread(SDL_ThreadFunction function, char *name, void *data, char *error)
+ {
+ #if defined(PLATFORM_EMSCRIPTEN)
++  // frunk.store: no calls to the high score server
++#undef emscripten_async_wget2_data
++#define emscripten_async_wget2_data(u, m, p, a, f, l, e, r) ((e)(0, (a), 0, "offline"))
+   // threads currently not fully supported by Emscripten/SDL and some browsers
+   function(data);
+ #else
+--- pristine/src/files.c
++++ src/src/files.c
+@@ -12413,7 +12413,7 @@
+ {
+   int i;
+ 
+-  si->player_name			= getStringCopy(getDefaultUserName(user.nr));
++  si->player_name			= getStringCopy("Player");
+ 
+   si->multiple_users			= TRUE;
+ 
+@@ -12509,7 +12509,7 @@
+   si->touch.control_type		= getStringCopy(TOUCH_CONTROL_DEFAULT);
+   si->touch.move_distance		= TOUCH_MOVE_DISTANCE_DEFAULT;		// percent
+   si->touch.drop_distance		= TOUCH_DROP_DISTANCE_DEFAULT;		// percent
+-  si->touch.transparency		= TOUCH_TRANSPARENCY_DEFAULT;		// percent
++  si->touch.transparency		= 20;					// percent
+   si->touch.draw_outlined		= TRUE;
+   si->touch.draw_pressed		= TRUE;
+ 
+@@ -12736,13 +12736,13 @@
+   si->player_uuid			= NULL;		// (will be set later)
+   si->player_version			= 1;		// (will be set later)
+ 
+-  si->use_api_server			= TRUE;
++  si->use_api_server			= FALSE;
+   si->api_server_hostname		= getStringCopy(API_SERVER_HOSTNAME);
+   si->api_server_password		= getStringCopy(UNDEFINED_PASSWORD);
+   si->ask_for_uploading_tapes		= TRUE;
+   si->ask_for_remaining_tapes		= FALSE;
+-  si->provide_uploading_tapes		= TRUE;
+-  si->ask_for_using_api_server		= TRUE;
++  si->provide_uploading_tapes		= FALSE;
++  si->ask_for_using_api_server		= FALSE;
+   si->has_remaining_tapes		= FALSE;
+ }
+ 
+--- pristine/src/libgame/sdl.c
++++ src/src/libgame/sdl.c
+@@ -3141,6 +3141,12 @@
+ 	if (outline_border & MV_DOWN)
+ 	  RenderFillRectangle(rect_x, rect.y + rect.h - border_size,
+ 			      rect_w, border_size);
++
++#if defined(PLATFORM_EMSCRIPTEN)
++	// frunk.store: a faint fill, so a button reads as one on a busy level
++	SDL_SetRenderDrawColor(sdl_renderer, 255, 255, 255, alpha_draw / 6);
++	SDL_RenderFillRect(sdl_renderer, &rect);
++#endif
+       }
+       else
+       {
+--- pristine/src/libgame/sdl.h
++++ src/src/libgame/sdl.h
+@@ -15,7 +15,7 @@
+ #include <SDL.h>
+ #include <SDL_image.h>
+ #include <SDL_mixer.h>
+-#include <SDL_net.h>
++#include "SDL_net_stub.h"
+ #include <SDL_thread.h>
+ #if defined(PLATFORM_WINDOWS)
+ #include <SDL_syswm.h>
+--- pristine/src/libgame/SDL_net_stub.h
++++ src/src/libgame/SDL_net_stub.h
+@@ -0,0 +1,49 @@
++// frunk.store's web build has no network play and no high score server, so
++// SDL_net isn't linked. Everything that would use it gets a failure at once.
++#ifndef SDL_NET_STUB_H
++#define SDL_NET_STUB_H
++
++#include <SDL_version.h>
++
++typedef struct { unsigned int host; unsigned short port; } IPaddress;
++typedef void *TCPsocket;
++typedef void *UDPsocket;
++typedef void *SDLNet_SocketSet;
++typedef struct { int channel; unsigned char *data; int len; int maxlen; int status; IPaddress address; } UDPpacket;
++
++#define SDLNET_MAX_UDPCHANNELS 32
++#ifndef INADDR_NONE
++#define INADDR_NONE 0xFFFFFFFFu
++#endif
++
++#define SDL_NET_VERSION(x) SDL_VERSION(x)
++static inline const SDL_version *SDLNet_Linked_Version(void) { static SDL_version v = { 0, 0, 0 }; return &v; }
++
++static inline int SDLNet_Init(void) { return -1; }
++static inline const char *SDLNet_GetError(void) { return "no network in this build"; }
++static inline int SDLNet_ResolveHost(IPaddress *a, const char *h, unsigned short p) { (void)a; (void)h; (void)p; return -1; }
++static inline unsigned int SDLNet_Read32(const void *p) { (void)p; return 0; }
++static inline void SDLNet_Write32(unsigned int v, void *p) { (void)v; (void)p; }
++static inline void SDLNet_Write16(unsigned short v, void *p) { (void)v; (void)p; }
++static inline SDLNet_SocketSet SDLNet_AllocSocketSet(int n) { (void)n; return NULL; }
++static inline void SDLNet_FreeSocketSet(SDLNet_SocketSet s) { (void)s; }
++static inline int SDLNet_TCP_AddSocket(SDLNet_SocketSet s, TCPsocket t) { (void)s; (void)t; return -1; }
++static inline int SDLNet_TCP_DelSocket(SDLNet_SocketSet s, TCPsocket t) { (void)s; (void)t; return -1; }
++static inline int SDLNet_UDP_AddSocket(SDLNet_SocketSet s, UDPsocket t) { (void)s; (void)t; return -1; }
++static inline int SDLNet_UDP_DelSocket(SDLNet_SocketSet s, UDPsocket t) { (void)s; (void)t; return -1; }
++static inline TCPsocket SDLNet_TCP_Open(IPaddress *a) { (void)a; return NULL; }
++static inline TCPsocket SDLNet_TCP_Accept(TCPsocket t) { (void)t; return NULL; }
++static inline IPaddress *SDLNet_TCP_GetPeerAddress(TCPsocket t) { (void)t; return NULL; }
++static inline void SDLNet_TCP_Close(TCPsocket t) { (void)t; }
++static inline int SDLNet_TCP_Send(TCPsocket t, const void *d, int n) { (void)t; (void)d; (void)n; return -1; }
++static inline int SDLNet_TCP_Recv(TCPsocket t, void *d, int n) { (void)t; (void)d; (void)n; return -1; }
++static inline int SDLNet_CheckSockets(SDLNet_SocketSet s, unsigned int ms) { (void)s; (void)ms; return -1; }
++static inline int SDLNet_SocketReady(void *s) { (void)s; return 0; }
++static inline UDPsocket SDLNet_UDP_Open(unsigned short p) { (void)p; return NULL; }
++static inline void SDLNet_UDP_Close(UDPsocket u) { (void)u; }
++static inline int SDLNet_UDP_Recv(UDPsocket u, UDPpacket *p) { (void)u; (void)p; return -1; }
++static inline int SDLNet_UDP_Send(UDPsocket u, int c, UDPpacket *p) { (void)u; (void)c; (void)p; return 0; }
++static inline UDPpacket *SDLNet_AllocPacket(int n) { (void)n; return NULL; }
++static inline void SDLNet_FreePacket(UDPpacket *p) { (void)p; }
++
++#endif
+--- pristine/src/libgame/system.c
++++ src/src/libgame/system.c
+@@ -130,7 +130,9 @@
+ 
+ void InitRuntimeInfo(void)
+ {
+-#if defined(HAS_TOUCH_DEVICE)
++#if defined(PLATFORM_EMSCRIPTEN)
++  runtime.uses_touch_device = EM_ASM_INT({ return Module.rocksTouch ? 1 : 0; });
++#elif defined(HAS_TOUCH_DEVICE)
+   runtime.uses_touch_device = TRUE;
+ #else
+   runtime.uses_touch_device = FALSE;
+@@ -361,7 +363,11 @@
+   SetOverlayGridSizeAndButtons();
+ 
+ #if defined(USE_TOUCH_INPUT_OVERLAY)
+-  if (strEqual(setup.touch.control_type, TOUCH_CONTROL_VIRTUAL_BUTTONS))
++  if (strEqual(setup.touch.control_type, TOUCH_CONTROL_VIRTUAL_BUTTONS)
++#if defined(PLATFORM_EMSCRIPTEN)
++      && runtime.uses_touch_device
++#endif
++      )
+     overlay.enabled = TRUE;
+ #endif
+ }
+--- pristine/src/libgame/system.h
++++ src/src/libgame/system.h
+@@ -127,7 +127,7 @@
+ #define TOUCH_CONTROL_WIPE_GESTURES	"wipe_gestures"
+ #define TOUCH_CONTROL_FOLLOW_FINGER	"follow_finger"
+ 
+-#if defined(PLATFORM_ANDROID)
++#if defined(PLATFORM_ANDROID) || defined(PLATFORM_EMSCRIPTEN)
+ #define TOUCH_CONTROL_DEFAULT		TOUCH_CONTROL_VIRTUAL_BUTTONS
+ #else
+ #define TOUCH_CONTROL_DEFAULT		TOUCH_CONTROL_OFF
+@@ -149,6 +149,12 @@
+ #define SCREEN_KEYBOARD_POS(h)		((h) * 40 / 100)
+ #endif
+ 
++// frunk.store: the on-screen buttons on the car's touch screen
++#if defined(PLATFORM_EMSCRIPTEN)
++#define HAS_TOUCH_DEVICE
++#define USE_TOUCH_INPUT_OVERLAY
++#endif
++
+ // values for drag-and-drop support (some parts not added before SDL 2.0.5)
+ #if !SDL_VERSION_ATLEAST(2,0,5)
+ #define SDL_DROPTEXT			(SDL_DROPFILE + 1)
+--- pristine/src/Makefile
++++ src/src/Makefile
+@@ -103,10 +103,10 @@
+ 
+ ifeq ($(TARGET),sdl2)			# compiling for SDL2 target
+ ifeq ($(PLATFORM),emscripten)
+-SDL_LIBS = -s USE_SDL_IMAGE=2 -s USE_SDL_MIXER=2 -s USE_SDL_NET=2 -s USE_MODPLUG=1 -s USE_MPG123=1 -s USE_ZLIB=1
+-SDL_FMTS = -s SDL2_IMAGE_FORMATS='["bmp","png","pcx","xpm"]' -s SDL2_MIXER_FORMATS='["mod","mp3"]'
++SDL_LIBS = -s USE_SDL_IMAGE=2 -s USE_SDL_MIXER=2 -s USE_ZLIB=1
++SDL_FMTS = -s SDL2_IMAGE_FORMATS='["png"]' -s SDL2_MIXER_FORMATS='["wav"]'
+ EXTRA_CFLAGS = $(SDL_LIBS)
+-EXTRA_LDFLAGS = $(SDL_FMTS) -s INITIAL_MEMORY=104857600 -s ALLOW_MEMORY_GROWTH=1 -s FORCE_FILESYSTEM -s NO_EXIT_RUNTIME=0 -s ASYNCIFY -O2 -lidbfs.js
++EXTRA_LDFLAGS = $(SDL_FMTS) -s INITIAL_MEMORY=104857600 -s ALLOW_MEMORY_GROWTH=1 -s FORCE_FILESYSTEM -s NO_EXIT_RUNTIME=0 -s ASYNCIFY -O2 -lidbfs.js -s EXPORTED_RUNTIME_METHODS='["FS","IDBFS","callMain","ccall"]' -s INVOKE_RUN=0
+ DATA_DIRS = conf docs levels graphics sounds music
+ FILE_PACKAGER_ARGS = --preload $(DATA_DIRS) --js-output=$(DATA_FILE).js
+ else
+@@ -193,7 +193,8 @@
+ 	anim.c		\
+ 	api.c		\
+ 	network.c	\
+-	netserv.c
++	netserv.c	\
++	web.c
+ 
+ OBJS =	main.o		\
+ 	conf_gfx.o	\
+@@ -212,7 +213,8 @@
+ 	anim.o		\
+ 	api.o		\
+ 	network.o	\
+-	netserv.o
++	netserv.o	\
++	web.o
+ 
+ CNFS =	conf_gfx.h	\
+ 	conf_snd.h	\
+--- pristine/src/screens.c
++++ src/src/screens.c
+@@ -2887,6 +2887,14 @@
+       else
+       {
+ 	pos = choice + dy;
++
++#if defined(PLATFORM_EMSCRIPTEN)
++	// the rows this build hides
++	if (pos == MAIN_CONTROL_EDITOR)
++	  pos += dy;
++	if (pos < MAIN_CONTROL_LEVELS || pos > MAIN_CONTROL_SETUP)
++	  pos = -1;
++#endif
+       }
+     }
+   }
+@@ -3138,11 +3146,13 @@
+ static struct TokenInfo info_info_main[] =
+ {
+   { TYPE_ENTER_SCREEN,	execInfoTitleScreen,	STR_INFO_TITLE		},
++#if !defined(PLATFORM_EMSCRIPTEN)
+   { TYPE_ENTER_SCREEN,	execInfoElements,	STR_INFO_ELEMENTS	},
+   { TYPE_ENTER_SCREEN,	execInfoMusic,		STR_INFO_MUSIC		},
+   { TYPE_ENTER_SCREEN,	execInfoCredits,	STR_INFO_CREDITS	},
+   { TYPE_ENTER_SCREEN,	execInfoProgram,	STR_INFO_PROGRAM	},
+   { TYPE_ENTER_SCREEN,	execInfoVersion,	STR_INFO_VERSION	},
++#endif
+   { TYPE_ENTER_SCREEN,	execInfoLevelSet,	STR_INFO_LEVELSET	},
+   { TYPE_ENTER_SCREEN,	execInfoLevel,		STR_INFO_LEVEL		},
+   { TYPE_ENTER_SCREEN,	execInfoIntro,		STR_INFO_INTRO		},
+@@ -8989,8 +8999,10 @@
+ static struct TokenInfo setup_info_main[] =
+ {
+   { TYPE_ENTER_MENU,	execSetupGame,			STR_SETUP_GAME			},
++#if !defined(PLATFORM_EMSCRIPTEN)
+   { TYPE_ENTER_MENU,	execSetupEngines,		STR_SETUP_ENGINES		},
+   { TYPE_ENTER_MENU,	execSetupEditor,		STR_SETUP_EDITOR		},
++#endif
+   { TYPE_ENTER_MENU,	execSetupGraphics,		STR_SETUP_GRAPHICS		},
+   { TYPE_ENTER_MENU,	execSetupSound,			STR_SETUP_SOUND			},
+   { TYPE_ENTER_MENU,	execSetupArtwork,		STR_SETUP_ARTWORK		},
+@@ -9007,6 +9019,7 @@
+ static struct TokenInfo setup_info_game[] =
+ {
+   { TYPE_SWITCH,	&setup.team_mode,		"Team-Mode (Multi-Player):"	},
++#if !defined(PLATFORM_EMSCRIPTEN)
+   { TYPE_SWITCH,	&setup.network_mode,		"Network Multi-Player Mode:"	},
+   { TYPE_PLAYER,	&setup.network_player_nr,	"Preferred Network Player:"	},
+   { TYPE_TEXT_INPUT,	execGadgetNetworkServer,	"Network Server Hostname:"	},
+@@ -9015,6 +9028,7 @@
+   { TYPE_ENTER_LIST,	execSetupChooseScoresType,	"Scores in Highscore List:"	},
+   { TYPE_STRING,	&scores_type_text,		""				},
+   { TYPE_ENTER_LIST,	execOfferUploadTapes,		"Upload Tapes to Server"	},
++#endif
+   { TYPE_SWITCH,	&setup.multiple_users,		"Multiple Users/Teams:"		},
+   { TYPE_YES_NO,	&setup.input_on_focus,		"Only Move Focussed Player:"	},
+   { TYPE_SWITCH,	&setup.time_limit,		"Time Limit:"			},
+--- pristine/src/web.c
++++ src/src/web.c
+@@ -0,0 +1,68 @@
++// frunk.store: small hooks for the page (apps/rocks/rocks.js).
++#include <emscripten.h>
++
++#include "main.h"
++#include "game.h"
++#include "tape.h"
++#include "tools.h"
++#include "files.h"
++#include "game_em/export_em.h"
++
++// 0 elsewhere, 1 in the menus, 2 playing
++EMSCRIPTEN_KEEPALIVE int web_state(void)
++{
++  return (game_status == GAME_MODE_PLAYING ? 2 :
++	  game_status == GAME_MODE_MAIN ? 1 : 0);
++}
++
++EMSCRIPTEN_KEEPALIVE int web_level(void)	{ return level_nr; }
++EMSCRIPTEN_KEEPALIVE int web_paused(void)	{ return (tape.pausing ? 1 : 0); }
++EMSCRIPTEN_KEEPALIVE int web_frames(void)	{ return FrameCounter; }
++EMSCRIPTEN_KEEPALIVE int web_engine(void)	{ return level.game_engine_type; }
++
++EMSCRIPTEN_KEEPALIVE int web_player_x(void)
++{
++  if (game_status != GAME_MODE_PLAYING)
++    return -1;
++  return (level.game_engine_type == GAME_ENGINE_TYPE_EM ? game_em.ply[0]->x : local_player->jx);
++}
++
++EMSCRIPTEN_KEEPALIVE int web_player_y(void)
++{
++  if (game_status != GAME_MODE_PLAYING)
++    return -1;
++  return (level.game_engine_type == GAME_ENGINE_TYPE_EM ? game_em.ply[0]->y : local_player->jy);
++}
++
++EMSCRIPTEN_KEEPALIVE int web_solved(void)	{ return (game_status == GAME_MODE_PLAYING && game.LevelSolved ? 1 : 0); }
++
++// Reports which elements each level of the named set uses, for the build check
++// that no level leans on a blanked sheet: prints "scan <level> <token> <file>"
++// for every element whose graphic comes from a sheet in the list of names.
++EMSCRIPTEN_KEEPALIVE void web_scan(const char *set, const char *sheets)
++{
++  TreeInfo *node = getTreeInfoFromIdentifier(leveldir_first, (char *)set);
++  if (node == NULL) { EM_ASM({ console.log('scan none', UTF8ToString($0)); }, set); return; }
++  leveldir_current = node;
++  EM_ASM({ console.log('scan set', UTF8ToString($0), $1, $2); }, set, node->first_level, node->last_level);
++  for (int nr = node->first_level; nr <= node->last_level; nr++)
++  {
++    LoadLevel(nr);
++    static char seen[MAX_NUM_ELEMENTS + 1];
++    memset(seen, 0, sizeof(seen));
++    for (int y = 0; y < level.fieldy; y++)
++      for (int x = 0; x < level.fieldx; x++)
++	seen[level.field[x][y]] = 1;
++    for (int e = 0; e <= MAX_NUM_ELEMENTS; e++)
++    {
++      if (!seen[e])
++	continue;
++      struct FileInfo *fi = getImageListEntryFromImageID(el2img(e));
++      char *file = fi && fi->filename ? fi->filename : "";
++      char *base = strrchr(file, '/');
++      base = base ? base + 1 : file;
++      if (strstr(sheets, base))
++	EM_ASM({ console.log('scan', $0, $1, UTF8ToString($2), UTF8ToString($3)); }, nr, e, element_info[e].token_name, base);
++    }
++  }
++}
+--- pristine/graphics/gfx_classic/graphicsinfo.conf
++++ src/graphics/gfx_classic/graphicsinfo.conf
+@@ -1,3 +1,16 @@
+ name:                                   Classic Graphics
+ 
+ sort_priority:                          100
++
++# frunk.store: a tidier main menu, without the rows this build hides
++main.button.name.x:		-1
++main.button.name.y:		-1
++main.button.editor.x:		-1
++main.button.editor.y:		-1
++main.button.quit.x:		-1
++main.button.quit.y:		-1
++main.button.levels.y:		96
++main.button.scores.y:		128
++main.button.info.y:		160
++main.button.game.y:		192
++main.button.setup.y:		224

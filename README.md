@@ -917,6 +917,21 @@ clear them to make room.
   hidden and at the hub's close handshake. And the player's name defaults to Player, so a first game
   doesn't start with spelling one on a D-pad. Measured with the CPU slowed 4.5x and a software GPU:
   100 to 200 ms/s of script, depending on the level, and 37 fps. See `apps/neverball/NOTICE`.
+- `apps/roguerogue`: Rogue Rogue by KesieV (MIT; its music is CC0), plain JavaScript,
+  built by `npm run build:roguerogue` (`tools/build-roguerogue.mjs`: a pinned commit and
+  `tools/roguerogue/roguerogue-web.patch`, joined into `game/rogue.js`). The CRT effect is
+  removed, since upstream's `js/crt.js` is adapted from a repo with no license, and the
+  build fails if it comes back. Music stays compressed until played. See `apps/roguerogue/NOTICE`.
+- `apps/critter`: Critical Mass (Critter) by Frank Becker (GPL-2.0-or-later), compiled to
+  WebAssembly by `npm run build:critter` (`tools/build-critter.mjs`, emsdk 4.0.10 in Docker
+  from `tools/critter/Dockerfile`, `tools/critter/critter-web.patch`). Upstream's soundtrack
+  carries no license, so a CC0 track replaces it. See `apps/critter/NOTICE`.
+- `apps/rocks`: Rocks'n'Diamonds by Holger Schemel (code GPL-2.0-or-later), compiled to
+  WebAssembly by `npm run build:rocks` (`tools/build-rocks.mjs`, upstream's Emscripten Makefile
+  target in Docker from `tools/rocks/Dockerfile`, `tools/rocks/rocks-web.patch`). Network play
+  and the score server are compiled out. The build leaves out the classic level sets, the
+  third-party music and other games' tile sheets, and ships 60 tutorial levels. Upstream states
+  no separate license for the game data. See `apps/rocks/NOTICE`.
 - `apps/supertux`: SuperTux 0.7.0 (GPL-3.0-or-later), compiled to
   WebAssembly by `npm run build:supertux` (`tools/build-supertux.mjs`: the
   release's source tarball checked against its SHA-256, plus

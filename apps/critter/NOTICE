@@ -1,0 +1,39 @@
+Critical Mass (apps/critter)
+
+Game and engine (engine/)
+  Critical Mass (Critter), Copyright (C) 2001-2024 Frank Becker.
+  License: GNU General Public License, version 2 or later (engine/COPYING).
+  Debian's copyright file for the game (criticalmass, in main) lists all of it,
+  code and data, under the same license.
+  Source: https://github.com/mooflu/critter, commit
+  c4c0b4df13079e8ec64ed5e5ac767b0cdd5bf39c, with frunk.store's changes for this
+  site in engine/critter-web.patch (also tools/critter/critter-web.patch in
+  https://github.com/RobertPKyle/frunk-store, whose tools/build-critter.mjs
+  builds it). The source the build came from is
+  engine/critter-c4c0b4df1307-web-src.tar.gz.
+  The changes: the page mounts the saves and sets the drawing size; the game
+  no longer grabs the pointer on its own; web_* functions let the page pass on
+  touch and controllers and ask for saves; a longer sound buffer; no Quit,
+  Fullscreen or Resolution items in the menu; the top-ten name comes from the
+  page; no quick-exit key.
+
+Music
+  The soundtrack upstream ships ("Critical: Lunar Gravity's Millennium Remake")
+  has no license and is left out. In its place, data/music/overdrive.ogg is
+  "Overdrive" by Centurion_of_war, CC0, from
+  https://opengameart.org/content/overdrive
+
+Libraries (built in)
+  PhysicsFS 3.2.0, (C) Ryan C. Gordon and others, zlib license
+    (engine/LICENSE.physfs). https://github.com/icculus/physfs
+  glm 0.9.9.8, The Happy Bunny License and MIT (engine/LICENSE.glm).
+    https://github.com/g-truc/glm
+  vmmlib, (C) 2006 Visualization and Multimedia Lab, University of Zurich,
+    BSD (engine/LICENSE.vmmlib).
+  TinyXML, (C) Lee Thomason, zlib license; mini-yaml, (C) Jimmie Bergmann, MIT
+    (in the source tarball, mooflu.common/).
+  Emscripten's SDL2, SDL2_mixer, SDL2_image, libogg, libvorbis, zlib and libpng
+    ports, under their own licenses.
+
+Page
+  index.html, critter.js and icon.svg: by frunk.store.

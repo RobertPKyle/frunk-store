@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Rocks'n'Diamonds</title>
+<style>
+  :root { --bg: #10121a; --panel: #1a1e2b; --card: #272c3d; --line: rgba(200, 215, 255, .16); --text: #f2f4fb; --muted: #a8b0c7;
+          --accent: #5ad3f0; --danger: #c4503a; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 16px/1.4 system-ui, sans-serif; overflow: hidden;
+               -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; touch-action: none; }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  .btn { min-height: 44px; padding: 8px 16px; border-radius: 12px; background: var(--card); border: 1px solid var(--line); white-space: nowrap; }
+  .btn.primary { background: var(--accent); border-color: transparent; color: #08202a; font-weight: 700; }
+  .btn:disabled { opacity: .5; cursor: default; }
+  [hidden] { display: none !important; }
+
+  #start { display: flex; flex-direction: column; height: 100%; }
+  /* left padding keeps clear of the hub's Apps button */
+  header { display: flex; align-items: center; gap: 10px; min-height: 60px; padding: 8px 12px 8px 110px; border-bottom: 1px solid var(--line); }
+  header h1 { margin: 0; font-size: 18px; font-weight: 600; flex: 1; }
+  .scroll { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 14px 16px 20px; touch-action: pan-y; }
+  .hero { display: flex; gap: 16px; align-items: center; max-width: 720px; padding: 16px; border-radius: 16px; background: var(--panel); border: 1px solid var(--line); }
+  .hero img { width: 84px; height: 84px; flex: none; }
+  .hero p { margin: 0 0 12px; color: #dde3f2; }
+  h2 { margin: 18px 2px 8px; font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  table.keys { border-collapse: collapse; font-size: 13px; color: var(--muted); margin: 4px 2px; }
+  table.keys th, table.keys td { text-align: left; padding: 3px 14px 3px 0; vertical-align: top; }
+  table.keys th { color: var(--text); font-weight: 600; }
+  .legal { margin-top: 18px; font-size: 12px; color: var(--muted); user-select: text; -webkit-user-select: text; max-width: 60em; }
+  .legal p { margin: 4px 0; }
+
+  .overlay { position: fixed; inset: 0; z-index: 5; display: grid; place-items: center; padding: 64px 16px 16px; background: rgba(5, 7, 14, .9); }
+  .sheet { display: flex; flex-direction: column; max-width: 560px; padding: 18px; border-radius: 18px; background: var(--panel); border: 1px solid var(--line); }
+  .sheet h2 { margin: 0 0 8px; font-size: 19px; color: var(--text); letter-spacing: 0; text-transform: none; }
+  .sheet p { margin: 0 0 10px; font-size: 15px; color: #dde3f2; overflow-wrap: anywhere; }
+  #loading { position: fixed; inset: 0; z-index: 4; display: grid; place-content: center; gap: 14px; text-align: center; background: var(--bg); padding: 16px; }
+  #loading b { font-size: 20px; }
+  #loadText { color: var(--muted); font-size: 15px; }
+
+  #player { position: fixed; inset: 0; display: grid; grid-template-rows: 60px minmax(0, 1fr); grid-template-columns: minmax(0, 1fr); background: #000; }
+  .bar { display: flex; align-items: center; gap: 8px; padding: 8px 10px 8px 110px; overflow-x: auto; scrollbar-width: none; touch-action: pan-x; background: var(--panel); border-bottom: 1px solid var(--line); }
+  .bar b { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #padNote { font-size: 13px; color: var(--muted); white-space: nowrap; }
+  .screen { position: relative; min-height: 0; min-width: 0; overflow: hidden; display: grid; place-items: center; }
+  /* SDL writes the canvas's size into its style; the page's size wins. It keeps the game's 6:5 shape */
+  #canvas { display: block; width: var(--w, 100%) !important; height: var(--h, 100%) !important; border: 0; padding: 0; background: #000; outline: none; touch-action: none; }
+  @media (max-width: 640px) {
+    .bar .btn { padding: 8px 10px; }
+    .hero img { width: 60px; height: 60px; }
+  }
+</style>
+</head>
+<body>
+<section id="start">
+  <header>
+    <h1>Rocks'n'Diamonds</h1>
+    <button class="btn primary" id="play" type="button">Play</button>
+  </header>
+  <div class="scroll">
+    <div class="hero">
+      <img src="icon.svg" alt="">
+      <div>
+        <p>Dig through dirt, grab the diamonds and outrun what's falling behind you. Holger Schemel's puzzle classic, with three tutorial sets that build from your first gem to tricky switches, keys and creatures.</p>
+        <button class="btn primary" id="play2" type="button">Play</button>
+      </div>
+    </div>
+
+    <h2>Controls</h2>
+    <table class="keys">
+      <tr><th></th><th>Touch</th><th>Controller</th></tr>
+      <tr><td>Move and dig</td><td>On-screen arrows</td><td>D-pad or left stick</td></tr>
+      <tr><td>Grab or dig without moving</td><td>On-screen button 1</td><td>Bottom button</td></tr>
+      <tr><td>Drop a bomb</td><td>On-screen button 2</td><td>Right button</td></tr>
+      <tr><td>Menus</td><td>Tap</td><td>D-pad and bottom button</td></tr>
+      <tr><td>Pause</td><td>Pause button on the side panel</td><td>Start</td></tr>
+      <tr><td>Leave a level</td><td>Menu</td><td>Select</td></tr>
+    </table>
+    <p class="legal">Touch and controller both work, and your progress is saved on this device.</p>
+
+    <div class="legal">
+      <p>Rocks'n'Diamonds by Holger Schemel / Artsoft Entertainment (GNU GPL version 2 or later), compiled to WebAssembly with changes for this site: /rocks/engine/rocks-web.patch, built by tools/build-rocks.mjs in github.com/RobertPKyle/frunk-store. The source is at /rocks/engine/. See /rocks/NOTICE.</p>
+      <p>frunk.store is not affiliated with or endorsed by Artsoft Entertainment. Play only while parked.</p>
+    </div>
+  </div>
+</section>
+
+<section id="loading" hidden aria-live="polite">
+  <b>Rocks'n'Diamonds</b>
+  <span id="loadText">Loading…</span>
+</section>
+
+<section id="failed" class="overlay" hidden aria-labelledby="failedTitle">
+  <div class="sheet">
+    <h2 id="failedTitle">The game stopped</h2>
+    <p id="failedText"></p>
+    <div><button class="btn primary" id="failedOk" type="button">Start again</button></div>
+  </div>
+</section>
+
+<section id="player" hidden>
+  <div class="bar">
+    <b>Rocks'n'Diamonds</b>
+    <span id="padNote" hidden>Controller</span>
+    <button class="btn" id="menuBtn" type="button">Menu</button>
+    <button class="btn" id="soundBtn" type="button">Sound on</button>
+    <button class="btn" id="quitBtn" type="button">Quit</button>
+  </div>
+  <div class="screen" id="screen">
+    <canvas id="canvas" tabindex="-1" oncontextmenu="event.preventDefault()"></canvas>
+  </div>
+</section>
+
+<script type="module" src="rocks.js"></script>
+<script src="/sw-register.js"></script>
+</body>
+</html>

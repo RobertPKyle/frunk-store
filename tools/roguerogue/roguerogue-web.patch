@@ -1,0 +1,533 @@
+diff --git a/js/arcade.js b/js/arcade.js
+index e3852da..9cfebb9 100644
+--- a/js/arcade.js
++++ b/js/arcade.js
+@@ -197,7 +197,9 @@ function Game(settings, scenesloader) {
+     let
+         rawkeyboard = [],
+         watchKeys,
+-        useGamepads=false;
++        // frunk.store: pads may be in use before the game loads (no connected event then)
++        useGamepads=!!navigator.getGamepads,
++        gamepadPressedMode=true;
+ 
+     let keydown = (e)=>{
+         rawkeyboard[e.keyCode] = 1;
+@@ -224,6 +226,10 @@ function Game(settings, scenesloader) {
+ 
+             if (key.keyCode)
+                 down|=rawkeyboard[key.keyCode];
++
++            // frunk.store: the page's touch buttons
++            if (settings.touchKeys&&settings.touchKeys[key.id]&&settings.touchKeys[key.id][key.subId])
++                down=true;
+             
+             if (useGamepads && key.gamepad) {
+                 let
+@@ -689,7 +695,19 @@ function Game(settings, scenesloader) {
+                 var request = new XMLHttpRequest();
+                 request.open('GET', resourcesPrefix+sample.file+(this.canPlayOgg?".ogg":".mp4"), true);
+                 request.responseType = 'arraybuffer';
+-                request.onload = ()=>{                   
++                request.onload = ()=>{
++                    // frunk.store: 7 minutes of decoded music would take 170 MB
++                    // of the car's memory, so tracks stay compressed until played
++                    if (/^audio\/music\//.test(sample.file)) {
++                        this.audio[sample.id]={
++                            id:sample.id,
++                            buffer:0,
++                            compressed:request.response,
++                            properties:sample
++                        };
++                        loadAudio(cb,true);
++                        return;
++                    }
+                     audioContext.decodeAudioData(request.response, (buffer)=>{
+                         this.audio[sample.id]={
+                             id:sample.id,
+@@ -741,8 +759,29 @@ function Game(settings, scenesloader) {
+         this.setAudioVolume(musicPlaying,vol);
+     }
+ 
++    // frunk.store: decodes a music track the first time it is asked for, then
++    // starts it if it is still the track wanted. Only the latest stays decoded.
++    let decodedTrack=0;
++    let playCompressed=(sample,loop,volume,force)=>{
++        if (sample.decoding) return;
++        sample.decoding=true;
++        audioContext.decodeAudioData(sample.compressed.slice(0),(buffer)=>{
++            sample.decoding=false;
++            if (decodedTrack&&(decodedTrack!==sample)) decodedTrack.buffer=0;
++            decodedTrack=sample;
++            sample.buffer=buffer;
++            if (musicPlaying==sample) this.playAudio(sample,loop,volume,force);
++        },()=>{ sample.decoding=false; });
++    }
++
++    this.getAudioContext=()=>audioContext;
++
+     this.playAudio=(sample,loop,volume,force)=>{
+         if (this.audioInitialize()&&sample&&this.audioEnabled&&(this.effectsEnabled||force)&&audioContext) {
++            if (sample.compressed&&!sample.buffer) {
++                playCompressed(sample,loop,volume,force);
++                return;
++            }
+             if (sample.mod) {
+                 XMPlayer.stop();
+                 XMPlayer.load(sample.mod);
+@@ -1959,7 +1998,6 @@ function Game(settings, scenesloader) {
+     let
+         prevScene,
+         delta = 0,
+-        renderer = false,
+         sceneStarted = false,
+         mspf = 1000/settings.fps,
+         time_step = mspf,
+@@ -1971,7 +2009,9 @@ function Game(settings, scenesloader) {
+             if (!timestamp) timestamp = 0;
+             if (!lastframems) lastframems = timestamp;
+             
+-            if (timestamp < lastframems + mspf) {
++            // frunk.store: a 60 Hz display's frames arrive a hair under mspf, and
++            // every other one was being skipped (30 fps pictures)
++            if (timestamp < lastframems + mspf - 3) {
+                 requestAnimationFrame(frame);
+                 return;
+             }
+@@ -2004,7 +2044,7 @@ function Game(settings, scenesloader) {
+             }
+ 
+             this.scene.onDraw(this, this.scene);
+-            if (renderer) renderer(timestamp);
++            this.frames=(this.frames|0)+1;
+ 
+             requestAnimationFrame(frame);
+         
+@@ -2021,133 +2061,15 @@ function Game(settings, scenesloader) {
+ 
+     // Game configuration
+     
+-    let
+-        preparePage=()=>{
+-            document.body.style.padding="0px";
+-            document.body.style.margin="0px";
+-            document.body.style.overflow="hidden";
+-            document.body.style.backgroundColor = settings.pageBackgroundColor;
+-        },
+-        configRow=0,
+-        loadingSpan=0,
+-        guiPanel=0,
+-        guiKeyMap=[],
+-        guiAudioEnabled=0,
+-        guiCrtEnabled=0;
+-
+-    let setLoadingMessage=(message)=>{
+-        if (loadingSpan)
+-            loadingSpan.innerHTML=message||"";
+-    }
+-
+-    let updateConfigurationGui=()=>{
+-        guiKeyMap.forEach((input,id)=>{
+-            input.value=KEYSYMBOLS[settings.watchKeys[id].keyCode]||String.fromCharCode(settings.watchKeys[id].keyCode);
+-            input.style.backgroundColor=settings.pageBackgroundColor;
+-            input.style.border="1px solid "+settings.configure.color;
+-            input.style.color=settings.configure.color;
+-        });
+-        guiAudioEnabled.checked=settings.audioEnabled?"checked":"";
+-        guiCrtEnabled.checked=settings.crt?"checked":"";
+-    }
+-
+-    let createRow=(table,label)=>{
+-        if (!configRow || (configRow.childElementCount == 4)) {
+-            configRow = document.createElement("tr");
+-            table.appendChild(configRow);
+-        }
+-        let cell=document.createElement("td");
+-        cell.style.whiteSpace="nowrap";
+-        cell.innerHTML=label;
+-        configRow.appendChild(cell);
+-        cell=document.createElement("td");
+-        cell.style.whiteSpace="nowrap";
+-        configRow.appendChild(cell);
+-        return cell;
+-    }
+-
+-    let createSpan=(container,text)=>{
+-        let span=document.createElement("span");
+-        span.innerHTML=text;
+-        span.style.color=settings.configure.color;
+-        span.style.fontFamily=settings.configure.fontFamily;
+-        span.style.fontSize=settings.configure.fontSize;
+-        container.appendChild(span);
+-        return span;
+-    }
+-
+-    let createCheckbox=(container,onchange)=>{
+-        let checkbox=document.createElement("input");
+-        checkbox.type="checkbox";
+-        container.appendChild(checkbox);
+-        checkbox.onchange=onchange;
+-        createSpan(container,"Enabled");
+-        return checkbox;
+-    }
+-
+-    let formatSmallInput=(input)=>{
+-        input.style.padding="5px";
+-        input.style.textAlign="center";
+-        input.style.cursor="pointer";
+-        input.style.marginRight="5px";
+-        input.style.borderRadius="5px";
+-        input.style.fontSize=settings.configure.fontSize;
+-    }
+-
+-    let formatInput=(input)=>{
+-        formatSmallInput(input);
+-        input.style.width="150px";
+-    }
+-
+-    let prepareConfig=()=>{
+-        settings.watchKeys.forEach(control=>{
+-            control.defaultKeyCode=control.keyCode;
+-        });
+-        if (settings.audioEnabled===undefined) settings.audioEnabled=true;
+-        if (settings.crt===undefined) settings.crt=true;
+-    }
+-
+-    let loadConfig=()=>{
+-        let config=this.loadData("config");
+-        if (config) {
+-            if (config.watchKeys)
+-                config.watchKeys.forEach((setting,id)=>{
+-                    if (settings.watchKeys[id]) {
+-                        if (setting.keyCode!==undefined)
+-                            settings.watchKeys[id].keyCode=setting.keyCode;
+-                    }
+-                });
+-            if (config.audioEnabled !== undefined)
+-                settings.audioEnabled=config.audioEnabled;
+-            if (config.crt !== undefined)
+-                settings.crt=config.crt;
+-        }
++    let preparePage=()=>{
++        document.body.style.padding="0px";
++        document.body.style.margin="0px";
++        document.body.style.overflow="hidden";
++        document.body.style.backgroundColor = settings.pageBackgroundColor;
+     }
+ 
+-    let saveConfig=()=>{
+-        let config={
+-            watchKeys:[],
+-            audioEnabled:settings.audioEnabled,
+-            crt:settings.crt
+-        };
+-    
+-        settings.watchKeys.forEach(setting=>{
+-            config.watchKeys.push({
+-                keyCode:setting.keyCode
+-            })
+-        });
+-
+-        this.saveData("config",config);
+-    }
+-
+-    let addConfigImage=(panel)=>{
+-        let image=document.createElement("img");
+-        image.src=resourcesPrefix+settings.configure.image;
+-        image.style.margin="auto";
+-        image.style.display="block";
+-        image.style.marginBottom="20px";
+-        panel.appendChild(image);
+-        return image;
++    let setLoadingMessage=(message)=>{
++        if (settings.onLoading) settings.onLoading(message||"");
+     }
+ 
+     let delay=(cb)=>{
+@@ -2159,129 +2081,12 @@ function Game(settings, scenesloader) {
+         delay(cb);
+     }
+ 
+-    this.configure =(node)=>{
++    // frunk.store: no configuration screen and no CRT effect. The page has its
++    // own start screen and the keys stay at their defaults.
++    this.configure =()=>{
+         preparePage();
+-        prepareConfig();
+-        loadConfig();
+-        guiPanel=document.createElement("div");
+-        let
+-            credits=document.createElement("div"),
+-            notes=document.createElement("div"),
+-            config=document.createElement("table"),
+-            audioEnabled=createRow(config,"Audio"),
+-            crtEnabled=createRow(config,"CRT Effect");
+-
+-        credits.style.position="absolute";
+-        credits.style.fontFamily=settings.configure.fontFamily;
+-        credits.style.fontSize=settings.configure.fontSize;
+-        credits.style.textAlign="center";
+-        credits.style.left=credits.style.right=credits.style.bottom="0px";
+-        credits.style.padding="10px";
+-        credits.style.color=settings.configure.color;
+-        credits.style.backgroundColor=settings.pageBackgroundColor;
+-        credits.style.zIndex=10;
+-        credits.innerHTML=settings.configure.credits;
+-
+-        notes.style.marginTop="20px";
+-        notes.style.fontFamily=settings.configure.fontFamily;
+-        notes.style.fontSize=settings.configure.fontSize;
+-        notes.style.color=settings.configure.color;
+-        notes.innerHTML=settings.configure.notes;
+-
+-        let anchors=credits.getElementsByTagName("A");
+-        for (let i=0;i<anchors.length;i++)
+-            anchors[i].style.color=settings.configure.color;
+-
+-        guiPanel.style.position="absolute";
+-        guiPanel.style.top="50%";
+-        guiPanel.style.left="50%";
+-        guiPanel.style.transform="translateX(-50%) translateY(-50%)";
+-        guiPanel.style.textAlign="center";
+-
+-        addConfigImage(guiPanel);
+-
+-        config.style.color=settings.configure.color;
+-        config.style.fontFamily=settings.configure.fontFamily;
+-        config.style.fontSize=settings.configure.fontSize;
+-        guiPanel.appendChild(config);
+-
+-        guiAudioEnabled=createCheckbox(audioEnabled,()=>{
+-            settings.audioEnabled=!!guiAudioEnabled.checked;
+-            updateConfigurationGui();
+-        });
+-
+-        guiCrtEnabled=createCheckbox(crtEnabled,()=>{
+-            settings.crt=!!guiCrtEnabled.checked;
+-            updateConfigurationGui();
+-        });
+-
+-        configRow=0;
+-
+-        settings.watchKeys.forEach((control,id)=>{
+-            let
+-                cell=createRow(config,"Player "+(control.id+1)+" "+control.label),
+-                input=document.createElement("input");
+-            guiKeyMap[id]=input;
+-            input.readOnly=true;
+-            formatInput(input);
+-            input.onclick=(e)=>{
+-                input.value="Press any key...";
+-                input.style.backgroundColor=settings.configure.color;
+-                input.style.border="1px solid "+settings.pageBackgroundColor;
+-                input.style.color=settings.pageBackgroundColor;
+-                input.onkeydown = (e)=>{
+-                    control.keyCode=e.keyCode;
+-                    input.onkeydown=0;
+-                    updateConfigurationGui();
+-                };
+-            }
+-            cell.appendChild(input);
+-            let defaultinput=document.createElement("input");
+-            defaultinput.type="button";
+-            defaultinput.value="Reset";
+-            defaultinput.onclick=(e)=>{
+-                control.keyCode=control.defaultKeyCode;
+-                updateConfigurationGui();
+-            }
+-            formatSmallInput(defaultinput);
+-            cell.appendChild(defaultinput);
+-        });
+-
+-        configRow=0;
+-
+-        let startButton=document.createElement("input");
+-
+-        startButton.type="button";
+-        startButton.value="Play!";
+-        startButton.style.backgroundColor=settings.configure.color;
+-        startButton.style.border="1px solid "+settings.pageBackgroundColor;
+-        startButton.style.marginTop="20px";
+-        startButton.style.color=settings.pageBackgroundColor;
+-        startButton.onclick=()=>{
+-            guiPanel.innerHTML="";
+-            let image=addConfigImage(guiPanel);
+-            loadingSpan=createSpan(guiPanel,"");
+-            loadingSpan.style.display="block";
+-            loadingSpan.style.textAlign="center";
+-            image.className="floating";
+-
+-            credits.parentNode.removeChild(credits);
+-            saveConfig();
+-            setTimeout(()=>{
+-                this.start();
+-            },10)
+-            
+-        }
+-        formatInput(startButton);
+-        guiPanel.appendChild(notes);
+-        guiPanel.appendChild(startButton);
+-
+-        node.appendChild(guiPanel);
+-        node.appendChild(credits);
+-        updateConfigurationGui();
+-
+-        if (isKioskMode)
+-            startButton.click();
++        settings.audioEnabled=true;
++        this.start();
+     }
+ 
+     // Wakelock
+@@ -2323,9 +2128,7 @@ function Game(settings, scenesloader) {
+ 
+     let
+         displayNode,
+-        canvas,
+-        doResize,
+-        maxScale=settings.maxScale;
++        canvas;
+ 
+     this.scene = 0;
+     this.scenes = 0;
+@@ -2335,30 +2138,9 @@ function Game(settings, scenesloader) {
+     this.cells = {};
+     this.palette = [];
+ 
+-    let resizeScreen=()=>{
+-        if (doResize) {
+-            doResize--;
+-            let
+-                screenWidth=document.body.clientWidth,
+-                screenHeight=document.body.clientHeight,
+-                ratio=Math.min(
+-                    Math.floor(screenWidth/settings.width*10)/10,
+-                    Math.floor(screenHeight/settings.height*10)/10
+-                ),x,y;
+-
+-            if (maxScale) ratio=Math.min(maxScale);
+-
+-            x=Math.floor((screenWidth-(ratio*settings.width))/2);
+-            y=Math.floor((screenHeight-(ratio*settings.height))/2);
+-
+-            canvas.node.style.transformOrigin="0 0";
+-            canvas.node.style.transform="translate("+x+"px,"+y+"px) scale("+ratio+")";
+-        }
+-    }
+-
+     this.start = ()=>{
+         displayNode = document.createElement("div");
+-        document.body.appendChild(displayNode);
++        (settings.stage||document.body).appendChild(displayNode);
+         this.audioEnabled=settings.audioEnabled===undefined?true:settings.audioEnabled;
+         this.musicEnabled=settings.musicEnabled===undefined?true:settings.musicEnabled;
+         this.effectsEnabled=settings.effectsEnabled===undefined?true:settings.effectsEnabled;  
+@@ -2373,34 +2155,13 @@ function Game(settings, scenesloader) {
+                 html:"rgba("+color[0]+","+color[1]+","+color[2]+","+Math.floor(color[3]/255)+")"
+             })
+         });  
+-        if (settings.crt) {
+-            // Forces deep black as color 0
+-            this.palette[0]={
+-                rgb:[0,0,0,255],
+-                html:"rgba(0,0,0,1)"
+-            };
+-        }
+-  
+         loadAudio(()=>{
+             loadFonts(()=>{
+                 loadImages(()=>{
+                     this.scheduleLoadingMessage("Hold on!",()=>{
+-                        if (guiPanel) {
+-                            guiPanel.parentNode.removeChild(guiPanel);
+-                            loadingSpan=0;
+-                        }
+                         this.scenes = scenesloader(this);
+                         if (this.scenes && this.scenes.default) {
+                             preparePage();
+-                            document.body.onmousedown=function(e) {
+-                                setFullScreen();
+-                                return false;
+-                            }
+-                            document.body.ontouchstart=function(e) {
+-                                setFullScreen();
+-                                e.preventDefault();
+-                                return false;
+-                            }
+                             this.watchKeys(settings.watchKeys||[]);
+                             window.addEventListener("gamepadconnected", (e) => {
+                                 useGamepads=true;
+@@ -2411,19 +2172,7 @@ function Game(settings, scenesloader) {
+                             displayNode.appendChild(canvas.node);
+                             document.body.onkeydown = keydown;
+                             document.body.onkeyup = keyup;
+-                            if (settings.crt) {
+-                                this.clearScreen = () => {
+-                                    this.fillRect(this.palette[0],0,0,canvas.width,canvas.height);
+-                                }
+-                                renderer = initRenderer(canvas.node);
+-                            } else {
+-                                doResize=10;
+-                                window.onresize=()=>{
+-                                    doResize=10;
+-                                    resizeScreen();
+-                                }
+-                                resizeScreen();
+-                            }
++                            if (settings.onCanvas) settings.onCanvas(canvas.node);
+                             this.setScene(this.scenes.default);
+                             frame();
+                         }
+diff --git a/js/game/run.js b/js/game/run.js
+index bcfee61..5fe905f 100644
+--- a/js/game/run.js
++++ b/js/game/run.js
+@@ -1,10 +1,10 @@
+-function gameRun() {
++function gameRun(options) {
+ 
+     let C={};
+ 
+     loadResourcesEnvironment(C);
+ 
+-    let game = new Game({
++    let game = new Game(Object.assign({
+         name:"ROGUEROGUE",
+         maxScale:C.DEBUG.enabled?C.DEBUG.maxScale:0,
+         frameSkip:10,
+@@ -13,16 +13,6 @@ function gameRun() {
+         height:C.SCREENHEIGHT,
+         pageBackgroundColor:"#000",
+         backgroundColor:"rgb(16,24,32)",
+-        configure:{
+-
+-            image:"logo.png",
+-            fontSize:"12px",
+-            color:"#fff",
+-            fontFamily:"sans-serif",
+-            notes:"You can also plug 1 or 2 game controllers to play.",
+-            credits:"By <a target='_blank' href='https://www.kesiev.com'>KesieV</a>, 2022 &dash; <a target='_blank' href='https://"+C.GAMEPAGE+"'>Play here</a> &dash; <a target='_blank' href='https://"+C.SOURCESPAGE+"'>Sources here</a>",
+-
+-        },
+         palette:loadResourcesPalette(C),
+         fonts:loadResourcesFonts(C),
+         audio:loadResourcesAudio(C),
+@@ -46,7 +36,7 @@ function gameRun() {
+             { id:1, label:"Start",subId:"start", keyCode:50, gamepad:{button:9, altButton:8 } },
+ 
+         ]
+-    },game=>{
++    },options),game=>{
+ 
+         let scenes={};
+ 
+@@ -141,6 +131,8 @@ function gameRun() {
+         return scenes;
+     });
+ 
+-    game.configure(document.body);
++    game.configure();
++
++    return {game,C};
+     
+ }

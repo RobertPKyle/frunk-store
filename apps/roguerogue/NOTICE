@@ -1,0 +1,59 @@
+Rogue Rogue
+Copyright (c) 2022 Francesco Cottone (KesieV)
+https://github.com/kesiev/roguerogue
+
+This site runs the game at commit 57288064b08bb7a3ca2d9c49f3909d885c7bef0b with
+small changes for the car's browser: tools/roguerogue/roguerogue-web.patch and
+tools/build-roguerogue.mjs in github.com/RobertPKyle/frunk-store. The changes
+remove the configuration screen and the CRT effect, add touch buttons and keep
+the music compressed until it plays.
+
+Upstream's license (also at /roguerogue/game/MIT-LICENSE.txt):
+
+  MIT License
+
+  Copyright (c) 2022 Francesco Cottone
+
+  Permission is hereby granted, free of charge, to any person obtaining a copy
+  of this software and associated documentation files (the "Software"), to deal
+  in the Software without restriction, including without limitation the rights
+  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+  copies of the Software, and to permit persons to whom the Software is
+  furnished to do so, subject to the following conditions:
+
+  The above copyright notice and this permission notice shall be included in all
+  copies or substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+  SOFTWARE.
+
+Music (each marked CC0 on its OpenGameArt page):
+
+  Chiptune Adventures, by Juhani Junkala
+    https://opengameart.org/content/4-chiptunes-adventure
+  Witch's Lair, from JRPG Pack 3 Evil, by Juhani Junkala
+    https://opengameart.org/content/jrpg-pack-3-evil
+  8Bit Bossa, by Joth
+    https://opengameart.org/content/bossa-nova
+  Free Run [8 bit(ish)], by TAD
+    https://opengameart.org/content/free-run-8-bitish
+  Overdrive, by Centurion of war
+    https://opengameart.org/content/overdrive
+
+Fonts:
+
+  Anvil, by Damien Guard (ZX Origins)
+    https://damieng.com/typography/zx-origins/anvil/
+    The ZX Origins page says the fonts are "freely available to be used in games
+    you create in exchange for a mention in the credits section". This is that
+    mention.
+  Tom Thumb Tiny ASCII Font (3x5), by Robey Pointer, CC0 on OpenGameArt
+    https://opengameart.org/content/tom-thumb-tiny-ascii-font-3x5
+
+The game's title and characters are its own. frunk.store is not affiliated with
+or endorsed by its author.

@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Rogue Rogue</title>
+<link rel="icon" href="icon.svg">
+<style>
+  :root { --bg: #120c26; --panel: #1c1438; --card: #2a1f50; --line: rgba(190, 200, 255, .16); --text: #f1eefc; --muted: #aba4c8;
+          --accent: #6fd0f0; --go: #ffe27a; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 16px/1.4 system-ui, sans-serif; overflow: hidden;
+               -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; touch-action: none; }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  .btn { min-height: 44px; padding: 8px 16px; border-radius: 12px; background: var(--card); border: 1px solid var(--line); white-space: nowrap; }
+  .btn.primary { background: var(--accent); border-color: transparent; color: #0d1b2a; font-weight: 700; }
+  .btn:disabled { opacity: .5; cursor: default; }
+  .btn.armed { background: #c4503a; border-color: transparent; color: #fff; }
+  [hidden] { display: none !important; }
+
+  /* ---------- start ---------- */
+  #start { display: flex; flex-direction: column; height: 100%; }
+  /* left padding keeps clear of the hub's Apps button */
+  header { display: flex; align-items: center; gap: 10px; min-height: 60px; padding: 8px 12px 8px 110px; border-bottom: 1px solid var(--line); }
+  header h1 { margin: 0; font-size: 18px; font-weight: 600; flex: 1; }
+  .scroll { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 14px 16px 20px; touch-action: pan-y; }
+  .hero { display: flex; gap: 16px; align-items: center; max-width: 720px; padding: 16px; border-radius: 16px; background: var(--panel); border: 1px solid var(--line); }
+  .hero img { width: 84px; height: 84px; flex: none; }
+  .hero p { margin: 0 0 12px; color: #ded9f2; }
+  h2 { margin: 18px 2px 6px; font-size: 15px; }
+  table.keys { border-collapse: collapse; font-size: 13px; color: var(--muted); margin: 4px 2px; }
+  table.keys th, table.keys td { text-align: left; padding: 3px 14px 3px 0; vertical-align: top; }
+  table.keys th { color: var(--text); font-weight: 600; }
+  .note { font-size: 13px; color: var(--muted); margin: 6px 2px; max-width: 60em; }
+  .legal { margin-top: 18px; font-size: 12px; color: var(--muted); user-select: text; -webkit-user-select: text; max-width: 60em; }
+  .legal p { margin: 4px 0; overflow-wrap: anywhere; }
+
+  /* ---------- overlays ---------- */
+  .overlay { position: fixed; inset: 0; z-index: 5; display: grid; place-items: center; padding: 64px 16px 16px; background: rgba(8, 5, 20, .92); }
+  .sheet { display: flex; flex-direction: column; max-width: 560px; padding: 18px; border-radius: 18px; background: var(--panel); border: 1px solid var(--line); }
+  .sheet h2 { margin: 0 0 8px; font-size: 19px; }
+  .sheet p { margin: 0 0 10px; font-size: 15px; color: #ded9f2; overflow-wrap: anywhere; }
+  #loading { position: fixed; inset: 0; z-index: 4; display: grid; place-content: center; gap: 14px; text-align: center; background: var(--bg); padding: 16px; }
+  #loading b { font-size: 20px; }
+  #loadText { color: var(--muted); font-size: 15px; }
+
+  /* ---------- player ---------- */
+  #player { position: fixed; inset: 0; background: #000; }
+  #stage { position: absolute; inset: 0; overflow: hidden; }
+  #stage canvas { position: absolute; image-rendering: pixelated; }
+  /* below the hub's Apps button, in the left column in both layouts */
+  #side { position: absolute; left: 6px; top: 62px; width: 92px; display: flex; flex-direction: column; gap: 6px; z-index: 2; }
+  #side .btn { padding: 6px 4px; min-height: 44px; font-size: 14px; }
+
+  .col { position: absolute; top: 0; bottom: 0; width: 132px; touch-action: none; z-index: 1; }
+  #leftCol { left: 0; }
+  #rightCol { right: 0; }
+  .key { position: absolute; display: grid; place-items: center; border-radius: 16px; border: 2px solid rgba(190, 215, 255, .38); background: rgba(90, 100, 170, .28);
+         color: #e6ecff; font-weight: 700; font-size: 20px; touch-action: none; }
+  .key.down { background: rgba(111, 208, 240, .62); color: #06121c; }
+  #kUp    { left: 36px; bottom: 202px; width: 60px; height: 58px; }
+  #kDown  { left: 36px; bottom: 16px;  width: 60px; height: 58px; }
+  #kLeft  { left: 4px;  bottom: 80px; width: 60px; height: 116px; }
+  #kRight { left: 68px; bottom: 80px; width: 60px; height: 116px; }
+  #kStart { right: 8px; top: 12px; width: 116px; height: 52px; font-size: 16px; }
+  #kStart.nudge { animation: nudge 1.1s ease-in-out infinite; }
+  @keyframes nudge { 50% { background: rgba(255, 226, 122, .7); color: #1a1405; } }
+  #kFire  { right: 8px; bottom: 148px; width: 116px; height: 124px; }
+  #kJump  { right: 8px; bottom: 16px;  width: 116px; height: 124px; }
+  body.pad #leftCol, body.pad #rightCol { display: none; }
+</style>
+</head>
+<body>
+<section id="start">
+  <header>
+    <h1>Rogue Rogue</h1>
+    <button class="btn primary" id="play" type="button">Play</button>
+  </header>
+  <div class="scroll">
+    <div class="hero">
+      <img src="icon.svg" alt="">
+      <div>
+        <p>A single-screen arcade platformer that deals you a new 100-stage dungeon every week. Trap monsters in bubbles, pop them for treasure, and dig for the Amulet of Yendor. Two controllers make it two players.</p>
+        <button class="btn primary" id="play2" type="button">Play</button>
+      </div>
+    </div>
+
+    <h2>Controls</h2>
+    <table class="keys">
+      <tr><th></th><th>Touch</th><th>Controller</th><th>Keyboard</th></tr>
+      <tr><td>Move</td><td>Arrows on the left</td><td>D-pad or left stick</td><td>Arrow keys</td></tr>
+      <tr><td>Jump</td><td>Jump</td><td>Bottom or top button</td><td>Z</td></tr>
+      <tr><td>Blow a bubble</td><td>Fire</td><td>Left or right button</td><td>X</td></tr>
+      <tr><td>Fire up or down</td><td>Hold up or down, then Fire</td><td>Same</td><td>Same</td></tr>
+      <tr><td>Start a game</td><td>Start</td><td>Start or Select</td><td>1</td></tr>
+    </table>
+    <p class="note">Second player: another controller, or I, J, K, L with A, S and 2. High scores stay on this car.</p>
+
+    <div class="legal">
+      <p>Rogue Rogue by Francesco Cottone (KesieV), MIT license, with small changes for this site: tools/roguerogue/roguerogue-web.patch and tools/build-roguerogue.mjs in github.com/RobertPKyle/frunk-store. Original at github.com/kesiev/roguerogue. Music by Juhani Junkala, Joth, TAD and Centurion of war (CC0). Anvil font by Damien Guard, Tom Thumb font by Robey Pointer. See /roguerogue/NOTICE.</p>
+      <p>frunk.store is not affiliated with or endorsed by the game's author. Play only while parked.</p>
+    </div>
+  </div>
+</section>
+
+<section id="loading" hidden aria-live="polite">
+  <b>Rogue Rogue</b>
+  <span id="loadText">Loading…</span>
+</section>
+
+<section id="failed" class="overlay" hidden aria-labelledby="failedTitle">
+  <div class="sheet">
+    <h2 id="failedTitle">The game stopped</h2>
+    <p id="failedText"></p>
+    <div><button class="btn primary" id="failedOk" type="button">Start again</button></div>
+  </div>
+</section>
+
+<section id="player" hidden>
+  <div id="stage"></div>
+  <div id="side">
+    <button class="btn" id="soundBtn" type="button">Sound on</button>
+    <button class="btn" id="quitBtn" type="button">Quit</button>
+  </div>
+  <div class="col" id="leftCol">
+    <div class="key" id="kUp" data-key="up" aria-label="Up">▲</div>
+    <div class="key" id="kLeft" data-key="left" aria-label="Left">◀</div>
+    <div class="key" id="kRight" data-key="right" aria-label="Right">▶</div>
+    <div class="key" id="kDown" data-key="down" aria-label="Down">▼</div>
+  </div>
+  <div class="col" id="rightCol">
+    <div class="key" id="kStart" data-key="start">Start</div>
+    <div class="key" id="kFire" data-key="b">Fire</div>
+    <div class="key" id="kJump" data-key="a">Jump</div>
+  </div>
+</section>
+
+<script type="module" src="roguerogue.js"></script>
+<script src="/sw-register.js"></script>
+</body>
+</html>

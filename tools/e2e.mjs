@@ -4433,6 +4433,95 @@ await check('craft 4k breaks and places with touch, saves when left and keeps th
   console.log(`     ${fps} fps, ${kept.edits.length} changes saved`);
 });
 
+// A pad like the car lists it: the raw device, and the standard-mapped copy
+const carPads = () => {
+  const pad = (id, mapping, index) => ({ id, index, mapping, connected: true, timestamp: 0, axes: [0, 0, 0, 0], buttons: Array.from({ length: 17 }, () => ({ pressed: false, value: 0 })) });
+  window.fakePads = [pad('raw', '', 0), pad('Tesla Virtual Gamepad', 'standard', 1)];
+  window.hold = (b, on) => { for (const p of window.fakePads) Object.assign(p.buttons[b], { pressed: on, value: on ? 1 : 0 }); };
+  window.press = async b => { window.hold(b, true); await new Promise(r => setTimeout(r, 220)); window.hold(b, false); await new Promise(r => setTimeout(r, 150)); };
+};
+
+await check('rogue rogue plays by controller, reads one pad as one player and keeps its high score', async () => {
+  await openFromHub(/Rogue Rogue/);
+  const frame = () => page.frames().find(f => f.url().includes('/roguerogue/'));
+  const app = appFrame();
+  const stats = () => frame().evaluate(() => window.roguerogueStats());
+  const until = async (what, fn, ms = 20000) => {
+    for (const t = Date.now(); Date.now() - t < ms; await page.waitForTimeout(100)) if (await fn(await stats())) return;
+    throw new Error(`no ${what}: ${JSON.stringify(await stats())}`);
+  };
+  await frame().evaluate(carPads);
+  await app.locator('#play').first().tap();
+  await until('title', s => s.running && s.credits > 0);
+  if ((await stats()).pads !== 1) throw new Error('one controller must read as one player');
+  await frame().evaluate(() => window.press(9));
+  await until('join', s => s.inGame === 1);
+  await page.waitForTimeout(500);
+  await frame().evaluate(() => window.press(0));
+  await until('first stage', s => s.scene === 'play');
+  await until('controller mode', s => s.mode === 'pad');
+  const before = (await stats()).frames;
+  await page.waitForTimeout(1000);
+  if ((await stats()).frames <= before) throw new Error('the game stopped drawing');
+  await frame().evaluate(() => { const { game, C } = window.roguerogueGame(); C.setHighScore(game, 0, 123456); C.saveHighScore(game, 0); });
+  await frame().evaluate(() => location.reload());
+  await page.waitForTimeout(1500);
+  await appFrame().locator('#play').first().tap();
+  await until('saved high score', s => s.running && s.hiscore === 123456);
+});
+
+await check('critical mass starts by touch and plays by controller', async () => {
+  await openFromHub(/Critical Mass/);
+  const frame = () => page.frames().find(f => f.url().includes('/critter/'));
+  const app = appFrame();
+  const stats = () => frame().evaluate(() => window.critterStats());
+  const until = async (what, fn, ms = 60000) => {
+    for (const t = Date.now(); Date.now() - t < ms; await page.waitForTimeout(100)) if (await fn(await stats())) return;
+    throw new Error(`no ${what}: ${JSON.stringify(await stats())}`);
+  };
+  await app.locator('#play').first().tap();
+  await until('engine', s => s?.ready);
+  await page.waitForTimeout(1200);
+  const box = await app.locator('#canvas').boundingBox();
+  await page.touchscreen.tap(box.x + box.width * 0.5, box.y + box.height * (1 - 462 / 750));
+  await until('new game by touch', s => s.context === 2);
+  await frame().evaluate(carPads);
+  const x = () => frame().evaluate(() => window.critterGame()._web_hero_x());
+  const from = await x();
+  await frame().evaluate(() => { window.fakePads[1].axes[0] = 1; window.fakePads[1].buttons[15].pressed = true; window.fakePads[1].buttons[15].value = 1; });
+  await page.waitForTimeout(800);
+  await frame().evaluate(() => { window.fakePads[1].axes[0] = 0; window.fakePads[1].buttons[15].pressed = false; window.fakePads[1].buttons[15].value = 0; });
+  if (await x() === from) throw new Error('the controller did not move the ship');
+  await frame().evaluate(() => window.press(9));
+  await until('menu from Start', s => s.context === 1);
+});
+
+await check('rocks and diamonds starts a level by controller, moves and ships no classic level sets', async () => {
+  await openFromHub(/Rocks'n'Diamonds/);
+  const frame = () => page.frames().find(f => f.url().includes('/rocks/'));
+  const app = appFrame();
+  const stats = () => frame().evaluate(() => window.rocksStats());
+  const until = async (what, fn, ms = 60000) => {
+    for (const t = Date.now(); Date.now() - t < ms; await page.waitForTimeout(100)) if (await fn(await stats())) return await stats();
+    throw new Error(`no ${what}: ${JSON.stringify(await stats())}`);
+  };
+  await frame().evaluate(carPads);
+  await app.locator('#play').first().tap();
+  await until('menu', s => s?.state === 1);
+  await page.waitForTimeout(1500);
+  await frame().evaluate(() => window.press(0));
+  const a = await until('level', s => s.state === 2);
+  await page.waitForTimeout(1200);
+  await frame().evaluate(() => { window.hold(13, true); });
+  await page.waitForTimeout(700);
+  await frame().evaluate(() => { window.hold(13, false); });
+  await page.waitForTimeout(600);
+  const b = await stats();
+  if (b.y === a.y && b.x === a.x) throw new Error(`the player did not move: ${JSON.stringify([a, b])}`);
+  const names = await frame().evaluate(() => { const fs = window.rocksGame().FS; const out = []; const walk = d => { for (const n of fs.readdir(d)) { if (n === '.' || n === '..') continue; const p = `${d}/${n}`; if (fs.isDir(fs.stat(p).mode)) walk(p); else out.push(p); } }; try { walk('/levels'); walk('/music'); } catch {} return out; });
+  if (names.some(n => /Classic_Games|emerald_mine|sokoban|supaplex|boulder|\.mod$|^\/music\/mod\./i.test(n))) throw new Error(`classic data shipped: ${names.filter(n => /Classic|mod\./.test(n)).slice(0, 3)}`);
+});
+
 await check('logic puzzles lists every puzzle, plays solo by touch and keeps it when closed', async () => {
   await openFromHub(/Logic Puzzles/);
   const frame = () => page.frames().find(f => f.url().includes('/puzzles/'));

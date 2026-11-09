@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Critical Mass</title>
+<style>
+  :root { --bg: #060a1a; --panel: #101636; --card: #1a2250; --line: rgba(160, 190, 255, .18); --text: #eff3ff; --muted: #a2adcf;
+          --accent: #ffc23d; --danger: #c4503a; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 16px/1.4 system-ui, sans-serif; overflow: hidden;
+               -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; touch-action: none; }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  .btn { min-height: 44px; padding: 8px 16px; border-radius: 12px; background: var(--card); border: 1px solid var(--line); white-space: nowrap; }
+  .btn.primary { background: var(--accent); border-color: transparent; color: #221703; font-weight: 700; }
+  .btn:disabled { opacity: .5; cursor: default; }
+  [hidden] { display: none !important; }
+
+  /* ---------- start ---------- */
+  #start { display: flex; flex-direction: column; height: 100%; }
+  /* left padding keeps clear of the hub's Apps button */
+  header { display: flex; align-items: center; gap: 10px; min-height: 60px; padding: 8px 12px 8px 110px; border-bottom: 1px solid var(--line); }
+  header h1 { margin: 0; font-size: 18px; font-weight: 600; flex: 1; }
+  .scroll { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 14px 16px 20px; touch-action: pan-y; }
+  .hero { display: flex; gap: 16px; align-items: center; max-width: 720px; padding: 16px; border-radius: 16px; background: var(--panel); border: 1px solid var(--line); }
+  .hero img { width: 84px; height: 84px; flex: none; }
+  .hero p { margin: 0 0 12px; color: #d9e0f8; }
+  .row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .note { font-size: 13px; color: var(--muted); margin: 8px 2px 0; max-width: 60em; }
+  h2 { margin: 18px 2px 8px; font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  table.keys { border-collapse: collapse; font-size: 13px; color: var(--muted); margin: 4px 2px; }
+  table.keys th, table.keys td { text-align: left; padding: 3px 14px 3px 0; vertical-align: top; }
+  table.keys th { color: var(--text); font-weight: 600; }
+  .legal { margin-top: 18px; font-size: 12px; color: var(--muted); user-select: text; -webkit-user-select: text; max-width: 60em; }
+  .legal p { margin: 4px 0; }
+
+  /* ---------- overlays ---------- */
+  .overlay { position: fixed; inset: 0; z-index: 5; display: grid; place-items: center; padding: 64px 16px 16px; background: rgba(3, 5, 16, .9); }
+  .sheet { display: flex; flex-direction: column; max-width: 560px; padding: 18px; border-radius: 18px; background: var(--panel); border: 1px solid var(--line); }
+  .sheet h2 { margin: 0 0 8px; font-size: 19px; color: var(--text); letter-spacing: 0; text-transform: none; }
+  .sheet p { margin: 0 0 10px; font-size: 15px; color: #d9e0f8; overflow-wrap: anywhere; }
+  .sheet input { font: inherit; min-height: 44px; padding: 8px 12px; margin-bottom: 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); color: var(--text); user-select: text; -webkit-user-select: text; }
+  #loading { position: fixed; inset: 0; z-index: 4; display: grid; place-content: center; gap: 14px; text-align: center; background: var(--bg); padding: 16px; }
+  #loading b { font-size: 20px; }
+  #loadText { color: var(--muted); font-size: 15px; }
+
+  /* ---------- player ---------- */
+  #player { position: fixed; inset: 0; display: grid; grid-template-rows: 60px minmax(0, 1fr); grid-template-columns: minmax(0, 1fr); background: #000; }
+  .bar { display: flex; align-items: center; gap: 8px; padding: 8px 10px 8px 110px; overflow-x: auto; scrollbar-width: none; touch-action: pan-x; background: var(--panel); border-bottom: 1px solid var(--line); }
+  .bar b { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #padNote { font-size: 13px; color: var(--muted); white-space: nowrap; }
+  .screen { position: relative; min-height: 0; min-width: 0; overflow: hidden; container-type: size; }
+  /* SDL writes the canvas's size into its style; the game draws 4:3 at
+     whatever size the page lays it out at, so these rules win */
+  #canvas { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); display: block;
+            width: min(100cqw, 133.333cqh) !important; height: min(75cqw, 100cqh) !important;
+            border: 0; padding: 0; background: #000; outline: none; touch-action: none; }
+  #touch { position: absolute; inset: 0; touch-action: none; }
+  .hold { position: absolute; width: 74px; height: 74px; border-radius: 50%; display: grid; place-items: center; font-size: 13px; font-weight: 700;
+          background: rgba(30, 40, 90, .55); border: 2px solid rgba(255, 255, 255, .35); color: #fff; touch-action: none; }
+  .hold.down { background: rgba(255, 194, 61, .7); color: #221703; }
+  #alt { left: 8px; top: 38%; }
+  #special { right: 8px; top: 38%; }
+  #over { position: absolute; left: 50%; top: 58%; transform: translateX(-50%); display: flex; gap: 12px; }
+  @media (max-width: 640px) {
+    .bar .btn { padding: 8px 10px; }
+    .hero img { width: 60px; height: 60px; }
+  }
+</style>
+</head>
+<body>
+<section id="start">
+  <header>
+    <h1>Critical Mass</h1>
+    <button class="btn primary" id="play" type="button">Play</button>
+  </header>
+  <div class="scroll">
+    <div class="hero">
+      <img src="icon.svg" alt="">
+      <div>
+        <p>An army of space critters has overrun your world. You get one tiny ship, wave after wave of them and a growing stack of weapons. Shoot the critters, grab the resource containers, and see how far up the scoreboard you can climb.</p>
+        <div class="row">
+          <button class="btn primary" id="play2" type="button">Play</button>
+          <button class="btn" id="sharp" type="button">Picture: Sharp</button>
+        </div>
+        <p class="note">Sharp is the game's own 800x600. Fast draws fewer pixels, if the picture stutters.</p>
+      </div>
+    </div>
+
+    <h2>Controls</h2>
+    <table class="keys">
+      <tr><th></th><th>Touch</th><th>Controller</th></tr>
+      <tr><td>Move the ship</td><td>Drag anywhere</td><td>D-pad or left stick</td></tr>
+      <tr><td>Main weapon</td><td>Fires while your finger is down</td><td>A (hold)</td></tr>
+      <tr><td>Second weapon</td><td>Alt (hold)</td><td>B (hold)</td></tr>
+      <tr><td>Third weapon</td><td>Special (hold)</td><td>X (hold)</td></tr>
+      <tr><td>Pause</td><td>Pause</td><td>Select</td></tr>
+      <tr><td>Menu</td><td>Menu</td><td>Start</td></tr>
+      <tr><td>In the menus</td><td>Tap an item</td><td>D-pad, A to choose, B to go back</td></tr>
+    </table>
+    <p class="note">The second and third weapons join in on the harder skill levels. Change the skill under Config in the game's menu.</p>
+
+    <div class="legal">
+      <p>Critical Mass (Critter) by Frank Becker (GNU GPL version 2 or later), compiled to WebAssembly with small changes for this site: /critter/engine/critter-web.patch, built by tools/build-critter.mjs in github.com/RobertPKyle/frunk-store. The source is at /critter/engine/. Music: "Overdrive" by Centurion_of_war (CC0). See /critter/NOTICE.</p>
+      <p>frunk.store is not affiliated with or endorsed by the game's author. Play only while parked.</p>
+    </div>
+  </div>
+</section>
+
+<section id="loading" hidden aria-live="polite">
+  <b>Critical Mass</b>
+  <span id="loadText">Loading…</span>
+</section>
+
+<section id="failed" class="overlay" hidden aria-labelledby="failedTitle">
+  <div class="sheet">
+    <h2 id="failedTitle">The game stopped</h2>
+    <p id="failedText"></p>
+    <div><button class="btn primary" id="failedOk" type="button">Start again</button></div>
+  </div>
+</section>
+
+<section id="name" class="overlay" hidden aria-labelledby="nameTitle">
+  <form class="sheet" id="nameForm">
+    <h2 id="nameTitle">Top ten finish</h2>
+    <p>Pilot name for the scoreboard</p>
+    <input id="nameInput" maxlength="15" autocomplete="off" spellcheck="false" aria-label="Pilot name">
+    <div><button class="btn primary" id="nameOk" type="submit">Save</button></div>
+  </form>
+</section>
+
+<section id="player" hidden>
+  <div class="bar">
+    <b>Critical Mass</b>
+    <span id="padNote" hidden>Controller</span>
+    <button class="btn" id="pauseBtn" type="button">Pause</button>
+    <button class="btn" id="menuBtn" type="button">Menu</button>
+    <button class="btn" id="soundBtn" type="button">Sound on</button>
+    <button class="btn" id="quitBtn" type="button">Quit</button>
+  </div>
+  <div class="screen">
+    <canvas id="canvas" tabindex="-1" oncontextmenu="event.preventDefault()"></canvas>
+    <div id="touch" hidden></div>
+    <button class="hold" id="alt" type="button" hidden>Alt</button>
+    <button class="hold" id="special" type="button" hidden>Special</button>
+    <div id="over" hidden>
+      <button class="btn primary" id="againBtn" type="button">Play again</button>
+      <button class="btn" id="overMenuBtn" type="button">Menu</button>
+    </div>
+  </div>
+</section>
+
+<script type="module" src="critter.js"></script>
+<script src="/sw-register.js"></script>
+</body>
+</html>
