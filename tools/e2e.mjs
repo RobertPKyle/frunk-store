@@ -4522,6 +4522,42 @@ await check('rocks and diamonds starts a level by controller, moves and ships no
   if (names.some(n => /Classic_Games|emerald_mine|sokoban|supaplex|boulder|\.mod$|^\/music\/mod\./i.test(n))) throw new Error(`classic data shipped: ${names.filter(n => /Classic|mod\./.test(n)).slice(0, 3)}`);
 });
 
+await check('sopwith starts by touch, ends a game and picks menus by controller', async () => {
+  await openFromHub(/Sopwith/);
+  const frame = () => page.frames().find(f => f.url().includes('/sopwith/'));
+  const app = appFrame();
+  const stats = () => frame().evaluate(() => window.sopwithStats());
+  const until = async (what, fn, ms = 30000) => {
+    for (const t = Date.now(); Date.now() - t < ms; await page.waitForTimeout(100)) if (await fn(await stats())) return;
+    throw new Error(`no ${what}: ${JSON.stringify(await stats())}`);
+  };
+  const rows = () => frame().evaluate(() => { const g = window.sopwithGame(); return Array.from({ length: 25 }, (_, i) => String.fromCharCode(g._web_menu_row(i) || 32)).join(''); });
+  const tapItem = async key => {
+    const row = (await rows()).indexOf(key);
+    if (row < 0) throw new Error(`no menu item ${key}: "${await rows()}"`);
+    const box = await app.locator('#canvas').boundingBox();
+    await page.touchscreen.tap(box.x + box.width / 2, box.y + (row + 0.5) / 25 * box.height);
+  };
+  await app.locator('#play').first().tap();
+  await until('title menu', s => s?.screen === 1);
+  await page.waitForTimeout(500);
+  if (/[MI]/.test(await rows())) throw new Error(`upstream's manual or install item is back: "${await rows()}"`);
+  await tapItem('S');
+  await page.waitForTimeout(400);
+  await tapItem('N');
+  await until('a level by touch', s => s.screen === 2);
+  if (!(await app.locator('.pad[data-key="5"]').isVisible())) throw new Error('no Fire button beside the picture');
+  await app.locator('#endBtn').tap();
+  await app.locator('#endBtn').tap();
+  await until('title after End game', s => s.screen === 1);
+  await frame().evaluate(carPads);
+  await page.waitForTimeout(300);
+  await frame().evaluate(() => window.press(1));   // A on the Tesla copy: single player
+  await page.waitForTimeout(400);
+  await frame().evaluate(() => window.press(1));   // novice
+  await until('a level by controller', s => s.screen === 2 && s.padSeen);
+});
+
 await check('logic puzzles lists every puzzle, plays solo by touch and keeps it when closed', async () => {
   await openFromHub(/Logic Puzzles/);
   const frame = () => page.frames().find(f => f.url().includes('/puzzles/'));

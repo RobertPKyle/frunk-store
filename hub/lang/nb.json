@@ -127,6 +127,7 @@
     "roguerogue": { "name": "Rogue Rogue", "tagline": "En ny arkade-dungeon med 100 brett hver uke: fang monstre i bobler og sprekk dem for bytte. Berøring eller kontroller, to spillere med to kontrollere." },
     "critter": { "name": "Critical Mass", "tagline": "Hold stand mot en hær av romkryp i dette 3D-arkadeskytespillet: bølge etter bølge, stadig flere våpen og en topp ti-liste. Berøring eller kontroller." },
     "rocks": { "name": "Rocks'n'Diamonds", "tagline": "Grav etter diamanter, unngå fallende steiner og overlist skapninger i Holger Schemels puslespillklassiker: 60 opplæringsbrett. Berøring eller kontroller." },
+    "sopwith": { "name": "Sopwith", "tagline": "Dobbeltdekker-klassikeren fra 1984: ta av, skyt ned fiendtlige fly, bomb basen deres og fly hjem for å fylle drivstoff. Berøring eller kontroller." },
     "neverball": { "name": "Neverball", "tagline": "Vipp gulvet for å rulle kula, samle myntene og nå målet før tiden renner ut. Åtte brettsett i 3D, med toppliste og reprise. Berøring eller kontroller." },
     "neverputt": { "name": "Neverputt", "tagline": "3D-minigolf fra Neverball-prosjektet: ni baner, 170 hull og opptil fire spillere etter tur på samme skjerm. Berøring eller kontroller." },
     "supertux": { "tagline": "Tux' hopp-og-løp-eventyr over Icy Island og Rooted Forest, pluss to bonusøyer: rundt hundre brett. Berøring eller kontroller." },

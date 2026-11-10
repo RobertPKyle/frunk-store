@@ -1,0 +1,28 @@
+Sopwith (apps/sopwith)
+
+Game and engine (engine/)
+  Sopwith, (C) 1984, 1985, 1987 BMB Compuscience and (C) 1984-2000 David L.
+  Clark, who released the source code under the GNU General Public License.
+  SDL Sopwith, (C) 2001-2026 Simon Howard, Jesse Smith and the other authors
+  in the source's AUTHORS file.
+  License: GNU General Public License, version 2 or later (engine/COPYING.md).
+  The game's pictures, sounds and levels are part of its source code, under
+  the same license; there is no separate data file.
+  Source: https://github.com/fragglet/sdl-sopwith, commit
+  c4e034109e28a5bd1727645fe77b27430219e8b5, with frunk.store's changes for this
+  site in engine/sopwith-web.patch (also tools/sopwith/sopwith-web.patch in
+  https://github.com/RobertPKyle/frunk-store, whose tools/build-sopwith.mjs
+  builds it). The source the build came from is
+  engine/sdl-sopwith-c4e034109e28-web-src.tar.gz.
+  The changes: web_* functions let the page pass on touch, controllers, menu
+  choices and the high score name; the game's own touch strip and its SDL
+  controller support are switched off on the web, since the page provides
+  both; the controller layout matches the page's, so the game's help screen
+  names the same buttons; keys reach the game only while its picture has the
+  focus; no "open manual" or "install as app" items in the menu.
+
+Libraries (built in)
+  Emscripten's SDL2 port, zlib license.
+
+Page
+  index.html, sopwith.js and icon.svg: by frunk.store.

@@ -127,6 +127,7 @@
     "roguerogue": { "name": "Rogue Rogue", "tagline": "Jede Woche ein neuer Arcade-Dungeon mit 100 Stages: Fang Monster in Blasen und lass sie für Beute platzen. Touch oder Controller, zu zweit mit zwei Controllern." },
     "critter": { "name": "Critical Mass", "tagline": "Halte eine Armee von Weltraum-Krabblern auf in diesem 3D-Arcade-Shooter: Welle um Welle, immer mehr Waffen und eine Top-Ten-Bestenliste. Touch oder Controller." },
     "rocks": { "name": "Rocks'n'Diamonds", "tagline": "Grabe nach Diamanten, weiche fallenden Felsen aus und überliste Kreaturen in Holger Schemels Puzzle-Klassiker: 60 Tutorial-Level, per Touch oder Controller." },
+    "sopwith": { "name": "Sopwith", "tagline": "Der Doppeldecker-Klassiker von 1984: starte, schieß feindliche Flugzeuge ab, bombardiere ihre Basis und flieg zum Auftanken heim. Touch oder Controller." },
     "neverball": { "name": "Neverball", "tagline": "Neige den Boden, um die Kugel zu rollen, sammle die Münzen und erreiche das Ziel, bevor die Zeit abläuft. Acht Levelsets in 3D, mit Bestenlisten und Wiederholungen. Touch oder Controller." },
     "neverputt": { "name": "Neverputt", "tagline": "3D-Minigolf aus dem Neverball-Projekt: neun Kurse, 170 Löcher und bis zu vier Spieler abwechselnd an einem Bildschirm. Touch oder Controller." },
     "supertux": { "tagline": "Tux' Jump-'n'-Run-Abenteuer über Icy Island und den Rooted Forest, dazu zwei Bonusinseln: rund hundert Level. Touch oder Controller." },

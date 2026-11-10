@@ -1,0 +1,332 @@
+diff --git a/src/sdl/controller.c b/src/sdl/controller.c
+index bafc58a..ee262b9 100644
+--- a/src/sdl/controller.c
++++ b/src/sdl/controller.c
+@@ -17,6 +17,26 @@
+ #include "swgrpha.h"
+ #include "video.h"
+ 
++#ifdef __EMSCRIPTEN__
++#include <emscripten.h>
++#endif
++
++#ifdef __EMSCRIPTEN__
++int controller_bindings[NUM_KEYS] = {
++    SDL_CONTROLLER_BUTTON_INVALID,       // KEY_UNKNOWN
++    SDL_CONTROLLER_BUTTON_DPAD_UP,       // KEY_PULLUP
++    SDL_CONTROLLER_BUTTON_DPAD_DOWN,     // KEY_PULLDOWN
++    SDL_CONTROLLER_BUTTON_X,             // KEY_FLIP
++    SDL_CONTROLLER_BUTTON_B,             // KEY_BOMB
++    SDL_CONTROLLER_BUTTON_A,             // KEY_FIRE
++    SDL_CONTROLLER_BUTTON_Y,             // KEY_HOME
++    SDL_CONTROLLER_BUTTON_INVALID,       // KEY_MISSILE
++    SDL_CONTROLLER_BUTTON_INVALID,       // KEY_STARBURST
++    SDL_CONTROLLER_BUTTON_RIGHTSHOULDER, // KEY_ACCEL
++    SDL_CONTROLLER_BUTTON_LEFTSHOULDER,  // KEY_DECEL
++    SDL_CONTROLLER_BUTTON_INVALID,       // KEY_SOUND
++};
++#else
+ int controller_bindings[NUM_KEYS] = {
+     SDL_CONTROLLER_BUTTON_INVALID,       // KEY_UNKNOWN
+     SDL_CONTROLLER_BUTTON_DPAD_DOWN,     // KEY_PULLUP
+@@ -31,6 +51,7 @@ int controller_bindings[NUM_KEYS] = {
+     SDL_CONTROLLER_BUTTON_B,             // KEY_DECEL
+     SDL_CONTROLLER_BUTTON_INVALID,       // KEY_SOUND
+ };
++#endif
+ 
+ static int button_to_key[SDL_CONTROLLER_BUTTON_MAX];
+ 
+@@ -38,6 +59,22 @@ static enum menukey last_menukey = MENUKEY_NONE;
+ static SDL_GameController *controller = NULL;
+ static SDL_JoystickID controller_id;
+ 
++#ifdef __EMSCRIPTEN__
++// The page reads the car's controllers itself (it lists each one twice).
++static bool web_pad = false;
++
++EMSCRIPTEN_KEEPALIVE void web_set_pad(int present)
++{
++	web_pad = present != 0;
++}
++
++// A menu press: 1 choose, 2 back, 3 up, 4 down (enum menukey).
++EMSCRIPTEN_KEEPALIVE void web_menu_key(int key)
++{
++	last_menukey = key;
++}
++#endif
++
+ static void RecalculateButtonMapping(void)
+ {
+ 	int i;
+@@ -133,6 +170,10 @@ void Vid_ControllerRemoved(SDL_ControllerDeviceEvent *event)
+ 
+ void Vid_ControllerInit(void)
+ {
++#ifdef __EMSCRIPTEN__
++	RecalculateButtonMapping();
++	return;
++#endif
+ 	SDL_Init(SDL_INIT_JOYSTICK | SDL_INIT_GAMECONTROLLER);
+ 	// SDL_GameControllerAddMappingsFromFile("gamecontrollerdb.txt");
+ 	RecalculateButtonMapping();
+@@ -147,10 +188,23 @@ enum menukey Vid_ControllerMenuKey(void)
+ 
+ bool Vid_HaveController(void)
+ {
++#ifdef __EMSCRIPTEN__
++	if (web_pad) {
++		return true;
++	}
++#endif
+ 	return controller != NULL;
+ }
+ 
+ const char *Vid_ControllerButtonName(enum gamekey key)
+ {
++#ifdef __EMSCRIPTEN__
++	static const char *names[SDL_CONTROLLER_BUTTON_MAX] = {
++	    "A", "B", "X", "Y", "Select", NULL, "Start", NULL, NULL,
++	    "LB", "RB", "D-pad up", "D-pad down", NULL, NULL,
++	};
++	int b = controller_bindings[key];
++	return b >= 0 && b < SDL_CONTROLLER_BUTTON_MAX ? names[b] : NULL;
++#endif
+ 	return SDL_GameControllerGetStringForButton(controller_bindings[key]);
+ }
+diff --git a/src/sdl/video.c b/src/sdl/video.c
+index e4dba17..6b3d301 100644
+--- a/src/sdl/video.c
++++ b/src/sdl/video.c
+@@ -24,6 +24,10 @@
+ #include "swmain.h"
+ #include "video.h"
+ 
++#ifdef __EMSCRIPTEN__
++#include <emscripten.h>
++#endif
++
+ #define INPUT_BUFFER_LEN 32
+ 
+ void Vid_ControllerButtonDown(SDL_ControllerButtonEvent *event);
+@@ -118,6 +122,11 @@ static const struct touch_button *pressed_buttons[16];
+ bool vid_fullscreen = false;
+ static bool touch_area_enabled = false;
+ static int ctrlbreak = 0;
++#ifdef __EMSCRIPTEN__
++// Ctrl+key from the page, run from GetEvents so it happens inside the
++// game's own loop and not in the middle of a call from the page.
++static int web_ctrl_key = 0;
++#endif
+ static bool initted = false;
+ static SDL_Window *window = NULL;
+ static uint32_t pixel_format;
+@@ -424,6 +433,11 @@ static void Vid_SetMode(void)
+ 	unsigned int rmask, gmask, bmask, amask;
+ 	int bpp;
+ 
++#ifdef __EMSCRIPTEN__
++	// Keys reach the game only while its picture has the focus, so typing
++	// into the page's own name box doesn't also type into the game.
++	SDL_SetHint(SDL_HINT_EMSCRIPTEN_KEYBOARD_ELEMENT, "#canvas");
++#endif
+ 	if (SDL_Init(SDL_INIT_VIDEO) < 0) {
+ 		ErrorExit("Unable to initialize video subsystem: %s",
+ 		          SDL_GetError());
+@@ -547,7 +561,11 @@ void Vid_Init(void)
+ 	}
+ 
+ 	fflush(stdout);
++#ifdef __EMSCRIPTEN__
++	touch_area_enabled = false;
++#else
+ 	touch_area_enabled = SDL_GetNumTouchDevices() > 0;
++#endif
+ 
+ 	Vid_SetMode();
+ 
+@@ -837,6 +855,14 @@ static void GetEvents(void)
+ 	bool need_redraw = false;
+ 	int i;
+ 
++#ifdef __EMSCRIPTEN__
++	if (web_ctrl_key != 0) {
++		SDL_Keycode k = web_ctrl_key;
++		web_ctrl_key = 0;
++		CtrlKeyPress(k);
++	}
++#endif
++
+ 	while (SDL_PollEvent(&event)) {
+ 		switch (event.type) {
+ 		case SDL_KEYDOWN:
+@@ -876,6 +902,9 @@ static void GetEvents(void)
+ 			break;
+ 
+ 		case SDL_FINGERDOWN:
++#ifdef __EMSCRIPTEN__
++			break;
++#endif
+ 			if (!touch_area_enabled) {
+ 				touch_area_enabled = true;
+ 				Vid_Reset();
+@@ -915,6 +944,46 @@ static void GetEvents(void)
+ 	}
+ }
+ 
++#ifdef __EMSCRIPTEN__
++// Calls for the page (apps/sopwith/sopwith.js on frunk.store), which turns
++// touch and controllers into these.
++
++// Holds or lets go of one of the game's keys (enum gamekey).
++EMSCRIPTEN_KEEPALIVE void web_key(int key, int down)
++{
++	if (key <= KEY_UNKNOWN || key >= NUM_KEYS) {
++		return;
++	}
++	if (down) {
++		keysdown[key] |= KEYDOWN_TOUCH | KEYDOWN_WAS_PRESSED;
++	} else {
++		keysdown[key] &= ~KEYDOWN_TOUCH;
++	}
++}
++
++// Types one character, as the menus and the name prompt read them
++// (27 is Escape, 13 is Enter, 8 is Backspace).
++EMSCRIPTEN_KEEPALIVE void web_char(int c)
++{
++	SDL_Keysym k = {0};
++	k.sym = c;
++	k.scancode = c == 27 ? SDL_SCANCODE_ESCAPE : SDL_SCANCODE_UNKNOWN;
++	InputBufferPush(k);
++}
++
++// Ctrl+R (restart the level) or Ctrl+Q (end the game).
++EMSCRIPTEN_KEEPALIVE void web_ctrl(int c)
++{
++	web_ctrl_key = c;
++}
++
++// Whether the game is waiting for typed text (the high score name).
++EMSCRIPTEN_KEEPALIVE int web_text_input(void)
++{
++	return SDL_IsTextInputActive();
++}
++#endif
++
+ void Vid_StartTextInput(void)
+ {
+ 	SDL_StartTextInput();
+diff --git a/src/swmenu.c b/src/swmenu.c
+index 9d92483..7d06b41 100644
+--- a/src/swmenu.c
++++ b/src/swmenu.c
+@@ -30,6 +30,18 @@
+ #include "swtext.h"
+ #include "swtitle.h"
+ 
++#ifdef __EMSCRIPTEN__
++#include <emscripten.h>
++
++static char web_rows[32];
++
++// The key of the menu item drawn on text row `row` (0 at the top), or 0.
++EMSCRIPTEN_KEEPALIVE int web_menu_row(int row)
++{
++	return row >= 0 && row < (int) sizeof(web_rows) ? web_rows[row] : 0;
++}
++#endif
++
+ #define CONFIG_SETTING_COLUMN 28
+ 
+ static const char menukeys[] = "1234567890ABCDEFGHIJKL";
+@@ -180,6 +192,9 @@ static void DrawMenu(const struct menu *menu, int selected)
+ 
+ 	Vid_ClearBuf();
+ 	swposcur(0, 0);
++#ifdef __EMSCRIPTEN__
++	memset(web_rows, 0, sizeof(web_rows));
++#endif
+ 
+ 	if (menu->draw_background != NULL) {
+ 		menu->draw_background(menu->draw_background_data);
+@@ -222,6 +237,11 @@ static void DrawMenu(const struct menu *menu, int selected)
+ 		GetCursorPosition(NULL, &y);
+ 		swposcur(0, y);
+ 		swputs(buf);
++#ifdef __EMSCRIPTEN__
++		if (y >= 0 && y < (int) sizeof(web_rows)) {
++			web_rows[y] = key;
++		}
++#endif
+ 
+ 		if (num_buttons < sizeof(buttons) - 1) {
+ 			buttons[num_buttons] = key;
+diff --git a/src/swtitle.c b/src/swtitle.c
+index 43a8b4e..3ee4fd1 100644
+--- a/src/swtitle.c
++++ b/src/swtitle.c
+@@ -402,7 +402,7 @@ static enum menu_action StartVsComputer(const struct menuitem *item)
+ 	return MENU_ACTION_RETURN;
+ }
+ 
+-#ifdef __EMSCRIPTEN__
++#if 0
+ static enum menu_action OpenManual(const struct menuitem *item)
+ {
+ 	emscripten_run_script("openManual()");
+@@ -431,10 +431,6 @@ static const struct menuitem main_menu_items[] = {
+     {'N', "network game", SubMenu, &netgame_menu},
+ #endif
+     {'O', "game options", SubMenu, &options_menu},
+-#ifdef __EMSCRIPTEN__
+-    {'M', "open manual", OpenManual},
+-    {'I', "install as app", InstallApp},
+-#endif
+ #ifndef NO_EXIT
+     {'Q', "quit game", QuitGame},
+ #endif
+diff --git a/src/touch_area.c b/src/touch_area.c
+index f65c437..86378e7 100644
+--- a/src/touch_area.c
++++ b/src/touch_area.c
+@@ -23,6 +23,18 @@
+ #include "swtext.h"
+ #include "video.h"
+ 
++#ifdef __EMSCRIPTEN__
++#include <emscripten.h>
++
++// 1 while a menu shows, 2 once a level starts
++static int web_mode = 0;
++
++EMSCRIPTEN_KEEPALIVE int web_screen(void)
++{
++	return web_mode;
++}
++#endif
++
+ #define MARGIN              4
+ #define BUTTON_WIDTH        87
+ #define BUTTON_HEIGHT       36
+@@ -139,6 +151,9 @@ void Vid_ShowTouchGameControls(void)
+ {
+ 	memset(button_pressed, 0, sizeof(button_pressed));
+ 	curr_buttons = game_buttons;
++#ifdef __EMSCRIPTEN__
++	web_mode = 2;
++#endif
+ }
+ 
+ void Vid_ShowTouchKeys(const char *keys)
+@@ -148,6 +163,9 @@ void Vid_ShowTouchKeys(const char *keys)
+ 	int i, x = 2, y = 8, key;
+ 
+ 	memset(button_pressed, 0, sizeof(button_pressed));
++#ifdef __EMSCRIPTEN__
++	web_mode = 1;
++#endif
+ 
+ 	buttons[0].type = TOUCH_BUTTON_KEYPRESS;
+ 	buttons[0].label = "ESC";

@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Sopwith</title>
+<style>
+  :root { --bg: #04060e; --panel: #0d1224; --card: #18203c; --line: rgba(140, 220, 255, .2); --text: #f2f7ff; --muted: #9eabc8;
+          --accent: #55ffff; --accent2: #ff55ff; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 16px/1.4 system-ui, sans-serif; overflow: hidden;
+               -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; touch-action: none; }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  .btn { min-height: 44px; padding: 8px 16px; border-radius: 12px; background: var(--card); border: 1px solid var(--line); white-space: nowrap; }
+  .btn.primary { background: var(--accent); border-color: transparent; color: #04161a; font-weight: 700; }
+  .btn:disabled { opacity: .5; cursor: default; }
+  [hidden] { display: none !important; }
+
+  /* ---------- start ---------- */
+  #start { display: flex; flex-direction: column; height: 100%; }
+  /* left padding keeps clear of the hub's Apps button */
+  header { display: flex; align-items: center; gap: 10px; min-height: 60px; padding: 8px 12px 8px 110px; border-bottom: 1px solid var(--line); }
+  header h1 { margin: 0; font-size: 18px; font-weight: 600; flex: 1; }
+  .scroll { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 14px 16px 20px; touch-action: pan-y; }
+  .hero { display: flex; gap: 16px; align-items: center; max-width: 720px; padding: 16px; border-radius: 16px; background: var(--panel); border: 1px solid var(--line); }
+  .hero img { width: 84px; height: 84px; flex: none; }
+  .hero p { margin: 0 0 12px; color: #dbe5fa; }
+  .row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .note { font-size: 13px; color: var(--muted); margin: 8px 2px 0; max-width: 60em; }
+  h2 { margin: 18px 2px 8px; font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  table.keys { border-collapse: collapse; font-size: 13px; color: var(--muted); margin: 4px 2px; }
+  table.keys th, table.keys td { text-align: left; padding: 3px 14px 3px 0; vertical-align: top; }
+  table.keys th { color: var(--text); font-weight: 600; }
+  .legal { margin-top: 18px; font-size: 12px; color: var(--muted); user-select: text; -webkit-user-select: text; max-width: 60em; }
+  .legal p { margin: 4px 0; }
+
+  /* ---------- overlays ---------- */
+  .overlay { position: fixed; inset: 0; z-index: 5; display: grid; place-items: center; padding: 64px 16px 16px; background: rgba(2, 4, 12, .9); }
+  .sheet { display: flex; flex-direction: column; max-width: 560px; padding: 18px; border-radius: 18px; background: var(--panel); border: 1px solid var(--line); }
+  .sheet h2 { margin: 0 0 8px; font-size: 19px; color: var(--text); letter-spacing: 0; text-transform: none; }
+  .sheet p { margin: 0 0 10px; font-size: 15px; color: #dbe5fa; overflow-wrap: anywhere; }
+  .sheet input { font: inherit; font-size: 22px; letter-spacing: .3em; text-transform: uppercase; min-height: 48px; padding: 8px 12px; margin-bottom: 12px;
+                 border-radius: 10px; border: 1px solid var(--line); background: var(--card); color: var(--text); user-select: text; -webkit-user-select: text; }
+  .sheet .row { gap: 10px; }
+  #loading { position: fixed; inset: 0; z-index: 4; display: grid; place-content: center; gap: 14px; text-align: center; background: var(--bg); padding: 16px; }
+  #loading b { font-size: 20px; }
+  #loadText { color: var(--muted); font-size: 15px; }
+
+  /* ---------- player ---------- */
+  #player { position: fixed; inset: 0; display: grid; grid-template-rows: 60px minmax(0, 1fr); grid-template-columns: minmax(0, 1fr); background: #000; }
+  .bar { display: flex; align-items: center; gap: 8px; padding: 8px 10px 8px 110px; overflow-x: auto; scrollbar-width: none; touch-action: pan-x; background: var(--panel); border-bottom: 1px solid var(--line); }
+  .bar b { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #padNote { font-size: 13px; color: var(--muted); white-space: nowrap; }
+  /* touch: a column of buttons each side of the picture */
+  .field { display: grid; grid-template-columns: minmax(0, 1fr); min-height: 0; }
+  .field.touch { grid-template-columns: 150px minmax(0, 1fr) 150px; }
+  .screen { position: relative; min-height: 0; min-width: 0; overflow: hidden; container-type: size; }
+  /* SDL writes the canvas's size into its style; the game draws 320x200 (16:10)
+     at whatever size the page lays the canvas out at, so these rules win */
+  #canvas { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); display: block;
+            width: min(100cqw, 160cqh) !important; height: min(62.5cqw, 100cqh) !important;
+            border: 0; padding: 0; background: #000; outline: none; touch-action: none; }
+  #menuTouch { position: absolute; inset: 0; touch-action: none; }
+  .side { display: flex; flex-direction: column; gap: 8px; padding: 8px; min-height: 0; background: #05070f; }
+  .side[hidden] { display: none !important; }
+  .field:not(.touch) .side { display: none; }
+  .pad { flex: 1 1 0; min-height: 0; display: grid; place-items: center; border-radius: 16px; font-size: 15px; font-weight: 700; text-align: center; line-height: 1.2;
+         background: rgba(40, 56, 110, .6); border: 2px solid rgba(255, 255, 255, .25); color: #fff; touch-action: none; padding: 4px; }
+  .pad.big { flex-grow: 2; }
+  .pad.small { flex-grow: .7; }
+  .pad.fire { background: rgba(255, 85, 255, .35); }
+  .pad.down { background: var(--accent); border-color: transparent; color: #04161a; }
+  .pad .arrow { display: block; font-size: 26px; line-height: 1; }
+  .pair { flex: 1 1 0; min-height: 0; display: flex; gap: 8px; }
+  .pair .pad { flex: 1 1 0; }
+  .side .gap { flex: 1 1 0; }
+  @media (max-width: 640px) {
+    .bar .btn { padding: 8px 10px; }
+    .hero img { width: 60px; height: 60px; }
+    .field.touch { grid-template-columns: 96px minmax(0, 1fr) 96px; }
+    .pad { font-size: 13px; }
+  }
+</style>
+</head>
+<body>
+<section id="start">
+  <header>
+    <h1>Sopwith</h1>
+    <button class="btn primary" id="play" type="button">Play</button>
+  </header>
+  <div class="scroll">
+    <div class="hero">
+      <img src="icon.svg" alt="">
+      <div>
+        <p>The 1984 biplane classic. Take off from your airfield, shoot down the enemy planes, bomb their buildings, oil tanks and tanks, and fly home before you run out of fuel and bombs. Watch out for the birds and the oxen.</p>
+        <div class="row">
+          <button class="btn primary" id="play2" type="button">Play</button>
+        </div>
+        <p class="note">New to it? Pick Single player, then Novice: unlimited bullets and bombs, and the plane can't stall. The high score table counts only games against the computer.</p>
+      </div>
+    </div>
+
+    <h2>Controls</h2>
+    <table class="keys">
+      <tr><th></th><th>Touch</th><th>Controller</th><th>Keyboard</th></tr>
+      <tr><td>Speed up, slow down</td><td>Faster, Slower</td><td>RB, LB</td><td>X, Z</td></tr>
+      <tr><td>Nose up, nose down</td><td>Nose up, Nose down (hold)</td><td>D-pad or left stick up, down</td><td>Comma, slash</td></tr>
+      <tr><td>Turn the right way up</td><td>Flip</td><td>X</td><td>Period</td></tr>
+      <tr><td>Machine gun</td><td>Fire (hold)</td><td>A (hold)</td><td>Space</td></tr>
+      <tr><td>Drop a bomb</td><td>Bomb</td><td>B</td><td>B</td></tr>
+      <tr><td>Fly home to refuel</td><td>Home</td><td>Y</td><td>H</td></tr>
+      <tr><td>In the menus</td><td>Tap an item</td><td>D-pad, A to choose, B to go back</td><td>The item's key, Esc to go back</td></tr>
+    </table>
+    <p class="note">Nose up and down turn the plane around its own wings, so upside down, Nose up points at the ground. To turn around, climb into a loop, then Flip at the top. Speed up on the runway to take off. Land on your own airfield (slow and level) to refill fuel, bullets and bombs.</p>
+
+    <div class="legal">
+      <p>Sopwith by David L. Clark (BMB Compuscience, 1984), released under the GNU GPL. SDL Sopwith by Simon Howard and others (GNU GPL version 2 or later), compiled to WebAssembly with small changes for this site: /sopwith/engine/sopwith-web.patch, built by tools/build-sopwith.mjs in github.com/RobertPKyle/frunk-store. The source is at /sopwith/engine/. See /sopwith/NOTICE.</p>
+      <p>frunk.store is not affiliated with or endorsed by the game's authors. Play only while parked.</p>
+    </div>
+  </div>
+</section>
+
+<section id="loading" hidden aria-live="polite">
+  <b>Sopwith</b>
+  <span id="loadText">Loading…</span>
+</section>
+
+<section id="failed" class="overlay" hidden aria-labelledby="failedTitle">
+  <div class="sheet">
+    <h2 id="failedTitle">The game stopped</h2>
+    <p id="failedText"></p>
+    <div><button class="btn primary" id="failedOk" type="button">Start again</button></div>
+  </div>
+</section>
+
+<section id="name" class="overlay" hidden aria-labelledby="nameTitle">
+  <form class="sheet" id="nameForm">
+    <h2 id="nameTitle">High score</h2>
+    <p>Your initials for the high score table</p>
+    <input id="nameInput" maxlength="3" autocomplete="off" spellcheck="false" aria-label="Initials">
+    <div class="row">
+      <button class="btn primary" id="nameOk" type="submit">Save</button>
+      <button class="btn" id="nameSkip" type="button">Skip</button>
+    </div>
+  </form>
+</section>
+
+<section id="player" hidden>
+  <div class="bar">
+    <b>Sopwith</b>
+    <span id="padNote" hidden>Controller</span>
+    <button class="btn" id="endBtn" type="button">End game</button>
+    <button class="btn" id="soundBtn" type="button">Sound on</button>
+    <button class="btn" id="quitBtn" type="button">Quit</button>
+  </div>
+  <div class="field" id="field">
+    <div class="side" id="leftSide">
+      <button class="pad big" type="button" data-key="1"><span><span class="arrow">▲</span>Nose up</span></button>
+      <button class="pad big" type="button" data-key="2"><span><span class="arrow">▼</span>Nose down</span></button>
+      <button class="pad" type="button" data-key="3">Flip</button>
+    </div>
+    <div class="side" id="leftMenu" hidden>
+      <button class="pad small" id="backBtn" type="button">Back</button>
+      <div class="gap"></div>
+    </div>
+    <div class="screen">
+      <canvas id="canvas" tabindex="-1" oncontextmenu="event.preventDefault()"></canvas>
+      <div id="menuTouch" hidden></div>
+    </div>
+    <div class="side" id="rightSide">
+      <div class="pair">
+        <button class="pad" type="button" data-key="10">Slower</button>
+        <button class="pad" type="button" data-key="9">Faster</button>
+      </div>
+      <button class="pad big fire" type="button" data-key="5">Fire</button>
+      <button class="pad" type="button" data-key="4">Bomb</button>
+      <button class="pad small" type="button" data-key="6">Home</button>
+    </div>
+    <div class="side" id="rightMenu" hidden></div>
+  </div>
+</section>
+
+<script type="module" src="sopwith.js"></script>
+<script src="/sw-register.js"></script>
+</body>
+</html>

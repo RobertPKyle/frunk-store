@@ -123,3 +123,5 @@ tools/.critter-build
 apps/critter/engine
 tools/.rocks-build
 apps/rocks/engine
+tools/.sopwith-build
+apps/sopwith/engine

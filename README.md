@@ -932,6 +932,12 @@ clear them to make room.
   and the score server are compiled out. The build leaves out the classic level sets, the
   third-party music and other games' tile sheets, and ships 60 tutorial levels. Upstream states
   no separate license for the game data. See `apps/rocks/NOTICE`.
+- `apps/sopwith`: SDL Sopwith (GPL-2.0-or-later; the original 1984 game by David L. Clark was
+  released under the GPL), compiled to WebAssembly by `npm run build:sopwith`
+  (`tools/build-sopwith.mjs`, emsdk 4.0.10 in Docker from `tools/sopwith/Dockerfile`,
+  `tools/sopwith/sopwith-web.patch`). The game's graphics and sounds are in its code, so there is
+  no data file. The patch switches off the game's own touch strip and adds `web_*` calls; the page
+  draws touch buttons beside the picture and reads controllers itself. See `apps/sopwith/NOTICE`.
 - `apps/supertux`: SuperTux 0.7.0 (GPL-3.0-or-later), compiled to
   WebAssembly by `npm run build:supertux` (`tools/build-supertux.mjs`: the
   release's source tarball checked against its SHA-256, plus
