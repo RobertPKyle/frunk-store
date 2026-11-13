@@ -100,7 +100,7 @@
 
     <div class="legal">
       <p>Build anything from 65 kinds of blocks, in creative mode: blocks never run out and you can fly. Worlds are kept on this screen and saved as you play (and whenever you leave), so they pick up where you left off.</p>
-      <p>Controls on the screen: drag to look around, the arrows at the bottom left walk, the arrow at the bottom right jumps, tap to place a block and hold to break one. Tap a block in the bar at the bottom to pick it, or "…" at its end for all of them. Fly and Speed are at the top right; "…" at the top has more, and Menu opens the game's menu (options, saving a copy of the world, loading one, making a new one). On a controller with two sticks: left stick walks, right stick looks, the bottom face button jumps, the right trigger places and the left trigger breaks, the shoulder buttons change block, the left face button shows all blocks and Start opens the menu. A keyboard and mouse work too: click the game, then WASD walks, Space jumps, the left mouse button breaks and the right one places, B shows all blocks, Z flies and Escape opens the menu.</p>
+      <p>Controls on the screen: drag to look around, the arrows at the bottom left walk, the arrow at the bottom right jumps, tap to place a block and hold to break one. Tap a block in the bar at the bottom to pick it, or "…" at its end for all of them. Fly and Speed are at the top right; "…" at the top has more, and Menu opens the game's menu (options, saving a copy of the world, loading one, making a new one). On a controller with two sticks: left stick walks, right stick looks, the bottom face button jumps, the right trigger places and the left trigger breaks, the shoulder buttons change block, the left face button shows all blocks and Start opens the menu. The Touch / Controller button at the top hides or shows the on-screen controls: the world is saved and opens again with the other choice. A keyboard and mouse work too: click the game, then WASD walks, Space jumps, the left mouse button breaks and the right one places, B shows all blocks, Z flies and Escape opens the menu.</p>
       <p>Game: ClassiCube by UnknownShadow200 and contributors (BSD 3-Clause license), compiled to WebAssembly with small changes for the browser: /blocks/engine/classicube-web.patch, built by tools/build-blocks.mjs in github.com/RobertPKyle/frunk-store; see /blocks/NOTICE. Textures: from Mineclonia, based on the Pixel Perfection packs by XSSheep and Nova Wostra (CC BY-SA 4.0), adapted for this game by frunk.store and shared under the same license. Sounds: from Mineclonia, by the artists listed in /blocks/data/SOUNDS-CREDITS.txt (CC BY 3.0, CC BY-SA 3.0 and 4.0, CC0).</p>
       <p>Block Builder and frunk.store are not affiliated with or endorsed by Mojang, Microsoft or the ClassiCube project. Minecraft is a trademark of Mojang Synergies AB. Play only while parked.</p>
     </div>
@@ -125,6 +125,7 @@
     <b id="title"></b>
     <span id="saved" aria-live="polite"></span>
     <button class="btn" id="menuBtn" type="button">Menu</button>
+    <button class="btn" id="inputBtn" type="button" hidden></button>
     <button class="btn" id="soundBtn" type="button">Sound on</button>
     <button class="btn" id="quitBtn" type="button">Worlds</button>
   </div>

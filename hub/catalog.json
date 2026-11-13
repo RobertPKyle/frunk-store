@@ -8,6 +8,7 @@
       "path": "/brain/",
       "icon": "/brain/icon.svg",
       "added": "2026-10-23",
+      "input": "touch",
       "tags": [
         "Tool"
       ]
@@ -18,9 +19,9 @@
       "tagline": "Classic paddle game. Drag to move, tap to launch.",
       "path": "/breakout/",
       "icon": "/breakout/icon.svg",
+      "input": "touch",
       "tags": [
         "Game",
-        "Controller",
         "WebGL"
       ]
     },
@@ -30,11 +31,11 @@
       "tagline": "Multi-threaded WebAssembly Mandelbrot. Pinch to zoom.",
       "path": "/fractal/",
       "icon": "/fractal/icon.svg",
+      "input": "touch",
       "tags": [
         "Camp Mode",
         "WASM threads",
-        "SIMD",
-        "Controller"
+        "SIMD"
       ]
     },
     {
@@ -43,6 +44,7 @@
       "tagline": "Rain, ocean, campfire and more for Camp Mode, with a dim clock and sleep timer.",
       "path": "/sleep/",
       "icon": "/sleep/icon.svg",
+      "input": "touch",
       "tags": [
         "Camp Mode",
         "Offline"
@@ -54,6 +56,7 @@
       "tagline": "Thousands of free audiobooks read by volunteers, with resume and a sleep timer. For Camp Mode and long charging stops.",
       "path": "/audiobooks/",
       "icon": "/audiobooks/icon.svg",
+      "input": "touch",
       "tags": ["Camp Mode", "Road Trip"],
       "added": "2026-11-03"
     },
@@ -63,6 +66,7 @@
       "tagline": "A crackling fire with sparks and crickets. Cozy screen for the campsite.",
       "path": "/fireplace/",
       "icon": "/fireplace/icon.svg",
+      "input": "touch",
       "tags": [
         "Camp Mode",
         "WebGL"
@@ -74,6 +78,7 @@
       "tagline": "What's in the sky tonight: stars, planets and the Moon over your campsite.",
       "path": "/stars/",
       "icon": "/stars/icon.svg",
+      "input": "touch",
       "tags": [
         "Camp Mode",
         "Offline"
@@ -85,6 +90,7 @@
       "tagline": "Forecast, sunset, true darkness, Moon and a stargazing rating for tonight.",
       "path": "/weather/",
       "icon": "/weather/icon.svg",
+      "input": "touch",
       "tags": [
         "Camp Mode",
         "Tool"
@@ -96,6 +102,7 @@
       "tagline": "When to see the ISS, Hubble and new Starlink trains pass over you.",
       "path": "/satellites/",
       "icon": "/satellites/icon.svg",
+      "input": "touch",
       "tags": [
         "Camp Mode",
         "Offline"
@@ -107,6 +114,7 @@
       "tagline": "Meteor showers, full moons, eclipses and planets for the year ahead, and what is up tonight.",
       "path": "/skyevents/",
       "icon": "/skyevents/icon.svg",
+      "input": "touch",
       "tags": [
         "Camp Mode",
         "Offline"
@@ -118,6 +126,7 @@
       "tagline": "History, landmarks and nature near where you are parked, from Wikipedia. Great while charging.",
       "path": "/nearby/",
       "icon": "/nearby/icon.svg",
+      "input": "touch",
       "tags": [
         "Road Trip",
         "Tool"
@@ -129,6 +138,7 @@
       "tagline": "The rock under your car in plain words: a drill core down through time, how old each layer is and the fossils found nearby.",
       "path": "/under/",
       "icon": "/under/icon.svg",
+      "input": "touch",
       "tags": ["Road Trip", "Camp Mode"],
       "added": "2026-11-03"
     },
@@ -138,6 +148,7 @@
       "tagline": "Water temperature, waves, wind and tide near your car, drawn as a beach you can read at a glance.",
       "path": "/beach/",
       "icon": "/beach/icon.svg",
+      "input": "touch",
       "tags": ["Road Trip", "Camp Mode"],
       "added": "2026-11-04"
     },
@@ -147,6 +158,7 @@
       "tagline": "Restrooms, coffee, food and shops within walking distance of the charger, with what's open now.",
       "path": "/pitstop/",
       "icon": "/pitstop/icon.svg",
+      "input": "touch",
       "tags": [
         "Road Trip",
         "Tool"
@@ -158,6 +170,7 @@
       "tagline": "A live flight radar. See what's flying over you, where it's headed and where to look for it.",
       "path": "/planes/",
       "icon": "/planes/icon.svg",
+      "input": "touch",
       "tags": ["Road Trip", "Camp Mode"],
       "added": "2026-11-03"
     },
@@ -167,6 +180,7 @@
       "tagline": "Turn where you're parked into a vintage postcard, with your town in big map-filled letters, and send it to your phone.",
       "path": "/postcard/",
       "icon": "/postcard/icon.svg",
+      "input": "touch",
       "tags": ["Road Trip"],
       "added": "2026-11-03"
     },
@@ -176,6 +190,7 @@
       "tagline": "How fast is the car's internet right now? Download, upload and ping, on Wi-Fi or LTE.",
       "path": "/speedtest/",
       "icon": "/speedtest/icon.svg",
+      "input": "touch",
       "tags": [
         "Tool"
       ]
@@ -186,6 +201,7 @@
       "tagline": "See what this car's browser can do.",
       "path": "/probe/",
       "icon": "/probe/icon.svg",
+      "input": "touch",
       "tags": [
         "Tool"
       ]
@@ -197,9 +213,9 @@
       "path": "/arcade/",
       "icon": "/arcade/icon.svg",
       "added": "2026-10-27",
+      "input": "controller",
       "tags": [
-        "Game",
-        "Controller"
+        "Game"
       ]
     },
     {
@@ -209,9 +225,9 @@
       "path": "/tic80/",
       "icon": "/tic80/icon.svg",
       "added": "2026-10-23",
+      "input": "controller",
       "tags": [
-        "Game",
-        "Controller"
+        "Game"
       ]
     },
     {
@@ -221,9 +237,9 @@
       "path": "/retro/",
       "icon": "/retro/icon.svg",
       "updated": "2026-10-28",
+      "input": "controller",
       "tags": [
-        "Game",
-        "Controller"
+        "Game"
       ]
     },
     {
@@ -232,10 +248,9 @@
       "tagline": "Notch's tiny Minecraft4k rebuilt in C++ and ray-marched on the graphics chip: a big block world with sun shadows, day and night, and mirrors to build with.",
       "path": "/craft4k/",
       "icon": "/craft4k/icon.svg",
+      "input": "both",
       "tags": [
-        "Game",
-        "Controller",
-        "Touch"
+        "Game"
       ],
       "added": "2026-10-28"
     },
@@ -245,9 +260,9 @@
       "tagline": "The classic Doom engine with the free Freedoom games, or Doom games you own sent from your phone, with a controller or on screen.",
       "path": "/doom/",
       "icon": "/doom/icon.svg",
+      "input": "controller",
       "tags": [
-        "Game",
-        "Controller"
+        "Game"
       ],
       "added": "2026-10-28"
     },
@@ -257,9 +272,9 @@
       "tagline": "The Heretic engine with the free dark-fantasy game Blasphemer, or Heretic you own sent from your phone. Spells, relics and flight.",
       "path": "/heretic/",
       "icon": "/heretic/icon.svg",
+      "input": "controller",
       "tags": [
-        "Game",
-        "Controller"
+        "Game"
       ]
     },
     {
@@ -268,9 +283,9 @@
       "tagline": "The classic Quake engine with the free LibreQuake, or Quake you own sent from your phone, with a controller or on screen.",
       "path": "/quake/",
       "icon": "/quake/icon.svg",
+      "input": "controller",
       "tags": [
-        "Game",
-        "Controller"
+        "Game"
       ],
       "added": "2026-10-28"
     },
@@ -280,9 +295,9 @@
       "tagline": "The 1996 shooter's first episode, free, or the full game you own sent from your phone, with a controller or on screen.",
       "path": "/duke3d/",
       "icon": "/duke3d/icon.svg",
+      "input": "controller",
       "tags": [
-        "Game",
-        "Controller"
+        "Game"
       ],
       "added": "2026-10-29"
     },
@@ -292,9 +307,9 @@
       "tagline": "Command & Conquer and Red Alert, the 1995 and 1996 real-time strategy classics EA made free: both sides' campaigns and skirmish, by touch.",
       "path": "/cnc/",
       "icon": "/cnc/icon.svg",
+      "input": "touch",
       "tags": [
-        "Game",
-        "Touch"
+        "Game"
       ],
       "added": "2026-10-30"
     },
@@ -304,10 +319,9 @@
       "tagline": "Arena and Daggerfall, Bethesda's 1994 and 1996 open-world RPGs, free from Bethesda: whole provinces to roam, with a controller or by touch.",
       "path": "/elderscrolls/",
       "icon": "/elderscrolls/icon.svg",
+      "input": "both",
       "tags": [
-        "Game",
-        "Controller",
-        "Touch"
+        "Game"
       ],
       "added": "2026-10-31"
     },
@@ -317,10 +331,9 @@
       "tagline": "Remedy's 1996 top-down death race, the free shareware episode: machine guns, mines and turbo on six tracks, with a controller or on screen.",
       "path": "/deathrally/",
       "icon": "/deathrally/icon.svg",
+      "input": "controller",
       "tags": [
-        "Game",
-        "Controller",
-        "Touch"
+        "Game"
       ],
       "added": "2026-11-01"
     },
@@ -330,10 +343,9 @@
       "tagline": "id Software's 1992 shooter that started the genre, the free first episode in full: escape Castle Wolfenstein floor by floor, with a controller or on screen.",
       "path": "/wolf3d/",
       "icon": "/wolf3d/icon.svg",
+      "input": "controller",
       "tags": [
-        "Game",
-        "Controller",
-        "Touch"
+        "Game"
       ],
       "added": "2026-11-01"
     },
@@ -343,10 +355,9 @@
       "tagline": "Marooned on Mars, id Software's 1990 side-scroller published by Apogee: shareware episode 1 in full, with pogo stick and raygun. With a controller or on screen.",
       "path": "/keen1/",
       "icon": "/keen1/icon.svg",
+      "input": "controller",
       "tags": [
-        "Game",
-        "Controller",
-        "Touch"
+        "Game"
       ],
       "added": "2026-11-04"
     },
@@ -356,10 +367,9 @@
       "tagline": "Secret of the Oracle, id Software's 1991 sequel published by Apogee: the shareware episode of Goodbye, Galaxy! in full, with AdLib music, a world map and a pogo stick. With a controller or on screen.",
       "path": "/keen4/",
       "icon": "/keen4/icon.svg",
+      "input": "controller",
       "tags": [
-        "Game",
-        "Controller",
-        "Touch"
+        "Game"
       ],
       "added": "2026-11-06"
     },
@@ -369,10 +379,9 @@
       "tagline": "Apogee's 1993 VGA sequel: aliens kidnap Duke, and he blasts his way out. Shareware episode 1 in full, with AdLib music and saves. With a controller or on screen.",
       "path": "/duke2/",
       "icon": "/duke2/icon.svg",
+      "input": "controller",
       "tags": [
-        "Game",
-        "Controller",
-        "Touch"
+        "Game"
       ],
       "added": "2026-11-06"
     },
@@ -382,10 +391,9 @@
       "tagline": "Forbidden Planet, Apogee's 1992 platformer: shareware episode 1 in full, with suction-cup hands, bombs and AdLib music. With a controller or on screen.",
       "path": "/cosmo/",
       "icon": "/cosmo/icon.svg",
+      "input": "controller",
       "tags": [
-        "Game",
-        "Controller",
-        "Touch"
+        "Game"
       ],
       "added": "2026-11-06"
     },
@@ -395,10 +403,9 @@
       "tagline": "Moonlite Software's 1994 VGA platformer published by Apogee: an apprentice wizard zaps monsters with lightning and collects magic crystals. Shareware episode 1 in full, with a controller or on screen.",
       "path": "/hocus/",
       "icon": "/hocus/icon.svg",
+      "input": "controller",
       "tags": [
-        "Game",
-        "Controller",
-        "Touch"
+        "Game"
       ],
       "added": "2026-11-06"
     },
@@ -408,10 +415,9 @@
       "tagline": "The HUNT Begins, Apogee's 1995 first-person shooter: shareware episode 1 in full, ten levels with rocket launchers and flying platforms. With a controller or on screen.",
       "path": "/rott/",
       "icon": "/rott/icon.svg",
+      "input": "controller",
       "tags": [
-        "Game",
-        "Controller",
-        "Touch"
+        "Game"
       ],
       "added": "2026-11-06"
     },
@@ -421,10 +427,9 @@
       "tagline": "Aliens of Gold, JAM Productions' 1993 shooter published by Apogee: secret agent Blake Stone against a mutant army, shareware episode 1 in full. With a controller or on screen.",
       "path": "/blake/",
       "icon": "/blake/icon.svg",
+      "input": "controller",
       "tags": [
-        "Game",
-        "Controller",
-        "Touch"
+        "Game"
       ],
       "added": "2026-11-06"
     },
@@ -434,6 +439,7 @@
       "tagline": "Build a transport empire with trains, trucks, ships and planes. The open-source Transport Tycoon, made for touch.",
       "path": "/openttd/",
       "icon": "/openttd/icon.svg",
+      "input": "touch",
       "tags": [
         "Game",
         "Offline"
@@ -446,29 +452,29 @@
       "tagline": "Heroes of Might and Magic II from your own copy, on the open-source fheroes2 engine: towns, heroes and turn-based battles, by touch.",
       "path": "/fheroes2/",
       "icon": "/fheroes2/icon.svg",
+      "input": "touch",
       "tags": [
         "Game",
         "Offline"
       ],
       "added": "2026-10-28"
     },
-    { "id": "pop", "name": "Prince of Persia", "tagline": "The 1989 original on SDLPoP: sixty minutes to escape the dungeons and stop the Vizier. Twelve levels, with a controller or by touch.", "path": "/pop/", "icon": "/pop/icon.svg", "tags": ["Game", "Controller", "Touch"], "added": "2026-10-31" },
-    { "id": "roguerogue", "name": "Rogue Rogue", "tagline": "A new 100-stage arcade dungeon every week: trap monsters in bubbles and pop them for loot. Touch or controller, with two players on two controllers.", "path": "/roguerogue/", "icon": "/roguerogue/icon.svg", "tags": ["Game", "Controller", "Touch"], "added": "2026-11-09" },
-    { "id": "critter", "name": "Critical Mass", "tagline": "Hold off an army of space critters in this 3D arcade shooter: wave after wave, a growing stack of weapons and a top-ten scoreboard. Touch or controller.", "path": "/critter/", "icon": "/critter/icon.svg", "tags": ["Game", "Controller", "Touch"], "added": "2026-11-09" },
-    { "id": "rocks", "name": "Rocks'n'Diamonds", "tagline": "Dig for diamonds, dodge falling rocks and outwit creatures in Holger Schemel's puzzle classic: 60 tutorial levels, by touch or controller.", "path": "/rocks/", "icon": "/rocks/icon.svg", "tags": ["Game", "Controller", "Touch"], "added": "2026-11-09" },
-    { "id": "sopwith", "name": "Sopwith", "tagline": "The 1984 biplane classic: take off, shoot down enemy planes, bomb their base and fly home to refuel. Touch or controller.", "path": "/sopwith/", "icon": "/sopwith/icon.svg", "tags": ["Game", "Controller", "Touch"], "added": "2026-11-09" },
-    { "id": "neverball", "name": "Neverball", "tagline": "Tilt the floor to roll the ball, grab the coins and reach the goal before time runs out. Eight level sets in 3D, with high scores and replays. Touch or controller.", "path": "/neverball/", "icon": "/neverball/icon.svg", "tags": ["Game", "Controller", "Touch"], "added": "2026-11-04" },
-    { "id": "neverputt", "name": "Neverputt", "tagline": "3D minigolf from the Neverball project: nine courses, 170 holes and up to four players taking turns on one screen. Touch or controller.", "path": "/neverputt/", "icon": "/neverputt/icon.svg", "tags": ["Game", "Controller", "Touch"], "added": "2026-11-04" },
+    { "id": "pop", "name": "Prince of Persia", "tagline": "The 1989 original on SDLPoP: sixty minutes to escape the dungeons and stop the Vizier. Twelve levels, with a controller or by touch.", "path": "/pop/", "icon": "/pop/icon.svg", "input": "controller", "tags": ["Game"], "added": "2026-10-31" },
+    { "id": "roguerogue", "name": "Rogue Rogue", "tagline": "A new 100-stage arcade dungeon every week: trap monsters in bubbles and pop them for loot. Touch or controller, with two players on two controllers.", "path": "/roguerogue/", "icon": "/roguerogue/icon.svg", "input": "controller", "tags": ["Game"], "added": "2026-11-09" },
+    { "id": "critter", "name": "Critical Mass", "tagline": "Hold off an army of space critters in this 3D arcade shooter: wave after wave, a growing stack of weapons and a top-ten scoreboard. Touch or controller.", "path": "/critter/", "icon": "/critter/icon.svg", "input": "both", "tags": ["Game"], "added": "2026-11-09" },
+    { "id": "rocks", "name": "Rocks'n'Diamonds", "tagline": "Dig for diamonds, dodge falling rocks and outwit creatures in Holger Schemel's puzzle classic: 60 tutorial levels, by touch or controller.", "path": "/rocks/", "icon": "/rocks/icon.svg", "input": "both", "tags": ["Game"], "added": "2026-11-09" },
+    { "id": "sopwith", "name": "Sopwith", "tagline": "The 1984 biplane classic: take off, shoot down enemy planes, bomb their base and fly home to refuel. Touch or controller.", "path": "/sopwith/", "icon": "/sopwith/icon.svg", "input": "both", "tags": ["Game"], "added": "2026-11-09" },
+    { "id": "neverball", "name": "Neverball", "tagline": "Tilt the floor to roll the ball, grab the coins and reach the goal before time runs out. Eight level sets in 3D, with high scores and replays. Touch or controller.", "path": "/neverball/", "icon": "/neverball/icon.svg", "input": "controller", "tags": ["Game"], "added": "2026-11-04" },
+    { "id": "neverputt", "name": "Neverputt", "tagline": "3D minigolf from the Neverball project: nine courses, 170 holes and up to four players taking turns on one screen. Touch or controller.", "path": "/neverputt/", "icon": "/neverputt/icon.svg", "input": "both", "tags": ["Game"], "added": "2026-11-04" },
     {
       "id": "supertux",
       "name": "SuperTux",
       "tagline": "Tux's jump-and-run adventure across Icy Island and the Rooted Forest, plus two bonus islands: about a hundred levels. Touch or controller.",
       "path": "/supertux/",
       "icon": "/supertux/icon.svg",
+      "input": "controller",
       "tags": [
-        "Game",
-        "Controller",
-        "Touch"
+        "Game"
       ],
       "added": "2026-10-28"
     },
@@ -478,9 +484,9 @@
       "tagline": "Fast arena shooting against bots on the Quake III engine: a free game with ten arenas, on screen or with a controller.",
       "path": "/openarena/",
       "icon": "/openarena/icon.svg",
+      "input": "controller",
       "tags": [
-        "Game",
-        "Controller"
+        "Game"
       ],
       "added": "2026-10-28"
     },
@@ -490,10 +496,9 @@
       "tagline": "Build anything in a Minecraft Classic-style world of blocks: creative mode, flying, and worlds that save as you play.",
       "path": "/blocks/",
       "icon": "/blocks/icon.svg",
+      "input": "both",
       "tags": [
-        "Game",
-        "Controller",
-        "Touch"
+        "Game"
       ]
     },
     {
@@ -503,11 +508,10 @@
       "path": "/city/",
       "icon": "/city/icon.svg",
       "added": "2026-10-28",
+      "input": "touch",
       "tags": [
         "Game",
         "Camp Mode",
-        "Touch",
-        "Controller",
         "Offline"
       ]
     },
@@ -518,10 +522,9 @@
       "path": "/adventure/",
       "icon": "/adventure/icon.svg",
       "updated": "2026-10-27",
+      "input": "touch",
       "tags": [
-        "Game",
-        "Touch",
-        "Controller"
+        "Game"
       ]
     },
     {
@@ -531,9 +534,9 @@
       "path": "/text/",
       "icon": "/text/icon.svg",
       "updated": "2026-10-28",
+      "input": "touch",
       "tags": [
         "Game",
-        "Touch",
         "Offline"
       ]
     },
@@ -544,9 +547,9 @@
       "path": "/ascii/",
       "icon": "/ascii/icon.svg",
       "added": "2026-10-27",
+      "input": "both",
       "tags": [
         "Game",
-        "Touch",
         "Offline"
       ]
     },
@@ -556,6 +559,7 @@
       "tagline": "Forty classic logic puzzles by Simon Tatham, from Solo (sudoku) to Mines and Net, with endless new boards in every size.",
       "path": "/puzzles/",
       "icon": "/puzzles/icon.svg",
+      "input": "touch",
       "tags": [
         "Game",
         "Puzzle",
@@ -569,10 +573,10 @@
       "path": "/pokeguess/",
       "icon": "/pokeguess/icon.svg",
       "added": "2026-10-29",
+      "input": "touch",
       "tags": [
         "Game",
         "Puzzle",
-        "Touch",
         "Offline"
       ]
     },
@@ -587,9 +591,9 @@
         "zh-Hant",
         "zh-Hans"
       ],
+      "input": "touch",
       "tags": [
         "Game",
-        "Touch",
         "Offline"
       ]
     },
@@ -600,10 +604,9 @@
       "path": "/wagon/",
       "icon": "/wagon/icon.svg",
       "added": "2026-11-05",
+      "input": "touch",
       "tags": [
         "Game",
-        "Controller",
-        "Touch",
         "Offline"
       ]
     },
@@ -614,9 +617,9 @@
       "path": "/stockfish/",
       "icon": "/stockfish/icon.svg",
       "added": "2026-11-01",
+      "input": "touch",
       "tags": [
         "Game",
-        "Touch",
         "Offline"
       ]
     },
@@ -626,6 +629,7 @@
       "tagline": "Solve the Lichess daily chess puzzle on your screen.",
       "path": "/chess/",
       "icon": "/chess/icon.svg",
+      "input": "touch",
       "tags": [
         "Game",
         "Puzzle"
@@ -638,6 +642,7 @@
       "path": "/terrarium/",
       "icon": "/terrarium/icon.svg",
       "added": "2026-10-23",
+      "input": "touch",
       "tags": [
         "Camp Mode",
         "Offline"

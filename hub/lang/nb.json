@@ -67,6 +67,9 @@
     "searchLabel": "Søk i apper",
     "searchClear": "Tøm søket",
     "searchNone": "Ingen apper passer til «{query}».",
+    "inputTouch": "Berøring",
+    "inputController": "Best med kontroller",
+    "inputBoth": "Berøring eller kontroller",
     "slowLoad": "Laster fortsatt. Svakt signal kan gjøre dette tregt."
   },
   "tags": {

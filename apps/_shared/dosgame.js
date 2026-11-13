@@ -19,6 +19,8 @@
 // presses is let go no sooner than two of DOSBox's frames after it went
 // down, so a game that polls the keyboard once a frame sees it. Keyboard
 // brings up the car's keyboard for names and the games' other keys.
+// #inputBtn (inputswap.js) swaps between the on-screen buttons and a
+// controller; both kinds of input work either way.
 //
 //   import { dosGame } from '../_shared/dosgame.js';
 //   dosGame({ id, title, memsize, dir: 'DIR', exe: 'GAME.EXE', pad: {...}, seed: {...} });
@@ -34,10 +36,11 @@
 //
 // The page needs: #start with #play (and #kept, #status), #loading with
 // #loadTitle #loadText #loadBar, #failed with #failedText #failedOk, #player
-// with #title #wait #padNote #menuBtn #keysBtn #smoothBtn #soundBtn #quitBtn,
+// with #title #wait #inputBtn #menuBtn #keysBtn #smoothBtn #soundBtn #quitBtn,
 // #screen > #canvas, #touch (buttons with data-key="name name"), #kbd.
 
 import { fetchBlock, padMenu, reason, secondTap } from './gamepage.js';
+import { inputSwap } from './inputswap.js';
 
 export function dosGame(G) {
 
@@ -419,7 +422,6 @@ async function start() {
   $('start').hidden = true;
   $('loading').hidden = true;
   $('player').hidden = false;
-  $('touch').hidden = padMode || !touchFirst;
   fit();
   showSmooth();
   requestAnimationFrame(loop);
@@ -430,7 +432,7 @@ async function start() {
 window.dosStats = () => ({
   game: G.id, started, running, ...stats, inMemory: mem.size, heapMB: memory ? Math.round(memory.buffer.byteLength / 1e6) : 0,
   frames: running ? M._web_frames() : 0, cycles: running ? M._web_cycles() : 0,
-  canvas: `${$('canvas').width}x${$('canvas').height}`, held: [...heldKeys.keys()], padMode, touch: !$('touch').hidden,
+  canvas: `${$('canvas').width}x${$('canvas').height}`, held: [...heldKeys.keys()], padMode: input.mode === 'pad', touch: !$('touch').hidden,
   audio: contexts.map(c => `${c.state} ${c.sampleRate}`),
 });
 window.dosLog = log;
@@ -494,15 +496,15 @@ function releaseDue() {
 
 // ---------- on-screen buttons ----------
 
-// Shown on a touch screen until a controller is used; each holds its keys
-// (data-key="space", or several) while a finger is on it
-let padMode = false;
-function setPadMode(on) {
-  if (on === padMode) return;
-  padMode = on;
-  $('padNote').hidden = !on;
-  if (running) $('touch').hidden = on || !touchFirst;
-}
+// Each holds its keys (data-key="space", or several) while a finger is on
+// it. They show in touch mode and hide in controller mode: the button on the
+// bar swaps the two. Until it's tapped, the mode follows the player: a touch
+// screen starts with them, a controller press hides them and a touch brings
+// them back; once tapped, only the button changes it (kept per game).
+const input = inputSwap({
+  id: G.id, button: $('inputBtn'), start: touchFirst ? 'touch' : 'pad',
+  apply: mode => { $('touch').hidden = mode === 'pad'; },
+});
 for (const b of $('touch').querySelectorAll('button')) {
   const names = b.dataset.key.split(/\s+/).filter(Boolean);
   let down = false;
@@ -514,7 +516,7 @@ for (const b of $('touch').querySelectorAll('button')) {
   b.addEventListener('lostpointercapture', lift);
   b.addEventListener('contextmenu', e => e.preventDefault());
 }
-addEventListener('touchstart', () => setPadMode(false), { capture: true, passive: true });
+addEventListener('touchstart', () => input.auto('touch'), { capture: true, passive: true });
 $('menuBtn').onclick = () => tapKey('escape');
 
 // ---------- controller ----------
@@ -580,7 +582,7 @@ const keysOf = v => typeof v === 'function' ? v() : v;
 
 function pad() {
   const s = readPads();
-  if (s.held.size || s.lx || s.ly || s.rx || s.ry || s.lt > 0.3 || s.rt > 0.3) setPadMode(true);
+  if (s.held.size || s.lx || s.ly || s.rx || s.ry || s.lt > 0.3 || s.rt > 0.3) input.auto('pad');
 
   // the left stick and the D-pad hold the arrow keys
   const want = new Set();

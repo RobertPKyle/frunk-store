@@ -48,7 +48,6 @@
   #player { position: fixed; inset: 0; display: grid; grid-template-rows: 60px minmax(0, 1fr); grid-template-columns: minmax(0, 1fr); background: #000; }
   .bar { display: flex; align-items: center; gap: 8px; padding: 8px 10px 8px 110px; overflow-x: auto; scrollbar-width: none; touch-action: pan-x; background: var(--panel); border-bottom: 1px solid var(--line); }
   .bar b { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  #padNote { font-size: 13px; color: var(--muted); white-space: nowrap; }
   .screen { position: relative; min-height: 0; min-width: 0; overflow: hidden; display: grid; place-items: center; }
   /* SDL sets the canvas's own size in its style; the sheet's rule wins and
      keeps the 4:3 picture as big as the screen area allows */
@@ -95,6 +94,7 @@
     </div>
 
     <h2>Controls</h2>
+    <p class="note">Best with a controller. The on-screen buttons work too: the Touch / Controller button on the game's bar swaps between them.</p>
     <table class="keys">
       <tr><th></th><th>Controller</th><th>On the screen</th></tr>
       <tr><td>Run, turn</td><td>D-pad or left stick</td><td>◀ ▶</td></tr>
@@ -129,7 +129,7 @@
 <section id="player" hidden>
   <div class="bar">
     <b>Prince of Persia</b>
-    <span id="padNote" hidden>Controller</span>
+    <button class="btn" id="inputBtn" type="button"></button>
     <button class="btn" id="menuBtn" type="button">Menu</button>
     <button class="btn" id="soundBtn" type="button">Sound on</button>
     <button class="btn" id="quitBtn" type="button">Quit</button>

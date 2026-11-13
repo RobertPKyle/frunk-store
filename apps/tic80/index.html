@@ -41,10 +41,11 @@
   footer a { color: var(--muted); }
   footer p { margin: 0 2px 6px; }
 
-  /* playing: the game fills the frame; Games sits top centre, clear of the hub's Apps button and the player's menu button */
+  /* playing: the game fills the frame; Games and the touch / controller swap sit top centre, clear of the hub's Apps button and the player's menu button */
   #stage { position: fixed; inset: 0; background: #1a1c2c; }
   #stage iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
-  #back { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); z-index: 2; min-height: 44px; padding: 4px 14px; border-radius: 12px; background: rgba(26, 28, 44, .8); border: 1px solid var(--line); font-size: 14px; }
+  .top { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); z-index: 2; display: flex; gap: 8px; }
+  .top button { min-height: 44px; padding: 4px 14px; border-radius: 12px; background: rgba(26, 28, 44, .8); border: 1px solid var(--line); font-size: 14px; }
   #playStatus { position: absolute; inset: 0; display: grid; place-items: center; padding: 20px; text-align: center; color: var(--muted); pointer-events: none; }
 
   .overlay { position: fixed; inset: 0; z-index: 5; display: grid; place-items: center; padding: 64px 16px 16px; background: rgba(10, 10, 18, .92); }
@@ -88,7 +89,7 @@
     <p id="mineEmpty">Add .tic carts from your phone or a USB drive: your own games, or ones their makers let you share.</p>
     <label class="settings"><input type="checkbox" id="crt"> Old TV effect (looks retro, a little blurrier and slower)</label>
     <footer>
-      <p>Tap a game to play. Use the on-screen buttons or a controller. Games save on this screen.</p>
+      <p>Tap a game to play. Use the on-screen buttons (touch the game to bring them up) or a controller; the Touch / Controller button at the top keeps touches from bringing them up over a controller game. Games save on this screen.</p>
       <p>TIC-80 by Vadim Grigoruk and contributors (MIT License). Each game is its makers', under the licence shown with it.</p>
       <div id="credits"></div>
     </footer>
@@ -97,7 +98,10 @@
 
 <div id="stage" hidden>
   <p id="playStatus">Starting…</p>
-  <button id="back" type="button">‹ Games</button>
+  <div class="top">
+    <button id="back" type="button">‹ Games</button>
+    <button id="inputBtn" type="button"></button>
+  </div>
 </div>
 
 <section id="transfer" class="overlay" hidden aria-labelledby="transferTitle">

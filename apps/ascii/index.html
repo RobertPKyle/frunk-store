@@ -46,11 +46,16 @@
   .side { display: flex; flex-direction: column; gap: 6px; padding: 66px 8px 8px; background: var(--panel); border-right: 1px solid var(--line); overflow-y: auto; scrollbar-width: none; }
   .side::-webkit-scrollbar { display: none; }
   .side button { min-height: 44px; border-radius: 10px; background: var(--card); border: 1px solid var(--line); font-size: 14px; padding: 4px 6px; }
-  .side .big { min-height: 62px; font-size: 16px; font-weight: 700; }
+  .side .big { min-height: 54px; font-size: 16px; font-weight: 700; }
   .side .whip { color: var(--accent); }
   .side .tele { color: var(--cyan); }
   .side .gap { flex: 1; min-height: 4px; }
   .side button.on { background: #2a2a3c; border-color: var(--accent); }
+  /* icon over the word: "Controller" doesn't fit beside it in the column */
+  .side #inputBtn { flex-direction: column; justify-content: center; gap: 1px; font-size: 13px; line-height: 1.1; }
+  /* in controller mode, what the buttons do, where Whip and Teleport were */
+  .side .legend { display: flex; flex-direction: column; gap: 3px; padding: 6px 4px; font-size: 13px; color: var(--muted); }
+  .side .legend b { color: var(--cyan); font-weight: 600; }
   .main { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; min-width: 0; min-height: 0; padding: 6px; }
   #frame { flex: none; padding: 6px; background: #000; touch-action: none; }
   #screen { display: block; width: 640px; height: 400px; }
@@ -71,6 +76,7 @@
     .side { order: 2; flex-direction: row; flex-wrap: wrap; padding: 8px; border-right: 0; border-top: 1px solid var(--line); }
     .side button { flex: 1 1 22%; }
     .side .gap { display: none; }
+    .side .legend { flex: 1 1 100%; flex-direction: row; flex-wrap: wrap; justify-content: center; gap: 4px 14px; }
     .main { padding-top: 64px; }
   }
 </style>
@@ -111,11 +117,13 @@
   <div class="side" id="side">
     <button class="big whip" type="button" data-key="W">Whip</button>
     <button class="big tele" type="button" data-key="T">Teleport</button>
+    <div class="legend" id="padKeys" hidden><span><b>D-pad</b> walk</span><span><b>A</b> whip</span><span><b>B</b> teleport</span><span><b>Start</b> pause</span></div>
     <button type="button" data-key="P">Pause</button>
     <button type="button" data-key="S">Save</button>
     <button type="button" data-key="R">Restore</button>
     <button type="button" id="keysBtn">Keys</button>
     <div class="gap"></div>
+    <button type="button" id="inputBtn">Touch</button>
     <button type="button" id="soundBtn">Sound</button>
     <button type="button" id="speedBtn">Speed</button>
     <button type="button" id="quitBtn">Games</button>

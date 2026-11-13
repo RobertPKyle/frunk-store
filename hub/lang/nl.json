@@ -67,6 +67,9 @@
     "searchLabel": "Apps zoeken",
     "searchClear": "Zoekopdracht wissen",
     "searchNone": "Geen apps gevonden voor ‘{query}’.",
+    "inputTouch": "Aanraken",
+    "inputController": "Het best met een controller",
+    "inputBoth": "Aanraken of controller",
     "slowLoad": "Nog aan het laden. Bij een zwak signaal kan dit even duren."
   },
   "tags": {

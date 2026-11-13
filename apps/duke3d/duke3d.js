@@ -20,6 +20,7 @@
 // leaving a game reloads it.
 
 import { fetchChunks, padMenu, reason } from '../_shared/gamepage.js';
+import { inputSwap } from '../_shared/inputswap.js';
 import { phonePanel } from '../_shared/phone.js';
 import { MAX_DUKE_FILE, dukePath, isZip, unzipAll } from '../_shared/roms.js';
 
@@ -411,7 +412,6 @@ async function boot(game, resume) {
   $('library').hidden = true;
   $('player').hidden = false;
   $('loading').hidden = true;
-  $('player').classList.toggle('mouse', !touchFirst);
   showSound();
   fit(size);
   addEventListener('resize', () => fit(size));
@@ -552,14 +552,16 @@ function readPad(p, s) {
 }
 
 // While a controller is in use, the on-screen controls are hidden;
-// touching the screen brings them back
-let padMode = false;
-function setPadMode(on) {
-  if (on === padMode) return;
-  padMode = on;
-  if (on) wakeSound();
-  $('player').classList.toggle('pad', on);
-}
+// touching the screen brings them back. With a mouse they start hidden too.
+// The bar's Touch / Controller button picks one for good (input.auto is
+// only a guess).
+const input = inputSwap({
+  id: 'duke3d', button: $('inputBtn'), start: touchFirst ? 'touch' : 'pad',
+  apply(mode) {
+    if (mode === 'pad') wakeSound();
+    $('player').classList.toggle('pad', mode === 'pad');
+  },
+});
 
 // Menus: keys go down when a direction or button is first held and repeat
 // while it stays held, as a keyboard would
@@ -638,7 +640,7 @@ function loop(t) {
   for (const b of swallow) {
     if (s.held.has(b) || s.dirs.has(b)) { s.held.delete(b); s.dirs.delete(b); } else swallow.delete(b);
   }
-  if (s.held.size || s.dirs.size || s.forward || s.turn || s.side || s.pitch) setPadMode(true);
+  if (s.held.size || s.dirs.size || s.forward || s.turn || s.side || s.pitch) input.auto('pad');
   for (const [b, left] of sticky) {
     s.held.add(b);
     if (left <= 1) sticky.delete(b); else sticky.set(b, left - 1);
@@ -754,10 +756,7 @@ function look(p, e) {
 }
 
 function onPointer(e) {
-  if (e.type === 'pointerdown' && e.pointerType === 'touch') {
-    setPadMode(false);
-    $('player').classList.remove('mouse');
-  }
+  if (e.type === 'pointerdown' && e.pointerType === 'touch') input.auto('touch');
   if (e.type === 'pointerdown') {
     const b = e.target.closest('#touch [data-b], #touch [data-k]');
     if (e.target.closest('#stick')) {

@@ -31,12 +31,40 @@ const fail = text => parent.postMessage({ tic80: 'failed', text }, location.orig
 // layout) and a "Tesla Virtual Gamepad" copy with the standard layout. The
 // player would take them as players 1 and 2, so when any standard pad is
 // connected, only standard pads are shown to it.
+// The player reads the pads every frame; a new press is reported to Tiny
+// Games, for its guess at whether touch or a controller is in use.
 const getGamepads = navigator.getGamepads.bind(navigator);
+let padHeld = false;
 navigator.getGamepads = () => {
   const pads = [...getGamepads()];
+  const held = pads.some(p => p && (p.buttons.some(b => b.pressed) || Math.abs(p.axes[0] || 0) > 0.5 || Math.abs(p.axes[1] || 0) > 0.5));
+  if (held && !padHeld) parent.postMessage({ tic80: 'pad' }, location.origin);
+  padHeld = held;
   if (!pads.some(p => p?.mapping === 'standard')) return pads;
   return pads.filter(p => p?.mapping === 'standard').concat(pads.filter(p => !p || p.mapping !== 'standard').map(() => null));
 };
+
+// Touch or controller (Tiny Games' button). The player brings up its touch
+// gamepad on any touch and keeps it for about ten seconds after the last
+// one. With Controller picked, touches are kept from it (it listens on the
+// canvas, so a capture on the window comes first): its gamepad stays down
+// and the game keeps the whole screen. A tap still reaches the game as a
+// mouse click. Whether a touch is kept away is decided when the first finger
+// comes down, so a touch never loses its end. Every touch is reported, for
+// Tiny Games' guess.
+let blockTouch = params.get('notouch') === '1', blocking = false;
+addEventListener('message', e => {
+  if (e.source === parent && e.origin === location.origin && e.data?.tic80 === 'input') blockTouch = !!e.data.block;
+});
+for (const type of ['touchstart', 'touchmove', 'touchend', 'touchcancel']) {
+  addEventListener(type, e => {
+    if (type === 'touchstart') {
+      if (e.touches.length === e.changedTouches.length) blocking = blockTouch;
+      parent.postMessage({ tic80: 'touch' }, location.origin);
+    }
+    if (blocking) e.stopPropagation();
+  }, { capture: true });
+}
 
 // The player fetches its cart by URL; carts the player added come from
 // this browser's storage

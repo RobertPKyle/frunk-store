@@ -138,7 +138,9 @@
     /* every button in the bar has to fit beside the hub's Apps button */
     .bar { padding-left: 100px; gap: 4px; justify-content: flex-end; }
     .bar b, #fps { display: none; }
-    .bar .btn { padding: 8px; font-size: 13px; }
+    .bar .btn { padding: 8px 6px; font-size: 13px; }
+    /* the touch / controller swap shows only its icon here */
+    #inputBtn span { display: none; }
   }
 </style>
 </head>
@@ -167,7 +169,7 @@
 
     <div class="legal">
       <p>Plays NES, Game Boy, Game Boy Color, Game Boy Advance, Master System, Game Gear, SG-1000, Atari Lynx, PC Engine / TurboGrafx-16 (HuCards) and Mega Drive / Genesis games (.nes, .gb, .gbc, .gba, .sms, .gg, .sg, .lnx, .lyx, .o, .pce, .md, .gen, .bin, .smd, also zipped). Mega CD, 32X and PC Engine CD games aren't supported, nor are the few Mega Drive games that save to EEPROM chips or are bigger than 4 MB (Super Street Fighter II). Games remember your progress: they pick up where you left off, and Reset starts over (keeping in-game saves).</p>
-      <p>Controls: a USB or Bluetooth controller, the on-screen buttons, or a keyboard (arrows, Z = B, X = A, Q = L, W = R, Enter = Start, Shift = Select). On Sega's consoles, B is button 1, A is button 2, and Start is the Master System's Pause button. On the PC Engine, B is II, A is I, and Start is Run. On the Mega Drive, a controller's left, bottom and right buttons are A, B and C (keys A, Z and X); the six-button pad's X, Y and Z are L, the top button and R, and Mode is Select. On the Lynx, Start is Pause, and Option 1 and 2 are the top buttons (L and R on a controller; Select is Option 1 too). With a controller, the on-screen buttons hide to make the game bigger; touch the screen to bring them back. Switching the controller off pauses the game, and Start resumes it. Select and Start together pause too, and Select then goes back to the games, where the D-pad and a face button pick one.</p>
+      <p>Controls: a USB or Bluetooth controller, the on-screen buttons, or a keyboard (arrows, Z = B, X = A, Q = L, W = R, Enter = Start, Shift = Select). On Sega's consoles, B is button 1, A is button 2, and Start is the Master System's Pause button. On the PC Engine, B is II, A is I, and Start is Run. On the Mega Drive, a controller's left, bottom and right buttons are A, B and C (keys A, Z and X); the six-button pad's X, Y and Z are L, the top button and R, and Mode is Select. On the Lynx, Start is Pause, and Option 1 and 2 are the top buttons (L and R on a controller; Select is Option 1 too). With a controller, the on-screen buttons hide to make the game bigger; touch the screen to bring them back. The Touch / Controller button at the top picks one for good, so a stray touch or a nudged controller doesn't swap them. Switching the controller off pauses the game, and Start resumes it. Select and Start together pause too, and Select then goes back to the games, where the D-pad and a face button pick one.</p>
       <p>Emulators: jsnes (Apache License 2.0) for NES, mGBA (Mozilla Public License 2.0, source at github.com/thenick775/mgba) for Game Boy, Gearsystem (GNU GPL 3 or later, source at frunk-apps.vercel.app/retro/sms/gearsystem-web-src.tar.gz) for Sega's consoles, Geargrafx (GNU GPL 3 or later, source at frunk-apps.vercel.app/retro/pce/geargrafx-web-src.tar.gz) for the PC Engine, clownmdemu (GNU AGPL 3 or later, source at frunk-apps.vercel.app/retro/md/clownmdemu-web-src.tar.gz) for the Mega Drive, Gearlynx (GNU GPL 3 or later, source at frunk-apps.vercel.app/retro/lynx/gearlynx-web-src.tar.gz) for the Atari Lynx. The Lynx starts without Atari's boot ROM: a stand-in modeled on Handy's (K. Wilkins, zlib license) loads each game. The free games are by their authors, under the licenses shown on each card; source code is kept next to each game.</p>
       <p>Not affiliated with or endorsed by Nintendo, Sega, NEC or Konami. Play only while parked.</p>
     </div>
@@ -211,6 +213,7 @@
     <button class="btn" id="pauseBtn" type="button">Pause</button>
     <button class="btn" id="resetBtn" type="button">Reset</button>
     <button class="btn" id="soundBtn" type="button">Sound on</button>
+    <button class="btn" id="inputBtn" type="button"></button>
     <button class="btn" id="quitBtn" type="button">Games</button>
   </div>
   <div class="side left">

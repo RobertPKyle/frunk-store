@@ -3,6 +3,7 @@
 // player adds from the phone or a USB drive, kept in IndexedDB. A game plays
 // in play.html in a frame of its own, thrown away to quit.
 
+import { inputSwap } from '../_shared/inputswap.js';
 import { padMenu } from '../_shared/padmenu.js';
 import { phonePanel } from '../_shared/phone.js';
 import { COVER_H, COVER_W, isCart, readCart } from './cart.js';
@@ -150,12 +151,27 @@ let frame = null;
 
 let slowTimer = 0;
 
+// Touch or controller. TIC-80's player draws its own touch gamepad inside the
+// game's frame: any touch brings it up (shrinking the game) and it goes after
+// about ten seconds without one; nothing outside the player can show or hide
+// it. So Controller, once picked with the button, keeps touches away from
+// the player (play.html), and its gamepad stays down; Touch leaves the player
+// as it is. Until then the guess follows what was used last, which changes
+// nothing in the player.
+let input = null;
+const blockTouch = () => input?.mode === 'pad' && !!input.pinned;
+function tellFrame() {
+  frame?.contentWindow?.postMessage({ tic80: 'input', block: blockTouch() }, location.origin);
+}
+input = inputSwap({ id: 'tic80', button: $('inputBtn'), start: 'touch', apply: tellFrame });
+
 function play(player, cart, title) {
   stop();
   status('');
   pref.set(LAST, JSON.stringify({ player, cart, title }));
   const q = new URLSearchParams({ player, cart });
   if ($('crt').checked) q.set('crt', '1');
+  if (blockTouch()) q.set('notouch', '1');
   frame = Object.assign(document.createElement('iframe'), { title: 'Game', src: `play.html?${q}` });
   frame.allow = 'fullscreen; gamepad; autoplay; cross-origin-isolated';
   $('playStatus').textContent = `Starting ${title}…`;
@@ -178,7 +194,10 @@ function stop() {
 
 addEventListener('message', e => {
   if (e.origin !== location.origin || e.source !== frame?.contentWindow) return;
-  if (e.data?.tic80 === 'started') { clearTimeout(slowTimer); $('playStatus').textContent = ''; }
+  // again once the player runs, in case the button was tapped while it loaded
+  if (e.data?.tic80 === 'started') { clearTimeout(slowTimer); $('playStatus').textContent = ''; tellFrame(); }
+  if (e.data?.tic80 === 'touch') input.auto('touch');
+  if (e.data?.tic80 === 'pad') input.auto('pad');
   if (e.data?.tic80 === 'failed') { stop(); status(e.data.text || 'The game stopped.'); }
 });
 $('back').addEventListener('click', stop);

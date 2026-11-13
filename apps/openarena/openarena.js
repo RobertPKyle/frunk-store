@@ -16,6 +16,7 @@
 // page is hidden or left. One match per page: leaving it reloads the page.
 
 import { fetchChunks, padMenu, reason } from '../_shared/gamepage.js';
+import { inputSwap } from '../_shared/inputswap.js';
 
 const $ = id => document.getElementById(id);
 const settings = {
@@ -268,7 +269,9 @@ async function boot(arena, data) {
   $('library').hidden = true;
   $('player').hidden = false;
   $('player').classList.add('wait');
-  $('player').classList.toggle('mouse', !touchFirst);
+  // With a mouse, the touch layer stays off even in menus, so the mouse
+  // reaches the game's own pointer
+  $('player').classList.toggle('mouse', !touchFirst && input.mode === 'pad');
   showSound();
   const [w, h] = gameSize();
   const config = (await getConfig())?.data;
@@ -430,13 +433,16 @@ function readPad(p, s) {
 }
 
 // While a controller is in use, the on-screen controls are hidden;
-// touching the screen brings them back
-let padMode = false;
-function setPadMode(on) {
-  if (on === padMode) return;
-  padMode = on;
-  $('player').classList.toggle('pad', on);
-}
+// touching the screen brings them back. With a mouse they start hidden too.
+// The bar's Touch / Controller button picks one for good (input.auto is
+// only a guess).
+const input = inputSwap({
+  id: 'openarena', button: $('inputBtn'), start: touchFirst ? 'touch' : 'pad',
+  apply(mode) {
+    $('player').classList.toggle('pad', mode === 'pad');
+    if (mode === 'touch') $('player').classList.remove('mouse');
+  },
+});
 
 // Menus: keys go down when a direction or button is first held and repeat
 // while it stays held, as a keyboard would
@@ -490,7 +496,7 @@ function loop(t) {
   if (conn === CA_ACTIVE && !everActive) {
     everActive = true;
     $('loading').hidden = true;
-    if (touchFirst) hint('Drag to look, use the stick to walk');
+    if (input.mode === 'touch') hint('Drag to look, use the stick to walk');
   }
   // Left the arena (the game's menu), or it never started
   if (everActive && conn <= CA_DISCONNECTED) return leave();
@@ -502,7 +508,7 @@ function loop(t) {
   if (isDead !== fragged) {
     fragged = isDead;
     $('player').classList.toggle('dead', fragged);
-    if (fragged && touchFirst && !padMode) hint('Tap FIRE to come back', 3000);
+    if (fragged && input.mode === 'touch') hint('Tap FIRE to come back', 3000);
   }
   if (now !== mode) {
     mode = now;
@@ -523,7 +529,7 @@ function loop(t) {
   for (const b of swallow) {
     if (s.held.has(b) || s.dirs.has(b)) { s.held.delete(b); s.dirs.delete(b); } else swallow.delete(b);
   }
-  if (s.held.size || s.dirs.size || s.forward || s.yaw || s.side || s.pitch) setPadMode(true);
+  if (s.held.size || s.dirs.size || s.forward || s.yaw || s.side || s.pitch) input.auto('pad');
   for (const p of touch.values()) {
     if (p.b) s.held.add(p.b);
     else if (p.stick) {
@@ -623,7 +629,7 @@ function pointerAt(e) {
 function onPointer(e) {
   if (!q3) return;
   if (e.type === 'pointerdown' && e.pointerType === 'touch') {
-    setPadMode(false);
+    input.auto('touch');
     $('player').classList.remove('mouse');
   }
   if (e.type === 'pointerdown') {

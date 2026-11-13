@@ -9,6 +9,7 @@ import { FONT } from './font.js';
 import { CTRL, KEY_SLOTS } from './runtime.js';
 import { keepAwake } from '../_shared/awake.js';
 import { padMenu } from '../_shared/padmenu.js';
+import { inputSwap } from '../_shared/inputswap.js';
 
 const GAMES = [
   { id: 'caverns', title: 'Caverns of Kroz II', year: 1990, levels: 40, goal: 'the Priceless Amulet',
@@ -250,6 +251,7 @@ function stepToward([tx, ty]) {
 $('frame').addEventListener('pointerdown', e => {
   if (!run) return;
   e.preventDefault();
+  input.auto('touch');
   $('frame').setPointerCapture(e.pointerId);
   if (run.prompt) return;   // answers are buttons
   // Before the first level there's no player to walk: any key will do
@@ -259,6 +261,21 @@ $('frame').addEventListener('pointerdown', e => {
 });
 $('frame').addEventListener('pointermove', e => { if (run?.target && e.buttons) run.target = cellAt(e); });
 for (const type of ['pointerup', 'pointercancel']) $('frame').addEventListener(type, () => { if (run) run.target = null; release(); });
+
+// ---------- touch or controller ----------
+
+// With a controller, Whip, Teleport and Pause are on its buttons, so the
+// side shows what those buttons do instead. Save, Restore and the rest stay:
+// a controller has nothing for them.
+const input = inputSwap({
+  id: 'ascii',
+  button: $('inputBtn'),
+  start: 'touch',
+  apply: mode => {
+    for (const b of $('side').querySelectorAll('[data-key="W"], [data-key="T"], [data-key="P"]')) b.hidden = mode === 'pad';
+    $('padKeys').hidden = mode !== 'pad';
+  },
+});
 
 // ---------- buttons ----------
 
@@ -403,6 +420,7 @@ function pollPad() {
   run.pad = s || {};
   if (!s) return;
   const pressed = k => s[k] && !was[k];
+  if (s.x || s.y || s.a || s.b || s.start || s.select) input.auto('pad');
   if (run.prompt) {
     // Left and right pick an answer, A gives it
     const buttons = [...$('prompt').children];

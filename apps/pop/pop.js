@@ -12,6 +12,7 @@
 // when it's left (the hub's Apps button asks first).
 
 import { fetchPackage, padMenu, reason, secondTap } from '../_shared/gamepage.js';
+import { inputSwap } from '../_shared/inputswap.js';
 
 (() => {
 
@@ -56,13 +57,19 @@ const tap = code => { key(code, true); setTimeout(() => key(code, false), 80); }
 
 // ---------- on-screen buttons ----------
 
-let padMode = false;
-function setPadMode(on) {
-  if (padMode === on) return;
-  padMode = on;
-  $('touch').hidden = on || !touchFirst;
-  $('padNote').hidden = !on;
-}
+// Touch mode shows the buttons once the game's first frame is up; controller
+// mode leaves the whole picture. The bar's button swaps them (and pins it).
+let gameShown = false, padMode = false;
+const showTouch = () => { $('touch').hidden = !gameShown || padMode; };
+const input = inputSwap({
+  id: 'pop', button: $('inputBtn'), start: touchFirst ? 'touch' : 'pad',
+  apply: mode => {
+    padMode = mode === 'pad';
+    // a button held as the controls go would stay held
+    if (padMode) for (const b of $('touch').querySelectorAll('.held')) { b.classList.remove('held'); key(b.dataset.key, false); }
+    showTouch();
+  },
+});
 for (const b of $('touch').querySelectorAll('button')) {
   const code = b.dataset.key;
   const down = e => { e.preventDefault(); b.setPointerCapture?.(e.pointerId); b.classList.add('held'); key(code, true); };
@@ -73,7 +80,7 @@ for (const b of $('touch').querySelectorAll('button')) {
   b.addEventListener('lostpointercapture', up);
 }
 $('menuBtn').onclick = () => tap('Escape');
-addEventListener('touchstart', () => setPadMode(false), { capture: true, passive: true });
+addEventListener('touchstart', () => input.auto('touch'), { capture: true, passive: true });
 
 // ---------- controller ----------
 
@@ -100,7 +107,7 @@ function readPad() {
   }
   for (const code of padKeys) if (!want.has(code)) { padKeys.delete(code); key(code, false); }
   for (const code of want) if (!padKeys.has(code)) { padKeys.add(code); key(code, true); }
-  if (want.size) setPadMode(true);
+  if (want.size) input.auto('pad');
 }
 function pollPads() {
   requestAnimationFrame(pollPads);
@@ -228,7 +235,8 @@ async function play() {
         if (window.Module.popFrames > 0 && firstFrame) {
           firstFrame = false;
           $('loading').hidden = true;
-          $('touch').hidden = padMode || !touchFirst;
+          gameShown = true;
+          showTouch();
           canvas.focus();
         } else if (firstFrame) requestAnimationFrame(shown);
       };

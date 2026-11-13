@@ -50,7 +50,6 @@
   #player { position: fixed; inset: 0; display: grid; grid-template-rows: 60px minmax(0, 1fr); grid-template-columns: minmax(0, 1fr); background: #000; }
   .bar { display: flex; align-items: center; gap: 8px; padding: 8px 10px 8px 110px; overflow-x: auto; scrollbar-width: none; touch-action: pan-x; background: var(--panel); border-bottom: 1px solid var(--line); }
   .bar b { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  #padNote { font-size: 13px; color: var(--muted); white-space: nowrap; }
   /* touch: a column of buttons each side of the picture */
   .field { display: grid; grid-template-columns: minmax(0, 1fr); min-height: 0; }
   .field.touch { grid-template-columns: 150px minmax(0, 1fr) 150px; }
@@ -101,6 +100,7 @@
     </div>
 
     <h2>Controls</h2>
+    <p class="note">Touch and a controller work about as well. The Touch / Controller button on the game's bar swaps the buttons beside the picture for a controller and back.</p>
     <table class="keys">
       <tr><th></th><th>Touch</th><th>Controller</th><th>Keyboard</th></tr>
       <tr><td>Speed up, slow down</td><td>Faster, Slower</td><td>RB, LB</td><td>X, Z</td></tr>
@@ -148,7 +148,7 @@
 <section id="player" hidden>
   <div class="bar">
     <b>Sopwith</b>
-    <span id="padNote" hidden>Controller</span>
+    <button class="btn" id="inputBtn" type="button"></button>
     <button class="btn" id="endBtn" type="button">End game</button>
     <button class="btn" id="soundBtn" type="button">Sound on</button>
     <button class="btn" id="quitBtn" type="button">Quit</button>

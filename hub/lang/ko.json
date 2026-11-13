@@ -67,6 +67,9 @@
     "searchLabel": "앱 검색",
     "searchClear": "검색 지우기",
     "searchNone": "“{query}”에 해당하는 앱이 없습니다.",
+    "inputTouch": "터치",
+    "inputController": "컨트롤러 권장",
+    "inputBoth": "터치 또는 컨트롤러",
     "slowLoad": "아직 불러오는 중입니다. 신호가 약하면 느릴 수 있습니다."
   },
   "tags": {

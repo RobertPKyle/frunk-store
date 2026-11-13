@@ -30,4 +30,7 @@ export const EN_UI = {
   badgeNew: 'New',
   badgeUpdated: 'Updated',
   searchNone: 'No apps match “{query}”.',
+  inputTouch: 'Touch',
+  inputController: 'Best with a controller',
+  inputBoth: 'Touch or controller',
 };

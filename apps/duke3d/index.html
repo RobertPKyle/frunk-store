@@ -82,7 +82,6 @@
      jump, duck, kick and change weapons and items. In menus, a pad of
      arrows takes their place. */
   #touch { position: absolute; inset: 0; }
-  #player.mouse #touch { display: none; }
   .side { position: absolute; bottom: var(--above-hud, 70px); display: flex; flex-direction: column; gap: 10px; }
   .side.left { left: var(--inset, 12px); align-items: flex-start; }
   .side.right { right: var(--inset, 12px); align-items: flex-end; }
@@ -154,7 +153,7 @@
     </div>
 
     <div class="legal">
-      <p>Controls: on the screen, the stick walks and steps sideways, a finger dragged anywhere else turns and looks, FIRE shoots (and turns too, if you drag it), OPEN opens doors and pushes switches, JUMP jumps (and swims up), DUCK ducks (and swims down), KICK kicks, ‹ › change weapons, Item › picks the next item (medkit, jetpack, steroids...), Use item uses it and Map shows the map; in menus, arrows move and OK picks. On a controller: left stick or D-pad to walk (with no right stick, the D-pad and stick turn left and right), right stick to turn and look, L and R to step sideways, the right face button or right trigger to fire, the bottom face button to jump, the left one to open, the top one to change weapons, the left trigger to duck, Start for the menu and Select for the map. Hold Select with another button for more: Select + bottom ducks, Select + right kicks, Select + left uses the item, Select + L or R picks an item, Select + top goes back a weapon. A keyboard and mouse work too (click the game to look with the mouse). Games pick up where you left off: the game is saved as "Continue" whenever you leave it, and Continue loads it. The game's own menu saves in its slots as well.</p>
+      <p>Controls: on the screen, the stick walks and steps sideways, a finger dragged anywhere else turns and looks, FIRE shoots (and turns too, if you drag it), OPEN opens doors and pushes switches, JUMP jumps (and swims up), DUCK ducks (and swims down), KICK kicks, ‹ › change weapons, Item › picks the next item (medkit, jetpack, steroids...), Use item uses it and Map shows the map; in menus, arrows move and OK picks. On a controller: left stick or D-pad to walk (with no right stick, the D-pad and stick turn left and right), right stick to turn and look, L and R to step sideways, the right face button or right trigger to fire, the bottom face button to jump, the left one to open, the top one to change weapons, the left trigger to duck, Start for the menu and Select for the map. Hold Select with another button for more: Select + bottom ducks, Select + right kicks, Select + left uses the item, Select + L or R picks an item, Select + top goes back a weapon. A keyboard and mouse work too (click the game to look with the mouse). The on-screen controls hide while a controller is in use; touch the screen to bring them back, or pick one for good with the Touch / Controller button at the top. Games pick up where you left off: the game is saved as "Continue" whenever you leave it, and Continue loads it. The game's own menu saves in its slots as well.</p>
       <p>Engine: EDuke32 by Richard "TerminX" Gobeille, Evan Ramos and its contributors, based on Duke Nukem 3D's source code by 3D Realms (GNU GPL 2) and the Build engine by Ken Silverman, compiled to WebAssembly with small changes for the browser. "Build Engine &amp; Tools" Copyright (c) 1993-1997 Ken Silverman. Ken Silverman's official web site: <a href="http://www.advsys.net/ken" target="_blank" rel="noopener">http://www.advsys.net/ken</a>. See the included license file <a href="engine/BUILDLIC.TXT" target="_blank">BUILDLIC.TXT</a> for license info. Source: <a href="engine/eduke32-ec5824d-web-src.tar.gz">/duke3d/engine/eduke32-ec5824d-web-src.tar.gz</a>, with the changes in <a href="engine/eduke32-web.patch" target="_blank">eduke32-web.patch</a>, built by tools/build-duke3d.mjs in github.com/RobertPKyle/frunk-store; see <a href="NOTICE" target="_blank">/duke3d/NOTICE</a>.</p>
       <p>Game: Duke Nukem 3D Episode One (shareware v1.3D) © 1996 3D Realms Entertainment, offered for download free of charge, complete and unchanged as its <a href="shareware/LICENSE.TXT" target="_blank">license</a> allows (shareware/3dduke13SW.zip). frunk.store is not affiliated with or endorsed by 3D Realms, Apogee or Gearbox. Duke Nukem is a trademark of Gearbox Software. Play only while parked.</p>
     </div>
@@ -210,6 +209,7 @@
     <b id="title"></b>
     <button id="fps" type="button" tabindex="-1"></button>
     <button class="btn" id="menuBtn" type="button">Menu</button>
+    <button class="btn" id="inputBtn" type="button"></button>
     <button class="btn" id="soundBtn" type="button">Sound on</button>
     <button class="btn" id="quitBtn" type="button">Games</button>
   </div>

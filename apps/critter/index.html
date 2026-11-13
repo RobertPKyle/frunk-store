@@ -48,7 +48,6 @@
   #player { position: fixed; inset: 0; display: grid; grid-template-rows: 60px minmax(0, 1fr); grid-template-columns: minmax(0, 1fr); background: #000; }
   .bar { display: flex; align-items: center; gap: 8px; padding: 8px 10px 8px 110px; overflow-x: auto; scrollbar-width: none; touch-action: pan-x; background: var(--panel); border-bottom: 1px solid var(--line); }
   .bar b { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  #padNote { font-size: 13px; color: var(--muted); white-space: nowrap; }
   .screen { position: relative; min-height: 0; min-width: 0; overflow: hidden; container-type: size; }
   /* SDL writes the canvas's size into its style; the game draws 4:3 at
      whatever size the page lays it out at, so these rules win */
@@ -88,6 +87,7 @@
     </div>
 
     <h2>Controls</h2>
+    <p class="note">Touch and a controller work about as well. The Touch / Controller button on the game's bar swaps them: Alt and Special show for touch, and dragging steers either way.</p>
     <table class="keys">
       <tr><th></th><th>Touch</th><th>Controller</th></tr>
       <tr><td>Move the ship</td><td>Drag anywhere</td><td>D-pad or left stick</td></tr>
@@ -132,7 +132,7 @@
 <section id="player" hidden>
   <div class="bar">
     <b>Critical Mass</b>
-    <span id="padNote" hidden>Controller</span>
+    <button class="btn" id="inputBtn" type="button"></button>
     <button class="btn" id="pauseBtn" type="button">Pause</button>
     <button class="btn" id="menuBtn" type="button">Menu</button>
     <button class="btn" id="soundBtn" type="button">Sound on</button>

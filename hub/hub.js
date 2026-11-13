@@ -111,6 +111,20 @@ function el(tag, attrs = {}, ...children) {
   return node;
 }
 
+// How an app plays best, from its catalog entry's "input": by touch, with a
+// controller (touch may still work), or either one as well as the other.
+// Apps that take both have a button on their own bar that swaps between them.
+const INPUT = { touch: 'inputTouch', controller: 'inputController', both: 'inputBoth' };
+const HAND = '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11V5.5a1.5 1.5 0 0 1 3 0V10m0-.5a1.5 1.5 0 0 1 3 0V11m0-.5a1.5 1.5 0 0 1 3 0V15a6 6 0 0 1-6 6h-.6a6 6 0 0 1-4.7-2.3L4.2 15.6a1.5 1.5 0 0 1 2.3-1.9L9 16"/></svg>';
+const PAD = '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 7h9a4.5 4.5 0 0 1 4.4 3.6l.9 4.6a2.6 2.6 0 0 1-4.6 2.1L15.5 15h-7l-1.7 2.3a2.6 2.6 0 0 1-4.6-2.1l.9-4.6A4.5 4.5 0 0 1 7.5 7z"/><path d="M8 10v3M6.5 11.5h3"/></svg>';
+const INPUT_ICONS = { touch: HAND, controller: PAD, both: HAND + PAD };
+function inputChip(app) {
+  if (!INPUT[app.input]) return [];
+  const chip = el('span', { class: 'tag input', 'data-input': app.input }, t(INPUT[app.input]));
+  chip.insertAdjacentHTML('afterbegin', INPUT_ICONS[app.input]);
+  return [chip];
+}
+
 // Apps marked unlisted aren't on the grid
 const listed = () => catalog.apps.filter(app => !app.unlisted);
 
@@ -130,7 +144,8 @@ function badge(app) {
 let query = '';
 const fold = s => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 function matches(app, words) {
-  const hay = fold([app.id, app.name, app.tagline, appName(app), appTagline(app), ...app.tags, ...app.tags.map(tagName)].join('\n'));
+  const how = INPUT[app.input] ? [en.ui[INPUT[app.input]], t(INPUT[app.input])] : [];
+  const hay = fold([app.id, app.name, app.tagline, appName(app), appTagline(app), ...app.tags, ...app.tags.map(tagName), ...how].join('\n'));
   return words.every(w => hay.includes(w));
 }
 
@@ -148,7 +163,7 @@ function renderGrid() {
       el('img', { src: appsOrigin + app.icon, alt: '', width: 64, height: 64 }),
       el('h2', {}, appName(app)),
       el('p', {}, appTagline(app)),
-      el('div', { class: 'tags' }, ...app.tags.map(tag => el('span', { class: 'tag' }, tagName(tag)))),
+      el('div', { class: 'tags' }, ...inputChip(app), ...app.tags.map(tag => el('span', { class: 'tag' }, tagName(tag)))),
     );
     card.addEventListener('click', e => launch(app.id, e.detail === 0));   // no clicks counted: a key or the controller
     return card;

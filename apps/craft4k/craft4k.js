@@ -10,6 +10,7 @@
 
 import { keepAwake } from '../_shared/awake.js';
 import { padMenu, reason } from '../_shared/gamepage.js';
+import { inputSwap } from '../_shared/inputswap.js';
 
 const $ = id => document.getElementById(id);
 
@@ -210,10 +211,15 @@ const keys = new Set();
 const stick = { x: 0, y: 0 };
 let touchJump = false;
 
-// Touch controls show on screens without a fine pointer, and once touched
+// Touch controls show on screens without a fine pointer, and once touched;
+// a controller in use hides them (see frame). The bar's Touch / Controller
+// button picks one for good (input.auto is only a guess).
 const touchUi = $('touch');
-touchUi.hidden = matchMedia('(pointer: fine)').matches;
-addEventListener('touchstart', () => { touchUi.hidden = false; }, { capture: true, passive: true });
+const input = inputSwap({
+  id: 'craft4k', button: $('inputBtn'), start: matchMedia('(pointer: fine)').matches ? 'pad' : 'touch',
+  apply(mode) { touchUi.hidden = mode === 'pad'; },
+});
+addEventListener('touchstart', () => input.auto('touch'), { capture: true, passive: true });
 
 // Walk stick
 const stickEl = $('stick'), knob = $('knob');
@@ -374,7 +380,7 @@ function frame() {
 
   const pad = readPad();
   // a controller in use: the on-screen controls go until the screen is touched
-  if (pad.used && !touchUi.hidden) touchUi.hidden = true;
+  if (pad.used) input.auto('pad');
   const k = c => keys.has(c) ? 1 : 0;
   const forward = k('KeyW') + k('ArrowUp') - k('KeyS') - k('ArrowDown') - stick.y - pad.y;
   const right = k('KeyD') + k('ArrowRight') - k('KeyA') - k('ArrowLeft') + stick.x + pad.x;

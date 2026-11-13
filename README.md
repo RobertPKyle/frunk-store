@@ -40,6 +40,15 @@ badge, until it's opened after that date. Set `added` on a new app and
 console). While an app tagged Game is open, the hub keeps the screen on with
 a wake lock, since play with a controller never touches the screen.
 
+Every catalog entry carries `"input"`, how the app plays best: `touch`,
+`controller` (a controller plays it clearly better, though touch may still
+work) or `both` (either one as well as the other). The card shows it as the
+first chip in its tag row (Touch, Best with a controller, Touch or
+controller), and a search for those words finds the apps. It takes the place
+of the old Controller and Touch tags. Games that have on-screen touch
+controls and play with a controller too carry a swap button on their bar
+(`apps/_shared/inputswap.js`, below).
+
 The hub's own text comes in English, Traditional and Simplified Chinese,
 German, Norwegian, Dutch, Japanese and Korean (the apps stay in English, except
 Mahjong, which also comes in both kinds of Chinese). The
@@ -1320,6 +1329,14 @@ clear them to make room.
   second tap on Quit for games that keep only what the player saved, and a
   controller on the start screens (D-pad or stick moves, a face button or Start
   presses; on the "I own my games" notice Cancel is lit first).
+- `apps/_shared/inputswap.js`: the Touch / Controller button on a game's bar.
+  It swaps between the on-screen touch controls and a controller; both kinds
+  of input keep working either way, the mode only decides what the screen
+  shows. Until the player taps it, the app's own guesses switch the mode (a
+  controller press hides the touch controls, a touch brings them back). A tap
+  pins the mode for that app (`input.<id>` in localStorage), and after that
+  only the button changes it, so a stray touch or a nudged stick no longer
+  flips it.
 - `apps/_shared/padmenu.js`: a controller in the game lists of Retro Console,
   Arcade, Tiny Games, Adventure Games, Logic Puzzles and ASCII Quests. It starts
   only once Chrome reports a controller. Retro Console also keeps a small index

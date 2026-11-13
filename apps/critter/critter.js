@@ -8,6 +8,7 @@
 
 import { fetchPackage, padMenu, reason, secondTap } from '../_shared/gamepage.js';
 import { mbOf } from '../_shared/engine.js';
+import { inputSwap } from '../_shared/inputswap.js';
 
 (() => {
 
@@ -108,12 +109,13 @@ showSharp();
 // ---------- what the game is doing ----------
 
 let state = 0, context = 0, alive = true, nameWanted = false, score = 0;
+let touchMode = touchFirst;   // Alt and Special show in a level (the swap button below sets it)
 
 function showState() {
   const inGame = context === GAME && alive && !nameWanted;
   $('pauseBtn').textContent = context === PAUSED ? 'Resume' : 'Pause';
   $('pauseBtn').disabled = !(context === PAUSED || inGame);
-  for (const b of [$('alt'), $('special')]) b.hidden = !touchFirst || !inGame;
+  for (const b of [$('alt'), $('special')]) b.hidden = !touchMode || !inGame;
   $('over').hidden = !(context === GAME && !alive && !nameWanted);
   if (nameWanted && $('name').hidden) {
     $('nameInput').value = settings.get('name', 'Driver');
@@ -221,6 +223,7 @@ for (const [id, sym] of [['alt', KEY.ALT], ['special', KEY.CTRL]]) {
   b.addEventListener('pointercancel', up);
   held.push(up);
 }
+
 function releaseHeld() {
   for (const up of held) up();
   setFiring(false);
@@ -230,6 +233,22 @@ function releaseHeld() {
   if (p) [p.a, p.b, p.c].forEach((down, i) => padDown.set('held' + i, down));
   for (const b of padKeys) if (b.on) { b.on = false; key(b.sym, false); }
 }
+
+// ---------- touch or controller ----------
+
+// Touch mode shows Alt and Special in a level; controller mode leaves the
+// picture clear. Dragging steers either way. A controller press picks
+// controller mode and a finger on the picture picks touch, until the player
+// pins one on the bar's button.
+const input = inputSwap({
+  id: 'critter', button: $('inputBtn'), start: touchFirst ? 'touch' : 'pad',
+  apply: mode => {
+    touchMode = mode === 'touch';
+    if (!touchMode) for (const up of held) up();   // a weapon held as its button goes would keep firing
+    if (running) showState();
+  },
+});
+$('touch').addEventListener('pointerdown', e => { if (e.pointerType === 'touch') input.auto('touch'); });
 
 // ---------- controller ----------
 
@@ -282,7 +301,7 @@ function edge(name, now) {
 function pollPad(dt, now) {
   const p = readPad();
   if (!p) return;
-  if ((p.a || p.b || p.c || p.start || p.select || Math.abs(p.x) > 0.5 || Math.abs(p.y) > 0.5) && $('padNote').hidden) $('padNote').hidden = false;
+  if (p.a || p.b || p.c || p.start || p.select || Math.abs(p.x) > 0.5 || Math.abs(p.y) > 0.5) input.auto('pad');
   const inGame = context === GAME && alive && !nameWanted;
 
   if (edge('start', p.start)) tapKey(KEY.BACKSPACE);

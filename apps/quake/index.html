@@ -80,7 +80,6 @@
      buttons) turns and looks, the stick walks, and the buttons fire, jump
      and change weapons. In menus, a pad of arrows takes their place. */
   #touch { position: absolute; inset: 0; }
-  #player.mouse #touch { display: none; }
   .side { position: absolute; bottom: var(--above-status, 70px); display: flex; flex-direction: column; align-items: center; gap: 12px; }
   .side.left { left: var(--inset, 12px); }
   .side.right { right: var(--inset, 12px); }
@@ -148,7 +147,7 @@
     </div>
 
     <div class="legal">
-      <p>Controls: on the screen, the stick walks and steps sideways, a finger dragged anywhere else turns and looks, FIRE shoots (and turns too, if you drag it), JUMP jumps (and swims up), and ‹ › change weapons; in menus, arrows move and OK picks. On a controller: left stick or D-pad to walk (with no right stick, the D-pad and stick turn left and right), right stick to turn and look, L and R to step sideways, the right face button or right trigger to fire, the bottom face button or left trigger to jump, the other two face buttons to change weapons, Start for the menu and Select for the scores. A keyboard and mouse work too (click the game to look with the mouse). Games pick up where you left off: the game is saved as "auto" whenever you leave it, and Continue loads it. The game's own menu saves in its slots as well.</p>
+      <p>Controls: on the screen, the stick walks and steps sideways, a finger dragged anywhere else turns and looks, FIRE shoots (and turns too, if you drag it), JUMP jumps (and swims up), and ‹ › change weapons; in menus, arrows move and OK picks. On a controller: left stick or D-pad to walk (with no right stick, the D-pad and stick turn left and right), right stick to turn and look, L and R to step sideways, the right face button or right trigger to fire, the bottom face button or left trigger to jump, the other two face buttons to change weapons, Start for the menu and Select for the scores. A keyboard and mouse work too (click the game to look with the mouse). The on-screen controls hide while a controller is in use; touch the screen to bring them back, or pick one for good with the Touch / Controller button at the top. Games pick up where you left off: the game is saved as "auto" whenever you leave it, and Continue loads it. The game's own menu saves in its slots as well.</p>
       <p>Engine: Chocolate Quake 2.1.0 by Henrique Barateli and others, based on id Software's Quake source (GNU GPL 3), compiled to WebAssembly with small changes for the browser. Source: /quake/engine/chocolate-quake-2.1.0-web-src.tar.gz, with the changes in /quake/engine/chocolate-web.patch, built by tools/build-quake.mjs in github.com/RobertPKyle/frunk-store; see /quake/NOTICE. Game: LibreQuake 0.09-beta (lite) by the LibreQuake project, art and sounds under the BSD 3-Clause license and game code under the GNU GPL 2 (source in /quake/librequake/librequake-0.09-beta-qcsrc.tar.gz); see /quake/librequake/COPYING and CREDITS.</p>
       <p>LibreQuake and frunk.store are not affiliated with or endorsed by id Software, Bethesda, ZeniMax or Microsoft. QUAKE is a trademark of ZeniMax Media. Play only while parked.</p>
     </div>
@@ -204,6 +203,7 @@
     <b id="title"></b>
     <button id="fps" type="button" tabindex="-1"></button>
     <button class="btn" id="menuBtn" type="button">Menu</button>
+    <button class="btn" id="inputBtn" type="button"></button>
     <button class="btn" id="soundBtn" type="button">Sound on</button>
     <button class="btn" id="quitBtn" type="button">Games</button>
   </div>

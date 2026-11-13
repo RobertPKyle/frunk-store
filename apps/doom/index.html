@@ -123,7 +123,7 @@
 
     <div class="legal">
       <p>Plays Doom games: Freedoom, and IWAD files from Doom, The Ultimate Doom, Doom II and Final Doom (TNT: Evilution and The Plutonia Experiment). Add-on levels (PWADs) aren't supported yet. Games pick up where you left off: the game is saved to the "AUTOSAVE" slot (last page of the load menu) whenever you leave it.</p>
-      <p>Controls: a USB or Bluetooth controller, the on-screen controls, or a keyboard. On the screen, the stick walks and turns, ‹ › change weapons, and in menus the stick moves, Fire picks and Use goes back. On a controller: D-pad or left stick to walk and turn (with a right stick, the left one steps sideways and the right one turns), L and R to step sideways, the right face button or right trigger to fire, the bottom face button or left trigger to use, the other two face buttons to change weapons, Select for the map and Start for the menu. With a controller, the on-screen controls hide to make the game bigger; touch the screen to bring them back.</p>
+      <p>Controls: a USB or Bluetooth controller, the on-screen controls, or a keyboard. On the screen, the stick walks and turns, ‹ › change weapons, and in menus the stick moves, Fire picks and Use goes back. On a controller: D-pad or left stick to walk and turn (with a right stick, the left one steps sideways and the right one turns), L and R to step sideways, the right face button or right trigger to fire, the bottom face button or left trigger to use, the other two face buttons to change weapons, Select for the map and Start for the menu. With a controller, the on-screen controls hide to make the game bigger; touch the screen to bring them back. The Touch / Controller button at the top picks one for good, so a stray touch or a nudged controller doesn't swap them.</p>
       <p>Engine: Crispy Doom 7.2 (GNU GPL 2 or later), compiled to WebAssembly with small changes for the browser. Source: frunk-apps.vercel.app/doom/engine/crispy-doom-7.2-web-src.tar.gz. Games: Freedoom 0.13.0 by the Freedoom project (BSD 3-Clause license; see /doom/freedoom/COPYING.txt and CREDITS.txt).</p>
       <p>Freedoom is not affiliated with or endorsed by id Software, Bethesda or ZeniMax. DOOM is a trademark of ZeniMax Media. Play only while parked.</p>
     </div>
@@ -180,6 +180,7 @@
     <button id="fps" type="button" tabindex="-1"></button>
     <button class="btn" type="button" data-b="menu">Menu</button>
     <button class="btn" type="button" data-b="map">Map</button>
+    <button class="btn" id="inputBtn" type="button"></button>
     <button class="btn" id="soundBtn" type="button">Sound on</button>
     <button class="btn" id="quitBtn" type="button">Games</button>
   </div>

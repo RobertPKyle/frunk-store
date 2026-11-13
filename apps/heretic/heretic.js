@@ -19,6 +19,7 @@
 // The engine can't be restarted within a page, so leaving a game reloads it.
 
 import { fetchChunks, padMenu, reason } from '../_shared/gamepage.js';
+import { inputSwap } from '../_shared/inputswap.js';
 import { phonePanel } from '../_shared/phone.js';
 import { MAX_WAD_FILE, cleanName, findWad, maybeWad } from '../_shared/roms.js';
 
@@ -379,7 +380,7 @@ async function boot(entry, data, resume) {
   fit();
   module.callMain(args);
   // The first time, how the game's menu works on the screen
-  if (!matchMedia('(hover: hover) and (pointer: fine)').matches && !settings.get('hinted', false)) {
+  if (input.mode === 'touch' && !matchMedia('(hover: hover) and (pointer: fine)').matches && !settings.get('hinted', false)) {
     settings.set('hinted', true);
     $('hint').textContent = 'Menu opens the game\'s menu: the stick moves, FIRE picks, USE goes back';
     $('hint').hidden = false;
@@ -536,15 +537,16 @@ function selectCombos(s) {
 }
 
 // While a controller is in use, the on-screen controls are hidden and the
-// game gets their room; touching the screen brings them back
-let padMode = false;
-function setPadMode(on) {
-  if (on === padMode) return;
-  padMode = on;
-  if (on) wakeSound();
-  $('player').classList.toggle('pad', on);
-  fit();
-}
+// game gets their room; touching the screen brings them back. The bar's
+// Touch / Controller button picks one for good (input.auto is only a guess).
+const input = inputSwap({
+  id: 'heretic', button: $('inputBtn'), start: 'touch',
+  apply(mode) {
+    if (mode === 'pad') wakeSound();
+    $('player').classList.toggle('pad', mode === 'pad');
+    fit();
+  },
+});
 
 const clamp = v => Math.max(-1, Math.min(1, v));
 const fixed = v => Math.round(clamp(v) * 65536);
@@ -554,7 +556,7 @@ function loop(t) {
   if (document.hidden) return;
   const s = { held: new Set(), dirs: new Set(), move: 0, turn: 0, strafe: 0, stick: 0 };
   readPads(s);
-  if (s.held.size || s.dirs.size || s.move || s.turn || s.strafe) setPadMode(true);
+  if (s.held.size || s.dirs.size || s.move || s.turn || s.strafe) input.auto('pad');
   selectCombos(s);
   for (const [b, left] of sticky) {
     s.held.add(b);
@@ -621,7 +623,7 @@ function stickAt(p, e) {
 }
 
 function onPointer(e) {
-  if (e.type === 'pointerdown' && !e.target.closest('.bar')) setPadMode(false);
+  if (e.type === 'pointerdown' && !e.target.closest('.bar')) input.auto('touch');
   if (e.type === 'pointerdown') {
     const b = e.target.closest('#player [data-b]');
     if (e.target.closest('#stick')) {

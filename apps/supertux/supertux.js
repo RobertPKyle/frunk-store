@@ -19,6 +19,7 @@
 // page is hidden and when it's left (the hub's Apps button asks first).
 
 import { fetchBlock, padMenu, reason } from '../_shared/gamepage.js';
+import { inputSwap } from '../_shared/inputswap.js';
 
 (() => {
 
@@ -320,6 +321,22 @@ if (window.AudioContext) {
   }
 }
 
+// The game draws its own touch controls into the picture, and decides whether
+// to as it starts (Module.touchControls, read once by
+// tools/supertux/supertux-web.patch), so a swap on the bar's button takes
+// effect from the next start; the bar says so until then.
+let startedWith = null;   // the mode the running game was started with
+const input = inputSwap({
+  id: 'supertux', button: $('inputBtn'), start: touchFirst ? 'touch' : 'pad',
+  apply: mode => {
+    const later = startedWith !== null && mode !== startedWith;
+    $('inputNote').hidden = !later;
+    if (later) {
+      $('inputBtn').title = `${mode === 'pad' ? 'A controller' : 'Touch controls'} from the next time the game starts: it sets up its on-screen controls only as it starts. Tap to swap back.`;
+    }
+  },
+});
+
 // Whether the game's own stack (main() and its loop) is the one running.
 // Only it can wait for data: anything else that runs the game's code (the
 // page's calls below, SDL's event handlers) is outside it, where a read
@@ -413,9 +430,10 @@ function start() {
     failed('The car\'s browser lost the game\'s picture. Your progress is saved.');
   });
   let firstFrame = true;
+  startedWith = input.mode;
   window.Module = {
     canvas,
-    touchControls: touchFirst,
+    touchControls: startedWith === 'touch',
     locateFile: path => ENGINE + path,
     print: remember,
     printErr: line => { remember(line); console.warn(line); },

@@ -18,6 +18,7 @@
 // MAME can't be restarted within a page, so leaving a game reloads it.
 
 import { mbOf, wasmProgress } from '../_shared/engine.js';
+import { inputSwap } from '../_shared/inputswap.js';
 import { padMenu } from '../_shared/padmenu.js';
 import { phonePanel } from '../_shared/phone.js';
 import { BY_SET, GAMES, MAX_ROM_FILE, setName } from './games.js';
@@ -219,8 +220,9 @@ async function play(set) {
       running = true;
       $('loading').hidden = true;
       canvas.focus();
-      if (padMode || [...(navigator.getGamepads?.() || [])].some(Boolean)) hint('Select for a coin, then Start', 5000);
-      else if (touchFirst) hint('Tap Coin, then Start', 5000);
+      // a pinned Touch wins over a controller that's merely connected
+      if (padMode || (!input.pinned && [...(navigator.getGamepads?.() || [])].some(Boolean))) hint('Select for a coin, then Start', 5000);
+      else if (touchFirst || input.pinned) hint('Tap Coin, then Start', 5000);
     } else if (performance.now() - t0 > 60000 && $('failed').hidden) {
       clearInterval(wait);
       failed(whyStopped());
@@ -314,12 +316,17 @@ function readPads(out) {
   return use.length > 0;
 }
 
+// A controller hides the on-screen controls and gives the game their room,
+// and a touch brings them back, until the bar's Touch / Controller button
+// pins one
 let padMode = false;
-function setPadMode(on) {
-  if (on === padMode) return;
-  padMode = on;
-  $('player').classList.toggle('pad', on);
-}
+const input = inputSwap({
+  id: 'arcade', button: $('inputBtn'), start: 'touch',
+  apply: mode => {
+    padMode = mode === 'pad';
+    $('player').classList.toggle('pad', padMode);
+  },
+});
 
 function tick() {
   if (!engine || leaving) return;
@@ -330,7 +337,7 @@ function tick() {
   }
   for (const t of touch.values()) for (const b of t.held || []) now.add(b);
   const pad = new Set();
-  if (readPads(pad) && pad.size) setPadMode(true);
+  if (readPads(pad) && pad.size) input.auto('pad');
   for (const b of pad) now.add(b);
   if (running) {
     for (const b of now) if (!sent.has(b)) { sent.add(b); key(b, true); }
@@ -371,7 +378,7 @@ function buttonAt(e) {
 }
 
 function onPointer(e) {
-  if (e.type === 'pointerdown' && e.target.closest('.side, .screen')) setPadMode(false);
+  if (e.type === 'pointerdown' && e.target.closest('.side, .screen')) input.auto('touch');
   if (e.type === 'pointerdown') {
     if (e.target.closest('#dpad')) touch.set(e.pointerId, { dpad: true, held: dpadDirs(e) });
     else if (e.target.closest('#player .side [data-b]')) touch.set(e.pointerId, { held: buttonAt(e) });

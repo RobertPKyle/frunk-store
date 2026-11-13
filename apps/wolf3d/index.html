@@ -55,7 +55,7 @@
   #player { position: fixed; inset: 0; display: grid; grid-template-rows: 60px minmax(0, 1fr); grid-template-columns: minmax(0, 1fr); background: #000; }
   .bar { display: flex; align-items: center; gap: 8px; padding: 8px 10px 8px 110px; overflow-x: auto; scrollbar-width: none; touch-action: pan-x; background: var(--panel); border-bottom: 1px solid var(--line); }
   .bar b { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  #wait, #padNote { font-size: 13px; color: var(--muted); white-space: nowrap; }
+  #wait { font-size: 13px; color: var(--muted); white-space: nowrap; }
   .screen { position: relative; min-height: 0; min-width: 0; overflow: hidden; }
   #canvas { position: absolute; display: block; border: 0; padding: 0; background: #000; outline: none; image-rendering: pixelated; }
   #canvas.smooth { image-rendering: auto; }
@@ -85,7 +85,8 @@
   #tStrafe { right: 92px; bottom: 14px; }
   @media (max-width: 640px) {
     .bar .btn { padding: 8px 10px; }
-    #padNote { display: none; }
+    /* the touch / controller button keeps just its icon */
+    #inputBtn span { display: none; }
   }
   /* the bar is full at the car's width: every button stays on it */
   @media (max-width: 800px) { .bar { gap: 6px; } .bar .btn { padding: 8px 10px; } }
@@ -111,6 +112,7 @@
     <p class="note" id="status" aria-live="polite"></p>
 
     <h2>Controls</h2>
+    <p class="note">Best with a controller. The on-screen buttons work too: the Touch / Controller button on the game's bar swaps between them.</p>
     <table class="keys">
       <tr><th></th><th>Controller</th><th>On screen</th></tr>
       <tr><td>Walk, turn, menus</td><td>Left stick or D-pad</td><td>▲ ▼ ◀ ▶</td></tr>
@@ -150,7 +152,7 @@
   <div class="bar">
     <b id="title">Wolfenstein 3D</b>
     <span id="wait" hidden>Loading…</span>
-    <span id="padNote" hidden>Controller</span>
+    <button class="btn" id="inputBtn" type="button">Touch</button>
     <button class="btn" id="menuBtn" type="button">Menu</button>
     <button class="btn" id="keysBtn" type="button">Keyboard</button>
     <button class="btn" id="smoothBtn" type="button">Sharp</button>

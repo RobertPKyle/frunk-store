@@ -42,7 +42,6 @@
   #player { position: fixed; inset: 0; display: grid; grid-template-rows: 60px minmax(0, 1fr); grid-template-columns: minmax(0, 1fr); background: #000; }
   .bar { display: flex; align-items: center; gap: 8px; padding: 8px 10px 8px 110px; overflow-x: auto; scrollbar-width: none; touch-action: pan-x; background: var(--panel); border-bottom: 1px solid var(--line); }
   .bar b { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  #padNote { font-size: 13px; color: var(--muted); white-space: nowrap; }
   .screen { position: relative; min-height: 0; min-width: 0; overflow: hidden; display: grid; place-items: center; }
   /* SDL writes the canvas's size into its style; the page's size wins. It keeps the game's 6:5 shape */
   #canvas { display: block; width: var(--w, 100%) !important; height: var(--h, 100%) !important; border: 0; padding: 0; background: #000; outline: none; touch-action: none; }
@@ -77,7 +76,7 @@
       <tr><td>Pause</td><td>Pause button on the side panel</td><td>Start</td></tr>
       <tr><td>Leave a level</td><td>Menu</td><td>Select</td></tr>
     </table>
-    <p class="legal">Touch and controller both work, and your progress is saved on this device.</p>
+    <p class="legal">Touch and a controller work about as well. The Touch / Controller button on the game's bar picks one; with Controller, the game's on-screen buttons go at the first controller press and stay away. Your progress is saved on this device.</p>
 
     <div class="legal">
       <p>Rocks'n'Diamonds by Holger Schemel / Artsoft Entertainment (GNU GPL version 2 or later), compiled to WebAssembly with changes for this site: /rocks/engine/rocks-web.patch, built by tools/build-rocks.mjs in github.com/RobertPKyle/frunk-store. The source is at /rocks/engine/. See /rocks/NOTICE.</p>
@@ -102,7 +101,7 @@
 <section id="player" hidden>
   <div class="bar">
     <b>Rocks'n'Diamonds</b>
-    <span id="padNote" hidden>Controller</span>
+    <button class="btn" id="inputBtn" type="button"></button>
     <button class="btn" id="menuBtn" type="button">Menu</button>
     <button class="btn" id="soundBtn" type="button">Sound on</button>
     <button class="btn" id="quitBtn" type="button">Quit</button>

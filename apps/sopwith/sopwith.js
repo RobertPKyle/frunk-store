@@ -7,6 +7,7 @@
 // one twice), and passes both on through the web_* calls the patch adds.
 
 import { padMenu, reason, secondTap } from '../_shared/gamepage.js';
+import { inputSwap } from '../_shared/inputswap.js';
 
 (() => {
 
@@ -30,6 +31,7 @@ const ROWS = 25;            // text rows on the game's 320x200 screen, 8 pixels 
 
 let started = false, running = false, game = null;
 let screen = 0, textWanted = false;
+let touchMode = touchFirst;   // the buttons beside the picture (the swap button below sets it)
 
 function loading(text) { $('loading').hidden = false; $('loadText').textContent = text; }
 const NO_LOAD = 'Couldn\'t load the game. Check the connection and try again.';
@@ -102,7 +104,8 @@ function showScreen() {
   const inGame = screen === GAME;
   for (const id of ['leftSide', 'rightSide']) $(id).hidden = !inGame;
   for (const id of ['leftMenu', 'rightMenu']) $(id).hidden = inGame;
-  $('menuTouch').hidden = !touchFirst || inGame;
+  // taps on the menu lines: on a touch screen always, else in touch mode (a mouse)
+  $('menuTouch').hidden = !(touchFirst || touchMode) || inGame;
   $('endBtn').disabled = !inGame;
 }
 
@@ -189,6 +192,22 @@ $('menuTouch').addEventListener('pointerdown', e => {
 });
 $('backBtn').onclick = () => { if (running && screen === MENU) game._web_char(ESC); };
 
+// ---------- touch or controller ----------
+
+// Touch mode puts the buttons beside the picture; controller mode gives the
+// picture the whole width. A controller press picks controller mode and a
+// finger on the screen picks touch, until the player pins one on the bar's button.
+const input = inputSwap({
+  id: 'sopwith', button: $('inputBtn'), start: touchFirst ? 'touch' : 'pad',
+  apply: mode => {
+    touchMode = mode === 'touch';
+    if (!touchMode) for (const b of [...held.keys()]) press(b, false);   // a held button would stay held
+    $('field').classList.toggle('touch', touchMode);
+    showScreen();
+  },
+});
+$('field').addEventListener('pointerdown', e => { if (e.pointerType === 'touch') input.auto('touch'); });
+
 // ---------- controller ----------
 
 // The car lists each controller twice: the device itself, and a "Tesla Virtual
@@ -250,9 +269,9 @@ function pollPad(now) {
   const p = readPad();
   if (!p) return;
   const any = p.a || p.b || p.x2 || p.y2 || p.lb || p.rb || p.start || Math.abs(p.x) > 0.5 || Math.abs(p.y) > 0.5;
+  if (any) input.auto('pad');
   if (any && !padSeen) {
     padSeen = true;
-    $('padNote').hidden = false;
     game._web_set_pad(1);   // the menus show a cursor
   }
   if (!padSeen) return;
@@ -332,7 +351,6 @@ async function play() {
   loading('Loading…');
   $('start').hidden = true;
   $('player').hidden = false;
-  $('field').classList.toggle('touch', touchFirst);
   showScreen();
   canvas.addEventListener('webglcontextlost', e => { e.preventDefault(); failed('The car\'s browser lost the game\'s picture. Start again to carry on.'); });
   try {

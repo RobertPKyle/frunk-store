@@ -153,6 +153,24 @@ await check('hub search finds apps and arrow keys move between cards', async () 
   await page.waitForSelector('#runner', { state: 'hidden' });
 });
 
+await check('hub cards say whether an app plays best by touch or with a controller', async () => {
+  await page.goto(base + '/');
+  await page.waitForSelector('#grid .card');
+  const catalog = await (await fetch(base + '/catalog.json')).json();
+  const bad = catalog.apps.filter(app => !['touch', 'controller', 'both'].includes(app.input) || app.tags.some(tag => tag === 'Controller' || tag === 'Touch'));
+  if (bad.length) throw new Error(`catalog input missing or old tags: ${bad.map(app => app.id).join(', ')}`);
+  const labels = await page.locator('#grid .card').evaluateAll(cards => cards.map(card => [card.dataset.app, card.querySelector('.tag.input')?.textContent]));
+  const want = { touch: 'Touch', controller: 'Best with a controller', both: 'Touch or controller' };
+  const wrong = labels.filter(([id, text]) => text !== want[catalog.apps.find(app => app.id === id).input]);
+  if (wrong.length) throw new Error(`cards with the wrong label: ${wrong.map(w => w.join('=')).join(', ')}`);
+  // a search finds them by the label (taglines may say it too, so only these are counted)
+  await page.fill('#query', 'touch or controller');
+  const found = await page.locator('#grid .card').evaluateAll(cards => cards.map(card => card.dataset.app));
+  const lost = catalog.apps.filter(app => app.input === 'both' && !app.unlisted && !found.includes(app.id));
+  if (lost.length) throw new Error(`"touch or controller" misses ${lost.map(app => app.id).join(', ')}`);
+  await page.fill('#query', '');
+});
+
 await check('hub badges a new app until it is opened', async () => {
   // Brick Breaker made new today, so the check doesn't depend on the catalog's real dates
   const today = new Date().toLocaleDateString('sv');
@@ -2744,7 +2762,7 @@ await check('prince of persia starts, moves by touch and controller, quick saves
   const press = async (b, wait = 1200) => { await frame().evaluate(b => padPress(b), b); await page.waitForTimeout(wait); };
   const playing = await look();
   await press(9);
-  if (!(await app.locator('#padNote').isVisible())) throw new Error('the controller wasn\'t noticed');
+  if (await app.locator('#inputBtn').getAttribute('data-mode') !== 'pad') throw new Error('the controller wasn\'t noticed');
   if ((await look()).equals(playing)) throw new Error('Start didn\'t open the pause menu');
   await page.screenshot({ path: shots + 'pop.png' });
   await press(1);
@@ -2790,7 +2808,7 @@ await check('death rally: starts a game by controller, types a name with the car
   await page.waitForTimeout(12000);
   await press(A);
   await press(A);
-  if (!(await app.locator('#padNote').isVisible())) throw new Error('the controller wasn\'t noticed');
+  if (!(await app.locator('#inputBtn[data-mode="pad"]').isVisible())) throw new Error('the controller wasn\'t noticed');
   // The driver's licence wants a nickname, typed with the car's keyboard
   await app.locator('#keysBtn').click();
   await page.keyboard.type('Frunk', { delay: 150 });
@@ -2872,7 +2890,7 @@ await check('wolfenstein 3d: starts a game, turns and opens the menu by controll
   await page.waitForTimeout(300);
   if ((await look()).equals(standing)) throw new Error('the left stick didn\'t turn');
   if ((await stats()).frames - beforeFrames < 40) throw new Error('the game drew too few frames while turning');
-  if (!(await app.locator('#padNote').isVisible())) throw new Error('the controller wasn\'t noticed');
+  if (!(await app.locator('#inputBtn[data-mode="pad"]').isVisible())) throw new Error('the controller wasn\'t noticed');
   await page.screenshot({ path: shots + 'wolf3d.png' });
   // Start (Esc) opens the game's menu
   const playing = await look();
@@ -2935,7 +2953,7 @@ await check('commander keen: saves on the map, enters a city and plays by contro
   await pad(A);
   await pad(A, 3500);
   await pad(A, 1000);
-  if (!(await app.locator('#padNote').isVisible())) throw new Error('the controller wasn\'t noticed');
+  if (!(await app.locator('#inputBtn[data-mode="pad"]').isVisible())) throw new Error('the controller wasn\'t noticed');
   if (await red() < 0.5) throw new Error(`not on the map: ${await red()}`);
   // Select saves in place 1 (the only way without number keys)
   await pad(SELECT, 3000);
@@ -3036,7 +3054,7 @@ await check('commander keen 4: saves by Select, enters the Border Village, plays
   await pad(A, 1500);
   await pad(A, 1500);
   await pad(A, 4000);
-  if (!(await app.locator('#padNote').isVisible())) throw new Error('the controller wasn\'t noticed');
+  if (!(await app.locator('#inputBtn[data-mode="pad"]').isVisible())) throw new Error('the controller wasn\'t noticed');
   if (await green() < 0.3) throw new Error(`not on the map: ${await green()}`);
   // Select saves in place 1: the menu, Save Game, the place, its name, back to the game
   await pad(SELECT, 6500);
@@ -3130,7 +3148,7 @@ await check('duke nukem ii: starts and plays by controller, saves in place 1 and
   // Start (Esc) skips the intro to the main menu
   for (let i = 0; i < 12 && !(await mainMenu()); i++) await pad(START, 1300);
   await until('the main menu', mainMenu, 5000);
-  if (!(await app.locator('#padNote').isVisible())) throw new Error('the controller wasn\'t noticed');
+  if (!(await app.locator('#inputBtn[data-mode="pad"]').isVisible())) throw new Error('the controller wasn\'t noticed');
   // The bottom button (Space): Start a New Game, episode 1, Medium
   await page.waitForTimeout(800);
   for (let i = 0; i < 4 && !(await playing()); i++) await pad(A, 2500);
@@ -3237,7 +3255,7 @@ await check('cosmo: begins by controller, saves in place 1, walks, quits to the 
   await page.waitForTimeout(3000);
   // The bottom button: the title to the main menu, then B for Begin
   await pad(A, 2500);
-  if (!(await app.locator('#padNote').isVisible())) throw new Error('the controller wasn\'t noticed');
+  if (!(await app.locator('#inputBtn[data-mode="pad"]').isVisible())) throw new Error('the controller wasn\'t noticed');
   await until('the main menu', menu, 10000);
   await pad(A, 500);
   await until('the first level', playing);
@@ -3333,7 +3351,7 @@ await check('hocus pocus: starts a game by controller, walks, jumps, saves with 
   // episode, the middle skill level, then the first hint
   for (const wait of [2500, 3000, 2500, 2500, 2500, 3000, 2000]) await pad(A, wait);
   await until('the first level (status bar)', async () => await bar() > 0.3, 10000);
-  if (!(await app.locator('#padNote').isVisible())) throw new Error('the controller wasn\'t noticed');
+  if (!(await app.locator('#inputBtn[data-mode="pad"]').isVisible())) throw new Error('the controller wasn\'t noticed');
   // The left stick walks: the picture scrolls and the game keeps drawing
   const standing = await look();
   const beforeFrames = (await stats()).frames;
@@ -3407,7 +3425,7 @@ await check('rise of the triad: starts a game by controller, turns, fires, quick
   // Game, the first player, the difficulty (one more is a shot in the game)
   for (let i = 0; i < 6; i++) await pad(A);
   await page.waitForTimeout(8000);
-  if (!(await app.locator('#padNote').isVisible())) throw new Error('the controller wasn\'t noticed');
+  if (!(await app.locator('#inputBtn[data-mode="pad"]').isVisible())) throw new Error('the controller wasn\'t noticed');
   // the left stick turns: the view changes and the game keeps drawing
   const standing = await look();
   const beforeFrames = (await stats()).frames;
@@ -3523,7 +3541,7 @@ await check('blake stone: starts a mission by touch, plays and saves by controll
   if ((await look()).equals(before)) throw new Error('the left stick didn\'t turn');
   const drawn = (await stats()).frames - beforeFrames;
   if (drawn < 30) throw new Error(`the game drew only ${drawn} frames in two seconds of turning`);
-  if (!(await app.locator('#padNote').isVisible())) throw new Error('the controller wasn\'t noticed');
+  if (!(await app.locator('#inputBtn[data-mode="pad"]').isVisible())) throw new Error('the controller wasn\'t noticed');
   // The right stick strafes
   before = await look();
   await stick([0, 0, 1, 0], 1000);

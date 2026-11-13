@@ -180,6 +180,23 @@ window.blocksLog = log;
 
 const touchFirst = !matchMedia('(hover: hover) and (pointer: fine)').matches;
 
+// Touch controls or a controller. The game draws its own on-screen controls
+// when it starts with Module.touchUI and has no way to change that while it
+// runs, so the bar's Touch / Controller button saves the world and opens it
+// again with the other choice (reopen).
+let inputMode = touchFirst ? 'touch' : 'pad';
+let startedMode = null;   // what the running game was started with
+const inputReady = import('../_shared/inputswap.js').then(({ inputSwap }) => {
+  $('inputBtn').hidden = false;
+  inputSwap({
+    id: 'blocks', button: $('inputBtn'), start: inputMode,
+    apply(mode) {
+      inputMode = mode;
+      if (ready && mode !== startedMode) reopen();
+    },
+  });
+}, () => {});
+
 // Canvas pixels per CSS pixel: 1, or every device pixel when Sharp
 const canvasScale = () => (settings.get('sharp', 'Normal') === 'Sharp' ? devicePixelRatio || 1 : 1);
 
@@ -206,7 +223,7 @@ function failed(message) {
 }
 $('failedOk').onclick = () => location.reload();
 
-function play(world, btn) {
+async function play(world, btn) {
   if (game) return;
   game = world;
   btn?.classList.add('busy');
@@ -217,6 +234,8 @@ function play(world, btn) {
   $('library').hidden = true;
   $('player').hidden = false;
   fitCanvas();
+  await inputReady;   // a pinned choice of controls, if there is one
+  startedMode = inputMode;
   const remember = line => {
     log.push(String(line));
     if (log.length > 200) log.shift();
@@ -242,7 +261,7 @@ function play(world, btn) {
     },
     texturePackUrl: 'data/textures.zip',
     soundUrl: name => `data/sounds/${name}.ogg`,
-    touchUI: touchFirst,
+    touchUI: startedMode === 'touch',
     // the game sizes its buttons and text by this
     canvasScale: canvasScale(),
     locateFile: path => `engine/${path}`,
@@ -268,7 +287,7 @@ function waitForStart(since) {
     ready = true;
     $('loading').hidden = true;
     $('canvas').focus();
-    if (touchFirst) hint('Drag to look around, use the arrows to walk', 5000);
+    if (startedMode === 'touch') hint('Drag to look around, use the arrows to walk', 5000);
     setInterval(save, AUTOSAVE_MS);
     navigator.storage?.persist?.().catch(() => {});   // so the browser doesn't clear the worlds to make room
     return;
@@ -313,6 +332,17 @@ async function leave() {
   location.reload();
 }
 $('quitBtn').onclick = () => leave();
+
+// The other controls: the world is saved, and opened again once the page
+// has reloaded with the new choice
+async function reopen() {
+  if (leaving) return;
+  leaving = true;
+  loading(game.name, inputMode === 'touch' ? 'Opening with touch controls…' : 'Opening for a controller…');
+  if (save()) await flush();
+  try { sessionStorage.setItem('blocks.reopen', game.name); } catch {}
+  location.reload();
+}
 
 // ---------- sound ----------
 
@@ -389,6 +419,12 @@ if (parent !== window) parent.postMessage({ frunk: 'save-on-close' }, '*');
 
 addEventListener('error', e => { if (game && !ready) failed(`The game stopped: ${e.message}`); });
 
-renderLibrary();
+renderLibrary().then(() => {
+  // Back from swapping the controls: straight into the same world
+  let name = null;
+  try { name = sessionStorage.getItem('blocks.reopen'); sessionStorage.removeItem('blocks.reopen'); } catch {}
+  const world = name && worlds.find(w => w.name === name);
+  if (world) play({ name: world.name, path: world.path });
+});
 import('../_shared/gamepage.js').then(m => m.padMenu(), () => {});
 })();

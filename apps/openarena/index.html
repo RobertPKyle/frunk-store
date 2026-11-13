@@ -64,9 +64,10 @@
   #canvas { position: absolute; inset: 0; display: block; width: 100% !important; height: 100% !important; background: #000; outline: none; }
   /* On-screen controls, over the game: a finger anywhere on it (but the
      buttons) turns and looks, the stick walks, and the buttons fire, jump,
-     zoom and change weapons. In menus, taps go to the game's own buttons. */
+     zoom and change weapons. In menus, taps go to the game's own buttons,
+     with a controller as well (the layer shows nothing there). */
   #touch { position: absolute; inset: 0; }
-  #player.mouse #touch, #player.pad #touch, #player.menu #touch .play, #player.wait #touch .play { display: none; }
+  #player.mouse #touch, #player.pad:not(.menu) #touch, #player.menu #touch .play, #player.wait #touch .play { display: none; }
   .side { position: absolute; bottom: 84px; display: flex; flex-direction: column; align-items: center; gap: 12px; }
   .side.left { left: 14px; }
   .side.right { right: 14px; }
@@ -109,7 +110,7 @@
     <p class="note">Free for all: the first to 15 frags, or the most after 10 minutes, wins, then the arena starts over.</p>
 
     <div class="legal">
-      <p>Controls: on the screen, the stick walks and steps sideways, a finger dragged anywhere else turns and looks, FIRE shoots (and turns too, if you drag it; it also brings you back after you're fragged), JUMP jumps, ZOOM zooms while held, and ‹ › change weapons. Menu opens the game's menu, where you tap its buttons. On a controller: left stick to walk, right stick to turn and look (with no right stick, the D-pad and stick turn left and right), L and R to step sideways, the right face button or right trigger to fire, the bottom face button or left trigger to jump, the other two face buttons to change weapons, Start for the menu and Select for the scores. A keyboard and mouse work too (click the game to look with the mouse).</p>
+      <p>Controls: on the screen, the stick walks and steps sideways, a finger dragged anywhere else turns and looks, FIRE shoots (and turns too, if you drag it; it also brings you back after you're fragged), JUMP jumps, ZOOM zooms while held, and ‹ › change weapons. Menu opens the game's menu, where you tap its buttons. On a controller: left stick to walk, right stick to turn and look (with no right stick, the D-pad and stick turn left and right), L and R to step sideways, the right face button or right trigger to fire, the bottom face button or left trigger to jump, the other two face buttons to change weapons, Start for the menu and Select for the scores. A keyboard and mouse work too (click the game to look with the mouse). The on-screen controls hide while a controller is in use; touch the screen to bring them back, or pick one for good with the Touch / Controller button at the top.</p>
       <p>Engine: ioquake3 (GNU GPL 2 or later), compiled to WebAssembly with small changes for the browser. Source: /openarena/engine/ioq3-87a99d18206e-web-src.tar.gz, with the changes in /openarena/engine/ioq3-web.patch, built by tools/build-openarena.mjs in github.com/RobertPKyle/frunk-store; see /openarena/NOTICE. Game: OpenArena 0.8.8 by the OpenArena team and contributors (GNU GPL 2 or later; see /openarena/data/COPYING and CREDITS), repacked for downloading; the source of its game code is /openarena/data/openarena-0.8.8-gamecode-src.tar.xz.</p>
       <p>OpenArena and frunk.store are not affiliated with or endorsed by id Software, Bethesda, ZeniMax or Microsoft. QUAKE is a trademark of ZeniMax Media. Cartoon violence. Play only while parked.</p>
     </div>
@@ -135,6 +136,7 @@
     <b id="title"></b>
     <button id="fps" type="button" tabindex="-1"></button>
     <button class="btn" id="menuBtn" type="button">Menu</button>
+    <button class="btn" id="inputBtn" type="button"></button>
     <button class="btn" id="soundBtn" type="button">Sound on</button>
     <button class="btn" id="quitBtn" type="button">Arenas</button>
   </div>

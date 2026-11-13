@@ -6,6 +6,7 @@
 
 import { fetchPackage, padMenu, reason } from '../_shared/gamepage.js';
 import { mbOf } from '../_shared/engine.js';
+import { inputSwap } from '../_shared/inputswap.js';
 
 const $ = id => document.getElementById(id);
 const settings = {
@@ -68,9 +69,46 @@ navigator.getGamepads = () => {
 };
 function pollPads() {
   requestAnimationFrame(pollPads);
-  if (!running || !$('padNote').hidden) return;
-  if (navigator.getGamepads().some(p => p?.buttons.some(b => b.pressed))) $('padNote').hidden = false;
+  if (!running) return;
+  if (navigator.getGamepads().some(p => p?.buttons.some(b => b.pressed))) {
+    buttonsOff = true;   // the game hides its on-screen buttons at any controller button
+    input.auto('pad');
+  }
 }
+
+// ---------- touch or controller ----------
+
+// The game draws its own on-screen buttons into the picture, and switches
+// them itself: a touch in a level shows them, a controller button hides them.
+// It reads only the starting state from the page (Module.rocksTouch), and
+// nothing else of its can be set from here without a new build of the
+// engine. So the bar's button sets how the next start begins, and in
+// controller mode, once a controller press has hidden the buttons, touches in
+// a level are kept from the game so they can't bring them back; the browser
+// still turns a tap into a click, so the side panel's buttons work. In touch
+// mode a controller press still hides them until the next touch.
+let buttonsOff = !touchFirst;   // the game's on-screen buttons are hidden, as far as the page can tell
+function explain(mode) {
+  $('inputBtn').title = mode === 'pad'
+    ? 'Controller: the game\'s on-screen buttons go at the next controller press, and touches don\'t bring them back. Tap to swap to touch controls.'
+    : 'Touch controls: the game\'s on-screen buttons show at the next touch in a level (a controller press hides them until then). Tap to swap to a controller.';
+}
+const input = inputSwap({ id: 'rocks', button: $('inputBtn'), start: touchFirst ? 'touch' : 'pad', apply: explain });
+
+const kept = new Set();   // touches kept from the game, by finger
+function screenTouch(e) {
+  const fingers = [...e.changedTouches];
+  if (e.type === 'touchstart') {
+    input.auto('touch');
+    const playing = running && game?._web_state?.() === 2;
+    if (input.mode === 'pad' && buttonsOff && playing) for (const t of fingers) kept.add(t.identifier);
+    else if (playing) buttonsOff = false;
+  }
+  if (fingers.length && fingers.every(t => kept.has(t.identifier))) e.stopPropagation();
+  if (e.type === 'touchend' || e.type === 'touchcancel') for (const t of fingers) kept.delete(t.identifier);
+}
+// on the way down to the canvas, where the game listens
+for (const type of ['touchstart', 'touchmove', 'touchend', 'touchcancel']) $('screen').addEventListener(type, screenTouch, { capture: true });
 pollPads();
 
 // ---------- sound ----------
@@ -183,7 +221,7 @@ async function play() {
     await new Promise((resolve, reject) => {
       window.Module = game = {
         canvas,
-        rocksTouch: touchFirst,
+        rocksTouch: input.mode === 'touch',
         locateFile: path => ENGINE + path,
         getPreloadedPackage: () => { const p = pack; pack = null; return p; },
         print: line => { if (window.rocksDebug) console.log(line); },
@@ -194,6 +232,7 @@ async function play() {
       loadScript(ENGINE + 'rocksndiamonds.data.js').then(() => loadScript(ENGINE + 'rocksndiamonds.js')).catch(reject);
     });
     running = true;
+    buttonsOff = !game.rocksTouch;
     engineStart = performance.now();
     game.callMain([]);
     $('loading').hidden = true;

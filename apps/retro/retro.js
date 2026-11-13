@@ -12,6 +12,7 @@
 // (nes.js, gba.js, sms.js, lynx.js, pce.js, md.js or n64.js) as sets of button
 // names, plus the players' analog sticks for the N64.
 
+import { inputSwap } from '../_shared/inputswap.js';
 import { padMenu } from '../_shared/padmenu.js';
 import { phonePanel } from '../_shared/phone.js';
 import { MAX_FILE, SYSTEMS, cleanName, findGame, isColor, maybeGame } from '../_shared/roms.js';
@@ -363,14 +364,9 @@ function readPad(p, out) {
 }
 
 // While a controller is in use, the on-screen buttons are hidden and the
-// game gets their room; touching the screen brings them back
+// game gets their room; touching the screen brings them back. The bar's
+// Touch / Controller button (input, set up below fit) can pin either one.
 let padMode = false;
-function setPadMode(on) {
-  if (on === padMode) return;
-  padMode = on;
-  $('player').classList.toggle('pad', on);
-  fit();
-}
 
 const readPads = () => padsToPlayers([...(navigator.getGamepads ? navigator.getGamepads() : [])].filter(Boolean));
 
@@ -399,7 +395,7 @@ function readInput() {
     }
   }
   pads.forEach((set, i) => { for (const b of set) now[i].add(b); });
-  if (pads.some(set => set.size)) setPadMode(true);
+  if (pads.some(set => set.size)) input.auto('pad');
   const combo = pads[0].has('select') && pads[0].has('start');
   if (combo && !padCombo) setPaused(true);
   padCombo = combo;
@@ -463,7 +459,7 @@ function buttonAt(e) {
 }
 
 function onPointer(e) {
-  if (e.type === 'pointerdown' && !e.target.closest('.bar')) setPadMode(false);
+  if (e.type === 'pointerdown' && !e.target.closest('.bar')) input.auto('touch');
   if (e.type === 'pointerdown') {
     if (e.target.closest('#dpad')) touch.set(e.pointerId, { dpad: true, held: dpadDirs(e), vec: dpadVec(e) });
     else if (e.target.closest('#player [data-b]')) touch.set(e.pointerId, { held: buttonAt(e) });
@@ -594,6 +590,17 @@ function fit() {
   core.canvas.style.height = `${Math.round(h * s)}px`;
 }
 addEventListener('resize', fit);
+
+// One choice for every console: the on-screen buttons, or a controller with
+// the game taking their room
+const input = inputSwap({
+  id: 'retro', button: $('inputBtn'), start: 'touch',
+  apply: mode => {
+    padMode = mode === 'pad';
+    $('player').classList.toggle('pad', padMode);
+    fit();
+  },
+});
 
 // Pausing saves the game's progress; returns when it's saved
 function setPaused(p) {

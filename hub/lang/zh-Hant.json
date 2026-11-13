@@ -67,6 +67,9 @@
     "searchLabel": "搜尋 App",
     "searchClear": "清除搜尋",
     "searchNone": "沒有符合「{query}」的 App。",
+    "inputTouch": "觸控",
+    "inputController": "建議用控制器",
+    "inputBoth": "觸控或控制器",
     "slowLoad": "仍在載入，訊號較弱時可能會比較慢。"
   },
   "tags": {

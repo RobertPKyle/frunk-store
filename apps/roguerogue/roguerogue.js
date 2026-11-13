@@ -4,6 +4,7 @@
 // one per player. High scores are upstream's, in localStorage.
 
 import { padMenu, secondTap } from '../_shared/gamepage.js';
+import { inputSwap } from '../_shared/inputswap.js';
 
 (() => {
 
@@ -55,22 +56,6 @@ navigator.getGamepads = () => {
   });
 };
 
-// A press on a controller hides the touch buttons and gives the picture the
-// room; a finger on the screen brings them back.
-function setPadMode(on) {
-  if (document.body.classList.contains('pad') === on) return;
-  document.body.classList.toggle('pad', on);
-  layout();
-}
-function pollPads() {
-  requestAnimationFrame(pollPads);
-  if (!running || document.body.classList.contains('pad')) return;
-  if (navigator.getGamepads().some(p => p.buttons.some(b => b.pressed) || p.axes.some(v => Math.abs(v) > 0.5))) setPadMode(true);
-}
-pollPads();
-addEventListener('pointerdown', e => { if (e.pointerType === 'touch' && running) setPadMode(false); }, true);
-document.body.classList.toggle('pad', !touchFirst);
-
 // ---------- touch ----------
 
 // What the game reads for player one each frame. One finger can slide from
@@ -114,11 +99,33 @@ for (const col of [$('leftCol'), $('rightCol')]) {
   col.addEventListener('contextmenu', e => e.preventDefault());
 }
 
+// ---------- touch or controller ----------
+
+// A press on a controller hides the touch buttons and gives the picture the
+// room; a finger on the screen brings them back. Once the player picks one on
+// the swap button, only the button changes it.
+const input = inputSwap({
+  id: 'roguerogue', button: $('inputBtn'), start: touchFirst ? 'touch' : 'pad',
+  apply: mode => {
+    document.body.classList.toggle('pad', mode === 'pad');
+    // a finger on a button as they go would hold it down
+    if (mode === 'pad' && fingers.size) { fingers.clear(); refresh(); }
+    layout();
+  },
+});
+function pollPads() {
+  requestAnimationFrame(pollPads);
+  if (!running || input.mode === 'pad') return;
+  if (navigator.getGamepads().some(p => p.buttons.some(b => b.pressed) || p.axes.some(v => Math.abs(v) > 0.5))) input.auto('pad');
+}
+pollPads();
+addEventListener('pointerdown', e => { if (e.pointerType === 'touch' && running) input.auto('touch'); }, true);
+
 // ---------- picture ----------
 
 // Whole device pixels per game pixel keep the art crisp. With touch buttons
 // the columns at the sides are theirs; with a controller only the left column
-// is kept, for the hub's Apps button and Sound and Quit.
+// is kept, for the hub's Apps button and the buttons below it.
 function layout() {
   if (!canvas) return;
   const stage = $('stage').getBoundingClientRect();

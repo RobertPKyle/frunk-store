@@ -67,7 +67,8 @@
   .bar b { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .screen { grid-column: 2; grid-row: 2; position: relative; min-width: 0; min-height: 0; }
   /* the canvas must have no border or padding, or the game's touches land off */
-  #canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; border: 0; padding: 0; background: #000; outline: none; }
+  /* MAME keeps the size it started at: after a swap between touch controls and a controller the picture keeps its shape, not stretched to the new room */
+  #canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; border: 0; padding: 0; background: #000; outline: none; object-fit: contain; }
   .side { grid-row: 2; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; padding: 6px; }
   .side.left { grid-column: 1; }
   .side.right { grid-column: 3; }
@@ -125,7 +126,7 @@
       <div class="games" id="others"></div>
     </div>
     <div class="legal">
-      <p>Controls on the screen: the pad moves (or turns a dial, paddle or trackball), the round buttons are the game's buttons, Coin puts in a credit and Start starts. With a controller: D-pad or stick moves, the face buttons are buttons 1 to 4, Select puts in a coin and Start starts. On a keyboard: arrows, Ctrl, Alt, Space and Shift for buttons 1 to 4, 5 for a coin and 1 to start. Games keep their high scores and settings on this car where the game saves them.</p>
+      <p>Controls on the screen: the pad moves (or turns a dial, paddle or trackball), the round buttons are the game's buttons, Coin puts in a credit and Start starts. With a controller: D-pad or stick moves, the face buttons are buttons 1 to 4, Select puts in a coin and Start starts, and the on-screen controls hide to make the game bigger. The Touch / Controller button at the top swaps them. On a keyboard: arrows, Ctrl, Alt, Space and Shift for buttons 1 to 4, 5 for a coin and 1 to start. Games keep their high scores and settings on this car where the game saves them.</p>
       <p>Emulator: MAME 0.289 by the MAMEdev team and contributors (GNU GPL 2 or later), with only these games' drivers, compiled to WebAssembly with small changes for this page: /arcade/engine/mame-web.patch, built by tools/build-mame.mjs in github.com/RobertPKyle/frunk-store; the source is /arcade/engine/mame-0.289-web-src.tar.xz. See /arcade/NOTICE.</p>
       <p>The games: their ROM images are released for free, non-commercial use by their owners through mamedev.org (www.mamedev.org/roms), and are never stored or passed on by frunk.store; you download them from mamedev.org yourself. MAME is a trademark of MAMEdev.org; frunk.store is not affiliated with or endorsed by MAMEdev or the games' owners. Play only while parked.</p>
     </div>
@@ -166,6 +167,7 @@
   <div class="bar">
     <b id="title"></b>
     <button class="btn" id="soundBtn" type="button">Sound on</button>
+    <button class="btn" id="inputBtn" type="button"></button>
     <button class="btn" id="quitBtn" type="button">Games</button>
   </div>
   <div class="side left">

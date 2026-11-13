@@ -67,6 +67,9 @@
     "searchLabel": "Apps suchen",
     "searchClear": "Suche löschen",
     "searchNone": "Keine App passt zu „{query}“.",
+    "inputTouch": "Touch",
+    "inputController": "Am besten mit Controller",
+    "inputBoth": "Touch oder Controller",
     "slowLoad": "Lädt noch. Bei schwachem Empfang kann das dauern."
   },
   "tags": {
