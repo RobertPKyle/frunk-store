@@ -7,6 +7,8 @@
     "fullscreenBlocked": "無法開啟全螢幕",
     "title": "為你的車用瀏覽器打造的 App",
     "lede": "停車時可以在中控螢幕上使用的遊戲與工具。",
+    "partnersTitle": "Frunk.store 合作夥伴",
+    "partnerVisit": "造訪 {site}",
     "recentLabel": "最近使用",
     "filtersLabel": "顯示",
     "filterAll": "全部",
@@ -86,6 +88,7 @@
     "SIMD": "SIMD"
   },
   "apps": {
+    "fatmusic": { "tagline": "沒有中間商的獨立音樂。", "about": "發現新的獨立音樂人，直接支持他們，並在 The Show Box 觀看現場演出。每首歌都可免費試聽 60 秒。" },
     "brain": { "name": "大腦測試", "tagline": "你的 Tesla 有多聰明？用 20 秒測試車上電腦，和其他 Tesla、手機與電腦一較高下。" },
     "breakout": { "name": "打磚塊", "tagline": "經典的擋板遊戲。拖曳移動擋板，點一下發球。" },
     "fractal": { "name": "碎形探索", "tagline": "多執行緒 WebAssembly 曼德博集合。用兩指縮放。" },

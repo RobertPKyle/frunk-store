@@ -7,6 +7,8 @@
     "fullscreenBlocked": "Fullskjerm blokkert",
     "title": "Apper for nettleseren i bilen din",
     "lede": "Spill og verktøy laget for midtskjermen mens du står parkert.",
+    "partnersTitle": "Frunk.store-partnere",
+    "partnerVisit": "Besøk {site}",
     "recentLabel": "Nylig brukt",
     "filtersLabel": "Vis",
     "filterAll": "Alle",
@@ -86,6 +88,7 @@
     "SIMD": "SIMD"
   },
   "apps": {
+    "fatmusic": { "tagline": "Uavhengig musikk uten mellomledd.", "about": "Oppdag nye uavhengige artister, støtt dem direkte og se livekonserter i The Show Box. Hver låt har en gratis forhåndsvisning på 60 sekunder." },
     "brain": { "name": "Hjernetest", "tagline": "Hvor smart er Teslaen din? En test på 20 sekunder av bilens datamaskin, rangert mot andre Teslaer, telefoner og PC-er." },
     "breakout": { "tagline": "Klassisk racketspill. Dra for å flytte, trykk for å sende ut ballen." },
     "fractal": { "name": "Fraktalutforsker", "tagline": "Mandelbrot i WebAssembly på flere tråder. Knip for å zoome." },

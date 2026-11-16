@@ -7,6 +7,8 @@
     "fullscreenBlocked": "无法全屏",
     "title": "为你的车载浏览器打造的应用",
     "lede": "停车时可以在中控屏幕上使用的游戏和工具。",
+    "partnersTitle": "Frunk.store 合作伙伴",
+    "partnerVisit": "访问 {site}",
     "recentLabel": "最近使用",
     "filtersLabel": "显示",
     "filterAll": "全部",
@@ -86,6 +88,7 @@
     "SIMD": "SIMD"
   },
   "apps": {
+    "fatmusic": { "tagline": "没有中间商的独立音乐。", "about": "发现新的独立音乐人，直接支持他们，并在 The Show Box 观看现场演出。每首歌都可免费试听 60 秒。" },
     "brain": { "name": "大脑测试", "tagline": "你的 Tesla 有多聪明？用 20 秒测试车载电脑，和其他 Tesla、手机与电脑一比高下。" },
     "breakout": { "name": "打砖块", "tagline": "经典的挡板游戏。拖动移动挡板，点一下发球。" },
     "fractal": { "name": "分形探索", "tagline": "多线程 WebAssembly 曼德博集合。用两指缩放。" },

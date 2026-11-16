@@ -74,6 +74,23 @@ await check('hub lists every catalog app', async () => {
   await page.screenshot({ path: shots + 'hub.png' });
 });
 
+await check('hub partners sit on top and link out', async () => {
+  await page.goto(base + '/');
+  await page.waitForSelector('#partners .partner');
+  const partners = (await (await fetch(base + '/catalog.json')).json()).partners ?? [];
+  const links = await page.locator('#partners .partner').evaluateAll(cards => cards.map(a => [a.dataset.partner, a.href, a.target, a.querySelector('img').naturalWidth]));
+  if (links.length !== partners.length) throw new Error(`expected ${partners.length} partners, got ${links.length}`);
+  for (const [i, [id, href, target, width]] of links.entries()) {
+    if (id !== partners[i].id || new URL(href).href !== new URL(partners[i].url).href) throw new Error(`partner ${id} links to ${href}`);
+    if (target !== '_blank') throw new Error(`partner ${id} doesn't open a new tab`);
+    if (!width) throw new Error(`partner ${id}'s icon didn't load`);
+  }
+  // first thing on the page, above the title
+  const above = await page.evaluate(() => document.getElementById('partners').getBoundingClientRect().bottom <= document.querySelector('h1').getBoundingClientRect().top);
+  if (!above) throw new Error('partners not above the title');
+  await page.screenshot({ path: shots + 'partners.png' });
+});
+
 await check('fractal renders with worker threads', async () => {
   await openFromHub(/Fractal Explorer/);
   const info = appFrame().locator('#info');

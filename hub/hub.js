@@ -5,6 +5,8 @@
 import { LANGS, EN_UI } from './i18n.js';
 
 const grid = document.getElementById('grid');
+const partnersBox = document.getElementById('partners');
+const partnerList = document.getElementById('partnerList');
 const recentRow = document.getElementById('recent');
 const filterRow = document.getElementById('filters');
 const toolbar = document.getElementById('toolbar');
@@ -62,6 +64,7 @@ let dict = en;
 const t = key => dict.ui[key] ?? en.ui[key];
 const appName = app => dict.apps[app.id]?.name ?? app.name;
 const appTagline = app => dict.apps[app.id]?.tagline ?? app.tagline;
+const partnerAbout = partner => dict.apps[partner.id]?.about ?? partner.about;
 const tagName = tag => dict.tags[tag] ?? tag;
 
 async function loadLang(code) {
@@ -98,6 +101,7 @@ function applyLang() {
   queryInput.placeholder = t('searchLabel');
   fsLabel();
   if (catalog) {
+    renderPartners();
     renderRecent();
     renderFilters();
     renderGrid();
@@ -123,6 +127,28 @@ function inputChip(app) {
   const chip = el('span', { class: 'tag input', 'data-input': app.input }, t(INPUT[app.input]));
   chip.insertAdjacentHTML('afterbegin', INPUT_ICONS[app.input]);
   return [chip];
+}
+
+// Partners: sites the store has teamed up with, in their own section at the
+// top of the page. They aren't apps run in the hub's frame: each card links
+// out to the partner's site, in a new tab. The icon is a hub file. A
+// language file translates a partner's tagline and "about" under "apps", by
+// its id, the way it does an app's.
+const OUT = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M9 7h8v8"/></svg>';
+function renderPartners() {
+  const partners = (catalog.partners ?? []).filter(p => /^https:\/\//.test(p.url));
+  partnersBox.hidden = !partners.length;
+  partnerList.replaceChildren(...partners.map(p => {
+    const go = el('span', { class: 'partner-go' }, t('partnerVisit').replace('{site}', new URL(p.url).host.replace(/^www\./, '')));
+    go.insertAdjacentHTML('beforeend', OUT);
+    return el('a', { class: 'partner', href: p.url, target: '_blank', rel: 'noopener', 'data-partner': p.id },
+      el('img', { src: p.icon, alt: '', width: 72, height: 72 }),
+      el('div', { class: 'partner-text' },
+        el('h3', {}, appName(p)),
+        el('p', { class: 'partner-tagline' }, appTagline(p)),
+        el('p', { class: 'partner-about' }, partnerAbout(p))),
+      go);
+  }));
 }
 
 // Apps marked unlisted aren't on the grid
@@ -369,7 +395,7 @@ if (document.documentElement.requestFullscreen) {
 // controller is read only while the hub itself is showing, never while an
 // app runs, so a game's input stays its own. The focused card is lit by
 // the .padnav class, since a ring from focus() alone isn't shown after a tap.
-const NAV = '#filters .chip, #recent .recent-app, #grid .card';
+const NAV = '#partners .partner, #filters .chip, #recent .recent-app, #grid .card';
 const DEAD = 0.5;          // stick travel before it counts as a direction
 const REPEAT = [400, 130]; // ms held before the first and the next repeats
 let padNav = false, lastNav = null;
@@ -521,6 +547,7 @@ async function init() {
     catalog = await res.json();
   } catch (e) {
     grid.replaceChildren();
+    partnersBox.hidden = true;
     err.hidden = false;
     err.textContent = t('catalogError').replace('{error}', e.message);
     retry = setTimeout(init, 10000);
@@ -531,6 +558,7 @@ async function init() {
   err.hidden = true;
   removeEventListener('online', init);
   appsOrigin = resolveAppsOrigin(catalog.appsOrigin);
+  renderPartners();
   renderRecent();
   renderFilters();
   renderGrid();

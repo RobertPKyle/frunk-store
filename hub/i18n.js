@@ -33,4 +33,5 @@ export const EN_UI = {
   inputTouch: 'Touch',
   inputController: 'Best with a controller',
   inputBoth: 'Touch or controller',
+  partnerVisit: 'Visit {site}',
 };

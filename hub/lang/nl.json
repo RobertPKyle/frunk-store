@@ -7,6 +7,8 @@
     "fullscreenBlocked": "Volledig scherm geblokkeerd",
     "title": "Apps voor de browser in je auto",
     "lede": "Games en tools voor het middenscherm, terwijl je geparkeerd staat.",
+    "partnersTitle": "Frunk.store-partners",
+    "partnerVisit": "Bezoek {site}",
     "recentLabel": "Recent gebruikt",
     "filtersLabel": "Toon",
     "filterAll": "Alle",
@@ -86,6 +88,7 @@
     "SIMD": "SIMD"
   },
   "apps": {
+    "fatmusic": { "tagline": "Onafhankelijke muziek zonder tussenpersoon.", "about": "Ontdek nieuwe onafhankelijke artiesten, steun ze rechtstreeks en kijk naar liveconcerten in The Show Box. Elk nummer heeft een gratis voorproefje van 60 seconden." },
     "brain": { "name": "Hersentest", "tagline": "Hoe slim is je Tesla? Een test van 20 seconden voor de computer van de auto, vergeleken met andere Tesla's, telefoons en pc's." },
     "breakout": { "tagline": "Klassiek batje-en-balspel. Sleep om te bewegen, tik om de bal weg te schieten." },
     "fractal": { "name": "Fractalverkenner", "tagline": "Mandelbrot in WebAssembly op meerdere threads. Knijp om te zoomen." },

@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <!-- FatMusic partner icon for the frunk.store hub, drawn after their FM mark -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1ec8d2"/>
+      <stop offset=".5" stop-color="#2742d8"/>
+      <stop offset="1" stop-color="#6c1fcb"/>
+    </linearGradient>
+    <radialGradient id="glow" cx=".08" cy=".96" r=".72">
+      <stop offset="0" stop-color="#36e352"/>
+      <stop offset="1" stop-color="#36e352" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="f" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#7dff74"/>
+      <stop offset="1" stop-color="#16b53a"/>
+    </linearGradient>
+    <linearGradient id="m" gradientUnits="userSpaceOnUse" x1="62" y1="0" x2="106" y2="0">
+      <stop offset="0" stop-color="#ffe01f"/>
+      <stop offset=".5" stop-color="#ff9f3a"/>
+      <stop offset="1" stop-color="#ff4fcb"/>
+    </linearGradient>
+  </defs>
+  <rect width="128" height="128" rx="28" fill="url(#bg)"/>
+  <rect width="128" height="128" rx="28" fill="url(#glow)"/>
+  <path d="M28 0h72a28 28 0 0 1 28 28v6C92 28 36 28 0 40V28A28 28 0 0 1 28 0z" fill="#fff" opacity=".13"/>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M27 92V37h24M27 64h18M66 92V37l18 31 18-31v55" stroke="#070d3a" stroke-opacity=".5" stroke-width="20" transform="translate(1 3)"/>
+    <path d="M27 92V37h24M27 64h18" stroke="url(#f)" stroke-width="14"/>
+    <path d="M66 92V37l18 31 18-31v55" stroke="url(#m)" stroke-width="14"/>
+  </g>
+</svg>

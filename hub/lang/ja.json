@@ -7,6 +7,8 @@
     "fullscreenBlocked": "全画面にできません",
     "title": "クルマのブラウザで使えるアプリ",
     "lede": "駐車中にセンターディスプレイで楽しめるゲームとツール。",
+    "partnersTitle": "Frunk.store パートナー",
+    "partnerVisit": "{site} を開く",
     "recentLabel": "最近使ったアプリ",
     "filtersLabel": "表示",
     "filterAll": "すべて",
@@ -86,6 +88,7 @@
     "SIMD": "SIMD"
   },
   "apps": {
+    "fatmusic": { "tagline": "仲介なしのインディーズ音楽。", "about": "新しいインディーズアーティストを見つけて直接応援し、The Show Box でライブを楽しめます。全曲 60 秒の無料試聴付き。" },
     "brain": { "name": "ブレインテスト", "tagline": "あなたのテスラの頭脳はどれくらい？ 車のコンピューターを20秒でテストし、他のテスラやスマホ、PCと比べます。" },
     "breakout": { "name": "ブロック崩し", "tagline": "定番のパドルゲーム。ドラッグで動かし、タップでボールを発射。" },
     "fractal": { "name": "フラクタル探索", "tagline": "マルチスレッドの WebAssembly で描くマンデルブロ集合。ピンチでズーム。" },

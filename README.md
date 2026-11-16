@@ -29,6 +29,16 @@ between chips and cards and A opens one (arrow keys and Enter do the same).
 The controller is read only while the hub itself is showing, never while an
 app runs.
 
+Partner sites get their own section, "Frunk.store partners", at the top of
+the hub, above the title. They come from `partners` in `hub/catalog.json`:
+`id`, `name`, `url` (https only), `icon` (a hub file, kept in
+`hub/partners/`), `tagline` and `about`. They aren't run in the hub's frame:
+each card links out to the partner's own site in a new tab. Language files
+translate a partner's tagline and `about` under `apps`, by its id, as they do
+an app's. To add a partner, add its entry and icon, and add the icon to
+`SHELL` in `hub/sw.js` so the hub still shows it offline. The first partner
+is FatMusic (fatmusic.ca), added 2026-11-15.
+
 The referral offer in the footer shows only in the Americas and Europe, going by
 the browser's time zone; a zone that says nothing (UTC) falls back on the
 language. The token addresses in the footer are hidden in the Chinese hub.
