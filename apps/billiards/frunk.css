@@ -1,0 +1,15 @@
+/* Billiards' game page: this site's changes over upstream's styles. */
+
+/* online only, or not for an app inside the hub's frame */
+#lobbyContainer, #fullscreen, #botDebugOverlay { display: none !important; }
+
+/* the ☰ menu's items: big enough for a finger */
+.menuItems .menuButton { flex: 0 0 46px; }
+#frunkGames { font-weight: 600; color: #111; }
+
+/* a controller's pick in a banner or the ☰ menu */
+.padlit { outline: 3px solid #fff; outline-offset: 2px; box-shadow: 0 0 0 6px rgba(47, 168, 102, .8) !important; }
+
+/* the hub's Apps button sits over the top left corner: keep the help panel's
+   close button clear of it */
+.about-panel { padding-top: 56px; }

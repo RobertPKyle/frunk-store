@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Billiards</title>
+<link rel="icon" href="icon.svg">
+<style>
+  :root { --bg: #0d1a14; --panel: #142a1f; --card: #1d3a2b; --line: rgba(200, 240, 215, .15); --text: #eef7f1; --muted: #a3bcae;
+          --accent: #e8c58a; --on: #2fa866; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 16px/1.4 system-ui, sans-serif; overflow: hidden;
+               -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  .btn { min-height: 44px; padding: 8px 16px; border-radius: 12px; background: var(--card); border: 1px solid var(--line); white-space: nowrap; }
+  .btn.primary { background: var(--accent); border-color: transparent; color: #241706; font-weight: 700; }
+  [hidden] { display: none !important; }
+
+  #start { display: flex; flex-direction: column; height: 100%; }
+  /* left padding keeps clear of the hub's Apps button */
+  header { display: flex; align-items: center; gap: 10px; min-height: 60px; padding: 8px 12px 8px 110px; border-bottom: 1px solid var(--line); }
+  header h1 { margin: 0; font-size: 18px; font-weight: 600; flex: 1; }
+  .scroll { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 14px 16px 20px; touch-action: pan-y; }
+  .hero { display: flex; gap: 16px; align-items: center; max-width: 760px; padding: 16px; border-radius: 16px; background: var(--panel); border: 1px solid var(--line); }
+  .hero img { width: 84px; height: 84px; flex: none; }
+  .hero p { margin: 0; color: #d9ebe0; }
+  h2 { margin: 18px 2px 8px; font-size: 15px; }
+
+  .seg { display: flex; flex-wrap: wrap; gap: 8px; }
+  .seg button { min-height: 48px; padding: 6px 16px; border-radius: 12px; background: var(--card); border: 1px solid var(--line); text-align: left; line-height: 1.2; }
+  .seg button small { display: block; color: var(--muted); font-size: 12px; }
+  .seg button[aria-pressed="true"] { background: var(--on); border-color: transparent; color: #fff; }
+  .seg button[aria-pressed="true"] small { color: #e2f5ea; }
+
+  .games { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; max-width: 980px; }
+  .game { display: flex; gap: 12px; align-items: center; min-height: 76px; padding: 10px 14px; border-radius: 14px; background: var(--panel);
+          border: 1px solid var(--line); text-align: left; }
+  .game:active { background: var(--card); }
+  .game b { display: block; font-size: 16px; }
+  .game span { display: block; color: var(--muted); font-size: 13px; line-height: 1.3; }
+  .game i { flex: none; width: 40px; height: 40px; border-radius: 50%; box-shadow: inset -5px -6px 10px rgba(0, 0, 0, .45), inset 4px 4px 8px rgba(255, 255, 255, .35); }
+  .game.last { border-color: var(--accent); }
+
+  table.keys { border-collapse: collapse; font-size: 13px; color: var(--muted); margin: 4px 2px; }
+  table.keys th, table.keys td { text-align: left; padding: 3px 14px 3px 0; vertical-align: top; }
+  table.keys th { color: var(--text); font-weight: 600; }
+  .note { font-size: 13px; color: var(--muted); margin: 6px 2px; max-width: 60em; }
+  .legal { margin-top: 18px; font-size: 12px; color: var(--muted); user-select: text; -webkit-user-select: text; max-width: 60em; }
+  .legal p { margin: 4px 0; overflow-wrap: anywhere; }
+</style>
+</head>
+<body>
+<section id="start">
+  <header>
+    <h1>Billiards</h1>
+    <button class="btn primary" id="play" type="button">Play</button>
+  </header>
+  <div class="scroll">
+    <div class="hero">
+      <img src="icon.svg" alt="">
+      <p>Pool, snooker and three-cushion on a 3D table, with real spin, throw and cushion bounces. Play the computer, or have the table to yourself and practise.</p>
+    </div>
+
+    <h2>Opponent</h2>
+    <div class="seg" id="opponents">
+      <button type="button" data-bot="ClawBreak">Computer: easy<small>ClawBreak</small></button>
+      <button type="button" data-bot="TheFarJaw">Computer: hard<small>TheFarJaw</small></button>
+      <button type="button" data-bot="">No opponent<small>Practise on your own</small></button>
+    </div>
+
+    <h2>Game</h2>
+    <div class="games" id="games">
+      <button class="game" type="button" data-rules="eightball"><i style="background:#111"></i><span><b>8-ball</b><span>Solids or stripes, then the black.</span></span></button>
+      <button class="game" type="button" data-rules="nineball"><i style="background:#f2c418"></i><span><b>9-ball</b><span>Hit the lowest ball first. Pot the 9 to win.</span></span></button>
+      <button class="game" type="button" data-rules="snooker"><i style="background:#c8231b"></i><span><b>Snooker</b><span>15 reds and the colours on a full-size table.</span></span></button>
+      <button class="game" type="button" data-rules="snooker" data-reds="6"><i style="background:#e05a9c"></i><span><b>Six-red snooker</b><span>The quick game: 6 reds.</span></span></button>
+      <button class="game" type="button" data-rules="threecushion"><i style="background:#f4f1e6"></i><span><b>Three-cushion</b><span>No pockets: hit both balls, three cushions first.</span></span></button>
+    </div>
+
+    <h2>Controls</h2>
+    <table class="keys">
+      <tr><th></th><th>Touch</th><th>Controller</th></tr>
+      <tr><td>Aim</td><td>Drag across the table (near the top for fine aim)</td><td>Left stick or D-pad; bumpers for fine aim</td></tr>
+      <tr><td>Power</td><td>Slide the cue at the bottom</td><td>Hold the bottom or right button</td></tr>
+      <tr><td>Shoot</td><td>Hit</td><td>Let go of that button</td></tr>
+      <tr><td>Spin</td><td>Tap a point on the cue ball, bottom left</td><td>Right stick</td></tr>
+      <tr><td>Ball in hand</td><td>Drag the ball, then Place Ball</td><td>Stick left or right, then the bottom or right button</td></tr>
+      <tr><td>Camera</td><td>Camera button, bottom right</td><td>Left or top button</td></tr>
+      <tr><td>Zoom</td><td>Drag up or down on the table</td><td>Triggers</td></tr>
+      <tr><td>Menu</td><td>☰, bottom right</td><td>Start</td></tr>
+    </table>
+    <p class="note">The ☰ menu has Games, to pick another game, and the full controls. Play only while parked.</p>
+
+    <div class="legal">
+      <p>Billiards by tailuge (Luke), GNU GPL 3.0, with changes for this site that take out the online lobby, scores and links: tools/billiards/billiards-web.patch and tools/build-billiards.mjs in github.com/RobertPKyle/frunk-store. Original at github.com/tailuge/billiards. The sounds are this site's own. Exo font by Natanael Gama (SIL Open Font License). See /billiards/NOTICE.</p>
+      <p>frunk.store is not affiliated with or endorsed by the game's author.</p>
+    </div>
+  </div>
+</section>
+
+<script type="module" src="billiards.js"></script>
+<script src="/sw-register.js"></script>
+</body>
+</html>

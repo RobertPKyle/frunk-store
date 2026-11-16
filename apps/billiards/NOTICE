@@ -1,0 +1,39 @@
+Billiards (apps/billiards)
+
+Game (game/)
+  Billiards, (C) tailuge (Luke) and the contributors to
+  https://github.com/tailuge/billiards.
+  License: GNU General Public License, version 3 (game/LICENSE). The table
+  models are the author's own Blender files, under the same license.
+  Source: https://github.com/tailuge/billiards, commit
+  8aeb1dee14e7dccf71b47cdf6f68fc33e5f6459b, with frunk.store's changes for this
+  site in game/billiards-web.patch (also tools/billiards/billiards-web.patch in
+  https://github.com/RobertPKyle/frunk-store, whose tools/build-billiards.mjs
+  builds it). The source the build came from, with the models' Blender files,
+  is game/billiards-8aeb1dee14e7-web-src.tar.gz.
+  The changes: nothing online (no lobby or presence, no usage pings, no
+  match-result uploads, no link shortener, no high-score links); the game-over
+  "Back to Lobby" button is "Menu" and opens this app's game list; the page is
+  trimmed to the game and its controls help; the Exo font comes from this
+  site; the sounds are this site's own; the three-cushion table has plain
+  cloth instead of a cloth photo whose source isn't stated.
+
+Libraries (built into game/billiards.js)
+  three.js 0.187.0, MIT license, (C) 2010-2026 three.js authors.
+  interact.js 1.10.28, MIT license, (C) 2012-present Taye Adeyemi.
+  fflate 0.8.3, MIT license, (C) 2026 Arjun Barrett.
+  JSONCrush 1.1.8, MIT license, (C) 2019 Frank Force.
+  @tailuge/messaging 1.48.0, GPL-3.0, by tailuge (its online code is never
+  started here).
+  Lit 3.3.3, BSD-3-Clause license, (C) 2017 Google LLC.
+  Their license texts are in game/THIRD-PARTY-LICENSES.txt.
+
+Font (game/fonts/)
+  Exo, (C) 2017 The Exo Project Authors (Natanael Gama), SIL Open Font
+  License 1.1 (game/fonts/OFL.txt).
+
+Sounds (game/sounds/)
+  Made by frunk.store from sine waves and noise (tools/billiards/sounds.mjs).
+
+Page
+  index.html, billiards.js, frunk.js, frunk.css and icon.svg: by frunk.store.

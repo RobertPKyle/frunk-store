@@ -1,0 +1,12 @@
+{
+  "name": "billiards-deps",
+  "private": true,
+  "description": "Billiards' runtime libraries at the versions upstream's yarn.lock pins (see tools/build-billiards.mjs)",
+  "dependencies": {
+    "@tailuge/messaging": "1.48.0",
+    "fflate": "0.8.3",
+    "interactjs": "1.10.28",
+    "jsoncrush": "1.1.8",
+    "three": "0.187.0"
+  }
+}

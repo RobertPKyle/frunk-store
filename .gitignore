@@ -125,3 +125,5 @@ tools/.rocks-build
 apps/rocks/engine
 tools/.sopwith-build
 apps/sopwith/engine
+tools/.billiards-build
+apps/billiards/game

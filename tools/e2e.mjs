@@ -4593,6 +4593,65 @@ await check('sopwith starts by touch, ends a game and picks menus by controller'
   await until('a level by controller', s => s.screen === 2 && s.padSeen);
 });
 
+await check('billiards plays 8-ball by touch and controller with nothing from other sites, and goes back to its games', async () => {
+  await openFromHub(/^Billiards$/);
+  const frame = () => page.frames().find(f => f.url().includes('/billiards/'));
+  const app = appFrame();
+  const outside = [];
+  const watch = r => { let f; try { f = r.frame(); } catch { return; } if (f.url().includes('/billiards/') && !r.url().startsWith(new URL(frame().url()).origin) && !/^(data|blob):/.test(r.url())) outside.push(r.url()); };
+  page.on('request', watch);
+  try {
+    await app.locator('#opponents button[data-bot="ClawBreak"]').tap();
+    await app.locator('.game[data-rules="eightball"]').tap();
+    await frame().waitForFunction(() => window.container?.table, null, { timeout: 30000 });
+    if (!/\/billiards\/game\/\?ruletype=eightball&userName=You&bot=ClawBreak&shotClock=60$/.test(frame().url())) throw new Error(`game page ${frame().url()}`);
+    const state = () => frame().evaluate(() => ({ controller: window.container.controller.constructor.name, angle: window.container.table.cue.aim.angle, moving: window.container.table.balls.some(b => b.inMotion()) }));
+    // touch: place the cue ball, then break
+    await page.waitForTimeout(1000);
+    await app.locator('#cueHit').tap();
+    await app.locator('#cueHit').filter({ hasText: 'Hit' }).waitFor();
+    const aiming = (await state()).controller;
+    await app.locator('#cueHit').tap();
+    for (const t = Date.now(); (await state()).controller === aiming; await page.waitForTimeout(100)) if (Date.now() - t > 5000) throw new Error('the break by touch did not happen');
+    // controller (the car's two pads): wait for the player's next turn or a
+    // ball in hand, turn the cue with the stick, hold B (the car's A) and let go
+    await frame().evaluate(carPads);
+    await frame().evaluate(() => dispatchEvent(new Event('gamepadconnected')));
+    for (const t = Date.now(); !(await app.locator('#cueHit').filter({ hasText: /Hit|Place/ }).isEnabled().catch(() => false)) || (await state()).moving; await page.waitForTimeout(250)) {
+      if (Date.now() - t > 90000) throw new Error(`no turn for the player: ${JSON.stringify(await state())}`);
+    }
+    await page.waitForTimeout(500);
+    if (/Place/.test(await app.locator('#cueHit').innerText())) await frame().evaluate(() => window.press(1));
+    await app.locator('#cueHit').filter({ hasText: 'Hit' }).waitFor();
+    const before = await state();
+    await frame().evaluate(() => { for (const p of window.fakePads) p.axes[0] = 1; });
+    await page.waitForTimeout(500);
+    await frame().evaluate(() => { for (const p of window.fakePads) p.axes[0] = 0; });
+    if (Math.abs((await state()).angle - before.angle) < 0.05) throw new Error('the stick did not turn the cue');
+    await frame().evaluate(() => window.hold(1, true));
+    await page.waitForTimeout(500);
+    await frame().evaluate(() => window.hold(1, false));
+    for (const t = Date.now(); (await state()).controller === before.controller; await page.waitForTimeout(100)) if (Date.now() - t > 5000) throw new Error('the controller shot did not happen');
+    // Games, in the ☰ menu, goes back to the list without a history entry,
+    // so the hub's Apps button still closes the app
+    await frame().evaluate(() => { window.fakePads = []; });
+    await app.locator('#menu').tap();
+    await app.locator('#frunkGames').tap();
+    await app.locator('.game[data-rules="eightball"].last').waitFor();
+    // Play starts the last game again (a page screenshot stops later taps
+    // into the frame arriving, so it comes last)
+    await app.locator('#play').tap();
+    await frame().waitForFunction(() => window.container?.table, null, { timeout: 30000 });
+    await page.waitForTimeout(1500);
+    await page.screenshot({ path: shots + 'billiards.png' });
+    if (outside.length) throw new Error(`requests to other sites: ${[...new Set(outside)].join(', ')}`);
+  } finally {
+    page.off('request', watch);
+  }
+  await page.click('#home');
+  await page.waitForSelector('#runner', { state: 'hidden', timeout: 5000 });
+});
+
 await check('logic puzzles lists every puzzle, plays solo by touch and keeps it when closed', async () => {
   await openFromHub(/Logic Puzzles/);
   const frame = () => page.frames().find(f => f.url().includes('/puzzles/'));

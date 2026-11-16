@@ -957,6 +957,16 @@ clear them to make room.
   `tools/sopwith/sopwith-web.patch`). The game's graphics and sounds are in its code, so there is
   no data file. The patch switches off the game's own touch strip and adds `web_*` calls; the page
   draws touch buttons beside the picture and reads controllers itself. See `apps/sopwith/NOTICE`.
+- `apps/billiards`: Billiards by tailuge (GPL-3.0; TypeScript and three.js), built by
+  `npm run build:billiards` (`tools/build-billiards.mjs`: a pinned commit and
+  `tools/billiards/billiards-web.patch`, bundled by esbuild with the library versions upstream's
+  yarn.lock pins, from `tools/billiards/deps/`). Everything online is patched out (lobby,
+  presence and usage pings, match-result uploads, link shortener, high-score links), and the
+  game-over Menu button opens the app's own game list in place. The sounds are made by
+  `tools/billiards/sounds.mjs`, since upstream's don't say where they came from. The start page
+  picks the game and the computer opponent; `frunk.js` adds a Games button to the game's menu, a
+  wake lock and a controller (it presses the game's keys). The build ships the patched source as
+  a tarball for the GPL. See `apps/billiards/NOTICE`.
 - `apps/supertux`: SuperTux 0.7.0 (GPL-3.0-or-later), compiled to
   WebAssembly by `npm run build:supertux` (`tools/build-supertux.mjs`: the
   release's source tarball checked against its SHA-256, plus

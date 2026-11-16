@@ -23,6 +23,7 @@
     "build:critter": "node tools/build-critter.mjs",
     "build:rocks": "node tools/build-rocks.mjs",
     "build:sopwith": "node tools/build-sopwith.mjs",
+    "build:billiards": "node tools/build-billiards.mjs",
     "build:neverball": "node tools/build-neverball.mjs",
     "build:stockfish": "node tools/build-stockfish.mjs",
     "build:mahjong": "node tools/build-mahjong.mjs",

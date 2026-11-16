@@ -134,6 +134,7 @@
     "critter": { "name": "Critical Mass", "tagline": "在這款 3D 街機射擊遊戲中抵禦太空蟲軍團:一波接一波的敵人、不斷增多的武器和前十名排行榜。支援觸控或手把。" },
     "rocks": { "name": "Rocks'n'Diamonds", "tagline": "挖掘鑽石、躲開落石、智取怪物,Holger Schemel 的經典益智遊戲:60 個教學關卡。支援觸控或手把。" },
     "sopwith": { "name": "Sopwith", "tagline": "1984 年的雙翼機經典遊戲:起飛、擊落敵機、轟炸敵方基地,再飛回機場加油。支援觸控或手把。" },
+    "billiards": { "name": "撞球", "tagline": "在 3D 球檯上打花式撞球、司諾克和三顆星，真實的旋轉與檯邊物理。和電腦對戰或獨自練習，用觸控操作。" },
     "neverball": { "name": "Neverball", "tagline": "傾斜地面讓球滾動，收集金幣，在時間結束前抵達終點。八組 3D 關卡，附高分榜和重播。支援觸控或手把。" },
     "neverputt": { "name": "Neverputt", "tagline": "來自 Neverball 專案的 3D 迷你高爾夫:九個球場、170 個球洞,最多四位玩家在同一螢幕上輪流擊球。支援觸控或手把。" },
     "supertux": { "tagline": "Tux 橫越冰雪島與根之森林的跳躍冒險，外加兩座獎勵島嶼：約一百個關卡。觸控或控制器皆可。" },
