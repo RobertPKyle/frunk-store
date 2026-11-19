@@ -54,14 +54,15 @@ button { font: inherit; color: inherit; cursor: pointer; }
 
 main { flex: 1; padding: 4px 24px 24px; max-width: 1100px; width: 100%; margin: 0 auto; }
 
-/* Partner sites, first on the page. Each card is a link out, with a
+/* Partner sites, first on the page, two small cards to a row so the apps
+   still show on the car's first screen. Each card is a link out, with a
    gradient edge so it doesn't read as one of the apps below. */
-.partners { margin: 4px 0 22px; }
+.partners { margin: 4px 0 18px; }
 .partners[hidden] { display: none; }
 .partners h2 { margin: 0 0 10px; font: 600 15px/1.2 "Unbounded", system-ui, sans-serif; letter-spacing: .01em; color: var(--accent); }
-.partner-list { display: grid; gap: 12px; }
+.partner-list { display: grid; gap: 10px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .partner {
-  display: flex; align-items: center; gap: 16px; min-height: 112px; padding: 16px 18px;
+  display: flex; align-items: center; gap: 12px; min-height: 84px; padding: 12px 14px;
   color: var(--text); text-decoration: none; border-radius: var(--radius); border: 1px solid transparent;
   background: linear-gradient(var(--card), var(--card)) padding-box,
               linear-gradient(115deg, var(--accent), #ff5fb8 50%, #6a5cff) border-box;
@@ -69,16 +70,17 @@ main { flex: 1; padding: 4px 24px 24px; max-width: 1100px; width: 100%; margin: 
 }
 .partner:active { transform: scale(.98); }
 @media (hover: hover) { .partner:hover { background: linear-gradient(var(--card-hover), var(--card-hover)) padding-box, linear-gradient(115deg, var(--accent), #ff5fb8 50%, #6a5cff) border-box; } }
-.partner img { flex: none; width: 72px; height: 72px; border-radius: 18px; }
+.partner img { flex: none; width: 56px; height: 56px; border-radius: 14px; }
 .partner-text { flex: 1; min-width: 0; }
-.partner h3 { margin: 0; font-size: 19px; }
-.partner-tagline { margin: 2px 0 0; font-size: 15px; font-weight: 600; color: #dfe4ec; }
-.partner-about { margin: 4px 0 0; font-size: 14px; color: var(--muted); }
-.partner-go {
-  flex: none; display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 8px 14px 8px 16px;
-  border-radius: 12px; background: var(--accent); color: #111418; font-size: 15px; font-weight: 700; white-space: nowrap;
+.partner h3 { margin: 0; font-size: 16px; line-height: 1.25; }
+.partner-tagline {
+  margin: 2px 0 0; font-size: 13px; line-height: 1.35; color: var(--muted);
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
 }
-.partner-skeleton { min-height: 112px; }
+/* the whole card is the link; this says where it goes */
+.partner-go { display: inline-flex; align-items: center; gap: 4px; margin-top: 4px; font-size: 13px; font-weight: 700; color: var(--accent); }
+.partner-go svg { width: 14px; height: 14px; }
+.partner-skeleton { min-height: 84px; }
 h1 { font-size: 30px; line-height: 1.15; margin: 8px 0 4px; letter-spacing: -0.02em; }
 .lede { color: var(--muted); margin: 0 0 20px; }
 
@@ -149,6 +151,10 @@ h1 { font-size: 30px; line-height: 1.15; margin: 8px 0 4px; letter-spacing: -0.0
 /* how the app plays best: touch, a controller, or either */
 .tag.input { display: inline-flex; align-items: center; gap: 4px; background: #2b2417; color: #ffd08a; }
 .tag.input svg { flex: none; }
+/* a partner's game, which opens in a new tab */
+.tag.partner-tag { display: inline-flex; align-items: center; gap: 3px; background: #2a1f33; color: #f0b8ff; }
+.tag.partner-tag svg { flex: none; width: 12px; height: 12px; }
+a.card { color: var(--text); text-decoration: none; }
 
 .skeleton { background: var(--card); border-radius: var(--radius); min-height: 190px; opacity: .5; }
 .error { color: #ff8a80; }
@@ -232,11 +238,10 @@ html:has(.runner:not([hidden])) { overflow: hidden; }
   .filters { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin: 0 -16px; padding: 0 16px; }
   .chip { flex: none; }
   .search { flex: none; max-width: none; margin-left: 0; }
-  /* the Visit button drops under the text, lined up with it */
-  .partner { flex-wrap: wrap; align-items: flex-start; gap: 12px 14px; padding: 14px; }
-  .partner img { width: 56px; height: 56px; border-radius: 14px; }
-  .partner-text { flex-basis: calc(100% - 70px); }
-  .partner-go { margin-left: 70px; }
+}
+/* a phone held upright: one partner card to a row */
+@media (max-width: 560px) {
+  .partner-list { grid-template-columns: minmax(0, 1fr); }
 }
 @media (prefers-reduced-motion: reduce) {
   .card, .partner, .spinner { transition: none; animation-duration: 2s; }

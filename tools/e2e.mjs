@@ -54,6 +54,8 @@ async function check(name, fn) {
     failed++; console.log(`FAIL ${name}\n     ${process.env.VERBOSE === "2" ? e.stack : process.env.VERBOSE ? e.message : e.message.split("\n")[0]}`); }
 }
 const appFrame = () => page.frameLocator('#frame');
+// what the hub's grid shows: the listed apps, then the partner games (partner entries with tags)
+const gridApps = catalog => [...catalog.apps.filter(app => !app.unlisted), ...(catalog.partners ?? []).filter(p => p.tags)];
 const dev = base.includes('localhost');
 const appsBase = dev ? 'http://127.0.0.1:5174' : 'https://frunk-apps.vercel.app';
 async function openFromHub(name) {
@@ -67,7 +69,7 @@ async function openFromHub(name) {
 await check('hub lists every catalog app', async () => {
   await page.goto(base + '/');
   await page.waitForSelector('.card');
-  const expected = (await (await fetch(base + '/catalog.json')).json()).apps.filter(app => !app.unlisted).length;
+  const expected = gridApps(await (await fetch(base + '/catalog.json')).json()).length;
   const n = await page.locator('.card').count();
   if (n !== expected) throw new Error(`expected ${expected} cards, got ${n}`);
   if (!(await page.evaluate(() => crossOriginIsolated))) throw new Error('hub not cross-origin isolated');
@@ -86,9 +88,19 @@ await check('hub partners sit on top and link out', async () => {
     if (!width) throw new Error(`partner ${id}'s icon didn't load`);
     if (!button.startsWith(partners[i].action === 'play' ? 'Play on' : 'Visit')) throw new Error(`partner ${id}'s button says "${button}"`);
   }
-  // first thing on the page, above the title
+  // first thing on the page, above the title, two to a row
   const above = await page.evaluate(() => document.getElementById('partners').getBoundingClientRect().bottom <= document.querySelector('h1').getBoundingClientRect().top);
   if (!above) throw new Error('partners not above the title');
+  const tops = await page.locator('#partners .partner').evaluateAll(cards => cards.map(a => a.getBoundingClientRect().top));
+  if (tops.length > 1 && tops[0] !== tops[1]) throw new Error(`partner cards not side by side: tops ${tops.join(', ')}`);
+  // partner games are on the grid too, linking out to the same page in a new tab
+  for (const p of partners.filter(p => p.tags)) {
+    const card = page.locator(`#grid .card[data-app="${p.id}"]`);
+    const [href, target, width, chip] = await card.evaluate(a => [a.href, a.target, a.querySelector('img').naturalWidth, a.querySelector('.partner-tag')?.textContent]);
+    if (new URL(href).href !== new URL(p.url).href || target !== '_blank') throw new Error(`grid card for ${p.id} links to ${href} (${target})`);
+    if (!width) throw new Error(`grid card for ${p.id}: icon didn't load`);
+    if (chip !== 'Partner') throw new Error(`grid card for ${p.id} not marked as a partner's`);
+  }
   await page.screenshot({ path: shots + 'partners.png' });
 });
 
@@ -175,16 +187,16 @@ await check('hub cards say whether an app plays best by touch or with a controll
   await page.goto(base + '/');
   await page.waitForSelector('#grid .card');
   const catalog = await (await fetch(base + '/catalog.json')).json();
-  const bad = catalog.apps.filter(app => !['touch', 'controller', 'both'].includes(app.input) || app.tags.some(tag => tag === 'Controller' || tag === 'Touch'));
+  const bad = gridApps(catalog).filter(app => !['touch', 'controller', 'both'].includes(app.input) || app.tags.some(tag => tag === 'Controller' || tag === 'Touch'));
   if (bad.length) throw new Error(`catalog input missing or old tags: ${bad.map(app => app.id).join(', ')}`);
   const labels = await page.locator('#grid .card').evaluateAll(cards => cards.map(card => [card.dataset.app, card.querySelector('.tag.input')?.textContent]));
   const want = { touch: 'Touch', controller: 'Best with a controller', both: 'Touch or controller' };
-  const wrong = labels.filter(([id, text]) => text !== want[catalog.apps.find(app => app.id === id).input]);
+  const wrong = labels.filter(([id, text]) => text !== want[gridApps(catalog).find(app => app.id === id).input]);
   if (wrong.length) throw new Error(`cards with the wrong label: ${wrong.map(w => w.join('=')).join(', ')}`);
   // a search finds them by the label (taglines may say it too, so only these are counted)
   await page.fill('#query', 'touch or controller');
   const found = await page.locator('#grid .card').evaluateAll(cards => cards.map(card => card.dataset.app));
-  const lost = catalog.apps.filter(app => app.input === 'both' && !app.unlisted && !found.includes(app.id));
+  const lost = gridApps(catalog).filter(app => app.input === 'both' && !found.includes(app.id));
   if (lost.length) throw new Error(`"touch or controller" misses ${lost.map(app => app.id).join(', ')}`);
   await page.fill('#query', '');
 });
@@ -291,6 +303,7 @@ await check('every language has every string', async () => {
       }
       for (const key of Object.keys(file.ui)) if (!(key in en)) problems.push(`${code}: unused ${key}`);
       for (const app of catalog.apps) if (!file.apps[app.id]?.tagline) problems.push(`${code}: no tagline for ${app.id}`);
+      for (const p of catalog.partners ?? []) if (!file.apps[p.id]?.tagline || !file.apps[p.id]?.about) problems.push(`${code}: no tagline or about for partner ${p.id}`);
       for (const tag of tags) if (!file.tags[tag]) problems.push(`${code}: no tag ${tag}`);
     }
     return problems;

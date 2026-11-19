@@ -35,4 +35,5 @@ export const EN_UI = {
   inputBoth: 'Touch or controller',
   partnerVisit: 'Visit {site}',
   partnerPlay: 'Play on {site}',
+  partnerTag: 'Partner',
 };

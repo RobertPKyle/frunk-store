@@ -33,7 +33,11 @@ Partner sites get their own section, "Frunk.store partners", at the top of
 the hub, above the title. They come from `partners` in `hub/catalog.json`:
 `id`, `name`, `url` (https only), `icon` (a hub file, kept in
 `hub/partners/`), `tagline`, `about`, and `action: "play"` for a game, so
-its button says "Play on" rather than "Visit". They aren't run in the hub's frame:
+its link says "Play on" rather than "Visit". The partner cards are small,
+two to a row (one on a phone), and show the tagline; `about` is shown on the
+grid. A partner entry with `tags`, `input` and `added`, as an app has, is
+also on the app grid among the apps: a card marked "Partner" that links out
+to the same page in a new tab, with its `about` as the card text. They aren't run in the hub's frame:
 each card links out to the partner's own site in a new tab. Language files
 translate a partner's tagline and `about` under `apps`, by its id, as they do
 an app's. To add a partner, add its entry and icon, and add the icon to

@@ -15,6 +15,9 @@
       "url": "https://webq3.games/games/super-memecoin-wars-enter-the-arena-b58210c3",
       "icon": "/partners/webq3-memecoin.webp",
       "action": "play",
+      "input": "touch",
+      "tags": ["Game"],
+      "added": "2026-11-18",
       "tagline": "A meme-powered arena brawler from WEBQ3 Gaming.",
       "about": "Pick one of 11 fighters, each with three forms, and beat a CPU rival across 10 stages full of moving platforms and hazards. Plays by touch."
     },
@@ -24,6 +27,9 @@
       "url": "https://webq3.games/games/power-surge-planet-breakers-e9db6900",
       "icon": "/partners/webq3-surge.webp",
       "action": "play",
+      "input": "touch",
+      "tags": ["Game"],
+      "added": "2026-11-18",
       "tagline": "An anime arena fighter from WEBQ3 Gaming.",
       "about": "Pick a fighter, survive the swarm, power up and shatter the boss before the clock runs out. Your fighter attacks on their own: drag to move."
     }

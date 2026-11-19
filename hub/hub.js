@@ -122,6 +122,13 @@ const INPUT = { touch: 'inputTouch', controller: 'inputController', both: 'input
 const HAND = '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11V5.5a1.5 1.5 0 0 1 3 0V10m0-.5a1.5 1.5 0 0 1 3 0V11m0-.5a1.5 1.5 0 0 1 3 0V15a6 6 0 0 1-6 6h-.6a6 6 0 0 1-4.7-2.3L4.2 15.6a1.5 1.5 0 0 1 2.3-1.9L9 16"/></svg>';
 const PAD = '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 7h9a4.5 4.5 0 0 1 4.4 3.6l.9 4.6a2.6 2.6 0 0 1-4.6 2.1L15.5 15h-7l-1.7 2.3a2.6 2.6 0 0 1-4.6-2.1l.9-4.6A4.5 4.5 0 0 1 7.5 7z"/><path d="M8 10v3M6.5 11.5h3"/></svg>';
 const INPUT_ICONS = { touch: HAND, controller: PAD, both: HAND + PAD };
+// A partner game's grid card says whose it is, and that it opens elsewhere
+function partnerChip(app) {
+  if (!app.url) return [];
+  const chip = el('span', { class: 'tag partner-tag' }, t('partnerTag'));
+  chip.insertAdjacentHTML('beforeend', OUT);
+  return [chip];
+}
 function inputChip(app) {
   if (!INPUT[app.input]) return [];
   const chip = el('span', { class: 'tag input', 'data-input': app.input }, t(INPUT[app.input]));
@@ -134,7 +141,9 @@ function inputChip(app) {
 // out to the partner's site, in a new tab. The icon is a hub file. A
 // language file translates a partner's tagline and "about" under "apps", by
 // its id, the way it does an app's. A partner game has "action": "play", so
-// its button says "Play on" rather than "Visit".
+// its link says "Play on" rather than "Visit". The cards are small, two to
+// a row, so the apps below still show on the car's first screen; a
+// partner's "about" is shown where there is room for it, on its grid card.
 const OUT = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M9 7h8v8"/></svg>';
 function renderPartners() {
   const partners = (catalog.partners ?? []).filter(p => /^https:\/\//.test(p.url));
@@ -148,13 +157,19 @@ function renderPartners() {
       el('div', { class: 'partner-text' },
         el('h3', {}, appName(p)),
         el('p', { class: 'partner-tagline' }, appTagline(p)),
-        el('p', { class: 'partner-about' }, partnerAbout(p))),
-      go);
+        go));
   }));
 }
 
+// A partner entry with "tags" (and "input" and "added", like an app's) is
+// on the grid too, among the apps: a card that links out to the same page,
+// marked as a partner's. Its icon is a hub file, not one on the apps origin.
+const partnerApps = () => (catalog.partners ?? []).filter(p => p.tags && /^https:\/\//.test(p.url));
+const iconSrc = app => app.url ? app.icon : appsOrigin + app.icon;
+
 // Apps marked unlisted aren't on the grid
-const listed = () => catalog.apps.filter(app => !app.unlisted);
+const listed = () => [...catalog.apps.filter(app => !app.unlisted), ...partnerApps()];
+const findApp = id => catalog.apps.find(a => a.id === id) ?? partnerApps().find(p => p.id === id);
 
 // A "New" or "Updated" badge while the catalog's date for it is recent, until
 // the app is opened after that date
@@ -173,7 +188,8 @@ let query = '';
 const fold = s => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 function matches(app, words) {
   const how = INPUT[app.input] ? [en.ui[INPUT[app.input]], t(INPUT[app.input])] : [];
-  const hay = fold([app.id, app.name, app.tagline, appName(app), appTagline(app), ...app.tags, ...app.tags.map(tagName), ...how].join('\n'));
+  const about = app.about ? [app.about, partnerAbout(app)] : [];
+  const hay = fold([app.id, app.name, app.tagline, appName(app), appTagline(app), ...about, ...app.tags, ...app.tags.map(tagName), ...how].join('\n'));
   return words.every(w => hay.includes(w));
 }
 
@@ -186,14 +202,18 @@ function renderGrid() {
     return;
   }
   grid.replaceChildren(...shown.map(app => {
-    const card = el('button', { class: 'card', type: 'button', 'data-app': app.id },
+    const card = app.url
+      ? el('a', { class: 'card', href: app.url, target: '_blank', rel: 'noopener', 'data-app': app.id })
+      : el('button', { class: 'card', type: 'button', 'data-app': app.id });
+    card.append(
       ...badge(app),
-      el('img', { src: appsOrigin + app.icon, alt: '', width: 64, height: 64 }),
+      el('img', { src: iconSrc(app), alt: '', width: 64, height: 64 }),
       el('h2', {}, appName(app)),
-      el('p', {}, appTagline(app)),
-      el('div', { class: 'tags' }, ...inputChip(app), ...app.tags.map(tag => el('span', { class: 'tag' }, tagName(tag)))),
+      el('p', {}, app.url ? partnerAbout(app) : appTagline(app)),
+      el('div', { class: 'tags' }, ...inputChip(app), ...partnerChip(app), ...app.tags.map(tag => el('span', { class: 'tag' }, tagName(tag)))),
     );
-    card.addEventListener('click', e => launch(app.id, e.detail === 0));   // no clicks counted: a key or the controller
+    // a partner's card opens its page itself, being a link
+    card.addEventListener('click', e => app.url ? openedPartner(app.id) : launch(app.id, e.detail === 0));   // no clicks counted: a key or the controller
     return card;
   }));
 }
@@ -236,11 +256,10 @@ searchForm.addEventListener('submit', e => {
 // know what the site is, so the row takes the place of the lede.
 function renderRecent() {
   if (!catalog) return;
-  const apps = store.get('recent', []).map(id => catalog.apps.find(a => a.id === id))
-    .filter(Boolean).slice(0, RECENT);
+  const apps = store.get('recent', []).map(findApp).filter(Boolean).slice(0, RECENT);
   recentRow.replaceChildren(...apps.map(app => {
     const b = el('button', { class: 'recent-app', type: 'button' },
-      el('img', { src: appsOrigin + app.icon, alt: '', width: 28, height: 28 }), el('span', {}, appName(app)));
+      el('img', { src: iconSrc(app), alt: '', width: 28, height: 28 }), el('span', {}, appName(app)));
     b.addEventListener('click', () => launch(app.id));
     return b;
   }));
@@ -252,6 +271,13 @@ function remember(id) {
   store.set('recent', [id, ...store.get('recent', []).filter(r => r !== id)].slice(0, 12));
   store.set('opened', { ...store.get('opened', {}), [id]: Date.now() });
   grid.querySelector(`[data-app="${id}"] .badge`)?.remove();
+}
+
+// A partner game left for in a new tab: in the Recent row now, since no
+// app closing will refresh it
+function openedPartner(id) {
+  remember(id);
+  renderRecent();
 }
 
 // A game played with a controller never touches the screen, so the hub keeps
@@ -275,6 +301,12 @@ document.addEventListener('visibilitychange', () => stayAwake(awake));
 // it can only be asked for during a tap, so this is the first chance.
 function launch(id, byKey = false) {
   if (!runner.hidden) return;   // a held Enter repeats its click
+  const partner = partnerApps().find(p => p.id === id);
+  if (partner) {
+    window.open(partner.url, '_blank', 'noopener');
+    openedPartner(id);
+    return;
+  }
   keysToApp = byKey;
   if (store.get('fullscreen', false) && !document.fullscreenElement) document.documentElement.requestFullscreen?.().catch(() => {});
   openApp(id, { push: true });
@@ -298,7 +330,7 @@ function freshFrame() {
 
 function openApp(id, { push }) {
   const app = catalog.apps.find(a => a.id === id);
-  if (!app) return;
+  if (!app) return;   // a partner game isn't run here, so it has no /app/ link either
   if (push) {
     history.pushState({ app: id }, '', `/app/${encodeURIComponent(id)}`);
     pushedHistory = true;
