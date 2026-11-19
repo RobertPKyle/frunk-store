@@ -9,6 +9,7 @@
     "lede": "주차 중에 센터 디스플레이에서 즐기는 게임과 도구.",
     "partnersTitle": "Frunk.store 파트너",
     "partnerVisit": "{site} 방문",
+    "partnerPlay": "{site}에서 플레이",
     "recentLabel": "최근 사용",
     "filtersLabel": "표시",
     "filterAll": "전체",
@@ -89,6 +90,8 @@
   },
   "apps": {
     "fatmusic": { "tagline": "중간 유통 없는 인디 음악.", "about": "새로운 인디 아티스트를 발견하고 직접 응원하며 The Show Box에서 라이브 공연을 즐기세요. 모든 곡을 60초 동안 무료로 미리 들을 수 있습니다." },
+    "webq3-memecoin": { "tagline": "WEBQ3 Gaming의 밈 파워 아레나 격투 게임.", "about": "각각 세 가지 형태를 가진 11명의 파이터 중 하나를 골라, 움직이는 발판과 함정이 가득한 10개 스테이지에서 CPU 상대를 이기세요. 터치로 플레이할 수 있습니다." },
+    "webq3-surge": { "tagline": "WEBQ3 Gaming의 애니메이션 아레나 격투 게임.", "about": "파이터를 골라 몰려오는 적을 버티고, 파워업해서 시간이 끝나기 전에 보스를 부수세요. 공격은 자동이고 드래그로 이동합니다." },
     "brain": { "name": "브레인 테스트", "tagline": "내 테슬라의 두뇌는 얼마나 빠를까? 20초 동안 차량 컴퓨터를 테스트하고 다른 테슬라, 휴대폰, PC와 순위를 비교합니다." },
     "breakout": { "name": "벽돌 깨기", "tagline": "고전 패들 게임. 드래그해서 움직이고, 탭해서 공을 발사하세요." },
     "fractal": { "name": "프랙털 탐색기", "tagline": "멀티스레드 WebAssembly로 그리는 망델브로 집합. 핀치로 확대/축소." },

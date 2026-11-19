@@ -133,13 +133,15 @@ function inputChip(app) {
 // top of the page. They aren't apps run in the hub's frame: each card links
 // out to the partner's site, in a new tab. The icon is a hub file. A
 // language file translates a partner's tagline and "about" under "apps", by
-// its id, the way it does an app's.
+// its id, the way it does an app's. A partner game has "action": "play", so
+// its button says "Play on" rather than "Visit".
 const OUT = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M9 7h8v8"/></svg>';
 function renderPartners() {
   const partners = (catalog.partners ?? []).filter(p => /^https:\/\//.test(p.url));
   partnersBox.hidden = !partners.length;
   partnerList.replaceChildren(...partners.map(p => {
-    const go = el('span', { class: 'partner-go' }, t('partnerVisit').replace('{site}', new URL(p.url).host.replace(/^www\./, '')));
+    const key = p.action === 'play' ? 'partnerPlay' : 'partnerVisit';
+    const go = el('span', { class: 'partner-go' }, t(key).replace('{site}', new URL(p.url).host.replace(/^www\./, '')));
     go.insertAdjacentHTML('beforeend', OUT);
     return el('a', { class: 'partner', href: p.url, target: '_blank', rel: 'noopener', 'data-partner': p.id },
       el('img', { src: p.icon, alt: '', width: 72, height: 72 }),

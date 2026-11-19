@@ -9,6 +9,7 @@
     "lede": "駐車中にセンターディスプレイで楽しめるゲームとツール。",
     "partnersTitle": "Frunk.store パートナー",
     "partnerVisit": "{site} を開く",
+    "partnerPlay": "{site} で遊ぶ",
     "recentLabel": "最近使ったアプリ",
     "filtersLabel": "表示",
     "filterAll": "すべて",
@@ -89,6 +90,8 @@
   },
   "apps": {
     "fatmusic": { "tagline": "仲介なしのインディーズ音楽。", "about": "新しいインディーズアーティストを見つけて直接応援し、The Show Box でライブを楽しめます。全曲 60 秒の無料試聴付き。" },
+    "webq3-memecoin": { "tagline": "WEBQ3 Gaming のミームだらけのアリーナ格闘ゲーム。", "about": "3 つの形態を持つ 11 人のファイターから 1 人を選び、動く足場や仕掛けのある 10 のステージで CPU と対戦。タッチで遊べます。" },
+    "webq3-surge": { "tagline": "WEBQ3 Gaming のアニメ風アリーナ格闘ゲーム。", "about": "ファイターを選び、敵の群れを生き延び、パワーアップして、時間切れまでにボスを打ち砕こう。攻撃は自動。ドラッグで移動。" },
     "brain": { "name": "ブレインテスト", "tagline": "あなたのテスラの頭脳はどれくらい？ 車のコンピューターを20秒でテストし、他のテスラやスマホ、PCと比べます。" },
     "breakout": { "name": "ブロック崩し", "tagline": "定番のパドルゲーム。ドラッグで動かし、タップでボールを発射。" },
     "fractal": { "name": "フラクタル探索", "tagline": "マルチスレッドの WebAssembly で描くマンデルブロ集合。ピンチでズーム。" },

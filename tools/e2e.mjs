@@ -78,12 +78,13 @@ await check('hub partners sit on top and link out', async () => {
   await page.goto(base + '/');
   await page.waitForSelector('#partners .partner');
   const partners = (await (await fetch(base + '/catalog.json')).json()).partners ?? [];
-  const links = await page.locator('#partners .partner').evaluateAll(cards => cards.map(a => [a.dataset.partner, a.href, a.target, a.querySelector('img').naturalWidth]));
+  const links = await page.locator('#partners .partner').evaluateAll(cards => cards.map(a => [a.dataset.partner, a.href, a.target, a.querySelector('img').naturalWidth, a.querySelector('.partner-go').textContent]));
   if (links.length !== partners.length) throw new Error(`expected ${partners.length} partners, got ${links.length}`);
-  for (const [i, [id, href, target, width]] of links.entries()) {
+  for (const [i, [id, href, target, width, button]] of links.entries()) {
     if (id !== partners[i].id || new URL(href).href !== new URL(partners[i].url).href) throw new Error(`partner ${id} links to ${href}`);
     if (target !== '_blank') throw new Error(`partner ${id} doesn't open a new tab`);
     if (!width) throw new Error(`partner ${id}'s icon didn't load`);
+    if (!button.startsWith(partners[i].action === 'play' ? 'Play on' : 'Visit')) throw new Error(`partner ${id}'s button says "${button}"`);
   }
   // first thing on the page, above the title
   const above = await page.evaluate(() => document.getElementById('partners').getBoundingClientRect().bottom <= document.querySelector('h1').getBoundingClientRect().top);

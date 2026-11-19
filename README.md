@@ -32,12 +32,15 @@ app runs.
 Partner sites get their own section, "Frunk.store partners", at the top of
 the hub, above the title. They come from `partners` in `hub/catalog.json`:
 `id`, `name`, `url` (https only), `icon` (a hub file, kept in
-`hub/partners/`), `tagline` and `about`. They aren't run in the hub's frame:
+`hub/partners/`), `tagline`, `about`, and `action: "play"` for a game, so
+its button says "Play on" rather than "Visit". They aren't run in the hub's frame:
 each card links out to the partner's own site in a new tab. Language files
 translate a partner's tagline and `about` under `apps`, by its id, as they do
 an app's. To add a partner, add its entry and icon, and add the icon to
 `SHELL` in `hub/sw.js` so the hub still shows it offline. The first partner
-is FatMusic (fatmusic.ca), added 2026-11-15.
+is FatMusic (fatmusic.ca), added 2026-11-15. WEBQ3 Gaming (webq3.games)
+followed on 2026-11-18 with two games, Super MemeCoin Wars and Power Surge:
+Planet Breakers, each a card linking to the game's page there.
 
 The referral offer in the footer shows only in the Americas and Europe, going by
 the browser's time zone; a zone that says nothing (UTC) falls back on the

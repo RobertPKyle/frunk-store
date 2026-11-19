@@ -9,6 +9,7 @@
     "lede": "停車時可以在中控螢幕上使用的遊戲與工具。",
     "partnersTitle": "Frunk.store 合作夥伴",
     "partnerVisit": "造訪 {site}",
+    "partnerPlay": "在 {site} 上玩",
     "recentLabel": "最近使用",
     "filtersLabel": "顯示",
     "filterAll": "全部",
@@ -89,6 +90,8 @@
   },
   "apps": {
     "fatmusic": { "tagline": "沒有中間商的獨立音樂。", "about": "發現新的獨立音樂人，直接支持他們，並在 The Show Box 觀看現場演出。每首歌都可免費試聽 60 秒。" },
+    "webq3-memecoin": { "tagline": "WEBQ3 Gaming 出品的迷因競技場格鬥遊戲。", "about": "從 11 名各有三種形態的鬥士中選擇一名，在 10 個滿是移動平台和陷阱的場景中擊敗電腦對手。支援觸控。" },
+    "webq3-surge": { "tagline": "WEBQ3 Gaming 出品的動漫競技場格鬥遊戲。", "about": "選擇鬥士，撐過怪群，強化能力，在時間結束前擊碎首領。鬥士會自動攻擊，拖曳即可移動。" },
     "brain": { "name": "大腦測試", "tagline": "你的 Tesla 有多聰明？用 20 秒測試車上電腦，和其他 Tesla、手機與電腦一較高下。" },
     "breakout": { "name": "打磚塊", "tagline": "經典的擋板遊戲。拖曳移動擋板，點一下發球。" },
     "fractal": { "name": "碎形探索", "tagline": "多執行緒 WebAssembly 曼德博集合。用兩指縮放。" },

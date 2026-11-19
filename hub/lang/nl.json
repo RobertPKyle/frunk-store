@@ -9,6 +9,7 @@
     "lede": "Games en tools voor het middenscherm, terwijl je geparkeerd staat.",
     "partnersTitle": "Frunk.store-partners",
     "partnerVisit": "Bezoek {site}",
+    "partnerPlay": "Speel op {site}",
     "recentLabel": "Recent gebruikt",
     "filtersLabel": "Toon",
     "filterAll": "Alle",
@@ -89,6 +90,8 @@
   },
   "apps": {
     "fatmusic": { "tagline": "Onafhankelijke muziek zonder tussenpersoon.", "about": "Ontdek nieuwe onafhankelijke artiesten, steun ze rechtstreeks en kijk naar liveconcerten in The Show Box. Elk nummer heeft een gratis voorproefje van 60 seconden." },
+    "webq3-memecoin": { "tagline": "Een arenavechtspel vol memes, van WEBQ3 Gaming.", "about": "Kies een van 11 vechters, elk met drie vormen, en versla een computertegenstander in 10 levels vol bewegende platforms en gevaren. Speelbaar met aanraking." },
+    "webq3-surge": { "tagline": "Een anime-arenavechtspel van WEBQ3 Gaming.", "about": "Kies een vechter, overleef de zwerm, word sterker en verbrijzel de baas voordat de tijd om is. Je vechter valt zelf aan: sleep om te bewegen." },
     "brain": { "name": "Hersentest", "tagline": "Hoe slim is je Tesla? Een test van 20 seconden voor de computer van de auto, vergeleken met andere Tesla's, telefoons en pc's." },
     "breakout": { "tagline": "Klassiek batje-en-balspel. Sleep om te bewegen, tik om de bal weg te schieten." },
     "fractal": { "name": "Fractalverkenner", "tagline": "Mandelbrot in WebAssembly op meerdere threads. Knijp om te zoomen." },

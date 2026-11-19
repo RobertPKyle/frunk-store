@@ -8,6 +8,24 @@
       "icon": "/partners/fatmusic.svg",
       "tagline": "Independent music without the middleman.",
       "about": "Discover new independent artists, support them directly, and catch live concerts in The Show Box. Every track has a free 60-second preview."
+    },
+    {
+      "id": "webq3-memecoin",
+      "name": "Super MemeCoin Wars",
+      "url": "https://webq3.games/games/super-memecoin-wars-enter-the-arena-b58210c3",
+      "icon": "/partners/webq3-memecoin.webp",
+      "action": "play",
+      "tagline": "A meme-powered arena brawler from WEBQ3 Gaming.",
+      "about": "Pick one of 11 fighters, each with three forms, and beat a CPU rival across 10 stages full of moving platforms and hazards. Plays by touch."
+    },
+    {
+      "id": "webq3-surge",
+      "name": "Power Surge: Planet Breakers",
+      "url": "https://webq3.games/games/power-surge-planet-breakers-e9db6900",
+      "icon": "/partners/webq3-surge.webp",
+      "action": "play",
+      "tagline": "An anime arena fighter from WEBQ3 Gaming.",
+      "about": "Pick a fighter, survive the swarm, power up and shatter the boss before the clock runs out. Your fighter attacks on their own: drag to move."
     }
   ],
   "apps": [

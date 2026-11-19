@@ -9,6 +9,7 @@
     "lede": "Spiele und Tools für den Bildschirm in der Mitte, solange du parkst.",
     "partnersTitle": "Frunk.store-Partner",
     "partnerVisit": "{site} besuchen",
+    "partnerPlay": "Auf {site} spielen",
     "recentLabel": "Zuletzt verwendet",
     "filtersLabel": "Anzeigen",
     "filterAll": "Alle",
@@ -89,6 +90,8 @@
   },
   "apps": {
     "fatmusic": { "tagline": "Unabhängige Musik ohne Zwischenhändler.", "about": "Entdecke neue unabhängige Künstler, unterstütze sie direkt und sieh dir Livekonzerte in der Show Box an. Jeder Titel hat eine kostenlose 60-Sekunden-Vorschau." },
+    "webq3-memecoin": { "tagline": "Ein Arena-Prügelspiel voller Memes, von WEBQ3 Gaming.", "about": "Wähle einen von 11 Kämpfern mit je drei Formen und besiege einen Computergegner auf 10 Bühnen voller beweglicher Plattformen und Gefahren. Mit Touch spielbar." },
+    "webq3-surge": { "tagline": "Ein Anime-Arenakampfspiel von WEBQ3 Gaming.", "about": "Wähle einen Kämpfer, überstehe den Schwarm, werde stärker und zerschmettere den Boss, bevor die Zeit abläuft. Dein Kämpfer greift selbst an: zum Bewegen ziehen." },
     "brain": { "name": "Gehirntest", "tagline": "Wie schlau ist dein Tesla? Ein 20-Sekunden-Test des Autocomputers, im Vergleich mit anderen Teslas, Handys und PCs." },
     "breakout": { "tagline": "Das klassische Schlägerspiel. Zum Bewegen ziehen, zum Abschlagen tippen." },
     "fractal": { "name": "Fraktal-Explorer", "tagline": "Mandelbrot in WebAssembly auf mehreren Threads. Mit zwei Fingern zoomen." },
