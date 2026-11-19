@@ -6,6 +6,9 @@
       "name": "FatMusic",
       "url": "https://fatmusic.ca",
       "icon": "/partners/fatmusic.svg",
+      "input": "touch",
+      "tags": ["Camp Mode", "Road Trip"],
+      "added": "2026-11-15",
       "tagline": "Independent music without the middleman.",
       "about": "Discover new independent artists, support them directly, and catch live concerts in The Show Box. Every track has a free 60-second preview."
     },

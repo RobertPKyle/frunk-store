@@ -37,7 +37,9 @@ its link says "Play on" rather than "Visit". The partner cards are small,
 two to a row (one on a phone), and show the tagline; `about` is shown on the
 grid. A partner entry with `tags`, `input` and `added`, as an app has, is
 also on the app grid among the apps: a card marked "Partner" that links out
-to the same page in a new tab, with its `about` as the card text. They aren't run in the hub's frame:
+to the same page in a new tab, with its `about` as the card text. All three
+partners are on the grid: FatMusic under Camp Mode and Road Trip, the two
+WEBQ3 games under Games. They aren't run in the hub's frame:
 each card links out to the partner's own site in a new tab. Language files
 translate a partner's tagline and `about` under `apps`, by its id, as they do
 an app's. To add a partner, add its entry and icon, and add the icon to
