@@ -145,8 +145,12 @@ function inputChip(app) {
 // a row, so the apps below still show on the car's first screen; a
 // partner's "about" is shown where there is room for it, on its grid card.
 const OUT = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M9 7h8v8"/></svg>';
+// A partner with "hideLangs" isn't shown in those languages: HoodFellas,
+// with real-money betting, stays out of the Chinese hubs, as the tokens do.
+const partnersHere = () => (catalog.partners ?? []).filter(p => /^https:\/\//.test(p.url)
+  && !(p.hideLangs ?? []).some(code => lang.startsWith(code)));
 function renderPartners() {
-  const partners = (catalog.partners ?? []).filter(p => /^https:\/\//.test(p.url));
+  const partners = partnersHere();
   partnersBox.hidden = !partners.length;
   partnerList.replaceChildren(...partners.map(p => {
     const key = p.action === 'play' ? 'partnerPlay' : 'partnerVisit';
@@ -164,7 +168,7 @@ function renderPartners() {
 // A partner entry with "tags" (and "input" and "added", like an app's) is
 // on the grid too, among the apps: a card that links out to the same page,
 // marked as a partner's. Its icon is a hub file, not one on the apps origin.
-const partnerApps = () => (catalog.partners ?? []).filter(p => p.tags && /^https:\/\//.test(p.url));
+const partnerApps = () => partnersHere().filter(p => p.tags);
 const iconSrc = app => app.url ? app.icon : appsOrigin + app.icon;
 
 // Apps marked unlisted aren't on the grid

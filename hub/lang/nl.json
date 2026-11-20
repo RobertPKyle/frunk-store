@@ -92,6 +92,7 @@
   "apps": {
     "fatmusic": { "tagline": "Onafhankelijke muziek zonder tussenpersoon.", "about": "Ontdek nieuwe onafhankelijke artiesten, steun ze rechtstreeks en kijk naar liveconcerten in The Show Box. Elk nummer heeft een gratis voorproefje van 60 seconden." },
     "webq3-memecoin": { "tagline": "Een arenavechtspel vol memes, van WEBQ3 Gaming.", "about": "Kies een van 11 vechters, elk met drie vormen, en versla een computertegenstander in 10 levels vol bewegende platforms en gevaren. Speelbaar met aanraking." },
+    "hoodfellas": { "tagline": "Pleeg misdaden, bouw je imperium en verover de stad. 18+.", "about": "Maak met alleen een e-mailadres en wachtwoord een gangster, draai zwendels, sticht een familie en win bendeoorlogen blok voor blok. Het casino en de sportweddenschappen kun je met echt geld spelen, dus alleen voor 18+." },
     "webq3-surge": { "tagline": "Een anime-arenavechtspel van WEBQ3 Gaming.", "about": "Kies een vechter, overleef de zwerm, word sterker en verbrijzel de baas voordat de tijd om is. Je vechter valt zelf aan: sleep om te bewegen." },
     "brain": { "name": "Hersentest", "tagline": "Hoe slim is je Tesla? Een test van 20 seconden voor de computer van de auto, vergeleken met andere Tesla's, telefoons en pc's." },
     "breakout": { "tagline": "Klassiek batje-en-balspel. Sleep om te bewegen, tik om de bal weg te schieten." },

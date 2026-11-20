@@ -37,16 +37,21 @@ its link says "Play on" rather than "Visit". The partner cards are small,
 two to a row (one on a phone), and show the tagline; `about` is shown on the
 grid. A partner entry with `tags`, `input` and `added`, as an app has, is
 also on the app grid among the apps: a card marked "Partner" that links out
-to the same page in a new tab, with its `about` as the card text. All three
-partners are on the grid: FatMusic under Camp Mode and Road Trip, the two
-WEBQ3 games under Games. They aren't run in the hub's frame:
+to the same page in a new tab, with its `about` as the card text. A partner
+with `hideLangs` (language code prefixes) isn't shown in those languages.
+All the partners are on the grid: FatMusic under Camp Mode and Road Trip,
+the WEBQ3 games and HoodFellas under Games. They aren't run in the hub's frame:
 each card links out to the partner's own site in a new tab. Language files
 translate a partner's tagline and `about` under `apps`, by its id, as they do
 an app's. To add a partner, add its entry and icon, and add the icon to
 `SHELL` in `hub/sw.js` so the hub still shows it offline. The first partner
 is FatMusic (fatmusic.ca), added 2026-11-15. WEBQ3 Gaming (webq3.games)
 followed on 2026-11-18 with two games, Super MemeCoin Wars and Power Surge:
-Planet Breakers, each a card linking to the game's page there.
+Planet Breakers, each a card linking to the game's page there. HoodFellas
+(hoodfellas.org) joined on 2026-11-19 as the first partner card, linking to
+its game page. It is a mob strategy game with a casino and sportsbook that
+take real money, so its card says 18+ and it has `hideLangs: ["zh"]`, staying
+out of the Chinese hubs as the tokens do.
 
 The referral offer in the footer shows only in the Americas and Europe, going by
 the browser's time zone; a zone that says nothing (UTC) falls back on the

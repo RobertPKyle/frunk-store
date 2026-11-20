@@ -237,6 +237,11 @@ await check('hub switches language and remembers it', async () => {
   await page.locator('h1', { hasText: zh.ui.title }).waitFor({ timeout: 3000 });
   const names = await page.locator('#grid .card h2').allTextContents();
   if (!names.includes(zh.apps.breakout.name)) throw new Error(`cards not translated: ${names.join(', ')}`);
+  // partners marked hideLangs "zh" (real-money betting) stay out of the Chinese hub
+  const hidden = ((await (await fetch(base + '/catalog.json')).json()).partners ?? []).filter(p => p.hideLangs?.includes('zh')).map(p => p.id);
+  for (const id of hidden) {
+    if (await page.locator(`#partners [data-partner="${id}"], #grid .card[data-app="${id}"]`).count()) throw new Error(`partner ${id} shows in the Chinese hub`);
+  }
   await page.reload();
   await page.locator('h1', { hasText: zh.ui.title }).waitFor({ timeout: 3000 });
   const state = await page.evaluate(() => ({ lang: document.documentElement.lang, waiting: document.documentElement.classList.contains('i18n-wait') }));

@@ -92,6 +92,7 @@
   "apps": {
     "fatmusic": { "tagline": "Unabhängige Musik ohne Zwischenhändler.", "about": "Entdecke neue unabhängige Künstler, unterstütze sie direkt und sieh dir Livekonzerte in der Show Box an. Jeder Titel hat eine kostenlose 60-Sekunden-Vorschau." },
     "webq3-memecoin": { "tagline": "Ein Arena-Prügelspiel voller Memes, von WEBQ3 Gaming.", "about": "Wähle einen von 11 Kämpfern mit je drei Formen und besiege einen Computergegner auf 10 Bühnen voller beweglicher Plattformen und Gefahren. Mit Touch spielbar." },
+    "hoodfellas": { "tagline": "Begehe Verbrechen, bau dein Imperium auf und erobere die Stadt. Ab 18.", "about": "Erstelle mit nur E-Mail und Passwort einen Gangster, zieh krumme Dinger durch, gründe eine Familie und gewinne Revierkriege Block für Block. Casino und Sportwetten lassen sich um echtes Geld spielen, deshalb erst ab 18." },
     "webq3-surge": { "tagline": "Ein Anime-Arenakampfspiel von WEBQ3 Gaming.", "about": "Wähle einen Kämpfer, überstehe den Schwarm, werde stärker und zerschmettere den Boss, bevor die Zeit abläuft. Dein Kämpfer greift selbst an: zum Bewegen ziehen." },
     "brain": { "name": "Gehirntest", "tagline": "Wie schlau ist dein Tesla? Ein 20-Sekunden-Test des Autocomputers, im Vergleich mit anderen Teslas, Handys und PCs." },
     "breakout": { "tagline": "Das klassische Schlägerspiel. Zum Bewegen ziehen, zum Abschlagen tippen." },

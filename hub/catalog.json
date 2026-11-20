@@ -2,6 +2,19 @@
   "appsOrigin": "https://frunk-apps.vercel.app",
   "partners": [
     {
+      "id": "hoodfellas",
+      "name": "HoodFellas",
+      "url": "https://www.hoodfellas.org/play",
+      "icon": "/partners/hoodfellas.webp",
+      "action": "play",
+      "input": "touch",
+      "tags": ["Game"],
+      "added": "2026-11-19",
+      "hideLangs": ["zh"],
+      "tagline": "Run crimes, build your empire and take the city. 18+.",
+      "about": "Make a mobster with just an email and password, run rackets, found a family and win turf wars block by block. Its casino and sportsbook can be played for real money, so it's 18+ only."
+    },
+    {
       "id": "fatmusic",
       "name": "FatMusic",
       "url": "https://fatmusic.ca",
