@@ -165,14 +165,69 @@
   <p class="follow" data-i18n="follow"><a href="https://x.com/FrunkStore" target="_blank" rel="noopener">Follow me on X @FrunkStore</a> for new apps and updates</p>
   <p class="referral" data-i18n="referral" hidden>Buying a Tesla or solar panels? Get 3 months of Full Self-Driving (Supervised) or $400 off solar panel installation with my referral link:
     <a href="https://ts.la/robert41397" target="_blank" rel="noopener">ts.la/robert41397</a></p>
-  <div class="token">
-    <p data-i18n="tokenLabel">Token addresses (Solana):</p>
-    <p class="token-row"><span class="token-name">$frunk</span> <code>CBsg6Nr9UoTPsLhqNHTbaFt4c6qcNgrnbntwabdQpump</code>
-      <button type="button" class="token-copy" data-i18n="copy">Copy</button></p>
-    <p class="token-row"><span class="token-name">Ronin</span> <code>2JVEVXoRsskapZ8T56MjMNJq6Dk3feEUYSRmzkkipump</code>
-      <button type="button" class="token-copy" data-i18n="copy">Copy</button></p>
+  <section class="token" aria-labelledby="tokenHead">
+    <div class="token-top">
+      <h2 class="token-head"><span class="live-dot" aria-hidden="true"></span><span id="tokenHead" data-i18n="tokenHead">Tokens on Solana</span></h2>
+      <div class="token-ranges" role="group" aria-label="Chart range" data-i18n-label="rangeLabel">
+        <button type="button" data-range="1h" aria-pressed="false">1H</button>
+        <button type="button" data-range="1d" aria-pressed="true">24H</button>
+        <button type="button" data-range="1w" aria-pressed="false">7D</button>
+      </div>
+    </div>
+    <div class="coins">
+      <article class="coin loading" data-mint="CBsg6Nr9UoTPsLhqNHTbaFt4c6qcNgrnbntwabdQpump">
+        <div class="coin-head">
+          <img class="coin-logo" src="/brand/frunk-mark-on-dark.svg" alt="" width="40" height="40">
+          <p class="coin-id"><b>$FRUNK</b><span>Frunk</span></p>
+          <span class="coin-change" hidden></span>
+        </div>
+        <p class="coin-price"><span class="coin-value">–</span><span class="coin-when"></span></p>
+        <div class="coin-chart">
+          <svg viewBox="0 0 300 100" preserveAspectRatio="none" aria-hidden="true">
+            <defs><linearGradient id="fill-frunk" x1="0" y1="0" x2="0" y2="1"><stop offset="0"/><stop offset="1"/></linearGradient></defs>
+            <line class="coin-base" x1="0" x2="300" y1="50" y2="50" vector-effect="non-scaling-stroke"/>
+            <path class="coin-area" fill="url(#fill-frunk)"/>
+            <path class="coin-line" vector-effect="non-scaling-stroke"/>
+          </svg>
+          <span class="coin-guide" hidden></span><span class="coin-dot" hidden></span>
+          <p class="coin-empty" data-i18n="chartDown" hidden>Chart unavailable right now</p>
+        </div>
+        <dl class="coin-stats">
+          <div><dt data-i18n="statMcap">Market cap</dt><dd data-k="mcap">–</dd></div>
+          <div><dt data-i18n="statLiq">Liquidity</dt><dd data-k="liquidity">–</dd></div>
+          <div><dt data-i18n="statVol">24h volume</dt><dd data-k="volume">–</dd></div>
+        </dl>
+        <p class="token-row"><code>CBsg6Nr9UoTPsLhqNHTbaFt4c6qcNgrnbntwabdQpump</code>
+          <button type="button" class="token-copy" data-i18n="copy">Copy</button></p>
+      </article>
+      <article class="coin loading" data-mint="roNinuSrZUqNcsqVT4tkRdBR5nswruJxQEN3MqSqWYy">
+        <div class="coin-head">
+          <span class="coin-logo ronin" aria-hidden="true">R</span>
+          <p class="coin-id"><b>$RONIN</b><span>Ronin</span></p>
+          <span class="coin-change" hidden></span>
+        </div>
+        <p class="coin-price"><span class="coin-value">–</span><span class="coin-when"></span></p>
+        <div class="coin-chart">
+          <svg viewBox="0 0 300 100" preserveAspectRatio="none" aria-hidden="true">
+            <defs><linearGradient id="fill-ronin" x1="0" y1="0" x2="0" y2="1"><stop offset="0"/><stop offset="1"/></linearGradient></defs>
+            <line class="coin-base" x1="0" x2="300" y1="50" y2="50" vector-effect="non-scaling-stroke"/>
+            <path class="coin-area" fill="url(#fill-ronin)"/>
+            <path class="coin-line" vector-effect="non-scaling-stroke"/>
+          </svg>
+          <span class="coin-guide" hidden></span><span class="coin-dot" hidden></span>
+          <p class="coin-empty" data-i18n="chartDown" hidden>Chart unavailable right now</p>
+        </div>
+        <dl class="coin-stats">
+          <div><dt data-i18n="statMcap">Market cap</dt><dd data-k="mcap">–</dd></div>
+          <div><dt data-i18n="statLiq">Liquidity</dt><dd data-k="liquidity">–</dd></div>
+          <div><dt data-i18n="statVol">24h volume</dt><dd data-k="volume">–</dd></div>
+        </dl>
+        <p class="token-row"><code>roNinuSrZUqNcsqVT4tkRdBR5nswruJxQEN3MqSqWYy</code>
+          <button type="button" class="token-copy" data-i18n="copy">Copy</button></p>
+      </article>
+    </div>
     <p class="token-note" data-i18n="tokenNote">This isn't financial advice or an offer to invest. Tokens like this are highly risky and can lose all their value, so do your own research.</p>
-  </div>
+  </section>
   <p data-i18n="unofficial">Unofficial. Not affiliated with Tesla, Inc. Use apps only while parked.</p>
 </footer>
 

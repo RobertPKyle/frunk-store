@@ -3,6 +3,7 @@
 // storage or navigate the top page.
 
 import { LANGS, EN_UI } from './i18n.js';
+import { startTokens, tokensLangChanged } from './tokens.js';
 
 const grid = document.getElementById('grid');
 const partnersBox = document.getElementById('partners');
@@ -98,6 +99,7 @@ function applyLang() {
   for (const node of document.querySelectorAll('[data-i18n-label]')) node.setAttribute('aria-label', t(node.dataset.i18nLabel));
   for (const node of document.querySelectorAll('[data-i18n-title]')) node.title = t(node.dataset.i18nTitle);
   document.getElementById('langName').textContent = LANGS.find(([code]) => code === lang)[1];
+  tokensLangChanged();
   queryInput.placeholder = t('searchLabel');
   fsLabel();
   if (catalog) {
@@ -596,6 +598,7 @@ async function init() {
   err.hidden = true;
   removeEventListener('online', init);
   appsOrigin = resolveAppsOrigin(catalog.appsOrigin);
+  startTokens(appsOrigin, () => lang, store);
   renderPartners();
   renderRecent();
   renderFilters();

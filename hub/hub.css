@@ -193,12 +193,62 @@ a.card { color: var(--text); text-decoration: none; }
 .follow a { display: inline-block; padding: 10px 4px; color: #c3cad6; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
 .foot .referral { max-width: 34em; margin: 0 auto 14px; font-size: 14px; color: #c3cad6; }
 .referral a { display: inline-block; padding: 8px 4px; color: var(--accent); font-weight: 600; }
-.token { max-width: 40em; margin: 0 auto 14px; font-size: 13px; }
-.token-row { display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap; margin: 6px 0 !important; }
-.token-name { color: var(--text); font-weight: 600; }
-.token code { font: 13px ui-monospace, "DejaVu Sans Mono", monospace; color: #c3cad6; word-break: break-all; user-select: all; }
-.token-copy { min-height: 44px; padding: 4px 14px; border-radius: 10px; background: transparent; border: 1px solid var(--line); color: #c3cad6; font-size: 13px; }
-.token-note { font-size: 12px; }
+/* The token cards: live price, change, a price line and market numbers */
+.token { max-width: 760px; margin: 4px auto 18px; text-align: left; --up: #3ddc97; --down: #ff5d73; }
+.token-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+.token-head { display: flex; align-items: center; gap: 10px; margin: 0; font: 600 15px/1.2 "Unbounded", system-ui, sans-serif; color: var(--text); letter-spacing: -0.01em; }
+.live-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--up); box-shadow: 0 0 0 0 rgba(61, 220, 151, .6); animation: live 2s ease-out infinite; }
+@keyframes live { 70% { box-shadow: 0 0 0 7px rgba(61, 220, 151, 0); } 100% { box-shadow: 0 0 0 0 rgba(61, 220, 151, 0); } }
+.token-ranges { display: flex; gap: 4px; padding: 4px; border-radius: 12px; background: var(--card); border: 1px solid var(--line); }
+.token-ranges button { min-width: 54px; min-height: 40px; padding: 4px 10px; border: 0; border-radius: 9px; background: transparent; color: var(--muted); font-size: 14px; font-weight: 600; }
+.token-ranges button[aria-pressed="true"] { background: #262b34; color: var(--text); }
+.coins { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.coin {
+  --trend: var(--up);
+  padding: 14px 16px 12px; border-radius: var(--radius); border: 1px solid var(--line);
+  background: var(--card);
+  background: radial-gradient(120% 80% at 100% 0%, color-mix(in srgb, var(--trend) 7%, transparent), transparent 60%), var(--card);
+}
+.coin.down { --trend: var(--down); }
+.coin p, .coin dl, .coin dd { margin: 0; }
+.coin-head { display: flex; align-items: center; gap: 10px; }
+.coin-logo { flex: none; width: 40px; height: 40px; border-radius: 50%; background: #0b0d10; border: 1px solid var(--line); }
+img.coin-logo { padding: 5px; }
+.coin-logo.ronin {
+  display: grid; place-items: center; border: 0; color: #fff; font: 700 18px/1 "Unbounded", system-ui, sans-serif;
+  background: linear-gradient(140deg, #ff5a3c, #b3122e 60%, #4a0a1c);
+}
+.coin-id { display: flex; flex-direction: column; min-width: 0; line-height: 1.2; }
+.coin-id b { font: 700 15px/1.2 "Unbounded", system-ui, sans-serif; color: var(--text); }
+.coin-id span { font-size: 13px; color: var(--muted); }
+.coin-change { margin-left: auto; padding: 4px 9px; border-radius: 999px; font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--up); background: rgba(61, 220, 151, .12); }
+.coin-change.down { color: var(--down); background: rgba(255, 93, 115, .12); }
+.coin-change[hidden] { display: none; }
+.coin-price { display: flex; align-items: baseline; gap: 10px; margin: 10px 0 4px !important; min-height: 34px; }
+.coin-value { font: 700 26px/1.2 "Unbounded", system-ui, sans-serif; color: var(--text); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.coin-value sub { font-size: .55em; vertical-align: -0.15em; margin: 0 .05em; }
+.coin-when { font-size: 13px; color: var(--muted); }
+.coin-chart { position: relative; height: 104px; margin: 0 -4px; touch-action: pan-y; cursor: crosshair; }
+.coin-chart svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.coin-line { fill: none; stroke: var(--trend); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.coin stop { stop-color: var(--trend); stop-opacity: .28; }
+.coin stop + stop { stop-opacity: 0; }
+.coin-base { stroke: rgba(238, 241, 245, .18); stroke-width: 1; stroke-dasharray: 3 4; }
+.coin-guide { position: absolute; top: 0; bottom: 0; width: 1px; margin-left: -.5px; background: rgba(238, 241, 245, .35); pointer-events: none; }
+.coin-dot { position: absolute; width: 11px; height: 11px; margin: -5.5px 0 0 -5.5px; border-radius: 50%; background: var(--trend); border: 2px solid var(--card); pointer-events: none; }
+.coin-guide[hidden], .coin-dot[hidden], .coin-empty[hidden] { display: none; }
+.coin-empty { position: absolute; inset: 0; display: grid; place-items: center; font-size: 13px; color: var(--muted); }
+.coin.loading .coin-chart { border-radius: 10px; background: linear-gradient(90deg, transparent 0, rgba(255, 255, 255, .05) 50%, transparent 100%) 0 0 / 200% 100% no-repeat, rgba(255, 255, 255, .02); animation: shimmer 1.4s linear infinite; }
+.coin.loading .coin-chart > * { visibility: hidden; }
+@keyframes shimmer { from { background-position: 150% 0, 0 0; } to { background-position: -50% 0, 0 0; } }
+.coin-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 10px 0 8px !important; padding-top: 10px; border-top: 1px solid var(--line); }
+.coin-stats dt { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.coin-stats dd { font-size: 15px; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; }
+.token-row { display: flex; align-items: center; gap: 8px; padding: 4px 4px 4px 12px; border-radius: 12px; background: #0f1215; border: 1px solid var(--line); }
+.token code { flex: 1; min-width: 0; font: 11.5px/1.35 ui-monospace, "DejaVu Sans Mono", monospace; color: #c3cad6; word-break: break-all; user-select: all; }
+.token-copy { flex: none; min-height: 44px; padding: 4px 14px; border-radius: 9px; background: #1c2027; border: 1px solid var(--line); color: var(--text); font-size: 13px; font-weight: 600; }
+.token-copy:active { background: #262b34; }
+.token-note { margin-top: 12px !important; font-size: 12px; text-align: center; }
 
 .foot { color: var(--muted); font-size: 13px; text-align: center; padding: 16px 24px 24px; }
 
@@ -242,7 +292,9 @@ html:has(.runner:not([hidden])) { overflow: hidden; }
 /* a phone held upright: one partner card to a row */
 @media (max-width: 560px) {
   .partner-list { grid-template-columns: minmax(0, 1fr); }
+  .coins { grid-template-columns: minmax(0, 1fr); }
 }
 @media (prefers-reduced-motion: reduce) {
   .card, .partner, .spinner { transition: none; animation-duration: 2s; }
+  .live-dot, .coin.loading .coin-chart { animation: none; }
 }

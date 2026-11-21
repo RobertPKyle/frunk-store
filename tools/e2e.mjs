@@ -252,6 +252,36 @@ await check('hub switches language and remembers it', async () => {
   if (!(await page.locator('#grid .card h2').allTextContents()).includes('Brick Breaker')) throw new Error('cards not back in English');
 });
 
+await check('hub footer shows live token cards', async () => {
+  const mints = ['CBsg6Nr9UoTPsLhqNHTbaFt4c6qcNgrnbntwabdQpump', 'roNinuSrZUqNcsqVT4tkRdBR5nswruJxQEN3MqSqWYy'];
+  await page.goto(base + '/');
+  await page.waitForSelector('#grid .card');
+  await page.locator('.token').scrollIntoViewIfNeeded();
+  await page.waitForFunction(() => !document.querySelector('.coin.loading'), null, { timeout: 20000 });
+  const cards = await page.evaluate(() => [...document.querySelectorAll('.coin')].map(c => ({
+    ca: c.querySelector('code').textContent,
+    price: c.querySelector('.coin-value').textContent,
+    line: c.querySelector('.coin-line').getAttribute('d') || '',
+    stats: [...c.querySelectorAll('dd')].map(d => d.textContent),
+  })));
+  if (JSON.stringify(cards.map(c => c.ca)) !== JSON.stringify(mints)) throw new Error(`addresses: ${cards.map(c => c.ca).join(', ')}`);
+  for (const c of cards) {
+    if (!c.price.startsWith('$') || c.stats.some(v => v === '–')) throw new Error(`no numbers for ${c.ca}: ${c.price} ${c.stats.join(' ')}`);
+    if ((c.line.match(/L/g) || []).length < 2) throw new Error(`no price line for ${c.ca}`);
+  }
+  await page.click('.token-ranges [data-range="1h"]');
+  await page.waitForFunction(() => !document.querySelector('.coin.loading'), null, { timeout: 20000 });
+  if (await page.getAttribute('.token-ranges [data-range="1h"]', 'aria-pressed') !== 'true') throw new Error('range button not pressed');
+  await page.locator('.token').screenshot({ path: shots + 'hub-tokens.png' });
+  await page.evaluate(() => localStorage.removeItem('hub.tokenRange'));
+  // the tokens stay out of the Chinese hub
+  await page.evaluate(() => localStorage.setItem('hub.lang', '"zh-Hans"'));
+  await page.reload();
+  await page.waitForSelector('#grid .card');
+  if (await page.locator('.token').isVisible()) throw new Error('tokens show in the Chinese hub');
+  await page.evaluate(() => localStorage.removeItem('hub.lang'));
+});
+
 await check('referral shows only in the Americas and Europe', async () => {
   const cases = [
     ['America/Denver', 'en', true],
