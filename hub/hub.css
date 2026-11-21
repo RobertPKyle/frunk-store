@@ -238,8 +238,8 @@ img.coin-logo { padding: 5px; }
 .coin-dot { position: absolute; width: 11px; height: 11px; margin: -5.5px 0 0 -5.5px; border-radius: 50%; background: var(--trend); border: 2px solid var(--card); pointer-events: none; }
 .coin-guide[hidden], .coin-dot[hidden], .coin-empty[hidden] { display: none; }
 .coin-empty { position: absolute; inset: 0; display: grid; place-items: center; font-size: 13px; color: var(--muted); }
-.coin.loading .coin-chart { border-radius: 10px; background: linear-gradient(90deg, transparent 0, rgba(255, 255, 255, .05) 50%, transparent 100%) 0 0 / 200% 100% no-repeat, rgba(255, 255, 255, .02); animation: shimmer 1.4s linear infinite; }
-.coin.loading .coin-chart > * { visibility: hidden; }
+.coin-waiting .coin-chart { border-radius: 10px; background: linear-gradient(90deg, transparent 0, rgba(255, 255, 255, .05) 50%, transparent 100%) 0 0 / 200% 100% no-repeat, rgba(255, 255, 255, .02); animation: shimmer 1.4s linear infinite; }
+.coin-waiting .coin-chart > * { visibility: hidden; }
 @keyframes shimmer { from { background-position: 150% 0, 0 0; } to { background-position: -50% 0, 0 0; } }
 .coin-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 10px 0 8px !important; padding-top: 10px; border-top: 1px solid var(--line); }
 .coin-stats dt { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -296,5 +296,5 @@ html:has(.runner:not([hidden])) { overflow: hidden; }
 }
 @media (prefers-reduced-motion: reduce) {
   .card, .partner, .spinner { transition: none; animation-duration: 2s; }
-  .live-dot, .coin.loading .coin-chart { animation: none; }
+  .live-dot, .coin-waiting .coin-chart { animation: none; }
 }

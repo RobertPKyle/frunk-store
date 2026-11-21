@@ -57,7 +57,7 @@ function layout(points) {
 }
 
 function drawCard(card, token, lang) {
-  card.classList.remove('loading');
+  card.classList.remove('coin-waiting');
   card._token = token;
   const ok = token && token.price > 0;
   card.querySelector('.coin-value').innerHTML = ok ? priceHtml(token.price, lang) : '–';
@@ -150,7 +150,7 @@ function setRange(next) {
   range = next;
   store.set('tokenRange', next);
   for (const b of rangeButtons) b.setAttribute('aria-pressed', String(b.dataset.range === next));
-  for (const card of cards.values()) card.classList.add('loading');
+  for (const card of cards.values()) card.classList.add('coin-waiting');
   update();
 }
 
