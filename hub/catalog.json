@@ -1,5 +1,16 @@
 {
   "appsOrigin": "https://frunk-apps.vercel.app",
+  "shelves": [
+    { "id": "consoles", "apps": ["retro", "arcade", "tic80"] },
+    { "id": "shooters", "apps": ["doom", "wolf3d", "duke3d", "quake", "heretic", "rott", "blake", "openarena"] },
+    { "id": "platformers", "apps": ["pop", "keen1", "keen4", "cosmo", "duke2", "hocus", "supertux", "roguerogue"] },
+    { "id": "arcade", "apps": ["breakout", "critter", "sopwith", "deathrally", "neverball", "neverputt", "billiards", "webq3-memecoin", "webq3-surge"] },
+    { "id": "puzzles", "apps": ["puzzles", "chess", "stockfish", "mahjong", "pokeguess", "rocks"] },
+    { "id": "strategy", "apps": ["cnc", "openttd", "city", "fheroes2", "blocks", "craft4k", "hoodfellas"] },
+    { "id": "adventure", "apps": ["elderscrolls", "adventure", "text", "ascii", "wagon"] },
+    { "id": "camp", "apps": ["sleep", "fireplace", "terrarium", "audiobooks", "fatmusic", "stars", "skyevents", "satellites", "weather", "fractal"] },
+    { "id": "road", "apps": ["nearby", "pitstop", "planes", "under", "beach", "postcard", "speedtest", "brain", "probe"] }
+  ],
   "partners": [
     {
       "id": "hoodfellas",
@@ -11,6 +22,7 @@
       "tags": ["Game"],
       "added": "2026-11-19",
       "hideLangs": ["zh"],
+      "minAge": 18,
       "tagline": "Run crimes, build your empire and take the city. 18+.",
       "about": "Make a mobster with just an email and password, run rackets, found a family and win turf wars block by block. Its casino and sportsbook can be played for real money, so it's 18+ only."
     },
@@ -49,6 +61,14 @@
       "tagline": "An anime arena fighter from WEBQ3 Gaming.",
       "about": "Pick a fighter, survive the swarm, power up and shatter the boss before the clock runs out. Your fighter attacks on their own: drag to move."
     }
+  ],
+  "featured": [
+    { "app": "rocks", "image": "/featured/rocks.webp" },
+    { "app": "neverputt", "image": "/featured/neverputt.webp" },
+    { "app": "keen4", "image": "/featured/keen4.webp" },
+    { "app": "hocus", "image": "/featured/hocus.webp" },
+    { "app": "duke2", "image": "/featured/duke2.webp" },
+    { "app": "cnc", "image": "/featured/cnc.webp" }
   ],
   "apps": [
     {

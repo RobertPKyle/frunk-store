@@ -66,14 +66,19 @@
 
 <main>
   <!-- Partner sites, from catalog.json's "partners". Each card links out to
-       the partner's own site. The placeholder holds the room until the
+       the partner's own site. The placeholders hold the room until the
        catalog is in, so the page below doesn't jump down. -->
   <section id="partners" class="partners" aria-labelledby="partners-title">
     <h2 id="partners-title" data-i18n="partnersTitle">Frunk.store partners</h2>
     <div id="partnerList" class="partner-list"><div class="skeleton partner-skeleton"></div><div class="skeleton partner-skeleton"></div><div class="skeleton partner-skeleton"></div></div>
   </section>
+  <!-- A few apps worth a look, from catalog.json's "featured", as wide
+       slides with a screenshot behind each. hub.js fills it in. -->
+  <section id="featured" class="featured" aria-roledescription="carousel">
+    <div id="featuredTrack" class="featured-track"><div class="skeleton featured-skeleton"></div></div>
+    <div id="featuredDots" class="featured-dots" aria-hidden="true"></div>
+  </section>
   <h1 data-i18n="title">Apps for your car's browser</h1>
-  <p class="lede" id="lede" data-i18n="lede">Games and tools built to run on the center screen while you're parked.</p>
   <nav id="recent" class="recent" aria-label="Recently used" data-i18n-label="recentLabel" hidden></nav>
   <div id="toolbar" class="toolbar" hidden>
     <div id="filters" class="filters" role="group" aria-label="Show" data-i18n-label="filtersLabel"></div>
@@ -235,7 +240,16 @@
   <iframe id="frame" title="App" data-i18n-title="frameTitle"
     allow="fullscreen; gamepad; autoplay; encrypted-media; cross-origin-isolated; geolocation; screen-wake-lock"
     sandbox="allow-scripts allow-same-origin allow-pointer-lock allow-forms"></iframe>
-  <div id="loading" class="loading"><span class="spinner"></span><p id="slowLoad" class="slow-load" data-i18n="slowLoad" hidden>Still loading. A weak signal can make this slow.</p></div>
+  <!-- The app's splash while its frame loads; openApp() fills it in -->
+  <div id="loading" class="loading">
+    <div class="splash">
+      <img class="splash-icon" alt="" width="96" height="96">
+      <p class="splash-name"></p>
+      <p class="splash-tagline"></p>
+      <span class="spinner"></span>
+      <p id="slowLoad" class="slow-load" data-i18n="slowLoad" hidden>Still loading. A weak signal can make this slow.</p>
+    </div>
+  </div>
   <button id="home" class="home" aria-label="Back to apps" data-i18n-label="homeLabel" data-i18n="home">‹ Apps</button>
 </div>
 

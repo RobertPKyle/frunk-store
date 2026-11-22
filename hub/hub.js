@@ -104,6 +104,7 @@ function applyLang() {
   fsLabel();
   if (catalog) {
     renderPartners();
+    renderFeatured();
     renderRecent();
     renderFilters();
     renderGrid();
@@ -143,10 +144,12 @@ function inputChip(app) {
 // out to the partner's site, in a new tab. The icon is a hub file. A
 // language file translates a partner's tagline and "about" under "apps", by
 // its id, the way it does an app's. A partner game has "action": "play", so
-// its link says "Play on" rather than "Visit". The cards are small, two to
-// a row, so the apps below still show on the car's first screen; a
-// partner's "about" is shown where there is room for it, on its grid card.
-const OUT = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M9 7h8v8"/></svg>';
+// its link says "Play on" rather than "Visit". The cards are small, in one
+// row that scrolls sideways, so the banner and the apps below still show on
+// the car's first screen: just the icon, the name and where it goes. The
+// tagline is the card's tooltip, and a partner's "about" is shown where
+// there is room for it, on its grid card.
+const OUT ='<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M9 7h8v8"/></svg>';
 // A partner with "hideLangs" isn't shown in those languages: HoodFellas,
 // with real-money betting, stays out of the Chinese hubs, as the tokens do.
 const partnersHere = () => (catalog.partners ?? []).filter(p => /^https:\/\//.test(p.url)
@@ -156,16 +159,94 @@ function renderPartners() {
   partnersBox.hidden = !partners.length;
   partnerList.replaceChildren(...partners.map(p => {
     const key = p.action === 'play' ? 'partnerPlay' : 'partnerVisit';
-    const go = el('span', { class: 'partner-go' }, t(key).replace('{site}', new URL(p.url).host.replace(/^www\./, '')));
+    // the words in a span of their own, so a long one ends in "…" before the arrow
+    const go = el('span', { class: 'partner-go' }, el('span', {}, t(key).replace('{site}', new URL(p.url).host.replace(/^www\./, ''))));
     go.insertAdjacentHTML('beforeend', OUT);
-    return el('a', { class: 'partner', href: p.url, target: '_blank', rel: 'noopener', 'data-partner': p.id },
-      el('img', { src: p.icon, alt: '', width: 72, height: 72 }),
+    return el('a', { class: 'partner', href: p.url, target: '_blank', rel: 'noopener', 'data-partner': p.id, title: appTagline(p) ?? '' },
+      el('img', { src: p.icon, alt: '', width: 44, height: 44 }),
       el('div', { class: 'partner-text' },
-        el('h3', {}, appName(p)),
-        el('p', { class: 'partner-tagline' }, appTagline(p)),
+        // an age limit stays in sight now the tagline that said it is only a tooltip
+        el('h3', {}, el('span', {}, appName(p)), ...(p.minAge ? [el('span', { class: 'partner-age' }, `${p.minAge}+`)] : [])),
         go));
   }));
 }
+
+// Featured: a few apps picked in catalog.json's "featured", each a wide
+// slide with a screenshot behind its name, between the partners and the
+// grid. A tap anywhere on a slide opens the app. The slides scroll sideways
+// and snap, and move on by themselves every few seconds until the banner is
+// first touched or reached with the keys; never under reduced motion, nor
+// while the page is hidden or an app is open. The pictures are plain images
+// under a fixed gradient, so the car's GPU draws them like any other image.
+const featuredBox = document.getElementById('featured');
+const featuredTrack = document.getElementById('featuredTrack');
+const featuredDots = document.getElementById('featuredDots');
+const ADVANCE = 7000;      // ms each slide shows before the next one
+const PLAY = '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="currentColor"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12.5-7.5a1 1 0 0 0 0-1.72L8.5 3.64A1 1 0 0 0 7 4.5z"/></svg>';
+const quietMotion = matchMedia('(prefers-reduced-motion: reduce)');
+let featuredAt = 0, featuredHeld = false, featuredTimer;
+
+function renderFeatured() {
+  const picks = (catalog.featured ?? []).map(f => [catalog.apps.find(a => a.id === f.app && !a.unlisted), f.image]).filter(([app]) => app);
+  featuredBox.hidden = !picks.length;
+  featuredBox.setAttribute('aria-label', t('featuredLabel'));
+  featuredTrack.replaceChildren(...picks.map(([app, image], i) => {
+    // "New" or "Updated" on the same dates as the grid's badge, else "Featured"
+    const [fresh, date] = app.updated ? ['badgeUpdated', app.updated] : ['badgeNew', app.added];
+    const kicker = date && Date.now() - Date.parse(date + 'T00:00') < NEWS_DAYS * 86400_000 ? fresh : 'featuredKicker';
+    const play = el('span', { class: 'slide-play' }, t(app.tags.includes('Game') ? 'featuredPlay' : 'featuredOpen'));
+    play.insertAdjacentHTML('afterbegin', PLAY);
+    const slide = el('button', { class: 'slide', type: 'button', 'data-featured': app.id },
+      // the first is on the first screen; the rest wait for the icons on a slow connection
+      el('img', { class: 'slide-art', src: image, alt: '', width: 1200, height: 300, decoding: 'async', ...(i ? { fetchpriority: 'low' } : {}) }),
+      el('span', { class: 'slide-text' },
+        el('span', { class: 'slide-kicker' }, t(kicker)),
+        el('span', { class: 'slide-name' }, appName(app)),
+        el('span', { class: 'slide-tagline' }, appTagline(app))),
+      play);
+    slide.addEventListener('click', e => launch(app.id, e.detail === 0));   // no clicks counted: a key or the controller
+    return slide;
+  }));
+  featuredDots.replaceChildren(...picks.map(() => el('span')));
+  // drawn again for a new language: stay on the slide that was up
+  featuredAt = Math.min(featuredAt, Math.max(picks.length - 1, 0));
+  featuredTrack.scrollLeft = featuredAt * slideStep();
+  showDot();
+  advanceLater();
+}
+
+// one slide's width and the gap after it
+const slideStep = () => {
+  const [a, b] = featuredTrack.children;
+  return b ? b.offsetLeft - a.offsetLeft : featuredTrack.clientWidth || 1;
+};
+
+function showDot() {
+  featuredAt = Math.max(0, Math.min(featuredDots.children.length - 1, Math.round(featuredTrack.scrollLeft / slideStep())));
+  [...featuredDots.children].forEach((dot, i) => dot.classList.toggle('on', i === featuredAt));
+}
+featuredTrack.addEventListener('scroll', showDot, { passive: true });
+
+function advanceLater() {
+  clearTimeout(featuredTimer);
+  if (featuredHeld || quietMotion.matches || document.hidden || featuredTrack.children.length < 2) return;
+  featuredTimer = setTimeout(() => {
+    if (runner.hidden && !quietMotion.matches) {
+      const next = (featuredAt + 1) % featuredTrack.children.length;
+      featuredTrack.scrollTo({ left: next * slideStep(), behavior: 'smooth' });
+    }
+    advanceLater();
+  }, ADVANCE);
+}
+// Once someone takes the banner in hand it stays where they leave it
+function holdFeatured() {
+  featuredHeld = true;
+  clearTimeout(featuredTimer);
+}
+featuredBox.addEventListener('pointerdown', holdFeatured);
+featuredBox.addEventListener('focusin', holdFeatured);
+featuredTrack.addEventListener('wheel', holdFeatured, { passive: true });
+document.addEventListener('visibilitychange', () => document.hidden ? clearTimeout(featuredTimer) : advanceLater());
 
 // A partner entry with "tags" (and "input" and "added", like an app's) is
 // on the grid too, among the apps: a card that links out to the same page,
@@ -199,29 +280,78 @@ function matches(app, words) {
   return words.every(w => hay.includes(w));
 }
 
+// With "All" picked and nothing typed, the apps are on shelves: the newest
+// first, then the catalog's "shelves" in its order, each a row of cards that
+// scrolls sideways. A chip or a search shows one flat grid instead, since
+// that is a single list to look through. An app can be on two shelves, so
+// it can have two cards.
 function renderGrid() {
   const words = fold(query.trim()).split(/\s+/).filter(Boolean);
-  const shown = listed().filter(app => words.length ? matches(app, words) : filter === 'all' || app.tags.includes(filter));
   filterRow.toggleAttribute('data-off', words.length > 0);
+  if (!words.length && filter === 'all' && catalog.shelves) {
+    grid.dataset.view = 'shelves';
+    grid.replaceChildren(...shelves().map(([title, apps]) => el('section', { class: 'shelf' },
+      el('h2', { class: 'shelf-title' }, title),
+      el('div', { class: 'shelf-row' }, ...apps.map(appCard)))));
+    return;
+  }
+  grid.dataset.view = 'grid';
+  const shown = listed().filter(app => words.length ? matches(app, words) : filter === 'all' || app.tags.includes(filter));
   if (!shown.length) {
     grid.replaceChildren(el('p', { class: 'empty' }, t('searchNone').replace('{query}', query.trim())));
     return;
   }
-  grid.replaceChildren(...shown.map(app => {
-    const card = app.url
-      ? el('a', { class: 'card', href: app.url, target: '_blank', rel: 'noopener', 'data-app': app.id })
-      : el('button', { class: 'card', type: 'button', 'data-app': app.id });
-    card.append(
-      ...badge(app),
-      el('img', { src: iconSrc(app), alt: '', width: 64, height: 64 }),
-      el('h2', {}, appName(app)),
-      el('p', {}, app.url ? partnerAbout(app) : appTagline(app)),
-      el('div', { class: 'tags' }, ...inputChip(app), ...partnerChip(app), ...app.tags.map(tag => el('span', { class: 'tag' }, tagName(tag)))),
-    );
-    // a partner's card opens its page itself, being a link
-    card.addEventListener('click', e => app.url ? openedPartner(app.id) : launch(app.id, e.detail === 0));   // no clicks counted: a key or the controller
-    return card;
-  }));
+  grid.replaceChildren(...shown.map(appCard));
+}
+
+// The tags a card shows beside how the app plays and whose it is. The others
+// (Game, Camp Mode, WebGL and so on) repeat the filter chips or mean little
+// to a driver, so they're left to the filters and the search.
+const CARD_TAGS = ['Offline'];
+// A name with a long word, as German, Dutch and Norwegian make them
+// ("Hemelverschijnselen"), is set smaller, so the word fits beside the icon
+// more often instead of breaking in two
+const LONG_WORD = /[\p{Script=Latin}'’]{12,}/u;
+
+function appCard(app) {
+  const card = app.url
+    ? el('a', { class: 'card', href: app.url, target: '_blank', rel: 'noopener', 'data-app': app.id })
+    : el('button', { class: 'card', type: 'button', 'data-app': app.id });
+  const name = appName(app);
+  card.append(
+    el('img', { src: iconSrc(app), alt: '', width: 52, height: 52 }),
+    // the badge goes above the title, where it can't cover it in any language
+    el('div', { class: 'card-title' }, ...badge(app), el('h2', LONG_WORD.test(name) ? { class: 'long' } : {}, name)),
+    el('p', {}, app.url ? partnerAbout(app) : appTagline(app)),
+    el('div', { class: 'tags' }, ...inputChip(app), ...partnerChip(app),
+      ...app.tags.filter(tag => CARD_TAGS.includes(tag)).map(tag => el('span', { class: 'tag' }, tagName(tag)))),
+  );
+  // a partner's card opens its page itself, being a link
+  card.addEventListener('click', e => app.url ? openedPartner(app.id) : launch(app.id, e.detail === 0));   // no clicks counted: a key or the controller
+  return card;
+}
+
+const NEW_SHELF = 10;      // apps on the first shelf, the newest
+// the later of an app's "added" and "updated" dates; they're ISO dates, so they sort as text
+const newsDate = app => [app.added ?? '', app.updated ?? ''].sort()[1];
+
+// Each shelf as [title, apps], leaving out apps not listed here (a partner
+// game hidden in this language) and shelves left empty
+function shelves() {
+  const apps = listed();
+  const byId = new Map(apps.map(app => [app.id, app]));
+  // partner games are left off it: they already sit in the partners row at the top
+  const newest = apps.filter(app => !app.url && newsDate(app)).sort((a, b) => newsDate(b).localeCompare(newsDate(a))).slice(0, NEW_SHELF);
+  const rows = [[t('shelfNew'), newest]];
+  const placed = new Set();
+  for (const shelf of catalog.shelves) {
+    const row = shelf.apps.map(id => byId.get(id)).filter(Boolean);
+    for (const app of row) placed.add(app.id);
+    rows.push([t('shelf_' + shelf.id) ?? shelf.id, row]);
+  }
+  // an app added to the catalog but to no shelf still shows, at the end
+  rows.push([t('shelfMore'), apps.filter(app => !placed.has(app.id))]);
+  return rows.filter(([, row]) => row.length);
 }
 
 function renderFilters() {
@@ -258,8 +388,7 @@ searchForm.addEventListener('submit', e => {
   if (query.trim()) grid.querySelector('.card')?.click();
 });
 
-// The last few apps opened, newest first, one tap away. Returning visitors
-// know what the site is, so the row takes the place of the lede.
+// The last few apps opened, newest first, one tap away
 function renderRecent() {
   if (!catalog) return;
   const apps = store.get('recent', []).map(findApp).filter(Boolean).slice(0, RECENT);
@@ -270,13 +399,13 @@ function renderRecent() {
     return b;
   }));
   recentRow.hidden = !apps.length;
-  document.getElementById('lede').hidden = apps.length > 0;
 }
 
 function remember(id) {
   store.set('recent', [id, ...store.get('recent', []).filter(r => r !== id)].slice(0, 12));
   store.set('opened', { ...store.get('opened', {}), [id]: Date.now() });
-  grid.querySelector(`[data-app="${id}"] .badge`)?.remove();
+  // on the shelves an app can have more than one card
+  for (const b of grid.querySelectorAll(`[data-app="${id}"] .badge`)) b.remove();
 }
 
 // A partner game left for in a new tab: in the Recent row now, since no
@@ -341,6 +470,12 @@ function openApp(id, { push }) {
     history.pushState({ app: id }, '', `/app/${encodeURIComponent(id)}`);
     pushedHistory = true;
   }
+  // The splash shows which app is coming while its frame loads. The icon is
+  // a new element each time: an img given a new src keeps showing the last
+  // app's icon until the new one arrives, which on a weak signal can be a while.
+  loading.querySelector('.splash-icon').replaceWith(el('img', { class: 'splash-icon', src: iconSrc(app), alt: '', width: 96, height: 96 }));
+  loading.querySelector('.splash-name').textContent = appName(app);
+  loading.querySelector('.splash-tagline').textContent = appTagline(app);
   loading.hidden = false;
   slowLoad.hidden = true;
   clearTimeout(slowTimer);
@@ -435,7 +570,7 @@ if (document.documentElement.requestFullscreen) {
 // controller is read only while the hub itself is showing, never while an
 // app runs, so a game's input stays its own. The focused card is lit by
 // the .padnav class, since a ring from focus() alone isn't shown after a tap.
-const NAV = '#partners .partner, #filters .chip, #recent .recent-app, #grid .card';
+const NAV = '#partners .partner, #featured .slide, #filters .chip, #recent .recent-app, #grid .card';
 const DEAD = 0.5;          // stick travel before it counts as a direction
 const REPEAT = [400, 130]; // ms held before the first and the next repeats
 let padNav = false, lastNav = null;
@@ -452,7 +587,9 @@ function setPadNav(on) {
 
 // The nearest element in that direction, measured from the focused one's
 // edge, with sideways offset counted against it, so down from a chip lands
-// on the card below it
+// on the card below it. The offset runs from the focused one's middle to
+// the other's nearer side, so the wide banner counts as right above or
+// below whatever is under or over it, and isn't passed over.
 function move(dir) {
   const items = navItems();
   if (!items.length) return;
@@ -461,18 +598,21 @@ function move(dir) {
   if (!items.includes(cur)) {
     next = items.includes(lastNav) ? lastNav : items.find(n => n.matches('.card')) ?? items[0];
   } else {
+    // left and right stay on the shelf: past its end there's nothing, rather
+    // than a card scrolled out of sight on the shelf above or below
+    const row = (dir === 'left' || dir === 'right') && cur.closest('.shelf-row');
     const r = cur.getBoundingClientRect();
     const cx = (r.left + r.right) / 2, cy = (r.top + r.bottom) / 2;
     let best = Infinity;
     for (const n of items) {
-      if (n === cur) continue;
+      if (n === cur || (row && !row.contains(n))) continue;
       const b = n.getBoundingClientRect();
-      const bx = (b.left + b.right) / 2, by = (b.top + b.bottom) / 2;
+      const dx = Math.max(0, b.left - cx, cx - b.right), dy = Math.max(0, b.top - cy, cy - b.bottom);
       let ahead, aside;
-      if (dir === 'down') { ahead = b.top - r.bottom; aside = Math.abs(bx - cx); }
-      else if (dir === 'up') { ahead = r.top - b.bottom; aside = Math.abs(bx - cx); }
-      else if (dir === 'right') { ahead = b.left - r.right; aside = Math.abs(by - cy); }
-      else { ahead = r.left - b.right; aside = Math.abs(by - cy); }
+      if (dir === 'down') { ahead = b.top - r.bottom; aside = dx; }
+      else if (dir === 'up') { ahead = r.top - b.bottom; aside = dx; }
+      else if (dir === 'right') { ahead = b.left - r.right; aside = dy; }
+      else { ahead = r.left - b.right; aside = dy; }
       if (ahead < -1) continue;
       const score = ahead + aside * 1.5;
       if (score < best) { best = score; next = n; }
@@ -587,7 +727,7 @@ async function init() {
     catalog = await res.json();
   } catch (e) {
     grid.replaceChildren();
-    partnersBox.hidden = true;
+    partnersBox.hidden = featuredBox.hidden = true;
     err.hidden = false;
     err.textContent = t('catalogError').replace('{error}', e.message);
     retry = setTimeout(init, 10000);
@@ -600,6 +740,7 @@ async function init() {
   appsOrigin = resolveAppsOrigin(catalog.appsOrigin);
   startTokens(appsOrigin, () => lang, store);
   renderPartners();
+  renderFeatured();
   renderRecent();
   renderFilters();
   renderGrid();

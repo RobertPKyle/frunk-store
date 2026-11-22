@@ -5,7 +5,6 @@
 //   node tools/e2e.mjs https://frunk.store   # against production
 import { chromium } from 'playwright-core';
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
-import { n64TestRom } from './n64-test-rom.mjs';
 
 const base = process.argv[2] || 'http://localhost:5173';
 const shots = new URL('../.e2e/', import.meta.url).pathname;
@@ -62,16 +61,25 @@ async function openFromHub(name) {
   await page.goto(base + '/');
   await page.waitForSelector('.card');
   // by title, as a tagline may name other apps
-  await page.locator('#grid .card').filter({ has: page.locator('h2', { hasText: name }) }).click();
+  // the first card: an app on the New shelf has a second one further down
+  await page.locator('#grid .card').filter({ has: page.locator('h2', { hasText: name }) }).first().click();
   await page.waitForSelector('#loading', { state: 'hidden' });
 }
 
 await check('hub lists every catalog app', async () => {
   await page.goto(base + '/');
   await page.waitForSelector('.card');
-  const expected = gridApps(await (await fetch(base + '/catalog.json')).json()).length;
-  const n = await page.locator('.card').count();
-  if (n !== expected) throw new Error(`expected ${expected} cards, got ${n}`);
+  const catalog = await (await fetch(base + '/catalog.json')).json();
+  // on shelves, so an app on the New shelf has two cards: count the apps
+  const want = gridApps(catalog).map(app => app.id).sort();
+  const shown = [...new Set(await page.locator('#grid .card').evaluateAll(cards => cards.map(c => c.dataset.app)))].sort();
+  if (shown.join() !== want.join()) throw new Error(`expected ${want.length} apps, got ${shown.length}: missing ${want.filter(id => !shown.includes(id)).join(', ') || 'none'}`);
+  // every app is on a genre shelf, and every shelf in the catalog lists only real apps
+  const shelved = new Set(catalog.shelves.flatMap(shelf => shelf.apps));
+  const loose = want.filter(id => !shelved.has(id));
+  if (loose.length) throw new Error(`not on any shelf: ${loose.join(', ')}`);
+  const unknown = [...shelved].filter(id => !want.includes(id));
+  if (unknown.length) throw new Error(`shelves list unknown apps: ${unknown.join(', ')}`);
   if (!(await page.evaluate(() => crossOriginIsolated))) throw new Error('hub not cross-origin isolated');
   await page.screenshot({ path: shots + 'hub.png' });
 });
@@ -102,6 +110,29 @@ await check('hub partners sit on top and link out', async () => {
     if (chip !== 'Partner') throw new Error(`grid card for ${p.id} not marked as a partner's`);
   }
   await page.screenshot({ path: shots + 'partners.png' });
+});
+
+await check('hub featured banner shows its apps and opens one', async () => {
+  await page.goto(base + '/');
+  await page.waitForSelector('#featured .slide');
+  const featured = (await (await fetch(base + '/catalog.json')).json()).featured ?? [];
+  await page.waitForFunction(() => [...document.querySelectorAll('#featured .slide img')].every(img => img.complete), null, { timeout: 10000 });
+  const slides = await page.locator('#featured .slide').evaluateAll(s => s.map(n => [n.dataset.featured, n.querySelector('img')?.naturalWidth ?? 0]));
+  if (slides.map(([id]) => id).join() !== featured.map(f => f.app).join()) throw new Error(`slides ${slides.map(([id]) => id).join(', ')}`);
+  const blank = slides.filter(([, w]) => !w).map(([id]) => id);
+  if (blank.length) throw new Error(`slide pictures didn't load: ${blank.join(', ')}`);
+  // above the title, below the partners
+  const order = await page.evaluate(() => {
+    const y = sel => document.querySelector(sel).getBoundingClientRect();
+    return y('#partners').bottom <= y('#featured').top && y('#featured').bottom <= y('h1').top;
+  });
+  if (!order) throw new Error('banner not between the partners and the title');
+  const first = featured[0].app;
+  await page.locator(`#featured .slide[data-featured="${first}"]`).click();
+  await page.waitForSelector('#loading', { state: 'hidden' });
+  if (new URL(page.url()).pathname !== `/app/${first}`) throw new Error(`slide opened ${page.url()}`);
+  await page.click('#home');
+  await page.waitForSelector('#runner', { state: 'hidden' });
 });
 
 await check('fractal renders with worker threads', async () => {
@@ -137,10 +168,9 @@ await check('home button closes apps opened one after another', async () => {
 });
 
 await check('hub shows recent apps and filters by category', async () => {
-  // the apps opened above, newest first, in place of the lede
+  // the apps opened above, newest first
   const recent = await page.locator('#recent .recent-app').allTextContents();
   if (recent[0] !== 'Brick Breaker' || recent[1] !== 'Retro Console') throw new Error(`recent row: ${recent.join(', ')}`);
-  if (await page.locator('#lede').isVisible()) throw new Error('lede still shown next to the recent row');
   await page.getByRole('button', { name: 'Games', exact: true }).click();
   const games = await page.locator('#grid .card h2').allTextContents();
   if (!games.includes('Retro Console') || games.includes('Weather')) throw new Error(`Games shows ${games.join(', ')}`);
@@ -174,11 +204,15 @@ await check('hub search finds apps and arrow keys move between cards', async () 
   await page.evaluate(() => document.activeElement.blur());
   await page.keyboard.press('ArrowDown');
   await page.keyboard.press('ArrowRight');
-  const focused = await page.evaluate(() => document.activeElement.dataset.app);
-  if (focused !== 'breakout') throw new Error(`down, right focused ${focused}`);
+  // the second card on the first shelf, and its name
+  const [focused, want, name] = await page.evaluate(() => {
+    const second = document.querySelector('#grid .shelf-row').children[1];
+    return [document.activeElement.dataset.app, second.dataset.app, second.querySelector('h2').textContent];
+  });
+  if (focused !== want) throw new Error(`down, right focused ${focused}, not ${want}`);
   await page.keyboard.press('Enter');
   await page.waitForSelector('#loading', { state: 'hidden' });
-  if (!(await page.title()).startsWith('Brick Breaker')) throw new Error(`Enter opened "${await page.title()}"`);
+  if (!(await page.title()).startsWith(name)) throw new Error(`Enter opened "${await page.title()}"`);
   await page.click('#home');
   await page.waitForSelector('#runner', { state: 'hidden' });
 });
@@ -213,9 +247,11 @@ await check('hub badges a new app until it is opened', async () => {
   try {
     await page.evaluate(() => localStorage.removeItem('hub.opened'));
     await page.reload();
+    // new today, so it's on the New shelf as well as its own: two cards
     const card = page.locator('#grid .card[data-app="breakout"]');
-    await card.locator('.badge', { hasText: 'New' }).waitFor({ timeout: 3000 });
-    await card.click();
+    await card.first().locator('.badge', { hasText: 'New' }).waitFor({ timeout: 3000 });
+    if (await card.count() !== 2) throw new Error(`breakout has ${await card.count()} cards, not 2 (New shelf)`);
+    await card.first().click();
     await page.waitForSelector('#loading', { state: 'hidden' });
     await page.click('#home');
     await page.waitForSelector('#runner', { state: 'hidden' });
@@ -256,8 +292,13 @@ await check('hub footer shows live token cards', async () => {
   const mints = ['CBsg6Nr9UoTPsLhqNHTbaFt4c6qcNgrnbntwabdQpump', 'roNinuSrZUqNcsqVT4tkRdBR5nswruJxQEN3MqSqWYy'];
   await page.goto(base + '/');
   await page.waitForSelector('#grid .card');
+  // Before their prices come, the cards still sit in the footer (a class
+  // clash once laid them over the top of the page until it was scrolled)
+  const misplaced = await page.evaluate(() => [...document.querySelectorAll('.coin')]
+    .filter(c => getComputedStyle(c).position !== 'static' || c.getBoundingClientRect().top < document.querySelector('.foot').getBoundingClientRect().top).length);
+  if (misplaced) throw new Error(`${misplaced} token card(s) out of the footer before loading`);
   await page.locator('.token').scrollIntoViewIfNeeded();
-  await page.waitForFunction(() => !document.querySelector('.coin.loading'), null, { timeout: 20000 });
+  await page.waitForFunction(() => !document.querySelector('.coin-waiting'), null, { timeout: 20000 });
   const cards = await page.evaluate(() => [...document.querySelectorAll('.coin')].map(c => ({
     ca: c.querySelector('code').textContent,
     price: c.querySelector('.coin-value').textContent,
@@ -270,7 +311,7 @@ await check('hub footer shows live token cards', async () => {
     if ((c.line.match(/L/g) || []).length < 2) throw new Error(`no price line for ${c.ca}`);
   }
   await page.click('.token-ranges [data-range="1h"]');
-  await page.waitForFunction(() => !document.querySelector('.coin.loading'), null, { timeout: 20000 });
+  await page.waitForFunction(() => !document.querySelector('.coin-waiting'), null, { timeout: 20000 });
   if (await page.getAttribute('.token-ranges [data-range="1h"]', 'aria-pressed') !== 'true') throw new Error('range button not pressed');
   await page.locator('.token').screenshot({ path: shots + 'hub-tokens.png' });
   await page.evaluate(() => localStorage.removeItem('hub.tokenRange'));
@@ -859,10 +900,12 @@ await check('road trip postcard draws a card and hands it to the phone', async (
   // The name comes from the place chosen, the map fills the letters, and the code follows
   await app.locator('#names .chip[aria-pressed="true"]').filter({ hasText: 'Moab' }).waitFor({ timeout: 20000 });
   await app.locator('#names .chip').filter({ hasText: 'Utah' }).waitFor({ timeout: 20000 });
-  // The status line empties once the map has been drawn into the letters
+  // The status line empties once the map has been drawn into the letters.
+  // The map's tiles come from outside; late in a full run they can take
+  // over 40 seconds, so allow 90.
   for (let i = 0; ; i++) {
     if (!(await app.locator('#status').textContent())) break;
-    if (i > 200) throw new Error(`stuck on: ${await app.locator('#status').textContent()}`);
+    if (i > 450) throw new Error(`stuck on: ${await app.locator('#status').textContent()}`);
     await page.waitForTimeout(200);
   }
   const link = async () => decodeURIComponent((await app.locator('#qr a').getAttribute('href')).replace(/\+/g, ' '));
@@ -1752,9 +1795,9 @@ await check('retro console plays Genesis and PC Engine games, and the former ear
       smd[512 + block + 8192 + i] = atoms[block + i * 2];
     }
   }
-  // but not an N64 cartridge: the N64 is switched off (too slow in the car)
-  const n64 = n64TestRom();
-  n64.swap16();
+  // but not an N64 cartridge: Retro Console has no N64 core (it was too slow in the car)
+  const n64 = Buffer.alloc(0x101000);
+  n64.set([0x37, 0x80, 0x40, 0x12]);
   await (await picker).setFiles([
     { name: 'falling.pce', mimeType: 'application/octet-stream', buffer: readFileSync(new URL('../apps/retro/games/blox.pce', import.meta.url)) },
     { name: 'atoms.bin', mimeType: 'application/octet-stream', buffer: atoms },
@@ -2609,7 +2652,8 @@ await check('neverputt plays by touch and controller, and keeps what it writes',
   const stats = () => frame().evaluate(() => window.neverputtStats());
   const until = async (what, fn, ms = 15000) => {
     for (const t = Date.now(); Date.now() - t < ms; await page.waitForTimeout(100)) if (await fn()) return;
-    throw new Error(`no ${what}`);
+    // what the game had done, to tell a slow start (late in a full run) from a broken one
+    throw new Error(`no ${what}: ${JSON.stringify(await stats().catch(e => e.message))}`);
   };
   // Two pads like the car: the controller's raw device, whose presses must not
   // count, and the car's standard copy. A button on the raw device is "back".
