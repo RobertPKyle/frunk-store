@@ -13,6 +13,15 @@
   ],
   "partners": [
     {
+      "id": "hodl",
+      "name": "HODL",
+      "url": "https://hodluntildeath.itch.io/hodl",
+      "icon": "/partners/hodl.webp",
+      "hideLangs": ["zh"],
+      "tagline": "Diamond hands vs paper hands. A free team shooter for Windows PC.",
+      "about": "HODLers defend the Vault while JEETs try to dump it. Pick one of four classes, play online or alone against bots, or host your own game. Free to download for Windows PC."
+    },
+    {
       "id": "hoodfellas",
       "name": "HoodFellas",
       "url": "https://www.hoodfellas.org/play",
@@ -25,15 +34,6 @@
       "minAge": 18,
       "tagline": "Run crimes, build your empire and take the city. 18+.",
       "about": "Make a mobster with just an email and password, run rackets, found a family and win turf wars block by block. Its casino and sportsbook can be played for real money, so it's 18+ only."
-    },
-    {
-      "id": "hodl",
-      "name": "HODL",
-      "url": "https://hodluntildeath.itch.io/hodl",
-      "icon": "/partners/hodl.webp",
-      "hideLangs": ["zh"],
-      "tagline": "Diamond hands vs paper hands. A free team shooter for Windows PC.",
-      "about": "HODLers defend the Vault while JEETs try to dump it. Pick one of four classes, play online or alone against bots, or host your own game. Free to download for Windows PC."
     },
     {
       "id": "fatmusic",
