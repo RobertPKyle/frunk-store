@@ -2,8 +2,8 @@
 // the hub still opens when the car has a weak or no connection. A page that
 // doesn't arrive within a few seconds comes from the cache, and so do the
 // files it loads, so the shell and catalog stay from one version.
-const CACHE = 'frunk-hub-v23';
-const SHELL = ['/', '/hub.css', '/hub.js', '/i18n.js', '/tokens.js', '/catalog.json', '/icon.svg', '/brand/frunk-mark-on-dark.svg', '/partners/hoodfellas.webp', '/partners/fatmusic.svg', '/partners/webq3-memecoin.webp', '/partners/webq3-surge.webp', '/featured/rocks.webp', '/featured/neverputt.webp', '/featured/keen4.webp', '/featured/hocus.webp', '/featured/duke2.webp', '/featured/cnc.webp', '/fonts/unbounded-latin.woff2'];
+const CACHE = 'frunk-hub-v24';
+const SHELL = ['/', '/hub.css', '/hub.js', '/i18n.js', '/tokens.js', '/catalog.json', '/icon.svg', '/brand/frunk-mark-on-dark.svg', '/partners/hoodfellas.webp', '/partners/hodl.webp', '/partners/fatmusic.svg', '/partners/webq3-memecoin.webp', '/partners/webq3-surge.webp', '/featured/rocks.webp', '/featured/neverputt.webp', '/featured/keen4.webp', '/featured/hocus.webp', '/featured/duke2.webp', '/featured/cnc.webp', '/fonts/unbounded-latin.woff2'];
 const LANGS = ['zh-Hant', 'zh-Hans', 'de', 'nb', 'nl', 'ja', 'ko'];
 const SLOW = 3000;        // ms to wait for the page before using the cached copy
 const SLOW_FILE = 6000;   // the same for a file, once the page has come
