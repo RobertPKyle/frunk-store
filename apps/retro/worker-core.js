@@ -1,6 +1,6 @@
 // A core whose emulator runs on its own thread (nes-worker.js for NES,
 // sms-worker.js for Master System, Game Gear and SG-1000, pce-worker.js for
-// PC Engine, md-worker.js for Mega Drive, n64-worker.js for Nintendo 64).
+// PC Engine, md-worker.js for Mega Drive).
 // The worker draws
 // to this core's canvas (handed over as an OffscreenCanvas), keeps the
 // game's saves, and sends sound straight to the AudioWorklet made here. This
@@ -18,8 +18,7 @@
 //                                            the speaker has taken (or dropped) so far
 //   { type: 'sound', on }                    sound switched on or off
 //   { id, type: 'load', bytes, name }        -> { id, error? }
-//   { type: 'input', buttons: [p1, p2] }     held buttons as bitmasks (or what the
-//                                            core's encode() makes of the input)
+//   { type: 'input', buttons: [p1, p2] }     held buttons as bitmasks
 //   { type: 'pause', on } / { type: 'reset' }
 //   { type: 'detail', on }                   the details readout is shown, or hidden
 //   { id, type: 'save' }, { id, type: 'quit' }  -> { id } once saved
@@ -67,10 +66,8 @@ registerProcessor('worker-out', WorkerOut);
 // when it's an ES module; width and height: the picture's size, unless the
 // worker says otherwise; buttons: button name -> bit in the worker's
 // bitmasks; same: buttons that work as another (X as A); sampleRate: the
-// rate the emulator makes sound at, or none to have it use the speaker's;
-// encode: optional, makes what's sent from input()'s arguments (an array of
-// numbers) in place of the bitmasks
-export function createWorkerCore(canvas, { system, worker: url, module = false, width, height, buttons, same = {}, sampleRate, encode }) {
+// rate the emulator makes sound at, or none to have it use the speaker's
+export function createWorkerCore(canvas, { system, worker: url, module = false, width, height, buttons, same = {}, sampleRate }) {
   const audio = { ctx: null, node: null };
   let sent = [0, 0];
   let worker = null, nextId = 1, soundOn = true, paused = false, fromWorker = { n: 0, hz: 0, steady: false };
@@ -165,21 +162,14 @@ export function createWorkerCore(canvas, { system, worker: url, module = false, 
         stopAudio();
         throw new Error(error);
       }
-      sent = encode ? [] : [0, 0];
+      sent = [0, 0];
       paused = false;
       core.failed = '';
     },
 
     // players: two Sets of button names (up down left right a b x y l r start
-    // select, and more in retro.js); analog: { sticks, pads }, for encode
-    input(players, analog) {
-      if (encode) {
-        const now = encode(players, analog);
-        if (now.length === sent.length && now.every((v, i) => v === sent[i])) return;
-        sent = now;
-        worker.postMessage({ type: 'input', buttons: now });
-        return;
-      }
+    // select, and more in retro.js)
+    input(players) {
       const now = [0, 0];
       for (let p = 0; p < 2; p++) {
         for (const b of players[p]) {

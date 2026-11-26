@@ -1,16 +1,13 @@
 // Retro Console: NES (jsnes), Game Boy / Color / Advance (mGBA), Master
 // System / Game Gear / SG-1000 (Gearsystem), Atari Lynx (Gearlynx), PC
-// Engine / TurboGrafx-16 (Geargrafx), Mega Drive / Genesis (clownmdemu) and
-// Nintendo 64 (n64js) emulators with free
-// homebrew games built in, plus games the player loads from their own files. Loaded files are kept in this screen's IndexedDB and never leave
-// it.
-//
-// The Nintendo 64 core is switched off (see OFF): too slow in the car.
+// Engine / TurboGrafx-16 (Geargrafx) and Mega Drive / Genesis (clownmdemu)
+// emulators with free homebrew games built in, plus games the player loads
+// from their own files. Loaded files are kept in this screen's IndexedDB and
+// never leave it.
 //
 // Input comes from up to two gamepads, the on-screen buttons and the
 // keyboard; each frame they're merged and handed to the running core
-// (nes.js, gba.js, sms.js, lynx.js, pce.js, md.js or n64.js) as sets of button
-// names, plus the players' analog sticks for the N64.
+// (nes.js, gba.js, sms.js, lynx.js, pce.js or md.js) as sets of button names.
 
 import { inputSwap } from '../_shared/inputswap.js';
 import { padMenu } from '../_shared/padmenu.js';
@@ -22,7 +19,6 @@ import { createSms } from './sms.js';
 import { createLynx } from './lynx.js';
 import { createPce } from './pce.js';
 import { createMd } from './md.js';
-import { createN64 } from './n64.js';
 
 const GAMES = [
   {
@@ -88,11 +84,10 @@ const settings = {
   set(key, value) { try { localStorage.setItem('retro.' + key, JSON.stringify(value)); } catch {} },
 };
 
-// Consoles switched off: their games aren't added, listed or continued (any
-// already added stay stored). The N64 ran at about a sixth of full speed in
-// the car (2026-10-22).
-const OFF = new Set(['n64']);
-const playable = system => !OFF.has(system);
+// Games of a console this screen no longer runs aren't listed or continued;
+// any already added stay stored. The Nintendo 64 core was removed
+// (2026-11-21): it ran at about a sixth of full speed in the car.
+const playable = system => system !== 'n64';
 
 // ---------- your games (IndexedDB) ----------
 
@@ -282,8 +277,7 @@ function showSound() {
 // Buttons have their SNES-style names: a, b, x, y, l, r, start, select and
 // the four directions. Each core uses the ones its console has. Controllers
 // also report lb, rb (shoulder buttons), lt, rt (triggers) and dup, ddown,
-// dleft, dright (the D-pad alone), and the N64's on-screen buttons z and
-// cu, cd, cl, cr (C buttons), which only the N64 uses.
+// dleft, dright (the D-pad alone).
 const KEYS = {
   ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right',
   KeyX: 'a', KeyK: 'a', KeyZ: 'b', KeyJ: 'b', KeyS: 'x', KeyI: 'x', KeyA: 'y', KeyU: 'y', KeyQ: 'l', KeyW: 'r',
@@ -304,9 +298,6 @@ function press(b) { sticky.set(b, 3); }
 // axes, which agree with the standard pad. Without a standard pad, raw pads
 // are read with the usual raw layout (A 0, B 1, X 3, Y 4, L 6, R 7,
 // Select 10, Start 11).
-// Also returns each player's sticks (players.sticks): { x, y, cx, cy } from
-// -1 to 1, down and right positive (the left stick, and a standard pad's
-// right stick); and how many players have a controller (players.pads).
 function padsToPlayers(pads) {
   const players = [new Set(), new Set()];
   const standard = pads.filter(p => p.mapping === 'standard');
@@ -314,11 +305,6 @@ function padsToPlayers(pads) {
   const first = (standard.length ? standard : raw).slice(0, 2);
   first.forEach((p, i) => readPad(p, players[i]));
   if (standard.length) for (const p of raw) padAxes(p, players[0]);
-  players.sticks = [0, 1].map(i => {
-    const ax = first[i] ? first[i].axes : [], right = first[i]?.mapping === 'standard';
-    return { x: ax[0] || 0, y: ax[1] || 0, cx: right && ax[2] || 0, cy: right && ax[3] || 0 };
-  });
-  players.pads = first.length;
   return players;
 }
 
@@ -384,16 +370,7 @@ function readInput() {
     if (left <= 1) sticky.delete(b); else sticky.set(b, left - 1);
   }
   const pads = readPads();
-  const sticks = pads.sticks;
-  let knob = null;
-  for (const t of touch.values()) {
-    for (const b of t.held || []) now[0].add(b);
-    // the N64's touch stick: the D-pad, read for how far it's pushed
-    if (t.vec) {
-      knob = t.vec;
-      if (Math.hypot(...t.vec) > Math.hypot(sticks[0].x, sticks[0].y)) sticks[0] = { ...sticks[0], x: t.vec[0], y: t.vec[1] };
-    }
-  }
+  for (const t of touch.values()) for (const b of t.held || []) now[0].add(b);
   pads.forEach((set, i) => { for (const b of set) now[i].add(b); });
   if (pads.some(set => set.size)) input.auto('pad');
   const combo = pads[0].has('select') && pads[0].has('start');
@@ -403,9 +380,8 @@ function readInput() {
     if (now[0].has('start')) now[0].delete('start');
     else swallowStart = false;
   }
-  core.input(now, { sticks, pads: pads.pads });
+  core.input(now);
   showTouch(now[0]);
-  if (core.system === 'n64') moveKnob(knob);
 }
 
 // Lights the on-screen buttons that are held; touches the page only when
@@ -421,15 +397,6 @@ function showTouch(set) {
   for (const el of touchButtons) el.classList.toggle('on', set.has(el.dataset.b));
 }
 
-// The N64's touch stick shows where it's pushed (vec, or the middle)
-let knobAt = '';
-function moveKnob(vec) {
-  const at = vec ? `translate(${Math.round(vec[0] * 34)}px, ${Math.round(vec[1] * 34)}px)` : '';
-  if (at === knobAt) return;
-  knobAt = at;
-  $('knob').style.transform = at;
-}
-
 function dpadDirs(e) {
   const r = $('dpad').getBoundingClientRect();
   const x = e.clientX - (r.left + r.width / 2), y = e.clientY - (r.top + r.height / 2);
@@ -443,15 +410,6 @@ function dpadDirs(e) {
   return out;
 }
 
-// How far from its middle the D-pad is touched, as x and y from -1 to 1
-function dpadVec(e) {
-  const r = $('dpad').getBoundingClientRect();
-  let x = (e.clientX - (r.left + r.width / 2)) / (r.width * 0.4), y = (e.clientY - (r.top + r.height / 2)) / (r.height * 0.4);
-  const d = Math.hypot(x, y);
-  if (d > 1) { x /= d; y /= d; }
-  return [x, y];
-}
-
 function buttonAt(e) {
   const el = document.elementFromPoint(e.clientX, e.clientY);
   const b = el && el.closest('#player [data-b]');
@@ -461,7 +419,7 @@ function buttonAt(e) {
 function onPointer(e) {
   if (e.type === 'pointerdown' && !e.target.closest('.bar')) input.auto('touch');
   if (e.type === 'pointerdown') {
-    if (e.target.closest('#dpad')) touch.set(e.pointerId, { dpad: true, held: dpadDirs(e), vec: dpadVec(e) });
+    if (e.target.closest('#dpad')) touch.set(e.pointerId, { dpad: true, held: dpadDirs(e) });
     else if (e.target.closest('#player [data-b]')) touch.set(e.pointerId, { held: buttonAt(e) });
     else return;
     touch.get(e.pointerId).held.forEach(press);
@@ -471,7 +429,6 @@ function onPointer(e) {
     const t = touch.get(e.pointerId);
     if (!t) return;
     t.held = t.dpad ? dpadDirs(e) : buttonAt(e);   // slide between A and B
-    if (t.dpad) t.vec = dpadVec(e);
   } else {
     touch.delete(e.pointerId);
   }
@@ -496,16 +453,15 @@ addEventListener('blur', () => keyboard.clear());
 
 const cores = {
   nes: createNes($('screen')), gba: createGba($('gbaScreen')), sms: createSms($('smsScreen')), pce: createPce($('pceScreen')),
-  md: createMd($('mdScreen')), n64: createN64($('display')), lynx: createLynx($('lynxScreen')),
+  md: createMd($('mdScreen')), lynx: createLynx($('lynxScreen')),
 };
-const CORE = { nes: 'nes', gb: 'gba', gba: 'gba', sms: 'sms', gg: 'sms', sg: 'sms', pce: 'pce', md: 'md', n64: 'n64', lynx: 'lynx' };
+const CORE = { nes: 'nes', gb: 'gba', gba: 'gba', sms: 'sms', gg: 'sms', sg: 'sms', pce: 'pce', md: 'md', lynx: 'lynx' };
 
 // Sega's pads have buttons 1 and 2 where B and A are, and Start is the
 // Master System's Pause button; the PC Engine's have II and I there, and
 // Run. The Mega Drive's A, B and C take Y (shown only for it), B and A.
-// The N64's A and B take B and Y, with its own C buttons, Z and the
-// D-pad as its stick (see n64.js). The Lynx's Option 1 and 2 take L and R.
-const LABELS = { sms: ['1', '2', 'Pause'], gg: ['1', '2', 'Start'], sg: ['1', '2', 'Pause'], pce: ['II', 'I', 'Run'], md: ['B', 'C', 'Start', 'A'], n64: ['A', 'A', 'Start', 'B', 'Z'],
+// The Lynx's Option 1 and 2 take L and R.
+const LABELS = { sms: ['1', '2', 'Pause'], gg: ['1', '2', 'Start'], sg: ['1', '2', 'Pause'], pce: ['II', 'I', 'Run'], md: ['B', 'C', 'Start', 'A'],
   lynx: ['B', 'A', 'Pause', 'Y', 'Select', 'Option 1', 'Option 2'] };
 function labelButtons(system) {
   const [b, a, start, y = 'Y', select = 'Select', l = 'L', r = 'R'] = LABELS[system] || ['B', 'A', 'Start'];
@@ -528,9 +484,8 @@ const SLOW_HZ = 54;
 let steady = false, slowSeconds = 0, startedAt = 0;
 
 // Tapping the frame rate shows details for checking speed in the car: how
-// often the screen refreshed (60 when the page keeps up) and, for the N64,
-// how much of the time its emulator is busy (near 100 when it can't keep
-// up) and what it's busy with
+// often the screen refreshed (60 when the page keeps up), and how busy the
+// emulator is for a worker that says
 let details = settings.get('details', false);
 $('fps').onclick = () => {
   details = !details;

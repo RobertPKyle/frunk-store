@@ -311,71 +311,11 @@ clear them to make room.
   4 MB), and leaves out the Mega CD here. All four run in workers
   (`sms-worker.js`, `lynx-worker.js`, `pce-worker.js`, `md-worker.js`, sharing
   `gear-worker.js`) the way jsnes runs in its own (the page side is
-  `worker-core.js`). The Nintendo 64 is switched off (2026-10-22, after
-  two car tests at about a sixth of full speed): `OFF` in `retro.js` keeps
-  its games from being added, listed or continued, and no text names it
-  (it was tested in the since-removed holders edition as "Genesis, PC
-  Engine & N64", commit ac6afec). Its code stays: Nintendo 64 cartridges run on n64js (MIT, pure JavaScript, commit
-  1eb54aa, with `tools/n64js/patches/*.patch` applied), bundled by `npm run build:n64` (`tools/build-n64js.mjs` runs
-  Bun's bundler through npx on n64js's sources plus `tools/n64js/web.js`,
-  which stands in for n64js's own page and debugger, and
-  `tools/n64js/shims.js`, stand-ins for the page globals it expects; output
-  in `apps/retro/n64/`, committed). It runs in `n64-worker.js` like the other
-  cores (it compiles the game's code to JavaScript and draws with WebGL 2 to
-  the OffscreenCanvas). Its sound is resampled to the speaker's rate and
-  paced by a shared count of the samples the AudioWorklet has taken (about
-  50 ms queued, frames skipped past 100 ms, as n64js does with Web Audio).
-  In-game saves go to IndexedDB ("n64"); there are no snapshots. When a
-  frame takes longer than 20 ms, the worker runs one frame at a time, each
-  straight after the last (not waiting for the screen's next refresh), so
-  every frame worked out is shown; catching up three at a time showed only
-  one in three, a picture every third of a second in the car. While the
-  emulator is busy over 80% of the time, frames are overdue and WebGL
-  drawing takes over a fifth of a drawn frame's time, up to two in three
-  frames are worked out but not drawn (and not shown), and with sound off
-  the game's audio tasks are skipped. Tapping the frame rate also shows how
-  busy the emulator is, and how much of that is the game's code, its
-  display lists, WebGL drawing and sound, the frames drawn and skipped, and
-  the RSP tasks n64js can't do itself (their kind, and how much of the time
-  its RSP emulator, which steps along with the game's code, was running
-  them), measured only while shown. A first car test (2026-10-22) ran at
-  about 10 fps (a sixth of full speed), 98% busy; the second, with the
-  readout (Super Smash Bros.' menus), read 9 fps · 2 Hz · 97% busy · game
-  89% · lists 4% · gl 2% · sound 0% · 2 drawn, 5 skipped · rsp 7: the
-  game's code is the cost, so moving drawing to another thread would gain
-  little. Today's free N64
-  homebrew uses libdragon's boot code, which n64js doesn't boot, so there's
-  no free N64 game; the e2e check played a tiny test cartridge made by
-  `tools/n64-test-rom.mjs` (double-buffered display lists drawn by n64js's
-  Fast3D emulation, controller, tone and EEPROM save; `n64TestRom({
-  triangles: 9000 })` makes it heavy, and `work: { code, count }` runs a
-  compiled MIPS function each frame; it now checks Retro Console turns
-  that cartridge away). Dropping WebGL calls that change
-  nothing was tried and saved under 10% of the drawing time, so it was left
-  out. The patches (each with tests, run with n64js's own suite, `bun
-  test`) speed up n64js for the car: its recompiler compiles single-precision
-  ADD/SUB/MUL/DIV, NEG/ABS/MOV, compares and float/int conversions inline for
-  the common case (round to nearest, no FPU exceptions enabled, ordinary
-  numbers; anything else runs n64js's exact helpers, checked against them
-  with random operands), and lone float, byte and halfword loads and stores
-  inline with a cheap RAM guard (lone word accesses keep their helpers, which
-  also serve MMIO polling); and its HLE display lists draw triangles from
-  batches separated only by vertex loads, matrices and the like together (up
-  to 512, `graphicsOptions.batchTriangles`, which web.js turns on). On a
-  desktop, game-like float code compiled from C (skeletal animation, 64
-  characters) took 33% of the time before and 9% after, with RDRAM identical
-  after 300 frames; 9000 triangles a frame went from 43% drawing to 2%,
-  pixel-identical. The second patch keeps the registers a compiled block
-  uses (GPRs, singles, FCSR) in JavaScript locals, written through to n64js's
-  arrays and read back after helpers, which V8 can hold in machine
-  registers (checked with random programs run compiled and interpreted);
-  with the CPU fully loaded, integer game logic ran about 20% faster and
-  the animation code 13% (`count` takes integer rounds in bits 8 to 15 and
-  animation passes from bit 16, see `tools/n64js/bench/work.c`). On
-  the N64 the touch D-pad is an analog stick with a knob, and a second
-  controller plays as player 2. Moving n64js off the page's main thread
-  took the test cartridge's page load from 812 to 5 ms a second with the
-  CPU slowed 4.5x. Gearsystem takes about 0.5 ms a frame on a desktop
+  `worker-core.js`). A Nintendo 64 core (n64js, patched for speed) ran at
+  about a sixth of full speed in two car tests (2026-10-22), was switched
+  off, and was removed on 2026-11-21 (the last version with it, its build
+  script, patches and test cartridge is commit 2ef0ce9); N64 games added
+  before then stay stored but aren't listed. Gearsystem takes about 0.5 ms a frame on a desktop
   (2.2 ms with the CPU slowed 4.5x), Gearlynx 1.4 ms, Geargrafx 1.5 ms (6.7 ms slowed),
   clownmdemu 1.4 ms (7.7 ms slowed). The console is picked from the file's
   header (Sega's 8-bit consoles' and the PC Engine's by name, .sms, .gg, .sg
@@ -1404,7 +1344,6 @@ npm run build:lynx                      # Gearlynx for Retro Console (needs Dock
 npm run build:townpatrol                # Town Patrol's Lynx cartridge from source (needs Docker); output is committed
 npm run build:kroz                      # ASCII Quests' Kroz games from Apogee's GPL source; output is committed
 npm run build:md                        # clownmdemu for Retro Console (needs Docker); output is committed, rerun only to update it
-npm run build:n64                       # n64js for Retro Console (needs npx to fetch Bun); output is committed, rerun only to update it
 npm run dev                             # hub on localhost:5173, apps on 127.0.0.1:5174
 npm run test:e2e                        # checks against the dev server
 node tools/e2e.mjs https://frunk.store  # checks against production

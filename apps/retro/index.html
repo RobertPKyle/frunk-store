@@ -94,33 +94,14 @@
   #player[data-system=md] .ab [data-b=y] { display: block; left: 0; top: 70px; }
   #player[data-system=md] .ab [data-b=b] { left: 44px; top: 38px; bottom: auto; }
   #player[data-system=md] .ab [data-b=a] { left: 88px; top: 6px; right: auto; }
-  /* the N64's A below its B, and its four C buttons above them */
-  #player[data-system=n64] .ab [data-b=a] { display: none; }
-  #player[data-system=n64] .ab [data-b=b] { left: 52px; bottom: 6px; top: auto; right: auto; }
-  #player[data-system=n64] .ab [data-b=y] { display: block; left: 0; top: 14px; width: 48px; height: 48px; font-size: 18px; }
-  .cpad { display: none; position: relative; width: 96px; height: 96px; }
-  #player[data-system=n64] .cpad { display: block; }
-  .cpad button { position: absolute; width: 36px; height: 36px; border-radius: 50%; border: 0; background: var(--accent2); color: #1a1405; font-size: 13px; font-weight: 800; }
-  .cpad [data-b=cu] { left: 30px; top: 0; }
-  .cpad [data-b=cd] { left: 30px; bottom: 0; }
-  .cpad [data-b=cl] { left: 0; top: 30px; }
-  .cpad [data-b=cr] { right: 0; top: 30px; }
-  /* the N64's stick: the round pad with a knob that follows the thumb, and a bigger Z */
-  .dpad .knob { display: none; position: absolute; left: 50%; top: 50%; width: 52px; height: 52px; margin: -26px 0 0 -26px; border-radius: 50%;
-                background: #4a4a60; border: 1px solid var(--line); box-shadow: 0 2px 6px rgba(0, 0, 0, .5); pointer-events: none; }
-  #player[data-system=n64] .dpad i { display: none; }
-  #player[data-system=n64] .dpad .knob { display: block; }
-  #player[data-system=n64] .pill[data-b=select] { min-width: 96px; min-height: 48px; font-size: 16px; font-weight: 700; color: var(--text); }
-  /* 3D games look better smoothed than as blocks of pixels */
-  #display { image-rendering: auto; }
-  .ab button.on, .pill.on, .cpad button.on { filter: brightness(1.4); transform: scale(.94); }
+  .ab button.on, .pill.on { filter: brightness(1.4); transform: scale(.94); }
   .pills { display: flex; gap: 8px; }
   .pill { min-height: 44px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--line); background: #1d1d29; font-size: 13px; color: var(--muted); }
   /* a controller is in use: the game takes the on-screen buttons' room */
   #player.pad .side { display: none; }
   #player.pad .screen { grid-column: 1 / -1; }
   .shoulder { min-width: 96px; font-size: 15px; font-weight: 700; color: var(--text); }
-  #player:not([data-system=gba], [data-system=n64], [data-system=lynx]) .shoulder { display: none; }
+  #player:not([data-system=gba], [data-system=lynx]) .shoulder { display: none; }
   /* Sega's consoles have no Select */
   #player:is([data-system=sms], [data-system=gg], [data-system=sg]) [data-b=select] { visibility: hidden; }
   /* the Mega Drive's Mode button is only on the six-button pad, so it stays on controllers */
@@ -218,7 +199,7 @@
   </div>
   <div class="side left">
     <button class="pill shoulder" type="button" data-b="l">L</button>
-    <div class="dpad" id="dpad"><i class="h"></i><i class="v"></i><b class="knob" id="knob"></b></div>
+    <div class="dpad" id="dpad"><i class="h"></i><i class="v"></i></div>
     <div class="pills"><button class="pill" type="button" data-b="select">Select</button></div>
   </div>
   <div class="screen">
@@ -228,13 +209,10 @@
     <canvas id="pceScreen" width="256" height="224" hidden></canvas>
     <canvas id="mdScreen" width="320" height="224" hidden></canvas>
     <canvas id="lynxScreen" width="160" height="102" hidden></canvas>
-    <!-- n64js finds its canvas by this id -->
-    <canvas id="display" width="320" height="240" hidden></canvas>
     <div id="paused" hidden>Paused<small>Tap here or press Start to resume</small><small class="padonly">Select goes back to the games</small></div>
   </div>
   <div class="side right">
     <button class="pill shoulder" type="button" data-b="r">R</button>
-    <div class="cpad"><button type="button" data-b="cu" aria-label="C up">C▲</button><button type="button" data-b="cl" aria-label="C left">C◀</button><button type="button" data-b="cr" aria-label="C right">C▶</button><button type="button" data-b="cd" aria-label="C down">C▼</button></div>
     <div class="ab"><button type="button" data-b="y">Y</button><button type="button" data-b="b">B</button><button type="button" data-b="a">A</button></div>
     <div class="pills"><button class="pill" type="button" data-b="start">Start</button></div>
   </div>

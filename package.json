@@ -37,8 +37,6 @@
     "build:kroz": "node tools/build-kroz.mjs",
     "build:city": "node tools/build-city.mjs",
     "build:md": "node tools/build-clownmdemu.mjs",
-    "build:n64": "node tools/build-n64js.mjs",
-    "build:battleship": "node tools/build-battleship.mjs",
     "dev": "node tools/dev.mjs",
     "test:e2e": "node tools/e2e.mjs",
     "test:mahjong": "node tools/test-mahjong.mjs",

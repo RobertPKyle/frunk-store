@@ -44,10 +44,7 @@ tools/.gearlynx-build
 tools/.townpatrol-build
 tools/.clownmdemu-build
 tools/.craft4k-build
-tools/.n64js-build
 roms/
-tools/.battleship-build
-apps/battleship/engine
 tools/.tic80-build
 apps/tic80/players
 apps/tic80/games
@@ -127,3 +124,4 @@ tools/.sopwith-build
 apps/sopwith/engine
 tools/.billiards-build
 apps/billiards/game
+spaces/
