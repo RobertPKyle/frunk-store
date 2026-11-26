@@ -48,11 +48,22 @@
   #player { position: fixed; inset: 0; display: grid; grid-template-rows: 60px minmax(0, 1fr); grid-template-columns: minmax(0, 1fr); background: #000; }
   .bar { display: flex; align-items: center; gap: 8px; padding: 8px 10px 8px 110px; overflow-x: auto; scrollbar-width: none; touch-action: pan-x; background: var(--panel); border-bottom: 1px solid var(--line); }
   .bar b { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  #padNote { font-size: 13px; color: var(--muted); white-space: nowrap; }
   .screen { position: relative; min-height: 0; min-width: 0; overflow: hidden; }
   /* SDL writes the canvas's size into its style; the game draws at whatever
      size the page lays it out at, so the sheet's rule wins */
   #canvas { position: absolute; inset: 0; display: block; width: 100% !important; height: 100% !important; border: 0; padding: 0; background: #000; outline: none; touch-action: none; }
+  /* Touch mode: the whole picture is the drag area. Faint marks at its edges
+     say which way does what; the words fade once read, the marks stay. */
+  #touchHint { position: absolute; inset: 10px; pointer-events: none; border: 1px dashed rgba(230, 255, 225, .22); border-radius: 14px; }
+  #touchHint i { position: absolute; font-style: normal; font-size: 22px; line-height: 1; color: rgba(240, 255, 235, .42); text-shadow: 0 1px 3px rgba(0, 0, 0, .7); }
+  #touchHint .l { left: 10px; top: 50%; transform: translateY(-50%); }
+  #touchHint .r { right: 10px; top: 50%; transform: translateY(-50%); }
+  #touchHint .u { top: 8px; left: 50%; transform: translateX(-50%); }
+  #touchHint .d { bottom: 8px; left: 50%; transform: translateX(-50%); }
+  #touchHint span { position: absolute; left: 50%; bottom: 40px; transform: translateX(-50%); padding: 4px 10px; border-radius: 999px;
+                    background: rgba(5, 14, 8, .62); color: rgba(240, 255, 235, .9); font-size: 13px; white-space: nowrap;
+                    animation: hintFade 1s ease 6s forwards; }
+  @keyframes hintFade { to { opacity: 0; } }
   @media (max-width: 640px) {
     .bar .btn { padding: 8px 10px; }
     .hero img { width: 60px; height: 60px; }
@@ -79,7 +90,7 @@
     </div>
 
     <h2>Controls</h2>
-    <p class="note">Touch and a controller work about as well, at any time.</p>
+    <p class="note">Touch and a controller work about as well. The Touch / Controller button on the game's bar swaps between the two: with Controller, touches on the picture are ignored, so a bumped screen can't putt.</p>
     <table class="keys">
       <tr><th></th><th>Touch</th><th>Controller</th></tr>
       <tr><td>Aim</td><td>Drag left or right</td><td>Left stick left or right</td></tr>
@@ -112,13 +123,17 @@
 <section id="player" hidden>
   <div class="bar">
     <b>Neverputt</b>
-    <span id="padNote" hidden>Controller</span>
+    <button class="btn" id="inputBtn" type="button"></button>
     <button class="btn" id="menuBtn" type="button">Menu</button>
     <button class="btn" id="soundBtn" type="button">Sound on</button>
     <button class="btn" id="quitBtn" type="button">Quit</button>
   </div>
   <div class="screen">
     <canvas id="canvas" tabindex="-1" oncontextmenu="event.preventDefault()"></canvas>
+    <div id="touchHint" hidden>
+      <i class="l">◀</i><i class="r">▶</i><i class="u">▲</i><i class="d">▼</i>
+      <span>Drag ◀ ▶ to aim · Drag ▲ ▼ for power · Tap to putt</span>
+    </div>
   </div>
 </section>
 

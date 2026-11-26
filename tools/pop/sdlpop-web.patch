@@ -1,6 +1,6 @@
 diff -ruN rel/SDLPoP-1.23/src/common.h edit/src/common.h
 --- rel/SDLPoP-1.23/src/common.h	2023-02-04 03:43:22.000000000 -0600
-+++ edit/src/common.h	2026-10-31 19:13:35.162818168 -0500
++++ edit/src/common.h	2026-11-26 12:50:35.571147122 -0600
 @@ -74,6 +74,14 @@
  		}						\
  	} while (0)
@@ -18,7 +18,7 @@ diff -ruN rel/SDLPoP-1.23/src/common.h edit/src/common.h
  #endif
 diff -ruN rel/SDLPoP-1.23/src/menu.c edit/src/menu.c
 --- rel/SDLPoP-1.23/src/menu.c	2023-02-04 03:43:22.000000000 -0600
-+++ edit/src/menu.c	2026-10-31 19:13:35.163801187 -0500
++++ edit/src/menu.c	2026-11-26 12:50:35.571434586 -0600
 @@ -2143,6 +2143,7 @@
  		case SDL_SCANCODE_LEFT:
  			menu_control_x = -1;
@@ -29,7 +29,7 @@ diff -ruN rel/SDLPoP-1.23/src/menu.c edit/src/menu.c
  			pressed_enter = 1;
 diff -ruN rel/SDLPoP-1.23/src/seg009.c edit/src/seg009.c
 --- rel/SDLPoP-1.23/src/seg009.c	2023-02-04 03:43:22.000000000 -0600
-+++ edit/src/seg009.c	2026-10-31 19:13:35.163461581 -0500
++++ edit/src/seg009.c	2026-11-26 12:50:35.581175917 -0600
 @@ -2479,7 +2479,13 @@
  #ifdef SDL_HINT_WINDOWS_DISABLE_THREAD_NAMING
  	SDL_SetHint(SDL_HINT_WINDOWS_DISABLE_THREAD_NAMING, "1");
@@ -54,7 +54,19 @@ diff -ruN rel/SDLPoP-1.23/src/seg009.c edit/src/seg009.c
  	draw_overlay();
  	SDL_Surface* surface = get_final_surface();
  	init_scaling();
-@@ -3697,6 +3706,11 @@
+@@ -3694,9 +3703,23 @@
+ 	}
+ }
+ 
++#ifdef __EMSCRIPTEN__
++// [frunk] for the page: 1 while the game is paused or its pause menu is
++// open, so that hiding the page can pause without closing an open menu (Esc
++// toggles it)
++EMSCRIPTEN_KEEPALIVE int web_paused(void) {
++	return (is_paused || is_menu_shown) ? 1 : 0;
++}
++#endif
++
  void idle() {
  	process_events();
  	update_screen();

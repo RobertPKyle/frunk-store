@@ -1,0 +1,18 @@
+Weather uses these works by other people.
+
+Data, fetched when the app runs and not stored in this repository:
+
+Forecast     MET Norway Locationforecast (https://api.met.no), CC BY 4.0 and
+             NLOD 2.0: "Data from MET Norway". Through this site's
+             /api/forecast, which converts units and MET's weather symbols to
+             the app's icons and sums the hours into days.
+US extras    National Weather Service (https://www.weather.gov), open data:
+             rain chances, gusts and the time zone for US places.
+Aurora       NOAA Space Weather Prediction Center Kp forecast
+             (https://www.swpc.noaa.gov), public domain.
+Place search Photon by komoot (https://photon.komoot.io), with data from
+             OpenStreetMap contributors (ODbL), credited in the place picker.
+             Time zones for found places come from the tz database's zone.tab
+             (public domain), in ../_shared/timezones.js.
+
+None of these sources endorses this app.

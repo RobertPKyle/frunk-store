@@ -25,6 +25,8 @@ export const EN_UI = {
   filterCamp: 'Camp Mode',
   filterRoad: 'Road Trip',
   filterTools: 'Tools',
+  shelfFavorites: 'Favorites',
+  favorite: 'Favorite',
   shelfNew: 'New and updated',
   shelf_consoles: 'Retro consoles',
   shelf_shooters: 'Shooters',

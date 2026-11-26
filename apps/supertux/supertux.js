@@ -321,21 +321,17 @@ if (window.AudioContext) {
   }
 }
 
-// The game draws its own touch controls into the picture, and decides whether
-// to as it starts (Module.touchControls, read once by
-// tools/supertux/supertux-web.patch), so a swap on the bar's button takes
-// effect from the next start; the bar says so until then.
-let startedWith = null;   // the mode the running game was started with
-const input = inputSwap({
-  id: 'supertux', button: $('inputBtn'), start: touchFirst ? 'touch' : 'pad',
-  apply: mode => {
-    const later = startedWith !== null && mode !== startedWith;
-    $('inputNote').hidden = !later;
-    if (later) {
-      $('inputBtn').title = `${mode === 'pad' ? 'A controller' : 'Touch controls'} from the next time the game starts: it sets up its on-screen controls only as it starts. Tap to swap back.`;
-    }
-  },
-});
+// The game draws its own touch controls into the picture. Upstream decides
+// whether to only as it starts (here from Module.touchControls); the web
+// patch adds web_set_mobile_controls(on), so the bar's button switches them
+// at once, mid-level too. Until the game's first frame there is nothing to
+// switch, and the start reads the mode from Module.touchControls instead.
+let shown = false;   // the game has drawn its first frame
+function applyInput(mode) {
+  if (window.Module) window.Module.touchControls = mode === 'touch';
+  if (shown) call('web_set_mobile_controls', ['number'], [mode === 'touch' ? 1 : 0]);
+}
+const input = inputSwap({ id: 'supertux', button: $('inputBtn'), start: touchFirst ? 'touch' : 'pad', apply: mode => applyInput(mode) });
 
 // Whether the game's own stack (main() and its loop) is the one running.
 // Only it can wait for data: anything else that runs the game's code (the
@@ -430,10 +426,9 @@ function start() {
     failed('The car\'s browser lost the game\'s picture. Your progress is saved.');
   });
   let firstFrame = true;
-  startedWith = input.mode;
   window.Module = {
     canvas,
-    touchControls: startedWith === 'touch',
+    touchControls: input.mode === 'touch',
     locateFile: path => ENGINE + path,
     print: remember,
     printErr: line => { remember(line); console.warn(line); },
@@ -447,6 +442,9 @@ function start() {
         $('loading').hidden = true;
         $('player').hidden = false;
         fit();
+        shown = true;
+        // the mode may have changed while the game loaded
+        applyInput(input.mode);
         canvas.focus();
         // what the game reads next (the intro, the first world map and its
         // first level), two blocks at a time in the background
@@ -491,7 +489,7 @@ function start() {
   document.body.append(s);
 }
 
-window.supertuxStats = () => ({ ...stats, inMemory: mem.size, heapMB: memory ? Math.round(memory.buffer.byteLength / 1e6) : 0, audio: contexts.map(c => `${c.state} ${c.sampleRate}`) });
+window.supertuxStats = () => ({ ...stats, touch: shown && running ? window.Module.ccall('web_mobile_controls', 'number', [], []) : -1, inMemory: mem.size, heapMB: memory ? Math.round(memory.buffer.byteLength / 1e6) : 0, audio: contexts.map(c => `${c.state} ${c.sampleRate}`) });
 
 // ---------- sound ----------
 

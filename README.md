@@ -130,9 +130,12 @@ clear them to make room.
   `node tools/build-stars.mjs` from d3-celestial (BSD-3-Clause), and the
   planet and Moon math in `apps/_shared/astro.js` was checked against JPL
   Horizons to within about 0.1°.
-- `apps/weather`: Open-Meteo forecast plus a "Tonight's sky" card (sunset,
-  darkness, Moon, stargazing rating, aurora chance from the NOAA Kp
-  forecast). Needs a connection; the last forecast is cached.
+- `apps/weather` and `apps/api/forecast.js`: MET Norway forecast (with rain
+  chances, gusts and the time zone from the National Weather Service in the
+  US), shaped in `apps/_shared/forecast.js`, plus a "Tonight's sky" card
+  (sunset, darkness, Moon, stargazing rating, aurora chance from the NOAA Kp
+  forecast). Needs a connection; the last forecast is cached. The shared place
+  picker searches with Photon (komoot, OpenStreetMap data).
 - `apps/satellites`: visible passes of the ISS, Tiangong, Hubble, new
   Starlink trains and about 150 bright satellites, from CelesTrak orbit data
   (cached, refreshed at most every 8 hours). SGP4 comes from satellite.js
@@ -207,7 +210,7 @@ clear them to make room.
 - `apps/postcard`: Road Trip Postcard. Draws a vintage card of where the car is:
   a large-letter "Greetings from" with a bright map inside the letters, or a
   park poster whose ridges are the real skyline to the north (elevation from
-  Open-Meteo). Both are drawn by `card.js`, so the car and the phone make the
+  the Terrain Tiles on AWS Open Data). Both are drawn by `card.js`, so the car and the phone make the
   same picture. The QR code holds the card's details in its #fragment, which
   never reaches a server, and `view.html` draws the full-size PNG on the phone.
   So nothing is stored, and there's no function. Coordinates in the link are
@@ -244,6 +247,18 @@ clear them to make room.
   (speed.cloudflare.com). Each direction runs for a fixed time on several
   connections and reports the average after a 2 second warm-up. Data use is
   capped at about 350 MB per test. The last 30 results are kept on the device.
+- `apps/mydata`: My Data. Lists what each app keeps on this origin
+  (localStorage, IndexedDB from `indexedDB.databases()`, the service worker's
+  Cache Storage) with sizes, sorted into saves, the player's own files from the
+  phone and re-downloadable data. `map.js` says whose each key, database and
+  record is (read from each app's code; emscripten IDBFS databases are named
+  after their mount path, and the shared `/save` database is split by folder).
+  Big databases are sized from the first 16 MB and their keys. Clear can drop
+  only the downloads and keep saves. Back up saves packs saves only into a
+  gzipped JSON file (`backup.js`), encrypts it in pieces and offers it through
+  `apps/api/transfer.js` (`op=offer`, phone `op=fetch` and `op=fetched`); the
+  car shows a code for `mydata/phone.html`, which decrypts it and saves the
+  file. Restore takes the file back through `/send/?app=mydata` and asks first.
 - `apps/tic80`: Tiny Games. TIC-80 1.3.1's official web players (MIT), one
   per cart language, and nine freely licensed games (MIT or GPL-3, listed
   with their sources in the app), all built by `node tools/build-tic80.mjs`
@@ -1180,8 +1195,9 @@ clear them to make room.
   in the URL fragment, which never reaches the server. The phone page
   encrypts each game before upload; the function relays ciphertext through
   Upstash Redis (Vercel Marketplace, free plan, env `KV_REST_API_URL` and
-  `KV_REST_API_TOKEN`) for at most 15 minutes and deletes each file when the
-  car takes it. Games over 2 MB are split into 2 MB pieces on the phone and
+  `KV_REST_API_TOKEN`) for at most 15 minutes and deletes each piece once the
+  car confirms it arrived (`op=confirm` after `op=take`), so a download that
+  drops on a weak signal is taken again on the next poll. Games over 2 MB are split into 2 MB pieces on the phone and
   joined on the car. The phone tries each piece up to three times when the
   connection drops or the server has a problem, and the car ignores a piece
   it has already used. Limits: 2 MB per piece, 200 pieces and 80 MB per

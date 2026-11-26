@@ -1,13 +1,14 @@
 // Weather: current conditions, a 48-hour strip and a 7-day outlook from
-// Open-Meteo, plus a "Tonight's sky" card for campers: sunset, true darkness,
-// the Moon, a stargazing rating and the aurora chance (NOAA Kp forecast).
+// MET Norway (with NWS rain chances and gusts in the US), plus a "Tonight's
+// sky" card for campers: sunset, true darkness, the Moon, a stargazing rating
+// and the aurora chance (NOAA Kp forecast).
 // Sun and Moon times are computed here with the Star Map's astronomy code.
 import { julianDay, localSiderealTime, toHorizon, sun, moon } from '../_shared/astro.js';
+import { loadForecast } from '../_shared/forecast.js';
 import { ago, followCar, getPlace, pickPlace } from '../_shared/place.js';
 import { useMiles } from '../_shared/units.js';
 import { weatherIcon, weatherName } from './icons.js';
 
-const FORECAST = 'https://api.open-meteo.com/v1/forecast';
 const KP = 'https://services.swpc.noaa.gov/products/noaa-planetary-k-index-forecast.json';
 const CACHE_KEY = 'weather.cache';
 const KP_KEY = 'weather.kp';
@@ -172,7 +173,8 @@ function render() {
   $('desc').textContent = weatherName(c.weather_code);
   $('facts').innerHTML = [
     `Feels like <b>${temp(c.apparent_temperature)}</b> · Humidity <b>${c.relative_humidity_2m}%</b>`,
-    `Wind <b>${speed(c.wind_speed_10m)} ${compass(c.wind_direction_10m)}</b>, gusts <b>${speed(c.wind_gusts_10m)}</b>`,
+    // Gusts come with the forecast in the US and the Nordic countries only
+    `Wind <b>${speed(c.wind_speed_10m)} ${compass(c.wind_direction_10m)}</b>${Number.isFinite(c.wind_gusts_10m) ? `, gusts <b>${speed(c.wind_gusts_10m)}</b>` : ''}`,
     `Today <b>${temp(d.daily.temperature_2m_max[today])}</b> / <b>${temp(d.daily.temperature_2m_min[today])}</b> · UV <b>${Math.round(d.daily.uv_index_max[today] ?? 0)}</b>`,
     d.daily.precipitation_sum[today] > 0 ? `Rain or snow today <b>${amount(d.daily.precipitation_sum[today])}</b>` : '',
   ].filter(Boolean).map(s => `<span>${s}</span>`).join('');
@@ -294,15 +296,26 @@ function kmAway(key) {
   return Math.hypot(lat - place.lat, (lon - place.lon) * Math.cos(place.lat * r)) * 111;
 }
 
-function forecastUrl() {
-  const q = new URLSearchParams({
-    latitude: place.lat.toFixed(4), longitude: place.lon.toFixed(4),
-    timezone: 'auto', timeformat: 'unixtime', forecast_days: '7',
-    current: 'temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,is_day,wind_speed_10m,wind_direction_10m,wind_gusts_10m',
-    hourly: 'temperature_2m,precipitation_probability,weather_code,cloud_cover,is_day',
-    daily: 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,uv_index_max',
-  });
-  return `${FORECAST}?${q}`;
+// The forecast starts at the current hour, so before noon the night that just
+// ended (what "Tonight's sky" rates until midday) is gone from it. The last
+// copy for this place still has those hours: keep up to a day of them.
+function keepPastHours(data, old) {
+  const first = data.hourly.time[0];
+  if (!old?.hourly?.time || !Number.isFinite(first)) return;
+  const fields = Object.keys(data.hourly);
+  if (!fields.every(f => Array.isArray(old.hourly[f]))) return;
+  const from = old.hourly.time.findIndex(t => t >= first - 24 * HOUR / 1000);
+  let to = old.hourly.time.findIndex(t => t >= first);
+  if (to < 0) to = old.hourly.time.length;
+  if (from < 0 || from >= to) return;
+  for (const f of fields) data.hourly[f] = [...old.hourly[f].slice(from, to), ...data.hourly[f]];
+  // and today's high and low count the hours already gone
+  const d = data.daily, start = d.time[0], end = d.time[1] ?? start + 86400;
+  const today = data.hourly.temperature_2m.filter((v, i) => Number.isFinite(v) && data.hourly.time[i] >= start && data.hourly.time[i] < end);
+  if (today.length) {
+    d.temperature_2m_max[0] = Math.max(d.temperature_2m_max[0] ?? -Infinity, ...today);
+    d.temperature_2m_min[0] = Math.min(d.temperature_2m_min[0] ?? Infinity, ...today);
+  }
 }
 
 async function loadKp() {
@@ -333,10 +346,9 @@ async function load(force = false) {
   setStatus('Updating…');
   if (!forecast) showError('Getting the forecast…');
   try {
-    const res = await fetch(forecastUrl(), { signal: AbortSignal.timeout(WAIT) });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
+    const data = await loadForecast(place, { signal: AbortSignal.timeout(WAIT) });
     if (placeKey() !== key) return; // place changed while loading
+    if (forecast?.key === key) keepPastHours(data, forecast.data);
     forecast = { key, fetched: Date.now(), data };
     failed = false;
     store.set(CACHE_KEY, forecast);

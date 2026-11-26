@@ -16,12 +16,14 @@ export const PALETTES = {
   night: { name: 'Night', sky: ['#0d1a42', '#3a4583'], ray: 'rgba(160, 180, 255, .1)', deep: '#04071a', script: '#f3f1ff', ridges: ['#39447f', '#232b5e', '#0b1036'], sun: '#f4f0d8', stars: true },
 };
 
-// Open-Meteo's weather codes, in words short enough for a stamp
+// WMO weather codes (as ../_shared/forecast.js gives them), in words short
+// enough for a stamp
 export function weatherWord(code) {
   if (code === 0 || code === 1) return 'Clear';
   if (code === 2 || code === 3) return 'Cloudy';
   if (code === 45 || code === 48) return 'Fog';
   if ((code >= 51 && code <= 67) || (code >= 80 && code <= 82)) return 'Rain';
+  if (code === 68 || code === 69 || code === 83 || code === 84) return 'Sleet';
   if ((code >= 71 && code <= 77) || code === 85 || code === 86) return 'Snow';
   if (code >= 95) return 'Storm';
   return '';
@@ -123,25 +125,69 @@ export async function loadMap(lat, lon) {
   }
 }
 
+// Elevation comes from the Terrain Tiles on AWS Open Data (Mapzen's terrarium
+// PNGs, open data from USGS, Copernicus and others): map tiles whose colors
+// are heights, read here off a canvas. They send CORS headers and change
+// rarely, so the browser's cache keeps them.
+const TERRAIN = 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium';
+const TILE = 256;
+
+const tileX = (lon, z) => (lon + 180) / 360 * 2 ** z;
+const tileY = (lat, z) => { const r = lat * Math.PI / 180; return (1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * 2 ** z; };
+
+async function terrainTile(z, x, y) {
+  let res = await fetch(`${TERRAIN}/${z}/${x}/${y}.png`, { signal: AbortSignal.timeout(20_000) });
+  if (!res.ok && res.status >= 500) {   // a hiccup on a busy connection gets a second try
+    await new Promise(r => setTimeout(r, 2500));
+    res = await fetch(`${TERRAIN}/${z}/${x}/${y}.png`, { signal: AbortSignal.timeout(20_000) });
+  }
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  // Exact colors matter: they are numbers, not a picture
+  const bitmap = await createImageBitmap(await res.blob(), { colorSpaceConversion: 'none', premultiplyAlpha: 'none' });
+  const c = document.createElement('canvas');
+  c.width = c.height = TILE;
+  const ctx = c.getContext('2d', { willReadFrequently: true });
+  ctx.drawImage(bitmap, 0, 0);
+  bitmap.close();
+  return ctx.getImageData(0, 0, TILE, TILE).data;
+}
+
 // The real skyline around the spot: elevation along three east-west lines to
 // the north, nearest last, for the poster's layered ridges
 export async function loadRidges(lat, lon) {
   const POINTS = 80;
   const span = 0.55 / Math.max(0.2, Math.cos(lat * Math.PI / 180));
-  const rows = await Promise.all([0.42, 0.2, 0.06].map(async north => {
-    const la = Math.min(85, lat + north);
-    const lons = Array.from({ length: POINTS }, (_, i) => (lon - span + 2 * span * i / (POINTS - 1)).toFixed(3));
-    const url = `https://api.open-meteo.com/v1/elevation?latitude=${lons.map(() => la.toFixed(3)).join(',')}&longitude=${lons.join(',')}`;
-    // Open-Meteo sometimes turns away a burst of requests, so each gets a second try
-    let res = await fetch(url, { signal: AbortSignal.timeout(20_000) });
-    if (!res.ok) {
-      await new Promise(r => setTimeout(r, 2500));
-      res = await fetch(url, { signal: AbortSignal.timeout(20_000) });
-    }
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return (await res.json()).elevation;
+  const lines = [0.42, 0.2, 0.06].map(north => Math.min(85, lat + north));
+  // The sharpest zoom that covers all three lines in at most six tiles (each
+  // pixel is still well under the 1.5 km between points)
+  let z = 10, x0, x1, y0, y1;
+  for (; z > 5; z--) {
+    x0 = Math.floor(tileX(lon - span, z)); x1 = Math.floor(tileX(lon + span, z));
+    y0 = Math.floor(tileY(lines[0], z)); y1 = Math.floor(tileY(lines[2], z));
+    if ((x1 - x0 + 1) * (y1 - y0 + 1) <= 6) break;
+  }
+  const n = 2 ** z, tiles = new Map();
+  await Promise.all(Array.from({ length: (x1 - x0 + 1) * (y1 - y0 + 1) }, async (_, i) => {
+    const x = x0 + i % (x1 - x0 + 1), y = y0 + Math.floor(i / (x1 - x0 + 1));
+    tiles.set(`${x},${y}`, await terrainTile(z, ((x % n) + n) % n, y));
   }));
-  return rows;
+  // Height in metres at a pixel of the whole map: red * 256 + green + blue / 256 - 32768
+  const at = (px, py) => {
+    const tx = Math.min(x1, Math.max(x0, Math.floor(px / TILE))), ty = Math.min(y1, Math.max(y0, Math.floor(py / TILE)));
+    const d = tiles.get(`${tx},${ty}`);
+    const ix = Math.min(TILE - 1, Math.max(0, Math.floor(px - tx * TILE))), iy = Math.min(TILE - 1, Math.max(0, Math.floor(py - ty * TILE)));
+    const o = (iy * TILE + ix) * 4;
+    return d[o] * 256 + d[o + 1] + d[o + 2] / 256 - 32768;
+  };
+  // Blended from the four pixels around a point, so the ridges don't step;
+  // the sea floor counts as sea level, as a skyline only shows land
+  const height = (la, lo) => {
+    const px = tileX(lo, z) * TILE - 0.5, py = tileY(la, z) * TILE - 0.5;
+    const fx = px - Math.floor(px), fy = py - Math.floor(py), x = Math.floor(px), y = Math.floor(py);
+    const h = at(x, y) * (1 - fx) * (1 - fy) + at(x + 1, y) * fx * (1 - fy) + at(x, y + 1) * (1 - fx) * fy + at(x + 1, y + 1) * fx * fy;
+    return Math.max(0, Math.round(h));
+  };
+  return lines.map(la => Array.from({ length: POINTS }, (_, i) => height(la, lon - span + 2 * span * i / (POINTS - 1))));
 }
 
 // ---------- drawing ----------
@@ -320,7 +366,7 @@ function creditLine(ctx, spec, color) {
   ctx.fillText('MADE IN THE CAR AT FRUNK.STORE', W - BORDER - 4, H - BORDER / 2);
   ctx.textAlign = 'left';
   // The map inside the letters needs its credit; a poster shows only elevation
-  ctx.fillText(spec.style === 'g' ? 'MAP © OPENSTREETMAP CONTRIBUTORS' : 'ELEVATION: COPERNICUS DEM VIA OPEN-METEO', BORDER + 4, H - BORDER / 2);
+  ctx.fillText(spec.style === 'g' ? 'MAP © OPENSTREETMAP CONTRIBUTORS' : 'ELEVATION: TERRAIN TILES BY MAPZEN, USGS & OTHERS', BORDER + 4, H - BORDER / 2);
 }
 
 function drawGreetings(ctx, spec, pal, mapImage) {

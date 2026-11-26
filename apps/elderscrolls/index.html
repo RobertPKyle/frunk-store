@@ -59,19 +59,25 @@
   #player { position: fixed; inset: 0; display: grid; grid-template-rows: 60px minmax(0, 1fr); grid-template-columns: minmax(0, 1fr); background: #000; }
   .bar { display: flex; align-items: center; gap: 8px; padding: 8px 10px 8px 110px; overflow-x: auto; scrollbar-width: none; touch-action: pan-x; background: var(--panel); border-bottom: 1px solid var(--line); }
   .bar b { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  #wait, #padNote { font-size: 13px; color: var(--muted); white-space: nowrap; }
+  #wait { font-size: 13px; color: var(--muted); white-space: nowrap; }
   .screen { position: relative; min-height: 0; min-width: 0; overflow: hidden; }
   /* the canvas must have no border or padding, or the clicks land off; fit() sizes it */
   #canvas { position: absolute; display: block; border: 0; padding: 0; background: #000; outline: none; image-rendering: pixelated; }
   #canvas.smooth { image-rendering: auto; }
   /* touches land here and go to the game as mouse clicks and drags */
   #touch { position: absolute; inset: 0; }
+  /* Touch mode: a faint frame round the picture, where touches act, and what
+     they do, which fades once read. fit() lays it over the canvas. */
+  #touchHint { position: absolute; pointer-events: none; border: 1px dashed rgba(255, 240, 210, .28); border-radius: 4px; }
+  #touchHint span { position: absolute; left: 50%; top: 8px; transform: translateX(-50%); padding: 4px 10px; border-radius: 999px;
+                    background: rgba(10, 8, 5, .62); color: rgba(255, 245, 225, .9); font-size: 13px; white-space: nowrap;
+                    animation: hintFade 1s ease 6s forwards; }
+  @keyframes hintFade { to { opacity: 0; } }
   /* focused to bring up the car's keyboard; what's typed goes to the game */
   #kbd { position: absolute; left: 0; bottom: 0; width: 1px; height: 1px; opacity: 0; border: 0; padding: 0; }
 
   @media (max-width: 760px) {
     .bar .btn { padding: 8px 10px; }
-    #padNote { display: none; }
   }
   /* the bar is full at the car's width: every button stays on it */
   @media (max-width: 800px) { .bar { gap: 6px; } .bar .btn { padding: 8px 10px; } }
@@ -106,6 +112,7 @@
 
     <h2>Controls</h2>
     <p class="note">Both games are played with the pointer, as they were with a mouse. Tap to click. Drag a finger to hold the button down while the pointer moves (in the 3D view, that walks toward the pointer). Hold a finger still for a moment for a right click; keep holding and drag to swing your weapon once it's drawn. Keyboard brings up the car's keyboard, for names, saved games and the games' keys. Menu is the Esc key (save, load and options). A mouse and keyboard work too.</p>
+    <p class="note">The Touch / Controller button on the game's bar swaps between the two. With Controller, touches on the picture are ignored, so a bumped screen can't click in the game.</p>
     <p class="note">With a controller:</p>
     <table class="pad">
       <tr><th></th><th>Arena</th><th>Daggerfall</th></tr>
@@ -164,7 +171,7 @@
   <div class="bar">
     <b id="title">The Elder Scrolls</b>
     <span id="wait" hidden>Loading…</span>
-    <span id="padNote" hidden>Controller</span>
+    <button class="btn" id="inputBtn" type="button"></button>
     <button class="btn" id="menuBtn" type="button">Menu</button>
     <button class="btn" id="keysBtn" type="button">Keyboard</button>
     <button class="btn" id="spellsBtn" type="button" hidden>Spells</button>
@@ -175,6 +182,7 @@
   <div class="screen" id="screen">
     <canvas id="canvas" tabindex="-1" oncontextmenu="event.preventDefault()"></canvas>
     <div id="touch"></div>
+    <div id="touchHint" hidden><span>Tap: click · Drag: hold and move · Hold still: right click</span></div>
     <input id="kbd" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="Type into the game">
   </div>
 </section>

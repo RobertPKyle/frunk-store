@@ -39,6 +39,8 @@ page.on('console', m => {
   if (m.location().url.includes('/api/places') && m.text().includes('status of 503')) return;
   // The Audiobooks check cuts the connection to a chapter on purpose
   if (m.location().url.includes('archive.org/download/') && m.text().includes('ERR_FAILED')) return;
+  // My Data's restore check drops the car's first download of a piece on purpose
+  if (m.location().url.includes('/api/transfer?op=take') && m.text().includes('ERR_FAILED')) return;
   errors.push(`console: ${m.text()}`);
 });
 
@@ -56,7 +58,7 @@ const appFrame = () => page.frameLocator('#frame');
 // what the hub's grid shows: the listed apps, then the partner games (partner entries with tags)
 const gridApps = catalog => [...catalog.apps.filter(app => !app.unlisted), ...(catalog.partners ?? []).filter(p => p.tags)];
 const dev = base.includes('localhost');
-const appsBase = dev ? 'http://127.0.0.1:5174' : 'https://frunk-apps.vercel.app';
+const appsBase = process.env.APPS_BASE || (dev ? 'http://127.0.0.1:5174' : 'https://frunk-apps.vercel.app');
 async function openFromHub(name) {
   await page.goto(base + '/');
   await page.waitForSelector('.card');
@@ -206,7 +208,7 @@ await check('hub search finds apps and arrow keys move between cards', async () 
   await page.keyboard.press('ArrowRight');
   // the second card on the first shelf, and its name
   const [focused, want, name] = await page.evaluate(() => {
-    const second = document.querySelector('#grid .shelf-row').children[1];
+    const second = document.querySelector('#grid .shelf-row').querySelectorAll('.card')[1];
     return [document.activeElement.dataset.app, second.dataset.app, second.querySelector('h2').textContent];
   });
   if (focused !== want) throw new Error(`down, right focused ${focused}, not ${want}`);
@@ -233,6 +235,93 @@ await check('hub cards say whether an app plays best by touch or with a controll
   const lost = gridApps(catalog).filter(app => app.input === 'both' && !found.includes(app.id));
   if (lost.length) throw new Error(`"touch or controller" misses ${lost.map(app => app.id).join(', ')}`);
   await page.fill('#query', '');
+});
+
+await check('hub favorites: a star puts an app on its own shelf, by touch and controller, and it stays', async () => {
+  await page.goto(base + '/');
+  await page.evaluate(() => localStorage.removeItem('hub.favorites'));
+  await page.reload();
+  await page.waitForSelector('#grid .card');
+  if (await page.locator('.shelf[data-shelf="favorites"]').count()) throw new Error('an empty Favorites shelf shows');
+  const firstShelf = () => page.evaluate(() => {
+    const s = document.querySelector('#grid .shelf');
+    return [s.dataset.shelf, s.querySelector('.shelf-title').textContent, [...s.querySelectorAll('.card')].map(c => c.dataset.app).join()];
+  });
+  // starred on a shelf further down, which stays put on the screen as Favorites comes in above it
+  const shooters = page.locator('.shelf[data-shelf="shooters"]');
+  await shooters.scrollIntoViewIfNeeded();
+  const before = await shooters.evaluate(s => s.getBoundingClientRect().top);
+  await shooters.locator('.card[data-app="duke3d"] + .star').click();
+  if (await page.locator('#runner').isVisible()) throw new Error('the star opened the app');
+  const after = await shooters.evaluate(s => s.getBoundingClientRect().top);
+  if (Math.abs(after - before) > 1) throw new Error(`the Shooters shelf moved from ${before} to ${after} px`);
+  let [id, title, apps] = await firstShelf();
+  if (id !== 'favorites' || title !== 'Favorites' || apps !== 'duke3d') throw new Error(`first shelf ${id} "${title}": ${apps}`);
+  const pressed = await page.locator('.card[data-app="duke3d"] + .star').evaluateAll(stars => stars.map(s => s.getAttribute('aria-pressed')));
+  if (pressed.length < 2 || pressed.some(p => p !== 'true')) throw new Error(`duke3d's stars: ${pressed.join(', ')}`);
+  await page.reload();
+  await page.waitForSelector('#grid .card');
+  [id, , apps] = await firstShelf();
+  if (id !== 'favorites' || apps !== 'duke3d') throw new Error(`after a reload the first shelf is ${id}: ${apps}`);
+  // a controller's Y stars the card in focus, and the focus stays on it
+  await page.evaluate(() => {
+    window.testPad = { mapping: 'standard', axes: [0, 0, 0, 0], buttons: Array.from({ length: 17 }, () => ({ pressed: false, value: 0 })), connected: true, index: 0, id: 'test pad' };
+    navigator.getGamepads = () => [window.testPad];
+    dispatchEvent(new Event('gamepadconnected'));
+  });
+  const pressY = async () => {
+    await page.evaluate(() => { window.testPad.buttons[3].pressed = true; });
+    await page.waitForTimeout(200);
+    await page.evaluate(() => { window.testPad.buttons[3].pressed = false; });
+    await page.waitForTimeout(200);
+  };
+  await page.keyboard.press('ArrowDown');   // lights the controller's ring
+  await page.evaluate(() => {
+    const card = document.querySelector('.shelf[data-shelf="puzzles"] .card[data-app="mahjong"]');
+    card.focus({ preventScroll: true });
+    card.scrollIntoView({ block: 'center', inline: 'nearest' });
+  });
+  await pressY();
+  [, , apps] = await firstShelf();
+  if (apps !== 'mahjong,duke3d') throw new Error(`Y left Favorites as ${apps}`);
+  const focused = await page.evaluate(() => `${document.activeElement.closest('.shelf')?.dataset.shelf}/${document.activeElement.dataset.app}`);
+  if (focused !== 'puzzles/mahjong') throw new Error(`focus went to ${focused}`);
+  if (await page.evaluate(() => getComputedStyle(document.activeElement.nextElementSibling, '::after').content) !== '"Y"') throw new Error('no Y on the focused card\'s star');
+  await page.screenshot({ path: shots + 'hub-favorites.png' });
+  await pressY();
+  [, , apps] = await firstShelf();
+  if (apps !== 'duke3d') throw new Error(`a second Y left Favorites as ${apps}`);
+  // unstarred by touch on the Favorites shelf itself: the shelf goes once it's empty
+  await page.locator('.shelf[data-shelf="favorites"] .star').click();
+  if (await page.locator('.shelf[data-shelf="favorites"]').count()) throw new Error('the Favorites shelf stayed when empty');
+  const kept = await page.evaluate(() => localStorage.getItem('hub.favorites'));
+  if (kept !== '[]') throw new Error(`favorites kept as ${kept}`);
+});
+
+await check('hub footer links open in the same tab', async () => {
+  await page.goto(base + '/');
+  await page.waitForSelector('#grid .card');
+  // a new tab may be a dead tap in the car's browser, in any language
+  const links = await page.locator('.foot a[href^="https:"]').evaluateAll(as => as.map(a => [a.href, a.target]));
+  if (links.length < 3 || links.some(([, target]) => target)) throw new Error(`footer links: ${links.map(l => l.join(' ')).join(', ')}`);
+  for (const code of ['zh-Hant', 'zh-Hans', 'de', 'nb', 'nl', 'ja', 'ko']) {
+    const ui = (await (await fetch(`${base}/lang/${code}.json`)).json()).ui;
+    if (/target=/.test(ui.follow + ui.referral)) throw new Error(`${code}'s footer links open a new tab`);
+  }
+  await page.route('https://buymeacoffee.com/**', route => route.fulfill({ contentType: 'text/html', body: '<title>coffee</title>' }));
+  let popup = false;
+  const onPage = () => { popup = true; };
+  page.context().on('page', onPage);
+  try {
+    await page.click('.coffee');
+    await page.waitForURL('https://buymeacoffee.com/frunkstore', { timeout: 5000 });
+    if (popup) throw new Error('it opened a new tab');
+    await page.goBack();
+    await page.waitForSelector('#grid .card');
+  } finally {
+    page.context().off('page', onPage);
+    await page.unroute('https://buymeacoffee.com/**');
+  }
 });
 
 await check('hub badges a new app until it is opened', async () => {
@@ -453,9 +542,15 @@ await check('weather loads a forecast and tonight\'s sky', async () => {
   const picker = appFrame().locator('.fp-picker');
   await Promise.race([picker.waitFor({ timeout: 5000 }), appFrame().locator('#temp').filter({ hasText: /°/ }).waitFor({ timeout: 5000 })]).catch(() => {});
   if (!(await picker.isVisible())) await appFrame().locator('#placeBtn').click();
-  await appFrame().locator('.fp-search').fill('Moab');
-  await appFrame().getByRole('button', { name: /Moab.*Utah/ }).click();
+  await picker.locator('.fp-search').fill('Moab');
+  // Search results carry a time zone (Photon has none; it comes from the country and state)
+  await picker.getByRole('button', { name: /Moab.*Utah/ }).first().click();
+  const frame0 = page.frames().find(f => f.url().includes('/weather/'));
+  const picked = await frame0.evaluate(() => JSON.parse(localStorage.getItem('frunk.place')));
+  if (picked.tz !== 'America/Denver') throw new Error(`Moab saved without its time zone: ${JSON.stringify(picked)}`);
   await appFrame().locator('#temp').filter({ hasText: /°/ }).waitFor({ timeout: 15000 });
+  // The forecast function takes only 1 km cells, so nearby cars share the CDN's copy
+  if ((await fetch(appsBase + '/api/forecast?lat=38.571&lon=-109.55')).status !== 400) throw new Error('off-grid forecast location not rejected');
   const sky = await appFrame().locator('#sky').textContent();
   if (!/Moon/.test(sky)) throw new Error(`sky card missing Moon: "${sky}"`);
   const hours = await appFrame().locator('.hr').count(), days = await appFrame().locator('.day').count();
@@ -1386,6 +1481,231 @@ await check('speed test measures ping and starts the download', async () => {
   await appFrame().getByRole('button', { name: 'Stop' }).click();
   await appFrame().locator('#phase').filter({ hasText: 'Stopped' }).waitFor({ timeout: 5000 });
   console.log(`     ping ${await appFrame().locator('#tPing b').textContent()} ms, ${live} Mbps live, ${await appFrame().locator('#server').textContent()}`);
+});
+
+await check('transfer keeps a piece until the car confirms it, and carries files car to phone', async () => {
+  const api = (op, q = {}, method = 'GET', body) => fetch(`${appsBase}/api/transfer?${new URLSearchParams({ op, ...q })}`, { method, body });
+  const { sid, token } = await (await api('open', {}, 'POST')).json();
+  const piece = new Uint8Array(64).fill(7);
+  if ((await (await api('put', { sid }, 'POST', piece)).json()).n !== 1) throw new Error('put not counted');
+  // taking it twice works: a download lost on the way can be taken again
+  for (let i = 0; i < 2; i++) {
+    const r = await api('take', { sid, token, i: 1 });
+    if (!r.ok || (await r.arrayBuffer()).byteLength !== 64) throw new Error(`take ${i + 1}: ${r.status}`);
+  }
+  if ((await api('confirm', { sid, token: 'wrong', i: 1 }, 'POST')).status !== 403) throw new Error('confirm without the token allowed');
+  if (!(await api('confirm', { sid, token, i: 1 }, 'POST')).ok) throw new Error('confirm failed');
+  if ((await api('take', { sid, token, i: 1 })).status !== 404) throw new Error('piece still there after confirm');
+  // the other way: the car offers, the phone fetches (as often as it needs) and says so
+  if ((await api('offer', { sid, token: 'wrong' }, 'POST', piece)).status !== 403) throw new Error('offer without the token allowed');
+  if ((await (await api('offer', { sid, token }, 'POST', piece)).json()).n !== 1) throw new Error('offer not counted');
+  let poll = await (await api('poll', { sid })).json();
+  if (poll.n !== 1 || poll.out !== 1 || poll.got !== 0) throw new Error(`poll: ${JSON.stringify(poll)}`);
+  for (let i = 0; i < 2; i++) if ((await (await api('fetch', { sid, i: 1 })).arrayBuffer()).byteLength !== 64) throw new Error('fetch failed');
+  await api('fetched', { sid }, 'POST');
+  poll = await (await api('poll', { sid })).json();
+  if (poll.got !== 1) throw new Error(`poll after fetched: ${JSON.stringify(poll)}`);
+  await api('close', { sid, token }, 'POST');
+  if ((await api('fetch', { sid, i: 1 })).status !== 410) throw new Error('offered piece kept after close');
+});
+
+// Saves, the player's own files and downloads of a few apps, as they store them
+async function seedMyData(frame) {
+  await frame.evaluate(async () => {
+    const put = (name, version, stores, records) => new Promise((resolve, reject) => {
+      const r = indexedDB.open(name, version);
+      r.onupgradeneeded = () => { for (const [s, opts] of stores) r.result.createObjectStore(s, opts); };
+      r.onsuccess = () => {
+        const tx = r.result.transaction(stores.map(([s]) => s), 'readwrite');
+        for (const [s, value, key] of records) tx.objectStore(s).put(value, key);
+        tx.oncomplete = () => { r.result.close(); resolve(); };
+        tx.onerror = () => reject(tx.error);
+      };
+      r.onerror = () => reject(r.error);
+    });
+    const file = (n, fill) => ({ timestamp: new Date(1700000000000), mode: 33188, contents: new Uint8Array(n).fill(fill) });
+    localStorage.setItem('doom.last', '{"id":"free:freedoom1"}');
+    localStorage.setItem('input.doom', 'pad');
+    localStorage.setItem('mystery.thing', 'x'.repeat(500));
+    await put('doom', 1, [['wads', { keyPath: 'id' }]], [['wads', { id: 'free:freedoom1', wad: new Uint8Array(300000) }], ['wads', { id: 'g:1', title: 'mini', wad: new Uint8Array(20000) }]]);
+    await put('/doom', 21, [['FILE_DATA']], [['FILE_DATA', file(3000, 5), '/doom/free-freedoom1/doomsav0.dsg']]);
+    await put('/save', 21, [['FILE_DATA']], [['FILE_DATA', file(1000, 1), '/save/keen1/SAVEGAM0.CK1'], ['FILE_DATA', file(800, 2), '/save/PRINCE.SAV']]);
+    await put('keen1', 1, [['blocks']], [['blocks', new Uint8Array(500000), 'v1/0']]);
+  });
+}
+
+const myDataFrame = () => page.frames().find(f => f.url().includes('/mydata/'));
+const idbKeys = (frame, name, store) => frame.evaluate(([name, store]) => new Promise(resolve => {
+  indexedDB.databases().then(list => {
+    if (!list.some(d => d.name === name)) return resolve(null);
+    const r = indexedDB.open(name);
+    r.onsuccess = () => {
+      const g = r.result.transaction(store).objectStore(store).getAllKeys();
+      g.onsuccess = () => { r.result.close(); resolve(g.result.map(String).sort()); };
+    };
+  });
+}), [name, store]);
+
+await check('my data lists what each app stores and clears downloads but keeps saves', async () => {
+  await openFromHub(/My Data/);
+  await seedMyData(myDataFrame());
+  await myDataFrame().evaluate(() => location.reload());
+  const app = appFrame();
+  const row = id => app.locator(`.row[data-app="${id}"]`);
+  await row('doom').waitFor({ timeout: 15000 });
+  // Freedoom: its settings and save, the player's WAD and the downloaded one, apart
+  const doom = await row('doom').textContent();
+  for (const want of ['Saves and settings', 'Your files from phone', 'Downloaded data']) if (!doom.includes(want)) throw new Error(`Freedoom row lacks ${want}: ${doom}`);
+  // the shared /save database is split between the apps that use it
+  await row('keen1').waitFor();
+  await row('pop').waitFor();
+  if (!(await row('other').textContent()).includes('Saves')) throw new Error('unknown key not under Other');
+  if (!/used by frunk.store apps/.test(await app.locator('#used').textContent())) throw new Error('no total');
+  await page.waitForSelector('#loading', { state: 'hidden' });
+  await page.screenshot({ path: shots + 'mydata.png' });
+
+  // Clear downloads only: the free WAD goes, the player's WAD and the save stay
+  await row('doom').getByRole('button', { name: 'Clear Freedoom' }).click();
+  const what = await app.locator('#clearWhat').textContent();
+  if (!/Lost for good/.test(what) || !/download again/.test(what)) throw new Error(`clear sheet says: ${what}`);
+  await page.screenshot({ path: shots + 'mydata-clear.png' });
+  await app.getByRole('button', { name: 'Clear downloaded data only' }).click();
+  await app.locator('#clear').waitFor({ state: 'hidden' });
+  await app.locator('#status').waitFor({ state: 'hidden', timeout: 10000 });
+  const f = myDataFrame();
+  if ((await idbKeys(f, 'doom', 'wads'))?.join() !== 'g:1') throw new Error(`wads left: ${await idbKeys(f, 'doom', 'wads')}`);
+  if ((await idbKeys(f, '/doom', 'FILE_DATA'))?.length !== 1) throw new Error('Freedoom save gone');
+  if (!(await f.evaluate(() => localStorage.getItem('doom.last')))) throw new Error('Freedoom settings gone');
+  if ((await row('doom').textContent()).includes('Downloaded')) throw new Error('row still shows downloads');
+
+  // Clear everything for Commander Keen takes a second tap; Prince of Persia's save, in the same database, stays
+  await row('keen1').getByRole('button', { name: 'Clear Commander Keen' }).click();
+  await app.locator('#clearAll').click();
+  if (await app.locator('#clear').isHidden()) throw new Error('cleared saves on one tap');
+  await app.locator('#clearAll').click();
+  await row('keen1').waitFor({ state: 'detached', timeout: 10000 });
+  if ((await idbKeys(f, '/save', 'FILE_DATA'))?.join() !== '/save/PRINCE.SAV') throw new Error(`/save left: ${await idbKeys(f, '/save', 'FILE_DATA')}`);
+  if ((await idbKeys(f, 'keen1', 'blocks')) !== null) throw new Error('keen1 blocks database not deleted');
+  await row('pop').waitFor();
+
+  // A controller: the first press lights Back up saves, down moves to the first
+  // row's Clear, and A opens its sheet
+  await f.evaluate(() => {
+    const pad = (id, mapping, index) => ({ id, index, mapping, connected: true, timestamp: 0, axes: [0, 0, 0, 0], buttons: Array.from({ length: 17 }, () => ({ pressed: false, value: 0 })) });
+    const pads = [pad('raw', '', 0), pad('Tesla Virtual Gamepad', 'standard', 1)];
+    navigator.getGamepads = () => pads;
+    dispatchEvent(new Event('gamepadconnected'));
+    window.padPress = async b => {
+      Object.assign(pads[1].buttons[b], { pressed: true, value: 1 });
+      await new Promise(r => setTimeout(r, 150));
+      Object.assign(pads[1].buttons[b], { pressed: false, value: 0 });
+      await new Promise(r => setTimeout(r, 200));
+    };
+  });
+  await page.waitForTimeout(200);
+  if ((await f.evaluate(() => document.querySelector('.padlit')?.id)) !== 'backup') throw new Error('controller didn\'t light Back up saves');
+  await f.evaluate(() => padPress(13));
+  const lit = await f.evaluate(() => document.querySelector('.padlit')?.getAttribute('aria-label'));
+  if (!/^Clear /.test(lit || '')) throw new Error(`down lit ${lit}`);
+  await f.evaluate(() => padPress(1));
+  await app.locator('#clear').waitFor({ timeout: 3000 });
+  if ((await app.locator('#clearTitle').textContent()) !== `${lit}?`) throw new Error(`A opened ${await app.locator('#clearTitle').textContent()}`);
+  await app.locator('#clearCancel').click();
+});
+
+await check('my data backs saves up to a phone and restores them from it', async () => {
+  await openFromHub(/My Data/);
+  await seedMyData(myDataFrame());
+  await myDataFrame().evaluate(() => location.reload());
+  const app = appFrame();
+  await app.locator('.row[data-app="doom"]').waitFor({ timeout: 15000 });
+
+  // Back up: the car packs and uploads, then shows a code; the phone saves the file
+  await app.getByRole('button', { name: 'Back up saves' }).click();
+  await app.locator('#backupQr a').waitFor({ timeout: 20000 });
+  const link = await app.locator('#backupQr a').getAttribute('href');
+  if (!link.includes('/mydata/phone.html#')) throw new Error(`backup link: ${link}`);
+  await page.screenshot({ path: shots + 'mydata-backup.png' });
+  const phone = await browser.newPage({ viewport: { width: 390, height: 800 }, isMobile: true, hasTouch: true, acceptDownloads: true });
+  let file;
+  try {
+    await phone.goto(link);
+    await phone.locator('#save').waitFor({ timeout: 20000 });
+    await phone.screenshot({ path: shots + 'mydata-phone.png' });
+    const [download] = await Promise.all([phone.waitForEvent('download'), phone.locator('#save').click()]);
+    if (!/^frunk-saves-\d{4}-\d\d-\d\d\.frunkbackup$/.test(download.suggestedFilename())) throw new Error(`file named ${download.suggestedFilename()}`);
+    file = shots + download.suggestedFilename();
+    await download.saveAs(file);
+  } finally {
+    await phone.close();
+  }
+  await app.locator('#backupStatus').filter({ hasText: 'Your phone has the backup' }).waitFor({ timeout: 10000 });
+  await app.getByRole('button', { name: 'Done' }).click();
+  // saves only: the downloaded WAD, the player's WAD and the data blocks stay out
+  const { gunzipSync } = await import('node:zlib');
+  const backup = JSON.parse(gunzipSync(readFileSync(file)));
+  const dbs = Object.fromEntries(Object.entries(backup.apps).map(([id, a]) => [id, (a.idb || []).map(d => d.name).join()]));
+  if (dbs.doom !== '/doom' || dbs.keen1 !== '/save' || dbs.pop !== '/save') throw new Error(`databases backed up: ${JSON.stringify(dbs)}`);
+  if (backup.apps.doom.local['doom.last'] === undefined || backup.apps.other) throw new Error(`keys backed up: ${JSON.stringify(Object.keys(backup.apps))}`);
+
+  // Lose the saves, then restore them from the phone through the /send page.
+  // The car's first download of the piece drops: it's taken again and confirmed after.
+  const f = myDataFrame();
+  await f.evaluate(async () => {
+    localStorage.removeItem('doom.last');
+    for (const n of ['/doom', '/save']) await new Promise(r => { const d = indexedDB.deleteDatabase(n); d.onsuccess = d.onerror = r; });
+  });
+  let takes = 0, confirms = 0;
+  await page.route(/\/api\/transfer\?op=(take|confirm)/, route => {
+    if (route.request().url().includes('op=confirm')) { confirms++; return route.continue(); }
+    return ++takes === 1 ? route.abort() : route.continue();
+  });
+  try {
+    await app.getByRole('button', { name: 'Restore' }).click();
+    await app.locator('#transferStatus').filter({ hasText: 'Waiting' }).waitFor({ timeout: 10000 });
+    const sendLink = await app.locator('#qr a').getAttribute('href');
+    if (!sendLink.includes('/send/?app=mydata#')) throw new Error(`restore link: ${sendLink}`);
+    const phone2 = await browser.newPage({ viewport: { width: 390, height: 800 }, isMobile: true, hasTouch: true });
+    try {
+      await phone2.goto(sendLink);
+      if ((await phone2.locator('h1').textContent()) !== 'Send a backup to your car') throw new Error('send page not set up for a backup');
+      writeFileSync(shots + 'not-a-backup.frunkbackup', 'hello');
+      const [pick] = await Promise.all([phone2.waitForEvent('filechooser'), phone2.getByRole('button', { name: 'Choose backup' }).click()]);
+      await pick.setFiles([file, shots + 'not-a-backup.frunkbackup']);
+      await phone2.locator('#files li.bad').filter({ hasText: 'not-a-backup' }).waitFor({ timeout: 10000 });
+      await phone2.locator('#files li.ok').waitFor({ timeout: 20000 });
+    } finally {
+      await phone2.close();
+    }
+    await app.locator('#received li:not(.bad)').filter({ hasText: 'Backup from' }).waitFor({ timeout: 15000 });
+  } finally {
+    await page.unroute(/\/api\/transfer\?op=(take|confirm)/);
+  }
+  if (takes < 2 || confirms < 1) throw new Error(`takes ${takes}, confirms ${confirms}`);
+  await app.locator('#transferDone').click();
+  await app.locator('#restoreSheet').waitFor({ timeout: 5000 });
+  const list = await app.locator('#restoreWhat').textContent();
+  for (const name of ['Freedoom', 'Commander Keen', 'Prince of Persia']) if (!list.includes(name)) throw new Error(`restore list lacks ${name}: ${list}`);
+  await page.screenshot({ path: shots + 'mydata-restore.png' });
+  await app.locator('#restoreGo').click();
+  await app.locator('#message').filter({ hasText: 'Saves restored' }).waitFor({ timeout: 10000 });
+  await app.locator('#messageOk').click();
+  // back as they were, bytes and dates included
+  const back = await f.evaluate(() => new Promise(resolve => {
+    const r = indexedDB.open('/doom');
+    r.onsuccess = () => {
+      const db = r.result;
+      const g = db.transaction('FILE_DATA').objectStore('FILE_DATA').get('/doom/free-freedoom1/doomsav0.dsg');
+      g.onsuccess = () => { const v = g.result; db.close(); resolve([db.version, v?.contents instanceof Uint8Array, v?.contents?.length, v?.contents?.[9], v?.timestamp instanceof Date, localStorage.getItem('doom.last')]); };
+    };
+  }));
+  if (JSON.stringify(back) !== JSON.stringify([21, true, 3000, 5, true, '{"id":"free:freedoom1"}'])) throw new Error(`restored: ${JSON.stringify(back)}`);
+  if ((await idbKeys(f, '/save', 'FILE_DATA'))?.join() !== '/save/PRINCE.SAV,/save/keen1/SAVEGAM0.CK1') throw new Error(`/save restored: ${await idbKeys(f, '/save', 'FILE_DATA')}`);
+  // leave nothing behind for the game checks
+  await f.evaluate(async () => {
+    for (const k of ['doom.last', 'input.doom', 'mystery.thing']) localStorage.removeItem(k);
+    for (const n of ['doom', '/doom', '/save', 'keen1']) await new Promise(r => { const d = indexedDB.deleteDatabase(n); d.onsuccess = d.onerror = r; });
+  });
 });
 
 await check('brain test scores, ranks and makes a share card', async () => {
@@ -2684,7 +3004,7 @@ await check('neverputt plays by touch and controller, and keeps what it writes',
   await moves('players screen after a tap on a course', () => tapAt(0.207, 0.235));
   // Controller: one player, the hole's card, on to the first shot
   await moves('hole after the bottom button', () => frame().evaluate(() => padPress(0)));
-  if (!(await app.locator('#padNote').isVisible())) throw new Error('the controller wasn\'t noticed');
+  if (await app.locator('#inputBtn').getAttribute('data-mode') !== 'pad') throw new Error('the controller wasn\'t noticed');
   await moves('first shot after the bottom button', () => frame().evaluate(() => padPress(0)));
   // A tap without dragging putts. (Before any screenshot: after one, Chrome
   // sends the next touch to the hub's frame element, not into the frame.)
@@ -2823,6 +3143,40 @@ await check('neverball plays by touch and controller, and writes what it keeps b
       g.onsuccess = () => { db.close(); resolve(g.result.some(k => /e2e-check/.test(k))); };
     };
   })), 10000);
+});
+
+await check('neverputt swaps touch and controller, marking the drag area in touch mode', async () => {
+  await openFromHub(/Neverputt/);
+  const frame = () => page.frames().find(f => f.url().includes('/neverputt/'));
+  const app = appFrame();
+  const stats = () => frame().evaluate(() => window.neverputtStats());
+  const mode = () => app.locator('#inputBtn').getAttribute('data-mode');
+  try {
+    await app.locator('#play').click();
+    for (const t = Date.now(); (await stats()).frames < 10; await page.waitForTimeout(200)) if (Date.now() - t > 60000) throw new Error('no frames');
+    await page.waitForTimeout(800);
+    // how many touches reach the canvas, where SDL listens
+    await frame().evaluate(() => { window.touchesSeen = 0; document.getElementById('canvas').addEventListener('touchstart', () => window.touchesSeen++); });
+    const box = await app.locator('#canvas').boundingBox();
+    const tapCorner = () => page.touchscreen.tap(box.x + 30, box.y + box.height - 30);
+    if (await mode() !== 'touch') await app.locator('#inputBtn').tap();
+    if (await mode() !== 'touch' || !(await stats()).hint) throw new Error('touch mode shows no marks');
+    await tapCorner();
+    await page.waitForTimeout(300);
+    if (!(await frame().evaluate(() => window.touchesSeen))) throw new Error('a touch in touch mode didn\'t reach the game');
+    await app.locator('#inputBtn').tap();
+    if (await mode() !== 'pad' || (await stats()).hint) throw new Error('controller mode still shows the marks');
+    const seen = await frame().evaluate(() => window.touchesSeen);
+    await tapCorner();
+    await page.waitForTimeout(300);
+    if (await frame().evaluate(() => window.touchesSeen) !== seen) throw new Error('a touch in controller mode reached the game');
+    if (await mode() !== 'pad') throw new Error('a touch undid the pinned controller mode');
+    await app.locator('#inputBtn').tap();
+    if (!(await stats()).hint) throw new Error('the marks didn\'t come back');
+    await page.screenshot({ path: shots + 'neverputt-touch.png' });
+  } finally {
+    await frame()?.evaluate(() => localStorage.removeItem('input.neverputt')).catch(() => {});
+  }
 });
 
 await check('prince of persia starts, moves by touch and controller, quick saves and keeps the save', async () => {
@@ -3678,6 +4032,76 @@ await check('blake stone: starts a mission by touch, plays and saves by controll
   await until('the save after starting again', saved, 10000);
 });
 
+await check('prince of persia pauses when hidden and keeps an open pause menu open', async () => {
+  await openFromHub(/Prince of Persia/);
+  const frame = () => page.frames().find(f => f.url().includes('/pop/'));
+  const app = appFrame();
+  const stats = () => frame().evaluate(() => window.popStats());
+  const tapKey = async (code, ms = 100) => { await page.keyboard.down(code); await page.waitForTimeout(ms); await page.keyboard.up(code); };
+  await app.locator('#play').click();
+  for (const t = Date.now(); (await stats()).frames < 5; await page.waitForTimeout(250)) if (Date.now() - t > 60000) throw new Error('no frames');
+  await tapKey('Enter'); await page.waitForTimeout(1200);
+  await tapKey('Enter'); await page.waitForTimeout(1200);
+  await tapKey('ShiftLeft'); await page.waitForTimeout(3000);
+  if ((await stats()).paused !== 0) throw new Error(`paused before the page was hidden: ${JSON.stringify(await stats())}`);
+  // the page hidden and shown again, as when the car's screen goes elsewhere
+  const visible = on => frame().evaluate(on => {
+    Object.defineProperty(document, 'hidden', { configurable: true, get: () => !on });
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => (on ? 'visible' : 'hidden') });
+    document.dispatchEvent(new Event('visibilitychange'));
+  }, on);
+  await visible(false);
+  await page.waitForTimeout(1500);
+  if ((await stats()).paused !== 1) throw new Error('hiding the page didn\'t pause');
+  await visible(true);
+  await page.waitForTimeout(1000);
+  if ((await stats()).paused !== 1) throw new Error('showing the page again closed the pause menu');
+  // hidden again with the menu open: it stays open (Esc would close it)
+  await visible(false);
+  await page.waitForTimeout(1500);
+  if ((await stats()).paused !== 1) throw new Error('hiding the page closed the open pause menu');
+  await visible(true);
+  await page.waitForTimeout(500);
+  await tapKey('Escape');
+  await page.waitForTimeout(1200);
+  if ((await stats()).paused !== 0) throw new Error('Esc didn\'t close the pause menu');
+});
+
+await check('supertux swaps its touch controls live', async () => {
+  await openFromHub(/SuperTux/);
+  const frame = () => page.frames().find(f => f.url().includes('/supertux/'));
+  const app = appFrame();
+  const stats = () => frame().evaluate(() => window.supertuxStats());
+  const mode = () => app.locator('#inputBtn').getAttribute('data-mode');
+  const until = async (what, fn, ms = 5000) => {
+    for (const t = Date.now(); Date.now() - t < ms; await page.waitForTimeout(150)) if (await fn(await stats())) return;
+    throw new Error(`no ${what}: ${JSON.stringify(await stats())}`);
+  };
+  try {
+    await app.locator('#play').click();
+    await app.locator('#player').waitFor({ timeout: 120000 });
+    await until('frames', s => s.frames > 30, 60000);
+    // whichever mode it started in, the game's controls match it
+    const first = await mode();
+    await until(`${first} controls at the start`, s => s.touch === (first === 'touch' ? 1 : 0));
+    await app.locator('#inputBtn').tap();
+    await until('the swap, live', s => s.touch === (first === 'touch' ? 0 : 1));
+    await app.locator('#inputBtn').tap();
+    await until('the swap back, live', s => s.touch === (first === 'touch' ? 1 : 0));
+    if (await mode() !== 'touch') await app.locator('#inputBtn').tap();
+    await until('touch controls', s => s.touch === 1);
+    await page.waitForTimeout(500);
+    await page.screenshot({ path: shots + 'supertux-touch.png' });
+    // (a script click: after a screenshot, Chrome's touches miss the frame)
+    await app.locator('#inputBtn').evaluate(b => b.click());
+    await until('no touch controls', s => s.touch === 0);
+    await page.waitForTimeout(500);
+    await page.screenshot({ path: shots + 'supertux-pad.png' });
+  } finally {
+    await frame()?.evaluate(() => localStorage.removeItem('input.supertux')).catch(() => {});
+  }
+});
+
 await check('supertux streams its data, starts the story by touch, saves when left and loads the save again', async () => {
   await openFromHub(/SuperTux/);
   const frame = () => page.frames().find(f => f.url().includes('/supertux/'));
@@ -3915,6 +4339,49 @@ await check('elder scrolls: arena makes a character by touch and controller, fig
   if (!(await app.locator('#failed').isHidden())) throw new Error(await app.locator('#failedText').textContent());
   await app.locator('#quitBtn').evaluate(b => (b.click(), b.click()));
   await app.locator('#start').waitFor({ timeout: 10000 });
+});
+
+
+await check('elder scrolls swaps touch and controller, marking the touch area in touch mode', async () => {
+  await openFromHub(/The Elder Scrolls/);
+  const frame = () => page.frames().find(f => f.url().includes('/elderscrolls/'));
+  const app = appFrame();
+  const stats = () => frame().evaluate(() => window.esStats());
+  const mode = () => app.locator('#inputBtn').getAttribute('data-mode');
+  const shown = () => app.locator('#touchHint').isVisible();
+  const cdp = await page.context().newCDPSession(page);
+  const touch = (type, points) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: points.map(([x, y], id) => ({ x, y, id })) });
+  // a tap on a pixel of the game's 320x200 screen
+  const tap = async (x, y) => {
+    const b = await app.locator('#canvas').boundingBox();
+    await touch('touchStart', [[b.x + (x + 0.5) * b.width / 320, b.y + (y + 0.5) * b.height / 200]]);
+    await page.waitForTimeout(80);
+    await touch('touchEnd', []);
+    await page.waitForTimeout(400);
+  };
+  try {
+    await app.locator('#playArena').click();
+    await app.locator('#player').waitFor({ timeout: 120000 });
+    for (const t = Date.now(); (await stats()).frames < 30; await page.waitForTimeout(250)) if (Date.now() - t > 60000) throw new Error('no frames');
+    if (await mode() !== 'touch') await app.locator('#inputBtn').tap();
+    if (await mode() !== 'touch' || !(await shown())) throw new Error('touch mode shows no frame round the picture');
+    // the frame lies over the picture
+    const [c, h] = [await app.locator('#canvas').boundingBox(), await app.locator('#touchHint').boundingBox()];
+    if (Math.abs(c.x - h.x) > 1 || Math.abs(c.width - h.width) > 1 || Math.abs(c.height - h.height) > 1) throw new Error(`the frame isn't over the picture: ${JSON.stringify([c, h])}`);
+    await tap(100, 60);
+    if ((await stats()).pointer.join() !== '100,60') throw new Error(`a tap in touch mode didn't move the pointer: ${(await stats()).pointer}`);
+    await app.locator('#inputBtn').tap();
+    if (await mode() !== 'pad' || await shown()) throw new Error('controller mode still shows the frame');
+    await tap(200, 150);
+    if ((await stats()).pointer.join() !== '100,60') throw new Error(`a tap in controller mode moved the pointer: ${(await stats()).pointer}`);
+    if (await mode() !== 'pad') throw new Error('a touch undid the pinned controller mode');
+    await app.locator('#inputBtn').tap();
+    if (!(await shown())) throw new Error('the frame didn\'t come back');
+    // (last: after a screenshot, Chrome's touches miss the frame)
+    await page.screenshot({ path: shots + 'elderscrolls-touch.png' });
+  } finally {
+    await frame()?.evaluate(() => localStorage.removeItem('input.elderscrolls')).catch(() => {});
+  }
 });
 
 await check('librequake plays with touch and a controller and resumes from its autosave', async () => {
@@ -4648,6 +5115,55 @@ await check('rocks and diamonds starts a level by controller, moves and ships no
   if (b.y === a.y && b.x === a.x) throw new Error(`the player did not move: ${JSON.stringify([a, b])}`);
   const names = await frame().evaluate(() => { const fs = window.rocksGame().FS; const out = []; const walk = d => { for (const n of fs.readdir(d)) { if (n === '.' || n === '..') continue; const p = `${d}/${n}`; if (fs.isDir(fs.stat(p).mode)) walk(p); else out.push(p); } }; try { walk('/levels'); walk('/music'); } catch {} return out; });
   if (names.some(n => /Classic_Games|emerald_mine|sokoban|supaplex|boulder|\.mod$|^\/music\/mod\./i.test(n))) throw new Error(`classic data shipped: ${names.filter(n => /Classic|mod\./.test(n)).slice(0, 3)}`);
+});
+
+
+await check('rocks and diamonds swaps its touch buttons live, and a pinned mode wins over the game', async () => {
+  await openFromHub(/Rocks'n'Diamonds/);
+  const frame = () => page.frames().find(f => f.url().includes('/rocks/'));
+  const app = appFrame();
+  const stats = () => frame().evaluate(() => window.rocksStats());
+  const mode = () => app.locator('#inputBtn').getAttribute('data-mode');
+  const until = async (what, fn, ms = 60000) => {
+    for (const t = Date.now(); Date.now() - t < ms; await page.waitForTimeout(100)) if (await fn(await stats())) return await stats();
+    throw new Error(`no ${what}: ${JSON.stringify(await stats())}`);
+  };
+  try {
+    await frame().evaluate(carPads);
+    await app.locator('#play').first().tap();
+    await until('menu', s => s?.state === 1);
+    await page.waitForTimeout(1500);
+    await frame().evaluate(() => window.press(0));
+    await until('level', s => s.state === 2);
+    await page.waitForTimeout(1000);
+    // Touch, pinned (a tap on the button pins whatever it lands on): the
+    // buttons show at once, and a controller press no longer hides them
+    await app.locator('#inputBtn').tap();
+    if (await mode() !== 'touch') await app.locator('#inputBtn').tap();
+    await until('touch buttons on', s => s.touch === 1, 3000);
+    // left, into the wall: a step down lands on the tutorial's first message,
+    // which hides the buttons while it shows
+    await frame().evaluate(() => { window.hold(14, true); });
+    await page.waitForTimeout(500);
+    await frame().evaluate(() => { window.hold(14, false); });
+    await page.waitForTimeout(500);
+    if ((await stats()).touch !== 1) throw new Error('a controller press hid the pinned touch buttons');
+    if (await mode() !== 'touch') throw new Error('a controller press undid the pinned touch mode');
+    // Controller, pinned: off at once, and a touch in the level doesn't bring them back
+    await app.locator('#inputBtn').tap();
+    await until('touch buttons off', s => s.touch === 0, 3000);
+    const box = await app.locator('#canvas').boundingBox();
+    await page.touchscreen.tap(box.x + box.width * 0.3, box.y + box.height * 0.5);
+    await page.waitForTimeout(500);
+    if ((await stats()).touch !== 0) throw new Error('a touch brought the buttons back over the pinned controller mode');
+    await app.locator('#inputBtn').tap();
+    await until('touch buttons back on', s => s.touch === 1, 3000);
+    // (last: after a screenshot, Chrome's touches miss the frame)
+    await page.waitForTimeout(500);
+    await page.screenshot({ path: shots + 'rocks-touch.png' });
+  } finally {
+    await frame()?.evaluate(() => localStorage.removeItem('input.rocks')).catch(() => {});
+  }
 });
 
 await check('sopwith starts by touch, ends a game and picks menus by controller', async () => {

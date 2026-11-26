@@ -93,17 +93,20 @@ export function phonePanel({ app, save, onSaved, onClose = () => {}, notPlayable
         const i = transfer.taken + 1;
         const file = await api('take', { sid, token, i });
         // A missing file was rejected or already taken; other errors retry
-        if (file.ok || file.status === 404) transfer.taken = i;
-        if (file.status === 404) continue;
+        if (file.status === 404) { transfer.taken = i; continue; }
         if (!file.ok) break;
-        // The server deletes a piece as it's handed over, so one dropped here is gone
+        // The server keeps a piece until it's confirmed here, so one that
+        // drops on the way is taken again on the next poll
         let data;
         try {
           data = new Uint8Array(await file.arrayBuffer());
         } catch {
-          $('transferStatus').textContent = 'A piece was lost on a weak signal. If a game stays stuck below, send it again.';
-          continue;
+          $('transferStatus').textContent = 'Weak signal. Trying again…';
+          break;
         }
+        transfer.taken = i;
+        // a lost confirm only leaves the piece on the server until the code expires
+        api('confirm', { sid, token, i }, 'POST').catch(() => {});
         await receive(data);
       }
     } catch {

@@ -27,6 +27,7 @@
 // held down until DOSBox has drawn a couple of frames.
 
 import { fetchBlock, padMenu, reason, secondTap } from '../_shared/gamepage.js';
+import { inputSwap } from '../_shared/inputswap.js';
 
 (() => {
 
@@ -408,6 +409,8 @@ function fit() {
   fitted = key;
   const h = Math.floor(Math.min(r.height, r.width * 3 / 4)), w = Math.floor(h * 4 / 3);
   Object.assign(c.style, { width: `${w}px`, height: `${h}px`, left: `${Math.floor((r.width - w) / 2)}px`, top: `${Math.floor((r.height - h) / 2)}px` });
+  // touch mode's frame, over the picture
+  Object.assign($('touchHint').style, { width: `${w}px`, height: `${h}px`, left: c.style.left, top: c.style.top });
   fittedWidth = c.style.width;
 }
 addEventListener('resize', () => { fitted = ''; setTimeout(fit, 0); });
@@ -722,13 +725,27 @@ function readPad(p, s) {
                         [12, 'up'], [13, 'down'], [14, 'left'], [15, 'right']]) if (on(i)) s.held.add(b);
 }
 
-// While a controller is in use the bar says so; touching the screen ends it
-let padMode = false;
-function setPadMode(on) {
-  if (on === padMode) return;
-  padMode = on;
-  $('padNote').hidden = !on;
-}
+// Touch or controller, on the bar's button. Touch play has no buttons on the
+// screen, only gestures on the picture, so in touch mode a faint frame marks
+// the picture and a note says what the gestures do. In controller mode both
+// go, and touches on the picture are ignored, so a bumped screen can't click
+// in the game; the bar's buttons still work. Until the button is tapped, a
+// controller press or a touch on the picture switches the mode (input.auto).
+const touchFirst = params.has('touch') ? params.get('touch') !== '0' : !matchMedia('(hover: hover) and (pointer: fine)').matches;
+const hint = $('touchHint');
+const input = inputSwap({
+  id: 'elderscrolls', button: $('inputBtn'), start: touchFirst ? 'touch' : 'pad',
+  apply: mode => {
+    hint.hidden = mode !== 'touch';
+    // the note shows again, then fades, at each swap to touch
+    const note = hint.firstElementChild;
+    note.style.animation = 'none';
+    void note.offsetWidth;
+    note.style.animation = '';
+    if (mode === 'pad' && running) dropFinger();
+  },
+});
+const setPadMode = on => input.auto(on ? 'pad' : 'touch');
 
 let lastHeld = new Set();
 const moveKeys = new Set();       // arrow keys held for walking
@@ -830,7 +847,7 @@ const touchLayer = $('touch');
 touchLayer.addEventListener('touchstart', e => {
   e.preventDefault();
   setPadMode(false);
-  if (finger) return;
+  if (input.mode === 'pad' || finger) return;
   const t = e.changedTouches[0];
   finger = { id: t.identifier, x0: t.clientX, y0: t.clientY, gesture: 'tap' };
   movePointer(...gameOf(t.clientX, t.clientY));
@@ -853,6 +870,15 @@ touchLayer.addEventListener('touchmove', e => {
   }
   movePointer(...gameOf(t.clientX, t.clientY));
 }, { passive: false });
+
+// A swap to the controller mid-touch lets go of whatever that finger held
+function dropFinger() {
+  if (!finger) return;
+  clearTimeout(holdTimer);
+  if (finger.gesture === 'drag') buttonUp(0);
+  else if (finger.gesture === 'held') buttonUp(2);
+  finger = null;
+}
 
 function touchEnd(e) {
   e.preventDefault();

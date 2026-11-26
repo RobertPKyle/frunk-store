@@ -9,7 +9,7 @@
     { "id": "strategy", "apps": ["cnc", "openttd", "city", "fheroes2", "blocks", "craft4k", "hoodfellas"] },
     { "id": "adventure", "apps": ["elderscrolls", "adventure", "text", "ascii", "wagon"] },
     { "id": "camp", "apps": ["sleep", "fireplace", "terrarium", "audiobooks", "fatmusic", "stars", "skyevents", "satellites", "weather", "fractal"] },
-    { "id": "road", "apps": ["nearby", "pitstop", "planes", "under", "beach", "postcard", "speedtest", "brain", "probe"] }
+    { "id": "road", "apps": ["nearby", "pitstop", "planes", "under", "beach", "postcard", "speedtest", "brain", "probe", "mydata"] }
   ],
   "partners": [
     {
@@ -77,7 +77,13 @@
     { "app": "keen4", "image": "/featured/keen4.webp" },
     { "app": "hocus", "image": "/featured/hocus.webp" },
     { "app": "duke2", "image": "/featured/duke2.webp" },
-    { "app": "cnc", "image": "/featured/cnc.webp" }
+    { "app": "cnc", "image": "/featured/cnc.webp" },
+    { "app": "duke3d", "image": "/featured/duke3d.webp" },
+    { "app": "pop", "image": "/featured/pop.webp" },
+    { "app": "doom", "image": "/featured/doom.webp" },
+    { "app": "cosmo", "image": "/featured/cosmo.webp" },
+    { "app": "mahjong", "image": "/featured/mahjong.webp" },
+    { "app": "wagon", "image": "/featured/wagon.webp" }
   ],
   "apps": [
     {
@@ -284,6 +290,16 @@
       "tags": [
         "Tool"
       ]
+    },
+    {
+      "id": "mydata",
+      "name": "My Data",
+      "tagline": "See what each app keeps on this car, free up space by clearing game downloads, and back up your saves to your phone.",
+      "path": "/mydata/",
+      "icon": "/mydata/icon.svg",
+      "added": "2026-11-26",
+      "input": "both",
+      "tags": ["Tool"]
     },
     {
       "id": "arcade",

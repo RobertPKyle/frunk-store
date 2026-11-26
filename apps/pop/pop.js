@@ -253,7 +253,7 @@ async function play() {
 }
 $('play').onclick = $('play2').onclick = play;
 
-window.popStats = () => ({ frames: window.Module?.popFrames | 0, running, held: [...held], audio: contexts.map(c => `${c.state} ${c.sampleRate}`) });
+window.popStats = () => ({ frames: window.Module?.popFrames | 0, running, paused: window.Module?._web_paused?.() ?? -1, held: [...held], audio: contexts.map(c => `${c.state} ${c.sampleRate}`) });
 
 // ---------- leaving ----------
 
@@ -273,7 +273,12 @@ document.addEventListener('visibilitychange', () => {
   if (!running) return;
   if (document.hidden) {
     for (const code of [...held]) key(code, false);   // nothing stays pressed
-    tap('Escape');                                    // the pause menu, so the clock stops
+    // The pause menu, so the clock stops. Esc opens it but also closes it, so
+    // it's pressed only when the game isn't paused already: hiding the page
+    // never unpauses or closes an open menu. (An engine without web_paused,
+    // from before tools/pop/sdlpop-web.patch had it, gets the Esc as before.)
+    const paused = window.Module?._web_paused ? window.Module._web_paused() : 0;
+    if (!paused) tap('Escape');
     save();
     for (const c of contexts) c.suspend();
   } else if (soundOn()) {

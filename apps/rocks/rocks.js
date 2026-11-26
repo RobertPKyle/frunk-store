@@ -70,39 +70,45 @@ navigator.getGamepads = () => {
 function pollPads() {
   requestAnimationFrame(pollPads);
   if (!running) return;
-  if (navigator.getGamepads().some(p => p?.buttons.some(b => b.pressed))) {
-    buttonsOff = true;   // the game hides its on-screen buttons at any controller button
-    input.auto('pad');
-  }
+  if (navigator.getGamepads().some(p => p?.buttons.some(b => b.pressed))) input.auto('pad');
 }
 
 // ---------- touch or controller ----------
 
-// The game draws its own on-screen buttons into the picture, and switches
-// them itself: a touch in a level shows them, a controller button hides them.
-// It reads only the starting state from the page (Module.rocksTouch), and
-// nothing else of its can be set from here without a new build of the
-// engine. So the bar's button sets how the next start begins, and in
-// controller mode, once a controller press has hidden the buttons, touches in
-// a level are kept from the game so they can't bring them back; the browser
-// still turns a tap into a click, so the side panel's buttons work. In touch
-// mode a controller press still hides them until the next touch.
-let buttonsOff = !touchFirst;   // the game's on-screen buttons are hidden, as far as the page can tell
-function explain(mode) {
-  $('inputBtn').title = mode === 'pad'
-    ? 'Controller: the game\'s on-screen buttons go at the next controller press, and touches don\'t bring them back. Tap to swap to touch controls.'
-    : 'Touch controls: the game\'s on-screen buttons show at the next touch in a level (a controller press hides them until then). Tap to swap to a controller.';
+// The game draws its own on-screen buttons into the picture. Upstream switches
+// them itself: a touch shows them, a controller press hides them. The web
+// patch adds web_set_touch(on, pinned), so the bar's button shows or hides
+// them at once, mid-level too, and once the player has pinned a mode the
+// game's own switching stops: a controller press no longer hides the touch
+// buttons, and a touch no longer brings them back over a controller game.
+// Until then the game goes on switching them itself, and the page follows
+// along (input.auto).
+let input = null;
+function applyInput(mode) {
+  const touch = mode === 'touch';
+  const pinned = input?.pinned ? 1 : 0;   // (null on the first call, from inside inputSwap)
+  $('inputBtn').title = touch
+    ? 'Touch controls: the game\'s on-screen buttons are on. Tap to swap to a controller.'
+    : 'Controller: the game\'s on-screen buttons are off. Tap to swap to touch controls.';
+  if (!game) return;
+  // read again by the game if it sets up its input later
+  game.rocksTouch = touch;
+  game.rocksPin = pinned ? (touch ? 1 : 0) : -1;
+  if (running && game._web_set_touch) game._web_set_touch(touch ? 1 : 0, pinned);
 }
-const input = inputSwap({ id: 'rocks', button: $('inputBtn'), start: touchFirst ? 'touch' : 'pad', apply: explain });
+input = inputSwap({ id: 'rocks', button: $('inputBtn'), start: touchFirst ? 'touch' : 'pad', apply: applyInput });
 
+// In controller mode the buttons are hidden, but the game would still read a
+// touch in a level as a press of the invisible button under it, so those
+// touches are kept from it. The browser still turns a tap into a click, so
+// the side panel's buttons work.
 const kept = new Set();   // touches kept from the game, by finger
 function screenTouch(e) {
   const fingers = [...e.changedTouches];
   if (e.type === 'touchstart') {
     input.auto('touch');
     const playing = running && game?._web_state?.() === 2;
-    if (input.mode === 'pad' && buttonsOff && playing) for (const t of fingers) kept.add(t.identifier);
-    else if (playing) buttonsOff = false;
+    if (input.mode === 'pad' && playing) for (const t of fingers) kept.add(t.identifier);
   }
   if (fingers.length && fingers.every(t => kept.has(t.identifier))) e.stopPropagation();
   if (e.type === 'touchend' || e.type === 'touchcancel') for (const t of fingers) kept.delete(t.identifier);
@@ -222,6 +228,7 @@ async function play() {
       window.Module = game = {
         canvas,
         rocksTouch: input.mode === 'touch',
+        rocksPin: input.pinned ? (input.mode === 'touch' ? 1 : 0) : -1,
         locateFile: path => ENGINE + path,
         getPreloadedPackage: () => { const p = pack; pack = null; return p; },
         print: line => { if (window.rocksDebug) console.log(line); },
@@ -232,9 +239,10 @@ async function play() {
       loadScript(ENGINE + 'rocksndiamonds.data.js').then(() => loadScript(ENGINE + 'rocksndiamonds.js')).catch(reject);
     });
     running = true;
-    buttonsOff = !game.rocksTouch;
     engineStart = performance.now();
     game.callMain([]);
+    // the mode may have changed while the game loaded
+    applyInput(input.mode);
     $('loading').hidden = true;
     canvas.focus();
     showSound();
@@ -254,7 +262,7 @@ window.rocksStats = () => {
     running, width: $('canvas').width, height: $('canvas').height,
     state: on ? game._web_state() : -1, level: on ? game._web_level() : -1,
     x: on ? game._web_player_x() : -1, y: on ? game._web_player_y() : -1,
-    paused: on ? game._web_paused() : 0, frames: on ? game._web_frames() : 0, engine: on ? game._web_engine() : 0, solved: on ? game._web_solved() : 0,
+    paused: on ? game._web_paused() : 0, touch: on ? game._web_touch() : -1, frames: on ? game._web_frames() : 0, engine: on ? game._web_engine() : 0, solved: on ? game._web_solved() : 0,
     audio: audioContext()?.state, memoryMB: game?.HEAP8 ? Math.round(game.HEAP8.length / 1048576) : 0,
   };
 };

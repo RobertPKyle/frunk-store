@@ -1,18 +1,31 @@
-// Send games from a phone to the car, through a short-lived drop box.
+// Send games from a phone to the car, and saves from the car to a phone,
+// through a short-lived drop box.
 //
 // The car opens a session and shows a QR code holding the session id and an
 // AES key. The key stays in the link's #fragment, so it never reaches this
-// server: the phone encrypts each file before uploading, and the car decrypts
-// after downloading. This server only ever holds ciphertext, keeps it at most
-// 15 minutes, and deletes each file as soon as the car takes it.
+// server: whoever sends encrypts each file before uploading, and the other
+// side decrypts after downloading. This server only ever holds ciphertext,
+// keeps it at most 15 minutes, and deletes each file once the car says it has
+// it (or when the session ends).
 //
+// Phone to car:
 //   POST ?op=open                      car: new session -> { sid, token, ttl }
 //   POST ?op=put&sid=…        (body)   phone: one encrypted piece -> { n }
-//   GET  ?op=poll&sid=…                car: pieces uploaded so far -> { n, ttl }
-//   GET  ?op=take&sid=…&i=…&token=…    car: piece i (then deleted)
+//   GET  ?op=poll&sid=…                car: pieces uploaded so far -> { n, ttl, out, got }
+//   GET  ?op=take&sid=…&i=…&token=…    car: piece i
+//   POST ?op=confirm&sid=…&i=…&token=… car: piece i arrived whole; delete it
 //
-// Games bigger than one piece are split by the phone and joined by the car
-// (see apps/_shared/transfer.js); this server only counts pieces.
+// A piece stays until it's confirmed, so a download that drops on a weak
+// signal can be taken again. Car pages from before confirm never send it;
+// their pieces just wait for the session to expire.
+//
+// Car to phone (My Data's save backup):
+//   POST ?op=offer&sid=…&token=… (body) car: one encrypted piece -> { n }
+//   GET  ?op=fetch&sid=…&i=…           phone: offered piece i (kept, so it can retry)
+//   POST ?op=fetched&sid=…             phone: it has them all; poll's got turns 1
+//
+// Files bigger than one piece are split by the sender and joined by the
+// receiver (see apps/_shared/transfer.js); this server only counts pieces.
 //   POST ?op=close&sid=…&token=…       car: end the session early
 
 import { randomBytes, timingSafeEqual } from 'node:crypto';
@@ -24,6 +37,7 @@ const MAX_FILES = 200;            // pieces per session
 const MAX_BYTES = 80e6;           // per session: two of the biggest GBA games
 const OPENS_PER_HOUR = 30;        // per IP address
 const PUTS_PER_MINUTE = 60;       // per IP address
+const FETCHES_PER_MINUTE = 120;   // per IP address
 
 const SID = /^[A-Za-z0-9_-]{22}$/;
 
@@ -45,6 +59,7 @@ async function open(request) {
     ['SET', `t:${sid}`, hash(token), 'EX', TTL],
     ['SET', `t:${sid}:n`, 0, 'EX', TTL],
     ['SET', `t:${sid}:bytes`, 0, 'EX', TTL],
+    ['SET', `t:${sid}:on`, 0, 'EX', TTL],
   );
   return json({ sid, token, ttl: TTL });
 }
@@ -64,28 +79,73 @@ async function put(request, sid) {
   return json({ n });
 }
 
+// out: pieces the car offered; got: 1 once the phone has fetched them all
 async function poll(sid) {
   if (!SID.test(sid)) return fail(400, 'Bad session.');
-  const [n, ttl] = await redis(['GET', `t:${sid}:n`], ['TTL', `t:${sid}`]);
+  const [n, ttl, out, got] = await redis(['GET', `t:${sid}:n`], ['TTL', `t:${sid}`], ['GET', `t:${sid}:on`], ['GET', `t:${sid}:got`]);
   if (n === null || ttl <= 0) return fail(410, 'expired');
-  return json({ n: +n, ttl });
+  return json({ n: +n, ttl, out: +out || 0, got: +got || 0 });
 }
+
+const bytes = data => new Response(Buffer.from(data, 'base64'), {
+  headers: { 'Content-Type': 'application/octet-stream', 'Cache-Control': 'no-store' },
+});
 
 async function take(sid, token, i) {
   if (!(await carAllowed(sid, token))) return fail(403, 'Not this session.');
   if (!/^\d{1,3}$/.test(i)) return fail(400, 'Bad file.');
-  const [data] = await redis(['GETDEL', `t:${sid}:f:${i}`]);
+  // Not deleted here: the answer can still be lost on its way to the car
+  const [data] = await redis(['GET', `t:${sid}:f:${i}`]);
   if (data === null) return fail(404, 'Gone.');
-  return new Response(Buffer.from(data, 'base64'), {
-    headers: { 'Content-Type': 'application/octet-stream', 'Cache-Control': 'no-store' },
-  });
+  return bytes(data);
+}
+
+async function confirm(sid, token, i) {
+  if (!(await carAllowed(sid, token))) return fail(403, 'Not this session.');
+  if (!/^\d{1,3}$/.test(i)) return fail(400, 'Bad file.');
+  await redis(['DEL', `t:${sid}:f:${i}`]);
+  return json({ ok: true });
+}
+
+async function offer(request, sid, token) {
+  if (!(await carAllowed(sid, token))) return fail(403, 'Not this session.');
+  const length = +request.headers.get('content-length');
+  if (!length || length > MAX_FILE) return fail(413, 'That piece is too big.');
+  const [ttl] = await redis(['TTL', `t:${sid}`]);
+  if (ttl <= 0) return fail(410, 'expired');
+  const body = Buffer.from(await request.arrayBuffer());
+  if (body.length > MAX_FILE || body.length < 29) return fail(413, 'That piece is too big.');
+  // the same budget as the phone's uploads: one session holds at most MAX_BYTES
+  // (EXPIRE: a session opened before offers existed has no counter to inherit one from)
+  const [n, total] = await redis(['INCR', `t:${sid}:on`], ['INCRBY', `t:${sid}:bytes`, body.length], ['EXPIRE', `t:${sid}:on`, ttl, 'NX']);
+  if (n > MAX_FILES || total > MAX_BYTES) return fail(413, 'That\'s more than one code can carry.');
+  await redis(['SET', `t:${sid}:o:${n}`, body.toString('base64'), 'EX', ttl]);
+  return json({ n });
+}
+
+// Only the session id is needed: without the key in the link the pieces are noise
+async function fetchPiece(request, sid, i) {
+  if (!SID.test(sid)) return fail(400, 'Bad session.');
+  if (!/^\d{1,3}$/.test(i)) return fail(400, 'Bad file.');
+  if (await limited('fetch', request, FETCHES_PER_MINUTE, 60)) return fail(429, 'Too many downloads at once. Wait a minute.');
+  const [data] = await redis(['GET', `t:${sid}:o:${i}`]);
+  if (data === null) return fail(410, 'This code has expired. Show a new one on the car screen.');
+  return bytes(data);
+}
+
+async function fetched(sid) {
+  if (!SID.test(sid)) return fail(400, 'Bad session.');
+  const [ttl] = await redis(['TTL', `t:${sid}`]);
+  if (ttl <= 0) return fail(410, 'expired');
+  await redis(['SET', `t:${sid}:got`, 1, 'EX', ttl]);
+  return json({ ok: true });
 }
 
 async function close(sid, token) {
   if (!(await carAllowed(sid, token))) return fail(403, 'Not this session.');
-  const [n] = await redis(['GET', `t:${sid}:n`]);
-  const files = Array.from({ length: Math.min(+n || 0, MAX_FILES) }, (_, k) => `t:${sid}:f:${k + 1}`);
-  await redis(['DEL', `t:${sid}`, `t:${sid}:n`, `t:${sid}:bytes`, ...files]);
+  const [n, out] = await redis(['GET', `t:${sid}:n`], ['GET', `t:${sid}:on`]);
+  const keys = (count, kind) => Array.from({ length: Math.min(+count || 0, MAX_FILES) }, (_, k) => `t:${sid}:${kind}:${k + 1}`);
+  await redis(['DEL', `t:${sid}`, `t:${sid}:n`, `t:${sid}:bytes`, `t:${sid}:on`, `t:${sid}:got`, ...keys(n, 'f'), ...keys(out, 'o')]);
   return json({ ok: true });
 }
 
@@ -97,6 +157,10 @@ async function handle(request) {
     if (request.method === 'POST' && op === 'put') return await put(request, sid);
     if (request.method === 'GET' && op === 'poll') return await poll(sid);
     if (request.method === 'GET' && op === 'take') return await take(sid, token, q.get('i') || '');
+    if (request.method === 'POST' && op === 'confirm') return await confirm(sid, token, q.get('i') || '');
+    if (request.method === 'POST' && op === 'offer') return await offer(request, sid, token);
+    if (request.method === 'GET' && op === 'fetch') return await fetchPiece(request, sid, q.get('i') || '');
+    if (request.method === 'POST' && op === 'fetched') return await fetched(sid);
     if (request.method === 'POST' && op === 'close') return await close(sid, token);
     return fail(400, 'Unknown request.');
   } catch (e) {

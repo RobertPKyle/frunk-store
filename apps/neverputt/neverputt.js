@@ -8,6 +8,7 @@
 
 import { fetchPackage, padMenu, reason } from '../_shared/gamepage.js';
 import { mbOf } from '../_shared/engine.js';
+import { inputSwap } from '../_shared/inputswap.js';
 
 (() => {
 
@@ -73,9 +74,47 @@ navigator.getGamepads = () => {
 };
 function pollPads() {
   requestAnimationFrame(pollPads);
-  if (!running || !$('padNote').hidden) return;
-  if (navigator.getGamepads().some(p => p?.buttons.some(b => b.pressed))) $('padNote').hidden = false;
+  if (!running || input.mode === 'pad') return;
+  if (navigator.getGamepads().some(p => p?.buttons.some(b => b.pressed))) input.auto('pad');
 }
+
+// ---------- touch or controller ----------
+
+// The game reads touch through SDL: the whole picture is one drag area (drag
+// sideways to aim, up and down for power, tap to putt), with nothing drawn.
+// So in touch mode the page marks it faintly, and the bar's button has
+// something to swap. In controller mode the marks go, and touches on the
+// picture are kept from the game, so a bumped screen can't putt; the bar's
+// buttons still work. Until the button is tapped, a controller press or a
+// touch on the picture switches the mode (input.auto).
+const hint = $('touchHint');
+const input = inputSwap({
+  id: 'neverputt', button: $('inputBtn'), start: touchFirst ? 'touch' : 'pad',
+  apply: mode => {
+    hint.hidden = mode !== 'touch';
+    // the words show again, then fade, at each swap to touch
+    const note = hint.querySelector('span');
+    note.style.animation = 'none';
+    void note.offsetWidth;
+    note.style.animation = '';
+  },
+});
+const kept = new Set();   // touches kept from the game, by finger
+function screenTouch(e) {
+  if (e.type === 'touchstart') {
+    input.auto('touch');
+    if (input.mode === 'pad') for (const t of e.changedTouches) kept.add(t.identifier);
+  }
+  const fingers = [...e.changedTouches];
+  if (fingers.length && fingers.every(t => kept.has(t.identifier))) {
+    // (and no mouse events made from it afterwards, which SDL would read as a putt)
+    e.preventDefault();
+    e.stopPropagation();
+  }
+  if (e.type === 'touchend' || e.type === 'touchcancel') for (const t of fingers) kept.delete(t.identifier);
+}
+// on the way down to the canvas, where SDL listens
+for (const type of ['touchstart', 'touchmove', 'touchend', 'touchcancel']) $('canvas').parentElement.addEventListener(type, screenTouch, { capture: true, passive: false });
 pollPads();
 
 // ---------- sound ----------
@@ -182,7 +221,7 @@ async function play() {
 $('play').onclick = $('play2').onclick = play;
 
 window.neverputtGame = () => game;
-window.neverputtStats = () => ({ frames, running, states: game?.neverputtStates | 0, width: $('canvas').width, height: $('canvas').height, audio: window.Neverball.audioContext?.state,
+window.neverputtStats = () => ({ frames, running, hint: !hint.hidden, states: game?.neverputtStates | 0, width: $('canvas').width, height: $('canvas').height, audio: window.Neverball.audioContext?.state,
   memoryMB: game ? Math.round(game.HEAP8.length / 1048576) : 0 });
 
 // ---------- leaving ----------

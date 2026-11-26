@@ -1,5 +1,6 @@
-// Weather icons as inline SVG, keyed by WMO weather code (the codes
-// Open-Meteo returns). Drawn on a 32x32 grid.
+// Weather icons as inline SVG, keyed by WMO weather code (MET Norway's
+// symbols are turned into these in ../_shared/forecast.js). Drawn on a 32x32
+// grid.
 
 const SUN = '#ffc94d', MOON = '#e9e4cc', CLOUD = '#c9d3e6', DARK_CLOUD = '#8d98ae', RAIN = '#5b9bff', SNOW = '#eef4ff', BOLT = '#ffd24a';
 
@@ -29,7 +30,7 @@ export function weatherIcon(code, isDay = true) {
   else if (code === 3) body = cloud(-5, DARK_CLOUD, -3) + cloud(0);
   else if (code === 45 || code === 48) body = fog;
   else if (code >= 51 && code <= 57) body = cloud(-4) + drops(2);
-  else if ((code >= 61 && code <= 67) || (code >= 80 && code <= 82)) body = cloud(-4, code >= 63 && code !== 80 ? DARK_CLOUD : CLOUD) + drops(3);
+  else if ((code >= 61 && code <= 69) || (code >= 80 && code <= 84)) body = cloud(-4, code >= 63 && code !== 80 && code !== 83 ? DARK_CLOUD : CLOUD) + drops(3);
   else if ((code >= 71 && code <= 77) || code === 85 || code === 86) body = cloud(-4) + flakes();
   else if (code >= 95) body = cloud(-6, DARK_CLOUD) + bolt;
   else body = cloud(0);
@@ -39,9 +40,9 @@ export function weatherIcon(code, isDay = true) {
 const NAMES = {
   0: 'Clear', 1: 'Mostly clear', 2: 'Partly cloudy', 3: 'Cloudy', 45: 'Fog', 48: 'Freezing fog',
   51: 'Light drizzle', 53: 'Drizzle', 55: 'Heavy drizzle', 56: 'Freezing drizzle', 57: 'Freezing drizzle',
-  61: 'Light rain', 63: 'Rain', 65: 'Heavy rain', 66: 'Freezing rain', 67: 'Freezing rain',
+  61: 'Light rain', 63: 'Rain', 65: 'Heavy rain', 66: 'Freezing rain', 67: 'Freezing rain', 68: 'Light sleet', 69: 'Sleet',
   71: 'Light snow', 73: 'Snow', 75: 'Heavy snow', 77: 'Snow grains',
-  80: 'Showers', 81: 'Showers', 82: 'Heavy showers', 85: 'Snow showers', 86: 'Heavy snow showers',
+  80: 'Showers', 81: 'Showers', 82: 'Heavy showers', 83: 'Sleet showers', 84: 'Sleet showers', 85: 'Snow showers', 86: 'Heavy snow showers',
   95: 'Thunderstorms', 96: 'Thunderstorms with hail', 99: 'Thunderstorms with hail',
 };
 export const weatherName = code => NAMES[code] ?? 'Unknown';

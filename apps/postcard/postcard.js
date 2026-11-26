@@ -2,6 +2,7 @@
 // code holds the card's details, and the phone page draws its own copy, so no
 // server stores anything. See card.js.
 import { PALETTES, STYLES, drawCard, encode, loadFonts, loadMap, loadRidges } from './card.js';
+import { loadForecast } from '../_shared/forecast.js';
 import { qr } from '../_shared/qr.js';
 import { getPlace, herePlace, locationError, pickPlace, savePlace } from '../_shared/place.js';
 
@@ -121,11 +122,9 @@ async function lookUpNames(p) {
   return { list: list.filter(n => n.length <= MAX_NAME), area, ok: false };
 }
 
-async function lookUpWeather(p) {
-  const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${p.lat.toFixed(2)}&longitude=${p.lon.toFixed(2)}&current=temperature_2m,weather_code,is_day&temperature_unit=${useFahrenheit() ? 'fahrenheit' : 'celsius'}&timezone=auto`, { signal: AbortSignal.timeout(WAIT) });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
-}
+// The same forecast Weather uses (and the same 1 km cell, so often the CDN's
+// copy); only its "now" goes on the stamp
+const lookUpWeather = p => loadForecast(p, { signal: AbortSignal.timeout(WAIT) });
 
 // Follows Weather's °F/°C choice; until then, the US uses °F
 function useFahrenheit() {
@@ -174,7 +173,8 @@ async function lookUp(p, mine) {
   spec.area = found.area && found.area !== spec.name ? found.area : '';
   if (weather?.current) {
     const c = weather.current;
-    spec.temp = `${Math.round(c.temperature_2m)}°${useFahrenheit() ? 'F' : 'C'}`;
+    const f = useFahrenheit();
+    spec.temp = `${Math.round(f ? c.temperature_2m * 9 / 5 + 32 : c.temperature_2m)}°${f ? 'F' : 'C'}`;
     spec.weather = c.weather_code;
     // Its time string is local to the spot, which matters for a picked place far away
     spec.date = (c.time || '').slice(0, 10) || spec.date;

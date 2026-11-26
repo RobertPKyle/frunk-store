@@ -50,7 +50,7 @@
   #player { position: fixed; inset: 0; display: grid; grid-template-rows: 60px minmax(0, 1fr); grid-template-columns: minmax(0, 1fr); background: #000; }
   .bar { display: flex; align-items: center; gap: 8px; padding: 8px 10px 8px 110px; overflow-x: auto; scrollbar-width: none; touch-action: pan-x; background: var(--panel); border-bottom: 1px solid var(--line); }
   .bar b { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  #wait, #inputNote { font-size: 13px; color: var(--muted); white-space: nowrap; }
+  #wait { font-size: 13px; color: var(--muted); white-space: nowrap; }
   .screen { position: relative; min-height: 0; min-width: 0; overflow: hidden; }
   /* the canvas must have no border or padding, or the game's touches land off */
   #canvas { position: absolute; inset: 0; display: block; width: 100% !important; height: 100% !important; border: 0; padding: 0; background: #000; outline: none; }
@@ -114,7 +114,6 @@
   <div class="bar">
     <b>SuperTux</b>
     <span id="wait" hidden>Loading…</span>
-    <span id="inputNote" hidden>From next start</span>
     <button class="btn" id="inputBtn" type="button"></button>
     <button class="btn" id="soundBtn" type="button">Sound on</button>
     <button class="btn" id="quitBtn" type="button">Quit</button>

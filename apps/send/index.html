@@ -30,7 +30,7 @@
 </head>
 <body>
 <main>
-  <h1>Send games to your car</h1>
+  <h1 id="title">Send games to your car</h1>
   <p class="lede" id="lede">Pick game files on this phone: NES (.nes), Game Boy (.gb, .gbc), Game Boy Advance (.gba), Master System (.sms), Game Gear (.gg), SG-1000 (.sg), Atari Lynx (.lnx, .lyx, .o), PC Engine / TurboGrafx-16 (.pce) or Mega Drive / Genesis (.md, .gen, .bin, .smd), zipped or not. They appear on the car screen in a few seconds.</p>
   <ul id="links" hidden></ul>
   <button id="choose" type="button">Choose games</button>
@@ -39,7 +39,7 @@
   <ul id="files" aria-live="polite"></ul>
   <div class="fine">
     <p>Files are encrypted on this phone before they're sent. frunk.store can't read them, and deletes each one as soon as your car picks it up, or after 15 minutes.</p>
-    <p><b>Only send games you legally own</b>, such as copies you made from your own cartridges. frunk.store doesn't provide, sell or share commercial games. You're responsible for the files you send.</p>
+    <p id="owned"><b>Only send games you legally own</b>, such as copies you made from your own cartridges. frunk.store doesn't provide, sell or share commercial games. You're responsible for the files you send.</p>
   </div>
 </main>
 <script type="module" src="send.js"></script>

@@ -47,9 +47,55 @@
    si->has_remaining_tapes		= FALSE;
  }
  
+--- pristine/src/events.c
++++ src/src/events.c
+@@ -297,6 +297,10 @@
+     case SDL_CONTROLLERBUTTONDOWN:
+     case SDL_CONTROLLERBUTTONUP:
+       // for any game controller button event, disable overlay buttons
++#if defined(PLATFORM_EMSCRIPTEN)
++      // (frunk.store: unless the player has pinned the touch controls on)
++      if (web_touch_pin != 1)
++#endif
+       SetOverlayEnabled(FALSE);
+ 
+       HandleSpecialGameControllerButtons(event);
+@@ -750,6 +754,10 @@
+   int i;
+ 
+   // for any touch input event, enable overlay buttons (if activated)
++#if defined(PLATFORM_EMSCRIPTEN)
++  // (frunk.store: unless the player has pinned the controller on)
++  if (web_touch_pin != 0)
++#endif
+   SetOverlayEnabled(TRUE);
+ 
+   Debug("event:finger", "key '%s' was '%s' [fingerId: %lld]",
+@@ -1024,6 +1032,10 @@
+ 	event->pressure);
+ #endif
+ 
++#if defined(PLATFORM_EMSCRIPTEN)
++  // frunk.store: a pinned controller keeps the touch buttons off
++  if (web_touch_pin != 0)
++#endif
+   runtime.uses_touch_device = TRUE;
+ 
+   if (game_status != GAME_MODE_PLAYING)
 --- pristine/src/libgame/sdl.c
 +++ src/src/libgame/sdl.c
-@@ -3141,6 +3141,12 @@
+@@ -2758,6 +2758,10 @@
+ void HandleJoystickEvent(Event *event)
+ {
+   // when using joystick, disable overlay touch buttons
++#if defined(PLATFORM_EMSCRIPTEN)
++  // (frunk.store: unless the player has pinned the touch controls on)
++  if (web_touch_pin != 1)
++#endif
+   runtime.uses_touch_device = FALSE;
+ 
+   switch (event->type)
+@@ -3141,6 +3145,12 @@
  	if (outline_border & MV_DOWN)
  	  RenderFillRectangle(rect_x, rect.y + rect.h - border_size,
  			      rect_w, border_size);
@@ -127,18 +173,30 @@
 +#endif
 --- pristine/src/libgame/system.c
 +++ src/src/libgame/system.c
-@@ -130,7 +130,9 @@
+@@ -128,9 +128,21 @@
+   network.is_server_thread = FALSE;
+ }
  
++#if defined(PLATFORM_EMSCRIPTEN)
++// frunk.store: the mode the player pinned on the page's Touch/Controller
++// button: -1 none (the game switches its buttons itself, as upstream does),
++// 0 controller (touches don't bring the buttons back), 1 touch (controller
++// presses don't hide them). Set by web_set_touch() in web.c.
++int web_touch_pin = -1;
++#endif
++
  void InitRuntimeInfo(void)
  {
 -#if defined(HAS_TOUCH_DEVICE)
 +#if defined(PLATFORM_EMSCRIPTEN)
 +  runtime.uses_touch_device = EM_ASM_INT({ return Module.rocksTouch ? 1 : 0; });
++  // and whether the page's button has pinned that choice (see web_touch_pin)
++  web_touch_pin = EM_ASM_INT({ return Module.rocksPin === 0 || Module.rocksPin === 1 ? Module.rocksPin : -1; });
 +#elif defined(HAS_TOUCH_DEVICE)
    runtime.uses_touch_device = TRUE;
  #else
    runtime.uses_touch_device = FALSE;
-@@ -361,7 +363,11 @@
+@@ -361,7 +373,11 @@
    SetOverlayGridSizeAndButtons();
  
  #if defined(USE_TOUCH_INPUT_OVERLAY)
@@ -162,7 +220,7 @@
  #define TOUCH_CONTROL_DEFAULT		TOUCH_CONTROL_VIRTUAL_BUTTONS
  #else
  #define TOUCH_CONTROL_DEFAULT		TOUCH_CONTROL_OFF
-@@ -149,6 +149,12 @@
+@@ -149,6 +149,13 @@
  #define SCREEN_KEYBOARD_POS(h)		((h) * 40 / 100)
  #endif
  
@@ -170,6 +228,7 @@
 +#if defined(PLATFORM_EMSCRIPTEN)
 +#define HAS_TOUCH_DEVICE
 +#define USE_TOUCH_INPUT_OVERLAY
++extern int web_touch_pin;
 +#endif
 +
  // values for drag-and-drop support (some parts not added before SDL 2.0.5)
@@ -271,7 +330,7 @@
    { TYPE_SWITCH,	&setup.time_limit,		"Time Limit:"			},
 --- pristine/src/web.c
 +++ src/src/web.c
-@@ -0,0 +1,68 @@
+@@ -0,0 +1,83 @@
 +// frunk.store: small hooks for the page (apps/rocks/rocks.js).
 +#include <emscripten.h>
 +
@@ -307,6 +366,21 @@
 +    return -1;
 +  return (level.game_engine_type == GAME_ENGINE_TYPE_EM ? game_em.ply[0]->y : local_player->jy);
 +}
++
++// The page's Touch/Controller button: shows (on = 1) or hides (on = 0) the
++// on-screen buttons at once, mid-level too. With pinned = 1 the choice stays
++// until the next call: a controller press no longer hides the buttons and a
++// touch no longer brings them back. With pinned = 0 the game goes on
++// switching them itself at the next touch or controller press.
++EMSCRIPTEN_KEEPALIVE void web_set_touch(int on, int pinned)
++{
++  web_touch_pin = (pinned ? (on ? 1 : 0) : -1);
++  runtime.uses_touch_device = (on ? TRUE : FALSE);
++  SetOverlayEnabled(on ? TRUE : FALSE);
++}
++
++// 1 while the on-screen buttons are switched on (they show only in a level)
++EMSCRIPTEN_KEEPALIVE int web_touch(void)	{ return (GetOverlayEnabled() && runtime.uses_touch_device ? 1 : 0); }
 +
 +EMSCRIPTEN_KEEPALIVE int web_solved(void)	{ return (game_status == GAME_MODE_PLAYING && game.LevelSolved ? 1 : 0); }
 +

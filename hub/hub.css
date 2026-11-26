@@ -243,6 +243,30 @@ h1 { margin: 0 0 10px; font: 600 17px/1.25 "Unbounded", system-ui, sans-serif; l
 .tag.partner-tag { display: inline-flex; align-items: center; gap: 3px; background: #2a1f33; color: #f0b8ff; }
 .tag.partner-tag svg { flex: none; width: 12px; height: 12px; }
 a.card { color: var(--text); text-decoration: none; }
+/* Each card shares a box with its favorite star, which sits over the card's
+   top right corner: a dim outline until starred, then filled in the accent.
+   The button is 44 px for a finger; the star drawn in it is small, and the
+   title keeps clear of it. */
+.card-wrap { position: relative; display: grid; min-width: 0; }
+.star {
+  position: absolute; top: -4px; right: -4px; width: 44px; height: 44px; padding: 0;
+  display: grid; place-items: center; background: transparent; border: 0; border-radius: 14px; color: #4b5261;
+  -webkit-tap-highlight-color: transparent; transition: transform .12s;
+}
+.star svg { width: 17px; height: 17px; }
+.star[aria-pressed="true"] { color: var(--accent); }
+.star[aria-pressed="true"] svg { fill: currentColor; }
+.star:active { transform: scale(.85); }
+.star:focus { outline: none; }
+.star:focus-visible svg { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 4px; }
+.card-title { padding-right: 14px; }
+/* the card the controller is on says which button stars it */
+.padnav .card:focus + .star { color: #c3cad6; }
+.padnav .card:focus + .star[aria-pressed="true"] { color: var(--accent); }
+.padnav .card:focus + .star::after {
+  content: "Y"; position: absolute; top: 38px; right: 13px; min-width: 18px; padding: 0 4px; border-radius: 9px;
+  background: #2a2f37; color: var(--text); font-size: 11px; font-weight: 800; line-height: 18px; text-align: center;
+}
 
 .skeleton { background: var(--card); border-radius: var(--radius); min-height: 168px; opacity: .5; }
 
@@ -449,7 +473,7 @@ html:has(.runner:not([hidden])) { overflow: hidden; }
 }
 @media (prefers-reduced-motion: reduce) {
   .card, .partner, .spinner { transition: none; animation-duration: 2s; }
-  .slide-play, .featured-dots span { transition: none; }
+  .slide-play, .featured-dots span, .star { transition: none; }
   .live-dot, .coin-waiting .coin-chart { animation: none; }
 }
 

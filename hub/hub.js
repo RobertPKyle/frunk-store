@@ -290,7 +290,7 @@ function renderGrid() {
   filterRow.toggleAttribute('data-off', words.length > 0);
   if (!words.length && filter === 'all' && catalog.shelves) {
     grid.dataset.view = 'shelves';
-    grid.replaceChildren(...shelves().map(([title, apps]) => el('section', { class: 'shelf' },
+    grid.replaceChildren(...shelves().map(([id, title, apps]) => el('section', { class: 'shelf', 'data-shelf': id },
       el('h2', { class: 'shelf-title' }, title),
       el('div', { class: 'shelf-row' }, ...apps.map(appCard)))));
     return;
@@ -328,30 +328,76 @@ function appCard(app) {
   );
   // a partner's card opens its page itself, being a link
   card.addEventListener('click', e => app.url ? openedPartner(app.id) : launch(app.id, e.detail === 0));   // no clicks counted: a key or the controller
-  return card;
+  // The star sits beside the card, not in it: a button inside a button (or
+  // a link) isn't allowed, and a tap on it mustn't open the app
+  const fav = favorites().includes(app.id);
+  const star = el('button', { class: 'star', type: 'button', 'aria-pressed': String(fav), 'aria-label': t('favorite'), title: t('favorite') });
+  star.innerHTML = STAR;
+  star.addEventListener('click', () => toggleFavorite(app.id, star));
+  return el('div', { class: 'card-wrap' }, card, star);
+}
+
+// Favorites: a star on each card puts the app on a shelf of its own, first
+// on the shelves. A long press isn't used, as the car's screen doesn't
+// report one reliably; the star is a plain button, and a controller's X or
+// Y stars the card in focus. The ids are kept newest first.
+const STAR = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="m12 3.2 2.7 5.5 6 .9-4.35 4.2 1 6-5.35-2.8-5.35 2.8 1-6L3.3 9.6l6-.9z"/></svg>';
+const favorites = () => store.get('favorites', []);
+
+function toggleFavorite(id, from) {
+  const favs = favorites();
+  store.set('favorites', favs.includes(id) ? favs.filter(f => f !== id) : [id, ...favs]);
+  // Drawn again, as the Favorites shelf grows, shrinks or comes and goes
+  // above the others. The page is kept where it was: the shelf the star was
+  // on stays at the same height on the screen, each row stays scrolled as
+  // it was, and focus goes back to the same card, or its neighbour when
+  // the card has left the Favorites shelf.
+  const wrap = from.closest('.card-wrap');
+  const shelf = wrap.closest('.shelf');
+  const shelfId = shelf?.dataset.shelf;
+  const index = shelf ? [...shelf.querySelectorAll('.card-wrap')].indexOf(wrap) : -1;
+  const focus = document.activeElement === from ? 'star' : document.activeElement === wrap.firstChild ? 'card' : null;
+  const top = (shelf ?? wrap).getBoundingClientRect().top;
+  const scrolled = new Map([...grid.querySelectorAll('.shelf')].map(s => [s.dataset.shelf, s.querySelector('.shelf-row').scrollLeft]));
+  const shelfIds = [...scrolled.keys()];
+  renderGrid();
+  for (const s of grid.querySelectorAll('.shelf')) s.querySelector('.shelf-row').scrollLeft = scrolled.get(s.dataset.shelf) ?? 0;
+  // the shelf, or what took its place when the last favorite left it
+  const anchor = shelf
+    ? grid.querySelector(`.shelf[data-shelf="${shelfId}"]`) ?? grid.querySelector(`.shelf[data-shelf="${shelfIds[shelfIds.indexOf(shelfId) + 1]}"]`)
+    : grid.querySelector(`.card[data-app="${id}"]`)?.parentElement;
+  if (anchor) scrollBy(0, anchor.getBoundingClientRect().top - top);
+  if (!focus || !anchor) return;
+  const wraps = anchor.matches('.card-wrap') ? [anchor] : [...anchor.querySelectorAll('.card-wrap')];
+  const next = wraps.find(w => w.firstChild.dataset.app === id) ?? wraps[Math.min(index, wraps.length - 1)] ?? wraps[0];
+  if (!next) return;
+  const target = focus === 'star' ? next.lastChild : next.firstChild;
+  if (focus === 'card') lastNav = target;
+  target.focus({ preventScroll: true });
 }
 
 const NEW_SHELF = 10;      // apps on the first shelf, the newest
 // the later of an app's "added" and "updated" dates; they're ISO dates, so they sort as text
 const newsDate = app => [app.added ?? '', app.updated ?? ''].sort()[1];
 
-// Each shelf as [title, apps], leaving out apps not listed here (a partner
-// game hidden in this language) and shelves left empty
+// Each shelf as [id, title, apps], leaving out apps not listed here (a
+// partner game hidden in this language) and shelves left empty, as
+// Favorites is until something is starred
 function shelves() {
   const apps = listed();
   const byId = new Map(apps.map(app => [app.id, app]));
   // partner games are left off it: they already sit in the partners row at the top
   const newest = apps.filter(app => !app.url && newsDate(app)).sort((a, b) => newsDate(b).localeCompare(newsDate(a))).slice(0, NEW_SHELF);
-  const rows = [[t('shelfNew'), newest]];
+  const rows = [['favorites', t('shelfFavorites'), favorites().map(id => byId.get(id)).filter(Boolean)], ['new', t('shelfNew'), newest]];
   const placed = new Set();
   for (const shelf of catalog.shelves) {
     const row = shelf.apps.map(id => byId.get(id)).filter(Boolean);
     for (const app of row) placed.add(app.id);
-    rows.push([t('shelf_' + shelf.id) ?? shelf.id, row]);
+    rows.push([shelf.id, t('shelf_' + shelf.id) ?? shelf.id, row]);
   }
   // an app added to the catalog but to no shelf still shows, at the end
-  rows.push([t('shelfMore'), apps.filter(app => !placed.has(app.id))]);
-  return rows.filter(([, row]) => row.length);
+  rows.push(['more', t('shelfMore'), apps.filter(app => !placed.has(app.id))]);
+  return rows.filter(([, , row]) => row.length);
 }
 
 function renderFilters() {
@@ -566,7 +612,8 @@ if (document.documentElement.requestFullscreen) {
 }
 
 // Browsing with a controller, or arrow keys: the D-pad or left stick moves
-// between the chips, recent apps and cards, A opens the one in focus. The
+// between the chips, recent apps and cards, A opens the one in focus, and X
+// or Y stars a card as a favorite (the stars aren't stops of their own). The
 // controller is read only while the hub itself is showing, never while an
 // app runs, so a game's input stays its own. The focused card is lit by
 // the .padnav class, since a ring from focus() alone isn't shown after a tap.
@@ -574,7 +621,7 @@ const NAV = '#partners .partner, #featured .slide, #filters .chip, #recent .rece
 const DEAD = 0.5;          // stick travel before it counts as a direction
 const REPEAT = [400, 130]; // ms held before the first and the next repeats
 let padNav = false, lastNav = null;
-let padDir = null, padRepeat = 0, padA = false;
+let padDir = null, padRepeat = 0, padA = false, padY = false;
 
 function navItems() {
   return [...document.querySelectorAll(NAV)].filter(n => n.offsetParent !== null);
@@ -635,7 +682,7 @@ function pollPads() {
   // swapped from the usual numbering there, so either face button opens.
   const pads = [...navigator.getGamepads()].filter(Boolean);
   const pad = pads.find(p => p.mapping === 'standard') || pads[0];
-  let dir = null, a = false;
+  let dir = null, a = false, star = false;
   if (pad) {
     const [x = 0, y = 0] = pad.axes;
     const on = i => pad.mapping === 'standard' && !!pad.buttons[i]?.pressed;
@@ -644,6 +691,8 @@ function pollPads() {
     else if (on(14) || x < -DEAD) dir = 'left';
     else if (on(15) || x > DEAD) dir = 'right';
     a = !!(pad.buttons[0]?.pressed || pad.buttons[1]?.pressed);
+    // X or Y stars the card in focus; either, as the car may swap them as it does A and B
+    star = !!(pad.buttons[2]?.pressed || pad.buttons[3]?.pressed);
   }
   const now = performance.now();
   if (dir && (dir !== padDir || now >= padRepeat)) {
@@ -653,6 +702,9 @@ function pollPads() {
   padDir = dir;
   if (a && !padA && padNav && navItems().includes(document.activeElement)) document.activeElement.click();
   padA = a;
+  const card = document.activeElement;
+  if (star && !padY && padNav && card?.matches('#grid .card')) card.nextElementSibling.click();
+  padY = star;
 }
 
 // Chrome tells of a controller once a button on it is pressed

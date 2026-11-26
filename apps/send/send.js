@@ -6,6 +6,7 @@ import { sealPieces } from '../_shared/transfer.js';
 import { keepAwake } from '../_shared/awake.js';
 import { MAX_CART, isCart } from '../tic80/cart.js';
 import { GAMES as ARCADE, MAX_ROM_FILE, findRom } from '../arcade/games.js';
+import { MAX_BACKUP, isBackup } from '../mydata/backup.js';
 import { MAX_ADVENTURE_FILE, MAX_DUKE_FILE, MAX_FILE, MAX_HEROES_FILE, MAX_QUAKE_FILE, MAX_STORY_FILE, MAX_WAD_FILE, findAdventureFile, findDukeFile, findGame, findHeroesFile, findQuakeFile, findStory, findWad } from '../_shared/roms.js';
 
 const $ = id => document.getElementById(id);
@@ -38,10 +39,18 @@ const APPS = {
   arcade: { name: 'Arcade', max: MAX_ROM_FILE, check: findRom, wrong: 'Not a game zip',
     lede: 'These games\' owners let mamedev.org give them away for free, non-commercial use, from its own site only. Tap a game: on its page, tick the box and download it. Then come back here, tap Choose games and pick the downloaded .zip files, keeping their names.',
     links: ARCADE.map(g => [g.title, `https://www.mamedev.org/roms/${g.set}/`]) },
+  // My Data's Restore: a save backup it made earlier, kept on this phone
+  mydata: { name: 'My Data', max: MAX_BACKUP, check: isBackup, wrong: 'Not a frunk.store backup',
+    title: 'Send a backup to your car', button: 'Choose backup', saves: true,
+    lede: 'Pick a frunk.store save backup on this phone (frunk-saves-….frunkbackup, from Back up saves in My Data). The car shows what\'s in it before restoring anything.' },
   retro: { name: 'Retro Console', max: MAX_FILE, check: findGame, wrong: 'Not a game this plays' },
 };
 const APP = APPS[new URLSearchParams(location.search).get('app')] || APPS.retro;
 if (APP.lede) $('lede').textContent = APP.lede;
+if (APP.title) document.title = $('title').textContent = APP.title;
+if (APP.button) $('choose').textContent = APP.button;
+// a backup holds the player's own saves: the note about games they own doesn't apply
+if (APP.saves) $('owned').hidden = true;
 // Arcade: where each game can be downloaded
 if (APP.links) {
   $('links').replaceChildren(...APP.links.map(([title, href]) => {
@@ -56,7 +65,7 @@ async function start() {
   try {
     key = await crypto.subtle.importKey('raw', Uint8Array.from(atob(keyText.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0)), 'AES-GCM', false, ['encrypt']);
   } catch {
-    $('lede').textContent = `Open this page by scanning the code on the car screen: ${APP.name}, then Get games from phone.`;
+    $('lede').textContent = `Open this page by scanning the code on the car screen: ${APP.name}, then ${APP.saves ? 'Restore' : 'Get games from phone'}.`;
     $('choose').disabled = true;
   }
 }
